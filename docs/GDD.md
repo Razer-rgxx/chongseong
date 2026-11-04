@@ -232,6 +232,23 @@
 - **시즌.** 3개월이다. 끝나면 최고 티어의 인장 외형과 티어별 마석을 주고, 다음 시즌은 숨은 실력 점수를 평균 쪽으로 조금 당겨 시작한다.
 - **해금 조건을 판 수로 둔 이유.** 마석 경제가 일반전 15판에 총을 다 모으게 맞춰져 있어서, 총을 많이 가진 쪽이 카운터 픽에서 유리해지는 일이 랭크에서는 거의 없다.
 
+## 소리
+
+결투 중에는 음악을 거의 깔지 않고 소리로 정보를 준다. 이름 그대로 총성과 짓는 소리가 이 게임의 얼굴이다.
+
+| 소리 | 정한 것 |
+| --- | --- |
+| 짓는 소리 | 재질마다 다르다. 나무는 망치질, 돌은 돌 쌓는 소리, 쇠는 철컹. 벽 너머에서도 들려서 상대가 무엇을 짓는지 귀로 읽는다 |
+| 총성 | 총마다 확실히 다르다. 소리만 듣고 상대 총을 알 수 있게 한다 |
+| 결투 음악 | 평소에는 거의 없다. 마지막 30초나 내 심장석이 위험할 때만 북 레이어가 깔린다 |
+| 설계함 징글 | 봉인 색 등급마다 하나씩, 회색, 파랑, 금색 3종 |
+| 라운드와 결투 | 시작 북소리, 승패 징글 |
+| 영지와 로비 | 류트나 하프 같은 차분한 중세풍 |
+
+- 위치가 있는 소리(짓기, 총, 발소리)는 AudioStreamPlayer3D로 내서 방향과 거리가 들리게 한다.
+- 결투 음악은 AudioStreamSynchronized(Godot 4.3부터)로 층을 나눠 두고 북 레이어 볼륨만 올린다.
+- 출처는 Kenney 오디오(CC0, Music Jingles 포함)와 Sonniss GDC 번들(로열티 프리, 출처 표기 불필요)이다. 배경음악은 itch.io와 OpenGameArt에서 CC0만 쓰고, GPL 음원과 AI 생성 음악은 쓰지 않는다.
+
 ## 기술과 에셋
 
 Godot 4.6과 GDScript로 만들고 코드는 Claude Code가 쓴다. Godot는 씬 파일(.tscn)이 텍스트라 Claude Code가 씬까지 직접 고칠 수 있다.
@@ -261,6 +278,8 @@ Godot 4.6과 GDScript로 만들고 코드는 Claude Code가 쓴다. Godot는 씬
 | 총 모양 참고 | [Quaternius 50+ LowPoly Guns](https://quaternius.itch.io/50-lowpoly-guns). 현대 총이라 모양만 참고 | CC0 |
 | 19세기 총 | [LowPoly FPS Gun Weapon Pack](https://coynese.itch.io/lowpoly-fps-gun-weapon-pack-low-poly-3d-model). 2.5달러 | 확인 필요 |
 | 1인칭 팔 | [Low Poly FPS Starter Kit](https://itch.io/games-like/465530/50-lowpoly-guns). 팔과 애니메이션, 1.30달러 | 확인 필요 |
+| 효과음과 징글 | [Kenney 오디오](https://kenney.nl). Impact Sounds, Interface Sounds, Music Jingles | CC0 |
+| 총성과 재질 소리 | [Sonniss GDC 번들](https://sonniss.com/gameaudiogdc). 해마다 나오는 무료 효과음 모음 | 로열티 프리, 출처 표기 불필요 |
 
 - AI 생성 에셋은 쓰지 않는다. itch.io에서는 "No generative AI was used" 표기를 확인한다.
 - 여러 작가의 팩을 섞으면 화풍이 어긋난다. KayKit과 Quaternius 위주로 통일한다.
