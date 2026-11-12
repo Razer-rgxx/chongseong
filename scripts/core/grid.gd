@@ -40,6 +40,15 @@ static func ring_distance(a: Vector2i, b: Vector2i) -> int:
 	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
+## 칸 단위 실수 좌표(규칙이 쓰는 위치)와 월드 좌표. 칸 (x, y)의 가운데는 (x + 0.5, y + 0.5)다.
+static func cells_to_world(v: Vector2, height: float = 0.0) -> Vector3:
+	return Vector3(v.x * CELL, height, v.y * CELL)
+
+
+static func world_to_cells(p: Vector3) -> Vector2:
+	return Vector2(p.x / CELL, p.z / CELL)
+
+
 ## 시연판 수치(칸 단위)를 미터로 바꾼다.
 static func cells_to_meters(v: float) -> float:
 	return v * CELL

@@ -25,3 +25,7 @@ aggro_keep = 1.5
 respawn_invuln = 2.0
 aura_penalty = 0.25
 respawn_times = PackedFloat32Array(8.0, 15.0, 25.0)
+swing_time = 0.2
+close_hit = 0.35
+shake = 0.14
+shake_big = 0.32

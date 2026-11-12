@@ -12,6 +12,11 @@ func _init() -> void:
 	_test_rng_same_seed()
 	_test_roll_distribution()
 	_test_day_cycle()
+	_test_input_map()
+	_test_lord_move()
+	_test_lord_dash()
+	_test_lord_swing()
+	_test_lord_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -103,3 +108,104 @@ func _test_day_cycle() -> void:
 		r.end_night()
 	check(nights == [1, 2, 3, 4, 5, 6, 7], "밤이 7번 왔다 %s" % [nights])
 	check(r.phase == Rules.Phase.OVER and ended == [true], "7일째 밤을 넘기면 승리로 끝난다")
+
+
+func _test_input_map() -> void:
+	for a in ["move_left", "move_right", "move_up", "move_down", "attack", "dash"]:
+		check(InputMap.has_action(a) and InputMap.action_get_events(a).size() >= 2, "입력 %s에 키가 둘 이상" % a)
+
+
+func _inp(move: Vector2 = Vector2.ZERO, attack: bool = false, dash: bool = false) -> LordInput:
+	var i := LordInput.new()
+	i.move = move
+	i.attack = attack
+	i.dash = dash
+	return i
+
+
+func _test_lord_move() -> void:
+	var d := GameData.load_default()
+	var r := Rules.new(d, 1)
+	var x0: float = r.lord.pos.x
+	for i in d.run.tick_rate:
+		r.step(_inp(Vector2.RIGHT))
+	check(absf((r.lord.pos.x - x0) - d.lord.speed) < 0.05, "1초에 %.2f칸 간다(속도 %.2f)" % [r.lord.pos.x - x0, d.lord.speed])
+	check(absf(r.lord.face) < 0.01, "움직이는 쪽을 바라본다")
+	for i in 400:
+		r.step(_inp(Vector2.LEFT))
+	check(r.lord.pos.x >= 0.3 - 0.0001, "맵 밖으로 못 나간다")
+
+
+func _test_lord_dash() -> void:
+	var d := GameData.load_default()
+	var r := Rules.new(d, 1)
+	var y0: float = r.lord.pos.y
+	r.step(_inp(Vector2.DOWN, false, true))
+	for i in 10:
+		r.step(_inp())
+	var dist: float = r.lord.pos.y - y0
+	var want: float = d.lord.dash_speed * ceili(d.lord.dash_time / r.dt) * r.dt
+	check(absf(dist - want) < 0.2, "돌진 거리 %.2f칸(약 %.2f)" % [dist, want])
+	var y1: float = r.lord.pos.y
+	r.step(_inp(Vector2.ZERO, false, true))
+	r.step(_inp())
+	check(absf(r.lord.pos.y - y1) < 0.001, "다시 쓰기 전에는 돌진이 안 된다")
+
+
+func _test_lord_swing() -> void:
+	var d := GameData.load_default()
+	var r := Rules.new(d, 1)
+	var L := r.lord
+	L.face = 0.0
+	var front := r.add_dummy(L.pos + Vector2(1.2, 0.0))
+	var back := r.add_dummy(L.pos + Vector2(-1.2, 0.0))
+	var dmg: Array[float] = []
+	var bigs: Array[bool] = []
+	r.unit_hit.connect(func(u: Unit, amount: float, big: bool) -> void:
+		if u == front:
+			dmg.append(amount)
+			bigs.append(big)
+		else:
+			dmg.append(-1.0))
+	var held := _inp(Vector2.ZERO, true)
+	held.aim_valid = true
+	for i in 60:
+		held.aim = r.lord.pos + Vector2(3.0, 0.0)
+		r.step(held)
+	check(dmg.size() >= 3 and not dmg.has(-1.0), "앞의 허수아비만 맞는다 %s" % [dmg])
+	check(dmg.size() >= 3 and absf(dmg[0] - d.lord.damage) < 0.01 and absf(dmg[2] - d.lord.damage * d.lord.big_damage_mult) < 0.01 and bigs[2] and not bigs[0], "세 번째가 강타 %s" % [dmg])
+	var expect: int = ceili(60.0 * r.dt / d.lord.cooldown)
+	check(dmg.size() <= expect + 1, "공격 간격을 지킨다(%d번)" % dmg.size())
+	# 넉백과 히트스톱
+	var r2 := Rules.new(d, 1)
+	r2.lord.face = 0.0
+	var u := r2.add_dummy(r2.lord.pos + Vector2(1.0, 0.0))
+	var x0: float = u.pos.x
+	r2.step(_inp(Vector2.ZERO, true))
+	check(absf((u.pos.x - x0) - (d.lord.knockback - d.run.dummy_return_speed * r2.dt)) < 0.01, "맞으면 %.2f칸 밀린다(허수아비는 같은 틱에 조금 돌아온다)" % (u.pos.x - x0))
+	check(r2.freeze == roundi(d.lord.hitstop / r2.dt), "맞히면 히트스톱 %d틱" % r2.freeze)
+	var lp: Vector2 = r2.lord.pos
+	r2.step(_inp(Vector2.RIGHT))
+	check(r2.lord.pos == lp, "히트스톱 동안은 시간이 멈춘다")
+
+
+func _test_lord_replay() -> void:
+	var d := GameData.load_default()
+	var a := Rules.new(d, 99)
+	var b := Rules.new(d, 99)
+	for r in [a, b]:
+		r.add_dummy(r.lord.pos + Vector2(1.0, 0.5))
+		r.add_dummy(r.lord.pos + Vector2(-1.0, -0.5))
+	var rec := RandomNumberGenerator.new()
+	rec.seed = 5
+	var inputs: Array[LordInput] = []
+	for i in 600:
+		var inp := _inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)), rec.randf() < 0.4, rec.randf() < 0.05)
+		inp.aim_valid = rec.randf() < 0.7
+		inp.aim = Vector2(rec.randf_range(10, 22), rec.randf_range(10, 22))
+		inputs.append(inp)
+	for inp in inputs:
+		a.step(inp)
+	for inp in inputs:
+		b.step(inp)
+	check(a.lord.pos == b.lord.pos and a.units[0].hp == b.units[0].hp and a.units[1].pos == b.units[1].pos, "같은 입력을 다시 넣으면 똑같이 돈다")
