@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ClassData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/class_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"archer"
+display_name = "궁수"
+damage = 5.0
+attack_range = 5.2
+cooldown = 0.9
+projectile = &"arrow"
+splash_radius = 0.0
+slow_time = 0.0
+guard_k = 0.0
+heal = 0.0
+skill_name = "관통 화살"
+skill_description = "9칸 일직선(폭 0.7) 위의 모든 적에게 5 × 힘"
+hello_lines = PackedStringArray("\"…멀리서 쏘는 쪽이 제 성미에 맞습니다.\"", "\"바람만 읽으면 됩니다. 나머지는 화살이 합니다.\"")

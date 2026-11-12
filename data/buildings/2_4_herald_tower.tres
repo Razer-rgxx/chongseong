@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"herald_tower"
+display_name = "전령탑"
+tier = 2
+role = 3
+kind = &""
+description = "명성이 올라 적이 세지는 대신 설계함과 손님 운이 오른다."

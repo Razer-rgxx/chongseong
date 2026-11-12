@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ClassData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/class_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"priest"
+display_name = "사제"
+damage = 0.0
+attack_range = 2.6
+cooldown = 1.0
+projectile = &""
+splash_radius = 0.0
+slow_time = 0.0
+guard_k = 0.0
+heal = 5.0
+skill_name = "축복"
+skill_description = "영주 체력 +45, 3칸 안 성벽 +40%"
+hello_lines = PackedStringArray("\"다친 이가 있으면 불러 주십시오.\"", "\"기도는 길고, 붕대는 짧게 감습니다.\"")

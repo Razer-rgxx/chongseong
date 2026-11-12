@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ClassData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/class_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"mage"
+display_name = "술사"
+damage = 4.0
+attack_range = 3.8
+cooldown = 1.1
+projectile = &"bolt"
+splash_radius = 0.0
+slow_time = 0.8
+guard_k = 0.0
+heal = 0.0
+skill_name = "연쇄 번개"
+skill_description = "5마리까지 3칸씩 튀며 4 × 힘, 1.5초 느리게"
+hello_lines = PackedStringArray("\"…책에서 본 것보다 성벽이 낮군요.\"", "\"발을 묶는 주문이라면 몇 개 압니다.\"")

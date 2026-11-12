@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"lumber_camp"
+display_name = "벌목장"
+tier = 0
+role = 1
+kind = &"wood"
+description = "아침마다 나무가 들어온다."

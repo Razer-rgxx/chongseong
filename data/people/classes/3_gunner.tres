@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ClassData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/class_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"gunner"
+display_name = "포수"
+damage = 10.0
+attack_range = 3.8
+cooldown = 2.0
+projectile = &"stone"
+splash_radius = 1.0
+slow_time = 0.0
+guard_k = 0.0
+heal = 0.0
+skill_name = "대포격"
+skill_description = "목표 2칸 안의 모든 적에게 10 × 힘"
+hello_lines = PackedStringArray("\"화약 냄새가 싫지 않으시다면야.\"", "\"한 방이면 됩니다. 대신 좀 느립니다.\"")
