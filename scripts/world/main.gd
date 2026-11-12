@@ -127,6 +127,7 @@ func _on_hit(u: Unit, damage: float, big: bool) -> void:
 func _build_placeholder_world() -> void:
 	var side: float = Grid.size * Grid.CELL
 	var ground := MeshInstance3D.new()
+	ground.name = "Ground"
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(side, side)
 	ground.mesh = plane
@@ -138,6 +139,7 @@ func _build_placeholder_world() -> void:
 
 	# 영주관 자리: 가운데 칸에 상자 하나(4단계에서 진짜 영주관으로 바꾼다)
 	var hall := MeshInstance3D.new()
+	hall.name = "Hall"
 	var box := BoxMesh.new()
 	box.size = Vector3(Grid.CELL * 1.4, 2.4, Grid.CELL * 1.4)
 	hall.mesh = box
