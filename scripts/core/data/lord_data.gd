@@ -19,6 +19,13 @@ extends Resource
 @export var knockback: float = 0.38
 @export var hitstop: float = 0.035
 @export var hitstop_big: float = 0.07
+## 휘두르는 모습이 남는 시간.
+@export var swing_time: float = 0.2
+## 이만큼 가까운 적은 부채꼴 밖이어도 맞는다(크기에 더하는 칸).
+@export var close_hit: float = 0.35
+## 맞혔을 때 화면 흔들림 세기(0~1).
+@export var shake: float = 0.14
+@export var shake_big: float = 0.32
 
 @export_group("돌진")
 @export var dash_speed: float = 13.0

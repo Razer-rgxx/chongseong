@@ -88,6 +88,12 @@ extends Resource
 ## 밤을 당기면 남은 낮 시간 / 이 값만큼 금화.
 @export var call_night_gold_div: float = 4.0
 
+@export_group("시험")
+## 허수아비 체력. 0이 되면 다시 찬다.
+@export var dummy_hp: float = 200.0
+## 밀려난 허수아비가 제자리로 돌아오는 속도(칸/초).
+@export var dummy_return_speed: float = 1.5
+
 @export_group("길찾기 비용")
 @export var cost_empty: float = 1.0
 @export var cost_ruin: float = 1.5
