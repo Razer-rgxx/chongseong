@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"portcullis"
+display_name = "쇠살문"
+tier = 1
+role = 2
+kind = &"block"
+description = "아주 단단해서 적의 길을 막는다."
+hp_mult = 4.0
+path_cost = 18.0

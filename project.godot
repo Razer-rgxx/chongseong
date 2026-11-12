@@ -1,0 +1,30 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="영지"
+config/description="낮에는 짓고 사람을 뽑고, 밤에는 영주가 직접 싸우는 PC 영지 디펜스"
+run/main_scene="res://scenes/world/main.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+[layer_names]
+
+3d_physics/layer_1="world"
+3d_physics/layer_2="lord"
+3d_physics/layer_3="enemy"
+3d_physics/layer_4="structure"
+3d_physics/layer_5="nature"
+3d_physics/layer_6="pick"

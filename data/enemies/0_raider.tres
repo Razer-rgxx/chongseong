@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"raider"
+display_name = "약탈자"
+hp = 34.0
+damage = 6.0
+speed = 1.5
+radius = 0.3
+gold = 2
+cooldown = 1.0
+siege_mult = 1.0
+ignores_lord = false
+is_boss = false
+color = Color(0.851, 0.2824, 0.2471, 1)

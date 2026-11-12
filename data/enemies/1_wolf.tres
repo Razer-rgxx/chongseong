@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"wolf"
+display_name = "늑대"
+hp = 18.0
+damage = 4.0
+speed = 2.9
+radius = 0.26
+gold = 1
+cooldown = 0.7
+siege_mult = 1.0
+ignores_lord = false
+is_boss = false
+color = Color(0.7529, 0.5412, 0.3333, 1)

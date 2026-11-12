@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"caltrops"
+display_name = "마름쇠 밭"
+tier = 0
+role = 2
+kind = &"slow"
+description = "곁을 지나는 적을 느리게 하고 다치게 한다."
+damage = 2.5
+attack_range = 1.8
+cooldown = 0.5
+slow_time = 0.6
