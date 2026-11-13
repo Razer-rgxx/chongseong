@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 290
+display_name = "겨울의 끝"
+grade = 5
+form = 3
+inscriptions = PackedStringArray("서리", "처형")
+unique_text = "언 적이 부서질 때마다 다음 찌르기가 화면 끝까지 닿는 얼음 창이 된다."
+unique_ready = false
+unbreakable = false
+story = "끝나지 않는 겨울을 끝낸 검."

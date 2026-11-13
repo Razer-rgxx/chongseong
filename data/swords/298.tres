@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 298
+display_name = "언덕"
+grade = 5
+form = 2
+inscriptions = PackedStringArray()
+unique_text = "부러지지 않는다. 들면 이 판에서 뽑은 모든 검의 각인이 함께 발동한다."
+unique_ready = false
+unbreakable = true
+story = "언덕이 검이고, 검이 언덕이다."

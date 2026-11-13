@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"wraith"
+display_name = "망령"
+hp = 30
+damage = 6
+speed = 1.6
+radius = 0.3
+cooldown = 1.0
+color = Color(0.725, 0.659, 0.91, 1)
+knockback_mult = 1.0
+big = false
+wraith = true
+boss = false

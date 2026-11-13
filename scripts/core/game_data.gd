@@ -6,44 +6,59 @@ const DIR: String = "res://data/"
 
 var run: RunData
 var lord: LordData
-var tiers: TierTable
 var grades: GradeTable
-## 파일 이름 순서(0_창병, 1_궁수, …)대로 담는다.
-var classes: Array[ClassData] = []
+var unarmed: FormData
+var meta: MetaData
+## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
+var forms: Array[FormData] = []
+## 파일 이름 순서(001 … 300).
+var swords: Array[SwordData] = []
+## 등급마다 그 등급 검의 swords 번호.
+var swords_by_grade: Array[PackedInt32Array] = []
+## 각인 이름 → InscriptionData
+var inscriptions: Dictionary = {}
 ## id → EnemyData
 var enemies: Dictionary = {}
-## 파일 이름 순서(등급_순번_id)대로 담는다.
-var buildings: Array[BuildingData] = []
 
 
 static func load_default() -> GameData:
 	var d := GameData.new()
 	d.run = load(DIR + "run.tres") as RunData
 	d.lord = load(DIR + "lord.tres") as LordData
-	d.tiers = load(DIR + "box_tiers.tres") as TierTable
-	d.grades = load(DIR + "people/grades.tres") as GradeTable
-	for path in _tres_in(DIR + "people/classes/"):
-		d.classes.append(load(path) as ClassData)
+	d.grades = load(DIR + "grades.tres") as GradeTable
+	d.unarmed = load(DIR + "unarmed.tres") as FormData
+	d.meta = load(DIR + "meta.tres") as MetaData
+	for path in _tres_in(DIR + "forms/"):
+		d.forms.append(load(path) as FormData)
+	for path in _tres_in(DIR + "inscriptions/"):
+		var ins := load(path) as InscriptionData
+		d.inscriptions[ins.key] = ins
 	for path in _tres_in(DIR + "enemies/"):
 		var e := load(path) as EnemyData
 		d.enemies[e.id] = e
-	for path in _tres_in(DIR + "buildings/"):
-		d.buildings.append(load(path) as BuildingData)
+	for g in d.grades.names.size():
+		d.swords_by_grade.append(PackedInt32Array())
+	for path in _tres_in(DIR + "swords/"):
+		var s := load(path) as SwordData
+		d.swords_by_grade[s.grade].append(d.swords.size())
+		d.swords.append(s)
 	return d
 
 
-func buildings_of_tier(tier: int) -> Array[BuildingData]:
-	var out: Array[BuildingData] = []
-	for b in buildings:
-		if b.tier == tier:
-			out.append(b)
-	return out
+## SwordData.id는 1부터 300까지이고 swords 순서와 같다.
+func sword_by_id(id: int) -> SwordData:
+	if id >= 1 and id <= swords.size() and swords[id - 1].id == id:
+		return swords[id - 1]
+	for s in swords:
+		if s.id == id:
+			return s
+	return null
 
 
-func building(id: StringName) -> BuildingData:
-	for b in buildings:
-		if b.id == id:
-			return b
+func sword_by_name(n: String) -> SwordData:
+	for s in swords:
+		if s.display_name == n:
+			return s
 	return null
 
 

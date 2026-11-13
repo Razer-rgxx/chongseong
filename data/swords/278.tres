@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 278
+display_name = "구름 가르는 천둥"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("번개", "거인 베기")
+unique_text = "5번째 타격마다 가장 센 적 3명에게 벼락이 떨어진다 (피해 400%)."
+unique_ready = false
+unbreakable = false
+story = "구름을 벤 자국이 아직 하늘에 남아 있다고 한다."

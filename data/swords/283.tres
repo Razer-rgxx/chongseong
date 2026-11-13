@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 283
+display_name = "바람의 왕"
+grade = 4
+form = 3
+inscriptions = PackedStringArray("긴 날", "꿰뚫기")
+unique_text = "찌르기가 바람이 되어 화면 끝까지 날아가며 모두 꿰뚫는다."
+unique_ready = false
+unbreakable = false
+story = "찌른 자리에서 바람이 시작된다."

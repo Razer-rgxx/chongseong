@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 270
+display_name = "산 자의 몫"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("가벼운 손", "사냥")
+unique_text = "적을 쓰러뜨리면 10% 확률로 낮 뽑기 한 번이 체력 없이 된다 (최대 3번 쌓임)."
+unique_ready = false
+unbreakable = false
+story = "죽은 자의 검을 거두던 장의사의 검."

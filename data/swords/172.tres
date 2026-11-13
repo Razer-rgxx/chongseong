@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 172
+display_name = "곰의 앞발"
+grade = 2
+form = 2
+inscriptions = PackedStringArray("무거움")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = ""

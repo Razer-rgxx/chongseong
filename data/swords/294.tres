@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 294
+display_name = "떨어진 검"
+grade = 5
+form = 2
+inscriptions = PackedStringArray("거인 베기", "마지막 일격")
+unique_text = "큰 베기 3번마다 하늘에서 거대한 검이 떨어져 둘레 4칸을 친다."
+unique_ready = false
+unbreakable = false
+story = "하늘에서 떨어졌다. 떨어진 자리에 아직 구덩이가 있다."

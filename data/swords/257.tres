@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 257
+display_name = "끌어당기는 손"
+grade = 4
+form = 3
+inscriptions = PackedStringArray("긴 날", "첫 타")
+unique_text = "찌르기 끝에 맞은 적을 내 앞으로 끌어온다."
+unique_ready = false
+unbreakable = false
+story = "도망치는 적을 놓친 적이 없다."

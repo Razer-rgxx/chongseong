@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 267
+display_name = "행운의 녹"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("행운", "마지막 일격")
+unique_text = "이 검이 부러지면 다음 낮 첫 뽑기의 운이 3배가 된다."
+unique_ready = false
+unbreakable = false
+story = "녹이 슬수록 운이 좋아진다는 미신이 있다."

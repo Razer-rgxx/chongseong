@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 295
+display_name = "망각"
+grade = 5
+form = 3
+inscriptions = PackedStringArray("첫 타", "꿰뚫기")
+unique_text = "찔린 적은 나를 잊고 3초 동안 다른 적을 공격한다."
+unique_ready = false
+unbreakable = false
+story = "이 검에 베인 자는 자기가 누구와 싸우는지 잊는다."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 250
+display_name = "성주의 저울"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("막기", "날")
+unique_text = "체력이 절반 이상이면 피해 +40%, 절반 아래면 받는 피해 -40%."
+unique_ready = false
+unbreakable = false
+story = "성주는 이 검으로 재판을 했다. 이긴 쪽이 옳았다."

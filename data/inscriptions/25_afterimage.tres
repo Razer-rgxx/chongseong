@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "잔상"
+text = "N% 확률로 한 번 더 벰"
+values = PackedFloat32Array(6, 8, 10, 13, 19, 28)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 281
+display_name = "거인 왕의 뼈"
+grade = 4
+form = 2
+inscriptions = PackedStringArray("거인 베기", "밀쳐내기")
+unique_text = "큰 적을 쓰러뜨리면 10초 동안 몸이 커져 피해와 사거리 +50%."
+unique_ready = false
+unbreakable = false
+story = "거인 왕의 갈비뼈를 갈아 만들었다."

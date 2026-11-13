@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 282
+display_name = "영원한 파수"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("막기", "흡혈")
+unique_text = "체력이 0이 되어도 10초 동안 쓰러지지 않고, 그동안 준 피해만큼 체력을 되찾는다 (밤마다 1번)."
+unique_ready = false
+unbreakable = false
+story = "주인은 죽은 뒤에도 사흘을 더 성문을 지켰다."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 269
+display_name = "늪지기"
+grade = 4
+form = 3
+inscriptions = PackedStringArray("긴 날", "사냥")
+unique_text = "찌른 자리에 2초 동안 늪이 생겨 적이 60% 느려진다."
+unique_ready = false
+unbreakable = false
+story = "늪을 지키던 자의 검. 칼끝이 늘 젖어 있다."

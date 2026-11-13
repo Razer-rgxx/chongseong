@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "행운"
+text = "들고 있으면 낮 뽑기 운 +N%"
+values = PackedFloat32Array(5, 6, 8, 11, 16, 23)

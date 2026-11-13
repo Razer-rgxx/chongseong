@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 272
+display_name = "무너진 왕좌"
+grade = 4
+form = 2
+inscriptions = PackedStringArray("버팀", "무리 베기")
+unique_text = "둘레 3칸 안의 적 하나마다 받는 피해 -5% (최대 -50%)."
+unique_ready = false
+unbreakable = false
+story = "에워싸일수록 왕은 침착했다."

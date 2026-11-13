@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 128
+display_name = "대장장이의 세검"
+grade = 1
+form = 3
+inscriptions = PackedStringArray("단단함")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = ""

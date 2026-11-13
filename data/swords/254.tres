@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 254
+display_name = "상처 세는 자"
+grade = 4
+form = 0
+inscriptions = PackedStringArray("출혈", "가벼움")
+unique_text = "출혈 중인 적을 베면 남은 출혈 피해를 한꺼번에 준다."
+unique_ready = false
+unbreakable = false
+story = "주인은 자기가 낸 상처를 하나도 잊지 않았다."

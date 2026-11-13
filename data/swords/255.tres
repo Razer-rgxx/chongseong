@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 255
+display_name = "충신"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("버팀", "막기")
+unique_text = "체력이 0이 되면 이 검이 대신 부러지고 체력 30으로 버틴다 (밤마다 1번)."
+unique_ready = false
+unbreakable = false
+story = "왕 대신 칼을 맞고 부러진 검. 누군가 다시 붙여 놓았다."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 296
+display_name = "두 번째 기회"
+grade = 5
+form = 1
+inscriptions = PackedStringArray("버팀", "행운")
+unique_text = "밤에 쓰러지면 그 밤을 처음부터 다시 한다 (판마다 1번)."
+unique_ready = false
+unbreakable = false
+story = "주인은 같은 밤을 두 번 살았다고 한다."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 253
+display_name = "화형대"
+grade = 4
+form = 2
+inscriptions = PackedStringArray("불씨", "넓은 날")
+unique_text = "불붙은 적이 쓰러지면 터져서 둘레 1.5칸에 불을 붙인다."
+unique_ready = false
+unbreakable = false
+story = "장작더미 속에서 녹지 않고 남았다."
