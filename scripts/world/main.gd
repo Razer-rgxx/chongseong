@@ -34,7 +34,6 @@ var _lord: Node3D
 var _hilts: Dictionary = {}
 var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
-var _prompt := Label3D.new()
 var _hud_t: float = 0.0
 var _altar_view: Node3D = null
 
@@ -55,12 +54,6 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
-	_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_prompt.no_depth_test = true
-	_prompt.font_size = 44
-	_prompt.pixel_size = 0.01
-	_prompt.outline_size = 10
-	add_child(_prompt)
 	rules.day_started.connect(_on_day)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
@@ -91,7 +84,8 @@ func _ready() -> void:
 	_camera.snap()
 	_sync_altar()
 	var start: String = "검집에서 %s을(를) 꺼냈다. " % rules.slots[0].label() if rules.slots[0] else ""
-	_hud.toast("%s%s. 꽂힌 검 앞에서 E를 눌러 뽑아. 한 번에 체력 %d. 준비되면 N으로 밤을 맞아." % [start, _zone_name(), rules.pull_cost()])
+	_hud.area_title(_zone_name())
+	_hud.toast("%s꽂힌 검 앞에서 E를 눌러 뽑는다. 한 번에 체력 %d. 준비되면 N으로 밤을 맞는다." % [start, rules.pull_cost()])
 	_capture(true)
 
 
@@ -153,6 +147,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		match k.physical_keycode:
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			KEY_F1:
+				_hud.toggle_help()
 			KEY_V:
 				_camera.toggle_mode()
 				_capture(true)
@@ -208,13 +204,12 @@ func _process(delta: float) -> void:
 	_camera.target = _lord.position
 	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
 	var altar_near: bool = rules.near_altar() and rules.pull_hilt == null and rules.pending == null and not rules.altar_open
-	_prompt.visible = near != null or altar_near
 	if altar_near:
-		_prompt.text = "E  숫돌 제단"
-		_prompt.position = Grid.cells_to_world(rules.altar.pos, 2.0)
+		_hud.set_prompt("E", "숫돌 제단에 선다")
 	elif near:
-		_prompt.text = "E  뽑기 · " + ("공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost())
-		_prompt.position = Grid.cells_to_world(near.pos, 1.9)
+		_hud.set_prompt("E", "검을 뽑는다 · " + ("공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost()))
+	else:
+		_hud.set_prompt("", "")
 	_hud_t -= delta
 	if _hud_t <= 0.0:
 		_hud_t = 0.1
@@ -278,7 +273,8 @@ func _on_day(_zone: int) -> void:
 	_sync_hilts()
 	_sync_altar()
 	_set_light(false)
-	_hud.toast("날이 밝았다. 체력 +%d. %s(으)로 올라왔어. 뽑기 운 ×%s.%s" % [rules.heal_at_dawn(), _zone_name(), str(snappedf(rules.luck(), 0.01)), " 숫돌 제단이 섰다(E)." if rules.altar else ""])
+	_hud.area_title(_zone_name())
+	_hud.toast("날이 밝았다. 체력 +%d · 뽑기 운 ×%s%s" % [rules.heal_at_dawn(), str(snappedf(rules.luck(), 0.01)), " · 숫돌 제단이 섰다" if rules.altar else ""])
 
 
 func _on_night(_zone: int) -> void:

@@ -1,6 +1,7 @@
 class_name Hud
 extends CanvasLayer
 ## 화면 위 글자와 창. 노드는 코드로 만든다(에셋이 들어오면 씬으로 바꿔도 된다).
+## 모양은 UiKit(엘든 링식: 모서리 없는 검은 판, 놋쇠빛 줄). 알림과 뽑기·제단 안내는 띠(Band)로, 새 구역 이름은 AreaTitle로 띄운다.
 ## 규칙은 모른다. main이 값을 넣어 주고, 고르기·다시 하기는 신호로 돌려준다.
 
 signal chose(slot: int)
@@ -19,9 +20,10 @@ var _night_bar: ProgressBar
 var _help: Label
 var _cards: Array[RichTextLabel] = []
 var _card_boxes: Array[PanelContainer] = []
-var _toast: Label
-var _toast_box: PanelContainer
-var _toast_t: float = 0.0
+var _toast: Band
+var _prompt: Band
+var _title: AreaTitle
+var _help_hint: Label
 var _flash: ColorRect
 var _boss_box: VBoxContainer
 var _boss_bar: ProgressBar
@@ -66,7 +68,7 @@ func _ready() -> void:
 	mid.add_child(_night_bar)
 	_sub = _label("", 14)
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sub.modulate = Color(0.75, 0.78, 0.86)
+	_sub.modulate = UiKit.MUTED
 	mid.add_child(_sub)
 	var spacer2 := Control.new()
 	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -90,19 +92,9 @@ func _ready() -> void:
 	_boss_box.visible = false
 	add_child(_boss_box)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	center.offset_top = 150
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-	_toast_box = PanelContainer.new()
-	_toast_box.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.06)))
-	_toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_toast = _label("", 17)
-	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast_box.add_child(_toast)
-	_toast_box.modulate.a = 0.0
-	center.add_child(_toast_box)
+	_toast = Band.make(self, 150.0, 1000.0, 48.0, 17)
+	_prompt = Band.make(self, -200.0, 600.0, 46.0, 18)
+	_title = AreaTitle.make(self)
 
 	var bottom := HBoxContainer.new()
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 14)
@@ -120,7 +112,7 @@ func _ready() -> void:
 		r.add_theme_font_size_override("normal_font_size", 15)
 		r.add_theme_font_size_override("bold_font_size", 18)
 		var box := PanelContainer.new()
-		box.add_theme_stylebox_override("panel", _style(Color(0.16, 0.19, 0.25)))
+		box.add_theme_stylebox_override("panel", _style(Color(UiKit.LINE, 0.25)))
 		box.size_flags_vertical = Control.SIZE_SHRINK_END
 		box.add_child(r)
 		bottom.add_child(box)
@@ -128,9 +120,14 @@ func _ready() -> void:
 		_card_boxes.append(box)
 
 	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/Space 베기 · Shift 돌진\nQ 바꿔 쥐기 · 1/2 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정", 13)
-	_help.modulate = Color(0.6, 0.65, 0.75)
-	_help.position = Vector2(16, 76)
+	_help.modulate = UiKit.MUTED
+	_help.position = Vector2(20, 96)
+	_help.visible = false
 	add_child(_help)
+	_help_hint = _label("F1  조작법", 13)
+	_help_hint.modulate = Color(UiKit.MUTED, 0.7)
+	_help_hint.position = Vector2(20, 96)
+	add_child(_help_hint)
 
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -144,9 +141,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _toast_t > 0.0:
-		_toast_t -= delta
-		_toast_box.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 	_choice_t += delta
 	_altar_t += delta
 
@@ -175,15 +169,31 @@ func set_boss(e: Enemy) -> void:
 func set_cards(texts: Array[String], colors: Array[Color], active: int) -> void:
 	for k in 2:
 		_cards[k].text = texts[k]
-		var col: Color = colors[k] if k == active else Color(0.16, 0.19, 0.25)
+		var col: Color = colors[k] if k == active else Color(UiKit.LINE, 0.25)
 		_card_boxes[k].add_theme_stylebox_override("panel", _style(col, 2 if k == active else 1))
 		_card_boxes[k].modulate.a = 1.0 if k == active else 0.75
 
 
 func toast(t: String) -> void:
-	_toast.text = t
-	_toast_t = toast_time
-	_toast_box.modulate.a = 1.0
+	_toast.show_for(t, toast_time)
+
+
+## 꽂힌 검이나 제단 앞에 섰을 때 아래 띠(키 칸 + 할 일). 빈 글이면 지운다.
+func set_prompt(key: String, t: String) -> void:
+	if t == "":
+		_prompt.hide_band()
+	else:
+		_prompt.show_key(key, t)
+
+
+## 새 구역에 올라섰을 때 가운데 큰 글자.
+func area_title(t: String) -> void:
+	_title.show_title(t)
+
+
+func toggle_help() -> void:
+	_help.visible = not _help.visible
+	_help_hint.visible = not _help.visible
 
 
 ## 큰 등급의 번쩍임(영상이 없을 때 대신).
@@ -321,7 +331,10 @@ func _build_altar() -> void:
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_altar.add_child(panel)
-	box.add_child(_label("숫돌 제단", 26))
+	var at := _label("숫돌 제단", 26)
+	at.add_theme_color_override("font_color", UiKit.TITLE)
+	box.add_child(at)
+	box.add_child(UiKit.rule())
 	box.add_child(_label("한 번만 쓸 수 있다. 바친 검은 사라진다.", 14))
 	_altar_list = VBoxContainer.new()
 	_altar_list.add_theme_constant_override("separation", 6)
@@ -339,7 +352,8 @@ func _build_over() -> void:
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_over.add_child(panel)
-	_over_title = _label("", 30)
+	_over_title = _label("", 34)
+	_over_title.add_theme_color_override("font_color", UiKit.TITLE)
 	_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_over_title)
 	_over_text = _label("", 17)
@@ -356,7 +370,7 @@ func _build_over() -> void:
 
 func _dim() -> Control:
 	var c := ColorRect.new()
-	c.color = Color(0.02, 0.025, 0.05, 0.82)
+	c.color = Color(0.0, 0.0, 0.0, 0.78)
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(c)
 	return c
@@ -370,11 +384,7 @@ func _panel(inner: Control) -> Control:
 
 
 func _style(border: Color, width: int = 1) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color(0.035, 0.045, 0.07, 0.9)
-	s.border_color = border
-	s.set_border_width_all(width)
-	s.set_corner_radius_all(10)
+	var s := UiKit.style(border, width)
 	s.content_margin_left = 14
 	s.content_margin_right = 14
 	s.content_margin_top = 9
@@ -394,11 +404,11 @@ func _bar(c: Color) -> ProgressBar:
 	b.show_percentage = false
 	b.custom_minimum_size = Vector2(0, 8)
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.12, 0.14, 0.18)
-	bg.set_corner_radius_all(4)
+	bg.bg_color = Color(0.05, 0.045, 0.04, 0.9)
+	bg.border_color = Color(UiKit.LINE, 0.35)
+	bg.set_border_width_all(1)
 	var fg := StyleBoxFlat.new()
-	fg.bg_color = c
-	fg.set_corner_radius_all(4)
+	fg.bg_color = c.darkened(0.15)
 	b.add_theme_stylebox_override("background", bg)
 	b.add_theme_stylebox_override("fill", fg)
 	return b

@@ -2,6 +2,7 @@ extends Node3D
 ## 언덕 아래 마을(시작 장면). 걸어 다니며 들른다.
 ## 대장간: 모루 위에 검집의 검이 놓여 있고, 망치질로 검집을 강화한다. 성소: 축복. 검 진열대: 도감. 언덕 길: 판을 시작한다.
 ## 영주의 움직임은 언덕과 같은 Rules로 돌린다(검도 적도 없는 낮). 모양은 기본 도형이고, 모델이 들어오면 _build_*만 바꾼다.
+## 세계에 글자를 띄우지 않는다(간판 없음). 무엇인지는 다가가면 아래 띠가 알려 준다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const RUN_PATH: String = "res://scenes/world/main.tscn"
@@ -12,6 +13,9 @@ const RUN_PATH: String = "res://scenes/world/main.tscn"
 @export var rack_at: Vector2 = Vector2(9.0, 15.0)
 @export var gate_at: Vector2 = Vector2(17.0, 2.5)
 @export var reach: float = 2.0
+
+## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
+const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "언덕으로 오른다"}
 @export var max_ticks_per_frame: int = 8
 
 var data: GameData
@@ -20,9 +24,7 @@ var rules: Rules
 var _acc: float = 0.0
 var _want_dash: bool = false
 var _lord: Node3D
-var _prompt := Label3D.new()
 var _anvil_sword := Node3D.new()
-var _anvil_label := Label3D.new()
 var _forge_light := OmniLight3D.new()
 var _near: String = ""
 
@@ -53,12 +55,6 @@ func _ready() -> void:
 	add_child(_lord)
 	_lord.set_sword(meta.sheath_sword(data), data.grades)
 	_lord.torch.light_energy = 1.2
-	_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_prompt.no_depth_test = true
-	_prompt.font_size = 48
-	_prompt.pixel_size = 0.01
-	_prompt.outline_size = 10
-	add_child(_prompt)
 	_hud.forge_hit.connect(_on_hammer)
 	_hud.forge_done.connect(_on_forged)
 	_hud.closed.connect(func() -> void: _capture(true))
@@ -67,7 +63,7 @@ func _ready() -> void:
 	_camera.snap()
 	_sun.rotation_degrees = Vector3(-35.0, -60.0, 0.0)
 	_refresh_anvil()
-	_hud.toast("언덕 아래 마을. 대장간, 성소, 검 진열대에 들르고, 북쪽 길로 언덕에 오른다.")
+	_hud.area_title("언덕 아래 마을")
 	_capture(true)
 
 
@@ -129,10 +125,7 @@ func _process(delta: float) -> void:
 	for key in spots:
 		if p.distance_to(spots[key]) < reach:
 			_near = key
-	_prompt.visible = _near != "" and not _hud.is_open()
-	if _prompt.visible:
-		_prompt.text = {"forge": "E  대장간", "shrine": "E  성소", "rack": "E  검 진열대", "gate": "E  언덕 오르기"}[_near]
-		_prompt.position = Grid.cells_to_world(spots[_near], 2.4)
+	_hud.set_prompt("E", PROMPTS.get(_near, ""))
 	_forge_light.light_energy = lerpf(_forge_light.light_energy, 1.6, delta * 3.0)
 
 
@@ -178,7 +171,6 @@ func _refresh_anvil() -> void:
 		c.queue_free()
 	var s := meta.sheath_sword(data)
 	if s == null:
-		_anvil_label.text = "검집 +%d · 빈 모루" % meta.sheath_lv
 		return
 	var col: Color = data.grades.colors[s.grade]
 	var blade := _box(Vector3(s.form.blade_length, 0.04, s.form.blade_width * 1.4), _mat(Color(0.82, 0.85, 0.9), 0.85, 0.25))
@@ -190,8 +182,6 @@ func _refresh_anvil() -> void:
 	var grip := _box(Vector3(0.3, 0.05, 0.06), _mat(Color(0.25, 0.18, 0.12)))
 	grip.position = Vector3(-0.37, 0, 0)
 	_anvil_sword.add_child(grip)
-	_anvil_label.text = "%s · %s" % [s.label(), data.grades.names[s.grade]]
-	_anvil_label.modulate = col
 
 
 # ---------------------------------------------------------------- 마을 짓기
@@ -290,13 +280,6 @@ func _build_forge() -> void:
 	_anvil_sword.position = at + Vector3(0.55, 0.98, 2.6)
 	_anvil_sword.rotation.y = 0.25
 	add_child(_anvil_sword)
-	_anvil_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_anvil_label.font_size = 40
-	_anvil_label.pixel_size = 0.01
-	_anvil_label.outline_size = 8
-	_anvil_label.position = at + Vector3(0.6, 1.7, 2.6)
-	add_child(_anvil_label)
-	_sign("대장간", at + Vector3(0, 4.2, 2.2))
 
 
 func _build_shrine() -> void:
@@ -326,7 +309,6 @@ func _build_shrine() -> void:
 	light.light_energy = 1.4
 	light.position = at + Vector3(0, 1.8, 0)
 	add_child(light)
-	_sign("성소", at + Vector3(0, 4.6, 0))
 
 
 func _build_rack() -> void:
@@ -355,7 +337,6 @@ func _build_rack() -> void:
 		guard.position = at + Vector3(0, 1.75, -2.0 + shown * 0.8)
 		add_child(guard)
 		shown += 1
-	_sign("검 진열대 · 도감 %d / %d" % [meta.found.size(), data.swords.size()], at + Vector3(0, 2.6, 0))
 
 
 func _build_gate() -> void:
@@ -389,7 +370,6 @@ func _build_gate() -> void:
 		s.position = p + Vector3(0, 0.8, 0)
 		s.rotation.z = deco.randf_range(-0.3, 0.3)
 		add_child(s)
-	_sign("언덕으로", at + Vector3(0, 6.2, 0.6))
 
 
 func _build_houses() -> void:
@@ -419,17 +399,6 @@ func _build_houses() -> void:
 		lamp.light_energy = 1.0
 		lamp.position = Grid.cells_to_world(c, 2.7)
 		add_child(lamp)
-
-
-func _sign(t: String, at: Vector3) -> void:
-	var l := Label3D.new()
-	l.text = t
-	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.font_size = 56
-	l.pixel_size = 0.012
-	l.outline_size = 12
-	l.position = at
-	add_child(l)
 
 
 static func _box(size: Vector3, m: Material) -> MeshInstance3D:
