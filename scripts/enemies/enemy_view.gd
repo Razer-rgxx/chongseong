@@ -22,7 +22,7 @@ func setup(e: Enemy) -> void:
 func _ready() -> void:
 	add_child(_body)
 	var D := enemy.data
-	var r: float = Grid.cells_to_meters(D.radius)
+	var r: float = Grid.cells_to_meters(enemy.radius)
 	match D.id:
 		&"wolf":
 			_build_wolf(r, D.color)
@@ -30,6 +30,20 @@ func _ready() -> void:
 			_build_giant(r, D.color, D.boss)
 		_:
 			_build_wraith(r, D.color)
+	if enemy.elite:
+		# 정예: 발밑에 금빛 고리, 몸이 은은하게 빛난다
+		var ring := MeshInstance3D.new()
+		var t := TorusMesh.new()
+		t.inner_radius = r * 1.5
+		t.outer_radius = r * 1.75
+		ring.mesh = t
+		ring.material_override = _mat(Color(1.0, 0.84, 0.42), true)
+		ring.position.y = 0.05
+		add_child(ring)
+		for m in _mats:
+			m.emission_enabled = true
+			m.emission = Color(1.0, 0.8, 0.4)
+			m.emission_energy_multiplier = 0.25
 	position = Grid.cells_to_world(enemy.pos)
 
 

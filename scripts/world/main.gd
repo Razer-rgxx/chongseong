@@ -1,8 +1,10 @@
 extends Node3D
-## 본 장면. 입력을 모아 규칙을 고정 틱으로 돌리고, 규칙의 상태와 신호를 받아 그린다.
+## 언덕(한 판). 입력을 모아 규칙을 고정 틱으로 돌리고, 규칙의 상태와 신호를 받아 그린다.
 ## 낮: 언덕에 꽂힌 검을 E로 뽑는다. 밤(N): 뽑은 검으로 버틴다. 열 구역을 올라 정상의 언덕지기를 쓰러뜨리면 끝.
+## 끝나면 조각을 마을(scenes/lobby/lobby.tscn)로 가져간다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
+const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
 
 ## 0이면 시작할 때 아무 시드나 고른다. 같은 판을 다시 보고 싶으면 값을 넣는다.
 @export var seed_value: int = 0
@@ -22,6 +24,7 @@ const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 
 var data: GameData
 var rules: Rules
+var meta: Meta
 var _acc: float = 0.0
 var _want_attack: bool = false
 var _want_dash: bool = false
@@ -33,6 +36,7 @@ var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
 var _prompt := Label3D.new()
 var _hud_t: float = 0.0
+var _altar_view: Node3D = null
 
 @onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
@@ -43,8 +47,10 @@ var _hud_t: float = 0.0
 
 func _ready() -> void:
 	data = GameData.load_default()
+	meta = Meta.load_or_new()
+	meta.fix_sheath(data)
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
-	rules = Rules.new(data, s)
+	rules = Rules.new(data, s, meta)
 	_build_world()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
@@ -70,21 +76,50 @@ func _ready() -> void:
 	rules.lord_hurt.connect(_on_lord_hurt)
 	rules.enemy_hit.connect(_on_enemy_hit)
 	rules.enemy_died.connect(_on_enemy_died)
+	rules.elite_spawned.connect(func(e: Enemy) -> void: _hud.toast("정예 %s이(가) 올라온다. 쓰러뜨리면 공짜 뽑기." % e.data.display_name))
+	rules.altar_opened.connect(_on_altar_opened)
+	rules.altar_used.connect(_on_altar_used)
 	rules.boss_spawned.connect(func(_e: Enemy) -> void: _hud.toast("언덕지기가 올라온다."); _camera.add_shake(0.5); _sfx.play(&"night", _lord.position, 0.0))
-	_hud.chose.connect(func(k: int) -> void: rules.choose(k))
-	_hud.restart_requested.connect(func() -> void: get_tree().reload_current_scene())
+	_hud.chose.connect(func(k: int) -> void: rules.choose(k); _capture(true))
+	_hud.altar_chosen.connect(func(i: int) -> void: rules.use_altar(i); _capture(true))
+	_hud.restart_requested.connect(_to_lobby)
 	_hud.night_button().pressed.connect(func() -> void: rules.start_night())
 	_sync_hilts()
 	_refresh_cards()
 	_set_light(false, true)
 	_camera.target = _lord_world()
 	_camera.snap()
-	_hud.toast("%s. 꽂힌 검 앞에서 E를 눌러 뽑아. 한 번에 체력 %d. 준비되면 N으로 밤을 맞아." % [_zone_name(), data.run.pull_cost])
+	_sync_altar()
+	var start: String = "검집에서 %s을(를) 꺼냈다. " % rules.slots[0].label() if rules.slots[0] else ""
+	_hud.toast("%s%s. 꽂힌 검 앞에서 E를 눌러 뽑아. 한 번에 체력 %d. 준비되면 N으로 밤을 맞아." % [start, _zone_name(), rules.pull_cost()])
+	_capture(true)
+
+
+## 3인칭에서는 마우스를 가둬 둘러보게 한다. 창이 열리면 풀어 준다.
+func _capture(on: bool) -> void:
+	var want: bool = on and _camera.third() and rules.phase != Rules.Phase.OVER and not _hud.choice_open() and not _hud.altar_is_open()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if want else Input.MOUSE_MODE_VISIBLE
+
+
+func _to_lobby() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(LOBBY_PATH)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("restart") and rules.phase == Rules.Phase.OVER:
-		get_tree().reload_current_scene()
+		_to_lobby()
+		return
+	var mm := event as InputEventMouseMotion
+	if mm and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_camera.look(mm.relative)
+	if _hud.altar_is_open():
+		var kk := event as InputEventKey
+		if kk and kk.pressed and not kk.echo:
+			if kk.physical_keycode >= KEY_1 and kk.physical_keycode <= KEY_9:
+				_hud.pick_altar(kk.physical_keycode - KEY_1)
+			elif kk.physical_keycode == KEY_ESCAPE:
+				_hud.pick_altar(-1)
 		return
 	if _hud.choice_open():
 		if event.is_action_pressed("slot_1"):
@@ -93,6 +128,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_hud.pick(1)
 		elif event.is_action_pressed("discard"):
 			_hud.pick(-1)
+		return
+	var mb := event as InputEventMouseButton
+	if mb and mb.pressed and _camera.third() and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		_capture(true)
 		return
 	# 틱 사이에 눌렀다 뗀 것도 놓치지 않게 모아 둔다
 	if event.is_action_pressed("attack"):
@@ -112,6 +151,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k and k.pressed and not k.echo:
 		match k.physical_keycode:
+			KEY_ESCAPE:
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			KEY_V:
+				_camera.toggle_mode()
+				_capture(true)
+				_hud.toast("카메라: " + ("3인칭" if _camera.third() else "쿼터뷰"))
 			KEY_F2:
 				rules.debug_god = not rules.debug_god
 				_hud.toast("관리: 무적 " + ("켬" if rules.debug_god else "끔"))
@@ -139,15 +184,20 @@ func _physics_process(delta: float) -> void:
 
 func _read_input() -> LordInput:
 	var inp := LordInput.new()
-	inp.move = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 	inp.attack = Input.is_action_pressed("attack") or _want_attack
 	inp.dash = _want_dash
 	inp.pull = _want_pull
 	inp.swap_to = _swap_to
-	var g: Variant = _camera.ground_point(get_viewport().get_mouse_position())
-	if g != null:
+	if _camera.third():
+		# 3인칭: 카메라가 보는 쪽을 벤다
 		inp.aim_valid = true
-		inp.aim = Grid.world_to_cells(g)
+		inp.aim = rules.lord.pos + _camera.forward_cells() * 3.0
+	else:
+		var g: Variant = _camera.ground_point(get_viewport().get_mouse_position())
+		if g != null:
+			inp.aim_valid = true
+			inp.aim = Grid.world_to_cells(g)
 	return inp
 
 
@@ -157,9 +207,13 @@ func _process(delta: float) -> void:
 	_sync_enemies(alpha, delta)
 	_camera.target = _lord.position
 	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
-	_prompt.visible = near != null
-	if near:
-		_prompt.text = "E  뽑기 · 체력 %d" % data.run.pull_cost
+	var altar_near: bool = rules.near_altar() and rules.pull_hilt == null and rules.pending == null and not rules.altar_open
+	_prompt.visible = near != null or altar_near
+	if altar_near:
+		_prompt.text = "E  숫돌 제단"
+		_prompt.position = Grid.cells_to_world(rules.altar.pos, 2.0)
+	elif near:
+		_prompt.text = "E  뽑기 · " + ("공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost())
 		_prompt.position = Grid.cells_to_world(near.pos, 1.9)
 	_hud_t -= delta
 	if _hud_t <= 0.0:
@@ -185,9 +239,11 @@ func _update_hud() -> void:
 		var left: int = 0
 		for h in rules.hilts:
 			left += 0 if h.gone else 1
-		sub = "남은 검 %d · 뽑기 운 ×%s" % [left, str(rules.luck())]
+		sub = "남은 검 %d · 뽑기 운 ×%s" % [left, str(snappedf(rules.luck(), 0.01))]
+		if rules.free_pulls > 0:
+			sub += " · 공짜 뽑기 %d" % rules.free_pulls
 	var k: float = 1.0 - maxf(0.0, rules.night_left) / data.run.night_length if night else 0.0
-	_hud.set_status(rules.lord.hp, data.lord.hp, "%s · %s" % [_zone_name(), "밤" if night else "낮"], sub, k, night or rules.phase == Rules.Phase.OVER)
+	_hud.set_status(rules.lord.hp, rules.max_hp(), "%s · %s" % [_zone_name(), "밤" if night else "낮"], sub, k, night or rules.phase == Rules.Phase.OVER)
 	var boss: Enemy = null
 	for e in rules.enemies:
 		if e.data.boss:
@@ -199,22 +255,7 @@ func _update_hud() -> void:
 # ---------------------------------------------------------------- 카드
 
 func _card(s: Sword, slot: int, held: bool) -> String:
-	var key: String = "" if slot < 0 else "  [color=#8b96b3][%d][/color]" % (slot + 1)
-	if s == null:
-		return "[b][color=#8b96b3]%s[/color][/b]%s\n[color=#8b96b3]낮에 검을 뽑아 채워[/color]" % ["맨손" if held else "빈 칸", key]
-	var col: String = data.grades.colors[s.grade].to_html(false)
-	var dmg: int = roundi(s.damage(data))
-	var dur: String = "∞" if not s.breakable() else "%d/%d" % [ceili(s.durability), s.max_durability]
-	var t: String = "[b][color=#%s]%s[/color][/b]%s\n[color=#aab4c8]%s %s · 피해 %d · 내구 %s[/color]" % [col, s.data.display_name, key, data.grades.names[s.grade], s.form.display_name, dmg, dur]
-	for k in s.data.inscriptions:
-		var ins: InscriptionData = data.inscriptions.get(k)
-		if ins:
-			t += "\n[b]%s[/b]  %s" % [k, ins.describe(s.grade)]
-	if s.data.unique_text != "":
-		t += "\n[color=#ffe2a0]%s[/color]" % s.data.unique_text
-		if not s.data.unique_ready:
-			t += " [color=#c0566a](아직 작동 안 함)[/color]"
-	return t
+	return SwordCard.bbcode(s, data, slot, held)
 
 
 func _refresh_cards() -> void:
@@ -235,14 +276,16 @@ func _on_day(_zone: int) -> void:
 		v.queue_free()
 	_hilts.clear()
 	_sync_hilts()
+	_sync_altar()
 	_set_light(false)
-	_hud.toast("날이 밝았다. 체력 +%d. %s(으)로 올라왔어. 뽑기 운 ×%s." % [data.run.heal_per_dawn, _zone_name(), str(rules.luck())])
+	_hud.toast("날이 밝았다. 체력 +%d. %s(으)로 올라왔어. 뽑기 운 ×%s.%s" % [rules.heal_at_dawn(), _zone_name(), str(snappedf(rules.luck(), 0.01)), " 숫돌 제단이 섰다(E)." if rules.altar else ""])
 
 
 func _on_night(_zone: int) -> void:
 	for v in _hilts.values():
 		v.queue_free()
 	_hilts.clear()
+	_sync_altar()
 	_set_light(true)
 	_sfx.play(&"night", _lord.position, -2.0)
 	_hud.toast("밤이 왔다. %d초를 버텨.%s" % [data.run.night_length, " 정상의 언덕지기를 쓰러뜨려야 끝난다." if rules.last_zone() else ""])
@@ -251,7 +294,10 @@ func _on_night(_zone: int) -> void:
 func _on_end(won: bool) -> void:
 	var best: String = data.grades.names[rules.best_grade] if rules.best_grade >= 0 else "없음"
 	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
-	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s" % [rules.pulls, rules.kills, best])
+	var r := meta.record_run(rules, data.meta)
+	meta.save()
+	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt])
+	_capture(false)
 
 
 func _on_pull_step(_h: Hilt, st: int) -> void:
@@ -260,6 +306,8 @@ func _on_pull_step(_h: Hilt, st: int) -> void:
 
 
 func _on_pulled(s: Sword) -> void:
+	meta.note_found(s.data.id)
+	meta.save()
 	var c: Color = data.grades.colors[s.grade]
 	_sfx.play(&"draw", _lord.position, -4.0)
 	if s.grade >= data.grades.reveal_from:
@@ -278,6 +326,41 @@ func _on_pulled(s: Sword) -> void:
 
 func _on_choice_needed(s: Sword) -> void:
 	_hud.open_choice(_card(s, -1, false), _card(rules.slots[0], 0, false), _card(rules.slots[1], 1, false))
+	_capture(false)
+
+
+func _on_altar_opened() -> void:
+	var texts: Array[String] = []
+	var s := rules.current()
+	var o := rules.slots[1 - rules.active]
+	for opt in rules.altar_options():
+		match opt.kind:
+			"melt":
+				var w := rules.slots[opt.slot]
+				texts.append("녹이기: %s → 조각 %d" % [w.label(), data.meta.melt[w.grade]])
+			"repair":
+				texts.append("벼리기: %s을(를) 바쳐 %s의 내구를 다 채운다" % [o.label(), s.label()])
+			"transfer":
+				texts.append("옮기기: %s을(를) 바쳐 「%s」 각인을 %s에" % [o.label(), opt.key, s.label()])
+	if texts.is_empty():
+		rules.use_altar(-1)
+		_hud.toast("제단에 바칠 검이 없다.")
+		return
+	_hud.open_altar(texts)
+	_capture(false)
+
+
+func _on_altar_used(kind: String, text: String) -> void:
+	_sfx.play(&"thump", _lord.position, 0.0)
+	_hud.flash(Color(1, 0.91, 0.66), 0.25)
+	match kind:
+		"melt":
+			_hud.toast("%s을(를) 녹였다. 판이 끝나면 조각이 된다." % text)
+		"repair":
+			_hud.toast("%s의 날이 새것처럼 섰다." % text)
+		"transfer":
+			_hud.toast("「%s」 각인이 새겨졌다." % text)
+	_sync_altar()
 
 
 func _on_broke(_k: int, s: Sword) -> void:
@@ -297,12 +380,15 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	if _enemies.has(e.id):
 		_enemies[e.id].hit()
-	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.data.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
+	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_sfx.play(&"hit_big" if big else &"hit", at)
 
 
 func _on_enemy_died(e: Enemy) -> void:
+	if e.elite:
+		_float(_lord_world() + Vector3(0, 2.8, 0), "공짜 뽑기 +1", Color(1, 0.84, 0.42), big_number_size)
+		_hud.flash(Color(1, 0.84, 0.42), 0.25)
 	if e.data.boss:
 		_camera.add_shake(0.7)
 		_hud.flash(Color.WHITE, 0.6, 0.8)
@@ -327,6 +413,16 @@ func _sync_hilts() -> void:
 		v.setup(rules, h)
 		add_child(v)
 		_hilts[h.id] = v
+
+
+func _sync_altar() -> void:
+	if _altar_view:
+		_altar_view.queue_free()
+		_altar_view = null
+	if rules.altar:
+		_altar_view = AltarView.new()
+		_altar_view.altar = rules.altar
+		add_child(_altar_view)
 
 
 ## 규칙의 적 목록과 맞춘다: 새로 나온 적은 만들고, 없어진 적은 쓰러지는 모습을 보여 주고 지운다.

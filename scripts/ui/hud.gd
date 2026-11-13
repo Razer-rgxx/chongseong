@@ -5,6 +5,7 @@ extends CanvasLayer
 
 signal chose(slot: int)
 signal restart_requested()
+signal altar_chosen(index: int)
 
 ## 두 칸이 다 찼을 때 뜨는 창이, 연출을 넘기던 클릭을 받지 않도록 기다리는 시간.
 @export var choice_guard: float = 0.8
@@ -35,6 +36,9 @@ var _over: Control
 var _over_title: Label
 var _over_text: Label
 var _night_button: Button
+var _altar: Control
+var _altar_list: VBoxContainer
+var _altar_t: float = 0.0
 
 
 func _ready() -> void:
@@ -123,7 +127,7 @@ func _ready() -> void:
 		_cards.append(r)
 		_card_boxes.append(box)
 
-	_help = _label("WASD 걷기 · E 뽑기 · N 밤\n클릭/Space 베기 · Shift 돌진\nQ 바꿔 쥐기 · 1/2 칸 · 휠 확대\nF2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정", 13)
+	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/Space 베기 · Shift 돌진\nQ 바꿔 쥐기 · 1/2 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정", 13)
 	_help.modulate = Color(0.6, 0.65, 0.75)
 	_help.position = Vector2(16, 76)
 	add_child(_help)
@@ -135,6 +139,7 @@ func _ready() -> void:
 	add_child(_flash)
 
 	_build_choice()
+	_build_altar()
 	_build_over()
 
 
@@ -143,6 +148,7 @@ func _process(delta: float) -> void:
 		_toast_t -= delta
 		_toast_box.modulate.a = clampf(_toast_t / 0.4, 0.0, 1.0)
 	_choice_t += delta
+	_altar_t += delta
 
 
 func night_button() -> Button:
@@ -273,6 +279,56 @@ func _build_choice() -> void:
 	_choice.visible = false
 
 
+func open_altar(texts: Array[String]) -> void:
+	for c in _altar_list.get_children():
+		c.queue_free()
+	for i in texts.size():
+		var b := Button.new()
+		b.text = "%d.  %s" % [i + 1, texts[i]]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(560, 40)
+		var k: int = i
+		b.pressed.connect(func() -> void: pick_altar(k))
+		_altar_list.add_child(b)
+	var close := Button.new()
+	close.text = "그냥 간다 (Esc)"
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(0, 36)
+	close.pressed.connect(func() -> void: pick_altar(-1))
+	_altar_list.add_child(close)
+	_altar_t = 0.0
+	_altar.visible = true
+
+
+func altar_is_open() -> bool:
+	return _altar.visible
+
+
+func pick_altar(i: int) -> void:
+	if not _altar.visible or _altar_t < 0.4:
+		return
+	_altar.visible = false
+	altar_chosen.emit(i)
+
+
+func _build_altar() -> void:
+	_altar = _dim()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	var panel := _panel(box).get_parent() as PanelContainer
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_altar.add_child(panel)
+	box.add_child(_label("숫돌 제단", 26))
+	box.add_child(_label("한 번만 쓸 수 있다. 바친 검은 사라진다.", 14))
+	_altar_list = VBoxContainer.new()
+	_altar_list.add_theme_constant_override("separation", 6)
+	box.add_child(_altar_list)
+	_altar.visible = false
+
+
 func _build_over() -> void:
 	_over = _dim()
 	var box := VBoxContainer.new()
@@ -290,7 +346,7 @@ func _build_over() -> void:
 	_over_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_over_text)
 	var again := Button.new()
-	again.text = "  다시 오르기 (R)  "
+	again.text = "  마을로 (R)  "
 	again.focus_mode = Control.FOCUS_NONE
 	again.custom_minimum_size = Vector2(0, 44)
 	again.pressed.connect(func() -> void: restart_requested.emit())

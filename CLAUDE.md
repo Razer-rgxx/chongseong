@@ -7,7 +7,7 @@
 - docs/GDD.md "3. 앞으로의 계획"의 체크리스트를 위에서부터 한 번에 한 단계씩 진행한다. 단계를 마치면 그 줄을 `- [x]`로 바꾸고 "1. 지금까지 한 일"에 한 줄 적는다.
 - 단계마다 커밋하고, 끝나면 무엇을 만들었는지와 사용자가 PC의 Godot에서 무엇을 확인하면 되는지 한국어로 짧게 정리한다.
 - 사용자는 Godot 4.6과 GDScript를 쓰는 1인 개발자(학생)다. 답과 설명은 한국어로, 짧게 한다. 처음 여는 세션이면 docs/GDD.md의 "0. 인계 요약", "1. 지금까지 한 일", "3. 앞으로의 계획"부터 읽는다.
-- 기획에 없는 시스템은 새로 만들지 않는다. 애매하면 가장 단순한 쪽으로 만들고 정리에 적는다. GDD "2.12 정하지 않은 것"의 항목은 사용자에게 묻기 전에는 바꾸지 않는다.
+- 기획에 없는 시스템은 새로 만들지 않는다. 애매하면 가장 단순한 쪽으로 만들고 정리에 적는다. GDD "2.14 정하지 않은 것"의 항목은 사용자에게 묻기 전에는 바꾸지 않는다.
 - `prototype/`의 HTML 시험판은 참고용이다. 규칙과 수치는 거기서 가져오되 코드는 GDScript로 새로 쓴다. 시험판 파일은 고치지 않는다. 규칙 코드는 `prototype/game_reference.js`에 있다.
 
 ## 기술 규칙
@@ -17,11 +17,15 @@
 - 수치는 코드에 박지 않는다. 표 한 줄을 리소스 하나에 담는다.
   - `data/swords/001.tres` … `300.tres` (SwordData), `data/inscriptions/*.tres` (InscriptionData, 등급별 수치 6개)
   - `data/forms/*.tres` (FormData: 단검, 장검, 대검, 세검), `data/unarmed.tres` (맨손)
-  - `data/grades.tres` (GradeTable), `data/enemies/*.tres` (EnemyData), `data/lord.tres` (LordData), `data/run.tres` (RunData: 구역, 낮의 뽑기, 밤의 적)
+  - `data/grades.tres` (GradeTable), `data/enemies/*.tres` (EnemyData), `data/lord.tres` (LordData), `data/run.tres` (RunData: 구역, 낮의 뽑기와 제단, 밤의 적과 정예)
+  - `data/meta.tres` (MetaData: 조각, 대장간 검집, 성소 축복)
 - 게임 규칙(뽑기, 판정, 체력, 내구, 적, 구역)은 화면 코드와 섞지 않는다. `scripts/core/` 아래에 노드에 기대지 않는 RefCounted 클래스로 쓰고(`Rules`가 중심), 화면은 신호와 상태를 받아 그린다. 나중에 서버 판정으로 옮기기 쉽게 다음을 지킨다.
   - 규칙은 고정 틱(30Hz)으로 돈다. `_physics_process`에서 누적 시간을 틱으로 쪼갠다.
   - 랜덤은 전부 시드가 있는 `RandomNumberGenerator` 하나(`Rules.rng`)를 거친다. 전역 `randf()`, `randi()`는 쓰지 않는다. 같은 시드와 같은 입력이면 결과가 같아야 한다(`Rules.state_hash()`로 테스트한다). 화면 흔들림 같은 꾸밈용 랜덤은 화면 쪽에 따로 둔다.
-  - 영주의 입력은 틱마다 `LordInput` 하나로 넘긴다. 밤 시작(`start_night`)과 고르기(`choose`)는 틱 사이에 부르는 함수다.
+  - 영주의 입력은 틱마다 `LordInput` 하나로 넘긴다. 밤 시작(`start_night`), 고르기(`choose`), 제단(`use_altar`)은 틱 사이에 부르는 함수다.
+- 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
+- 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
+- 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다.
 - 영주와 적의 움직임과 부딪힘은 물리 엔진이 아니라 규칙이 계산한다. 화면 노드는 Node3D이고, 규칙의 위치(prev_pos → pos)를 틱 사이로 이어 그린다. 싸움터에는 장애물이 없어서 적은 영주에게 곧장 온다(길찾기가 필요해지면 그때 넣는다).
 - 위치가 있는 소리(타격, 휘두름, 뽑기, 부러짐)는 AudioStreamPlayer3D(`Sfx`)로 낸다. 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리는 쓰지 않는다(사용자가 싫어한다).
 - 규칙 단위 테스트를 `tests/`에 둔다. 애드온 없이 `extends SceneTree` 스크립트로 쓰고 `godot --headless --path . -s tests/run_all.gd`로 돌린다. 규칙을 바꾸면 테스트도 같이 고친다.
@@ -45,7 +49,7 @@
 ## 에셋
 
 - 에셋은 `assets/` 아래에 둔다. AI 생성 에셋은 쓰지 않는다.
-- 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 아직 정하지 않았다(GDD 2.12). 그전까지는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `scenes/lord/lord_model.tscn`, `main._build_world`).
+- 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 아직 정하지 않았다(GDD 2.14). 그전까지는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `AltarView`, `scenes/lord/lord_model.tscn`, `main._build_world`, `lobby._build_*`).
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.
 - 뽑기 연출은 뽑기 데모의 연출을 사용자가 녹화한 영상(.ogv, Ogg Theora)을 등급마다 하나씩 `assets/video/`에 넣어 VideoStreamPlayer로 튼다. 영상이 없으면 0.5초 번쩍임으로 대신한다.
 
@@ -59,9 +63,9 @@
 
 ```
 project.godot
-scenes/   world/, lord/, debug/
-scripts/  core/ (규칙), core/data/ (표의 Resource 클래스), world/, lord/, enemies/, ui/, debug/
-data/     swords/, inscriptions/, forms/, enemies/, grades.tres, lord.tres, run.tres, unarmed.tres
+scenes/   lobby/ (마을, 시작 장면), world/ (언덕), lord/, debug/
+scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, lord/, enemies/, ui/, debug/
+data/     swords/, inscriptions/, forms/, enemies/, grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres
 assets/   characters/, nature/, ui/, video/, sound/
 tests/
 prototype/  HTML 시험판 (고치지 않는다)

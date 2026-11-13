@@ -27,7 +27,7 @@ light_energy = 1.1
 shadow_enabled = true
 
 [node name="Camera" type="Camera3D" parent="."]
-fov = 40.0
+fov = 55.0
 script = ExtResource("2_cam")
 
 [node name="Sfx" type="Node3D" parent="."]

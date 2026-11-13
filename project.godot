@@ -12,7 +12,7 @@ config_version=5
 
 config/name="검의 언덕"
 config/description="낮에는 언덕에 꽂힌 검을 뽑고, 밤에는 그 검으로 버티며 정상까지 오르는 PC 액션 뽑기 게임"
-run/main_scene="res://scenes/world/main.tscn"
+run/main_scene="res://scenes/lobby/lobby.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [display]
