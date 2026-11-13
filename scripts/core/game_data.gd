@@ -8,6 +8,7 @@ var run: RunData
 var lord: LordData
 var grades: GradeTable
 var unarmed: FormData
+var meta: MetaData
 ## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
 var forms: Array[FormData] = []
 ## 파일 이름 순서(001 … 300).
@@ -26,6 +27,7 @@ static func load_default() -> GameData:
 	d.lord = load(DIR + "lord.tres") as LordData
 	d.grades = load(DIR + "grades.tres") as GradeTable
 	d.unarmed = load(DIR + "unarmed.tres") as FormData
+	d.meta = load(DIR + "meta.tres") as MetaData
 	for path in _tres_in(DIR + "forms/"):
 		d.forms.append(load(path) as FormData)
 	for path in _tres_in(DIR + "inscriptions/"):
@@ -41,6 +43,16 @@ static func load_default() -> GameData:
 		d.swords_by_grade[s.grade].append(d.swords.size())
 		d.swords.append(s)
 	return d
+
+
+## SwordData.id는 1부터 300까지이고 swords 순서와 같다.
+func sword_by_id(id: int) -> SwordData:
+	if id >= 1 and id <= swords.size() and swords[id - 1].id == id:
+		return swords[id - 1]
+	for s in swords:
+		if s.id == id:
+			return s
+	return null
 
 
 func sword_by_name(n: String) -> SwordData:

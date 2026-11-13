@@ -13,5 +13,9 @@ var face: Vector2 = Vector2.DOWN
 var hp: float
 var max_hp: float
 var damage: float
+## 크기(칸). 정예는 표의 값보다 크다.
+var radius: float
+## 정예: 밤마다 하나, 체력이 몇 배이고 쓰러뜨리면 공짜 뽑기를 준다.
+var elite: bool = false
 var cooldown: float = 0.0
 var dead: bool = false

@@ -4,7 +4,8 @@ extends RefCounted
 ## 랜덤은 전부 rng 하나를 거친다. 같은 시드와 같은 입력이면 결과가 같다.
 ## 화면은 신호와 상태를 받아 그린다.
 ## 지금(1단계): 낮에 꽂힌 검 뽑기, 두 칸과 바꿔 쥐기, 밤의 적, 형태별 베기, 내구와 부러짐, 구역 오르기, 언덕지기.
-## 각인과 고유 능력은 표에 수치만 있고 규칙에는 아직 없다(4, 5단계).
+## 판 사이 성장(Meta): 축복(체력, 운, 뽑기 값, 새벽 회복)과 검집의 검을 들고 시작한다. 정예와 숫돌 제단.
+## 각인과 고유 능력은 표에 수치만 있고 규칙에는 아직 없다.
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -23,10 +24,15 @@ signal enemy_spawned(enemy: Enemy)
 signal enemy_hit(enemy: Enemy, damage: float, big: bool)
 signal enemy_died(enemy: Enemy)
 signal boss_spawned(enemy: Enemy)
+signal elite_spawned(enemy: Enemy)
+signal altar_opened()
+signal altar_used(kind: String, text: String)
 
 enum Phase { DAY, NIGHT, OVER }
 
 var data: GameData
+## 판 사이에 남는 것. null이면 축복도 검집도 없다(테스트).
+var meta: Meta
 var rng := RandomNumberGenerator.new()
 var seed_value: int
 ## 한 틱의 길이(초).
@@ -55,6 +61,17 @@ var boss_out: bool = false
 var kills: int = 0
 var pulls: int = 0
 var best_grade: int = -1
+## 판이 끝나면 조각으로 바꾸는 기록.
+var broken_by_grade: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+var melted_by_grade: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+var elites_killed: int = 0
+## 체력을 쓰지 않는 뽑기(정예가 준다).
+var free_pulls: int = 0
+var elite_out: bool = false
+var altar: Altar = null
+## 제단 창이 열려 있으면 시간이 멈춘다.
+var altar_open: bool = false
+var _pull_free: bool = false
 ## 남은 히트스톱 틱. 0보다 크면 그 틱은 시간이 멈춘다.
 var freeze: int = 0
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
@@ -64,14 +81,36 @@ var _spawn_t: float = 0.0
 var _next_id: int = 1
 
 
-func _init(game_data: GameData, p_seed: int) -> void:
+func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	data = game_data
+	meta = p_meta
 	seed_value = p_seed
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
 	Grid.size = data.run.arena_size
-	lord.hp = data.lord.hp
+	lord.hp = max_hp()
 	_new_day()
+	if meta:
+		var s := meta.sheath_sword(data)
+		if s:
+			slots[0] = s
+			active = 0
+
+
+func _bless(key: String) -> float:
+	return meta.bless_value(data.meta, key) if meta else 0.0
+
+
+func max_hp() -> float:
+	return data.lord.hp + _bless("hp")
+
+
+func pull_cost() -> float:
+	return maxf(1.0, data.run.pull_cost - _bless("cost"))
+
+
+func heal_at_dawn() -> float:
+	return data.run.heal_per_dawn + _bless("heal")
 
 
 func zone_count() -> int:
@@ -87,7 +126,7 @@ func current() -> Sword:
 
 
 func luck() -> float:
-	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)]
+	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck"))
 
 
 func step(input: LordInput = null) -> void:
@@ -100,7 +139,7 @@ func step(input: LordInput = null) -> void:
 	if freeze > 0:
 		freeze -= 1
 		return
-	if pending != null:
+	if pending != null or altar_open:
 		return
 	if pull_hilt != null:
 		_step_pull()
@@ -116,13 +155,15 @@ func step(input: LordInput = null) -> void:
 
 ## 낮에만. 뽑는 중이거나 고르는 중이면 못 한다.
 func start_night() -> void:
-	if phase != Phase.DAY or pull_hilt != null or pending != null:
+	if phase != Phase.DAY or pull_hilt != null or pending != null or altar_open:
 		return
 	phase = Phase.NIGHT
 	night_left = data.run.night_length
 	_spawn_t = data.run.spawn_first
 	boss_out = false
+	elite_out = false
 	hilts.clear()
+	altar = null
 	night_started.emit(zone)
 
 
@@ -149,6 +190,14 @@ func _new_day() -> void:
 		h.pos = p
 		h.tilt = rng.randf_range(-0.25, 0.25)
 		hilts.append(h)
+	altar = null
+	if zone >= R.altar_from_zone:
+		var a := Altar.new()
+		for tries in 60:
+			a.pos = Vector2(rng.randf_range(3.0, R.arena_size.x - 3.0), rng.randf_range(3.0, R.arena_size.y - 3.0))
+			if a.pos.distance_to(lord.pos) >= 3.0 and hilts.all(func(h: Hilt) -> bool: return h.pos.distance_to(a.pos) >= 1.8):
+				break
+		altar = a
 	day_started.emit(zone)
 
 
@@ -169,7 +218,7 @@ func _end_night() -> void:
 		run_ended.emit(true)
 		return
 	zone += 1
-	lord.hp = minf(data.lord.hp, lord.hp + data.run.heal_per_dawn)
+	lord.hp = minf(max_hp(), lord.hp + heal_at_dawn())
 	_new_day()
 
 
@@ -202,12 +251,17 @@ func pull_duration() -> float:
 
 
 func _try_pull() -> void:
-	if phase != Phase.DAY or pending != null or pull_hilt != null:
+	if phase != Phase.DAY or pending != null or pull_hilt != null or altar_open:
+		return
+	if near_altar():
+		altar_open = true
+		altar_opened.emit()
 		return
 	var h := nearest_hilt(data.run.pull_reach)
 	if h == null:
 		return
-	if lord.hp <= data.run.pull_cost:
+	_pull_free = free_pulls > 0
+	if not _pull_free and lord.hp <= pull_cost():
 		pull_refused.emit("체력이 모자라. 더 뽑으면 쓰러진다.")
 		return
 	pull_hilt = h
@@ -229,7 +283,10 @@ func _step_pull() -> void:
 	var h := pull_hilt
 	pull_hilt = null
 	h.gone = true
-	lord.hp -= data.run.pull_cost
+	if _pull_free:
+		free_pulls -= 1
+	else:
+		lord.hp -= pull_cost()
 	pulls += 1
 	best_grade = maxi(best_grade, pull_grade)
 	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
@@ -333,7 +390,7 @@ func _swing() -> void:
 	var D := data.lord
 	var s := current()
 	var F: FormData = s.form if s else data.unarmed
-	var g_mult: float = data.grades.damage_mult[s.grade] if s else 1.0
+	var g_mult: float = data.grades.damage_mult[s.grade] * s.bonus if s else 1.0
 	if L.combo_timer <= 0.0:
 		L.combo = 0
 	L.combo = L.combo % F.combo + 1
@@ -354,9 +411,9 @@ func _swing() -> void:
 			continue
 		var to: Vector2 = e.pos - L.pos
 		var d: float = to.length()
-		if d > reach + e.data.radius:
+		if d > reach + e.radius:
 			continue
-		if absf(angle_difference(L.face, to.angle())) > arc / 2.0 and d > e.data.radius + D.close_hit:
+		if absf(angle_difference(L.face, to.angle())) > arc / 2.0 and d > e.radius + D.close_hit:
 			continue
 		hit.append(e)
 	var at: Vector2 = L.pos
@@ -379,6 +436,7 @@ func _swing() -> void:
 func _break(k: int) -> void:
 	var s := slots[k]
 	slots[k] = null
+	broken_by_grade[s.grade] += 1
 	if k == active and slots[1 - k] != null:
 		active = 1 - k
 	lord.combo = 0
@@ -395,6 +453,9 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool) -> void:
 	if e.hp <= 0.0:
 		e.dead = true
 		kills += 1
+		if e.elite:
+			elites_killed += 1
+			free_pulls = mini(data.run.max_free_pulls, free_pulls + 1)
 		enemy_died.emit(e)
 
 
@@ -421,6 +482,9 @@ func _step_night() -> void:
 	if last_zone() and not boss_out and night_left <= R.night_length * R.boss_at:
 		boss_out = true
 		boss_spawned.emit(_spawn(&"boss"))
+	if not elite_out and prog > R.elite_at:
+		elite_out = true
+		elite_spawned.emit(_spawn_elite())
 	_spawn_t -= dt
 	if _spawn_t <= 0.0 and enemies.size() < R.max_enemies and (night_left > 0.0 or last_zone()):
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
@@ -472,6 +536,7 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 	e.max_hp = D.hp * (1.0 if D.boss else data.run.zone_hp[zi])
 	e.hp = e.max_hp
 	e.damage = D.damage * (1.0 if D.boss else data.run.zone_damage[zi])
+	e.radius = D.radius
 	e.cooldown = rng.randf() * 0.5
 	enemies.append(e)
 	enemy_spawned.emit(e)
@@ -492,7 +557,7 @@ func _step_enemies() -> void:
 		if d > 0.001:
 			e.face = to / d
 		e.cooldown -= dt
-		if d > e.data.radius + reach:
+		if d > e.radius + reach:
 			e.pos += e.face * e.data.speed * dt
 		elif e.cooldown <= 0.0:
 			e.cooldown = e.data.cooldown
@@ -504,7 +569,7 @@ func _step_enemies() -> void:
 			var b := enemies[j]
 			var dv: Vector2 = b.pos - a.pos
 			var d: float = dv.length()
-			var m: float = a.data.radius + b.data.radius
+			var m: float = a.radius + b.radius
 			if d < m and d > 0.0001:
 				var p: Vector2 = dv * ((m - d) / 2.0 / d)
 				a.pos -= p
@@ -516,6 +581,83 @@ func _step_enemies() -> void:
 	enemies = alive
 
 
+## 정예: 체력과 피해가 몇 배, 몸이 크다. 쓰러뜨리면 공짜 뽑기.
+func _spawn_elite() -> Enemy:
+	var R := data.run
+	var kind: StringName = &"wraith"
+	if zone >= R.elite_giant_from and rng.randf() < R.elite_giant_chance:
+		kind = &"giant"
+	elif rng.randf() < 0.5:
+		kind = &"wolf"
+	var e := _spawn(kind)
+	e.elite = true
+	e.max_hp *= R.elite_hp
+	e.hp = e.max_hp
+	e.damage *= R.elite_damage
+	e.radius *= R.elite_size
+	return e
+
+
+# ---------------------------------------------------------------- 제단
+
+func near_altar() -> bool:
+	return altar != null and not altar.used and phase == Phase.DAY and altar.pos.distance_to(lord.pos) < data.run.altar_reach
+
+
+## 지금 할 수 있는 일. kind: melt(그 칸의 검을 조각으로), repair(다른 칸을 바쳐 쥔 검 내구를 채움), transfer(다른 칸을 바쳐 그 각인 하나를 쥔 검에).
+func altar_options() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for k in 2:
+		if slots[k]:
+			out.append({"kind": "melt", "slot": k})
+	var s := current()
+	var o := slots[1 - active]
+	if s and o:
+		if s.breakable() and s.durability < s.max_durability:
+			out.append({"kind": "repair"})
+		var n: int = 0
+		for key in o.ins:
+			if not s.ins.has(key) and n < 2:
+				out.append({"kind": "transfer", "key": key})
+				n += 1
+	return out
+
+
+## 고른 일을 한다. -1이면 그냥 닫는다(제단은 남는다).
+func use_altar(i: int) -> void:
+	if not altar_open:
+		return
+	altar_open = false
+	var opts := altar_options()
+	if i < 0 or i >= opts.size():
+		return
+	var o: Dictionary = opts[i]
+	var s := current()
+	var other_k: int = 1 - active
+	var text: String = ""
+	match o.kind:
+		"melt":
+			var k: int = o.slot
+			var w := slots[k]
+			slots[k] = null
+			melted_by_grade[w.grade] += 1
+			if k == active and slots[1 - k] != null:
+				active = 1 - k
+			text = w.label()
+		"repair":
+			slots[other_k] = null
+			s.durability = s.max_durability
+			text = s.label()
+		"transfer":
+			slots[other_k] = null
+			s.add_ins(o.key, data)
+			text = o.key
+	altar.used = true
+	lord.combo = 0
+	altar_used.emit(o.kind, text)
+	slots_changed.emit()
+
+
 func _new_id() -> int:
 	_next_id += 1
 	return _next_id
@@ -523,7 +665,7 @@ func _new_id() -> int:
 
 ## 같은 시드·같은 입력이면 같은 값이 나와야 한다(테스트용).
 func state_hash() -> int:
-	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state]
+	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null]
 	for e in enemies:
 		parts.append(e.pos)
 		parts.append(e.hp)

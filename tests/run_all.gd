@@ -27,6 +27,13 @@ func _init() -> void:
 	_test_lord_dies()
 	_test_last_zone_boss()
 	_test_replay()
+	_test_meta_save()
+	_test_sheath()
+	_test_forge()
+	_test_bless()
+	_test_elite()
+	_test_altar()
+	_test_run_shards()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -424,3 +431,234 @@ func _test_replay() -> void:
 			r.step(inputs[k])
 	check(a.state_hash() == b.state_hash() and a.tick == b.tick, "같은 시드·같은 입력이면 똑같이 돈다(뽑기, 밤, 적 포함)")
 	check(a.pulls > 0 and a.kills + a.enemies.size() > 0, "다시 돌린 판에서 뽑기와 싸움이 실제로 일어났다(뽑기 %d, 처치 %d)" % [a.pulls, a.kills])
+
+
+func _meta() -> Meta:
+	var m := Meta.new()
+	m.rng.seed = 3
+	return m
+
+
+func _test_meta_save() -> void:
+	var m := _meta()
+	m.shards = 123
+	m.sheath_id = 196
+	m.sheath_lv = 4
+	m.sheath_ins = PackedStringArray(["연격"])
+	m.bless = {"hp": 2}
+	m.note_found(196)
+	m.note_found(196)
+	var path := "user://test_save.json"
+	m.save(path)
+	var n := Meta.load_or_new(path)
+	check(n.shards == 123 and n.sheath_id == 196 and n.sheath_lv == 4 and n.sheath_ins == PackedStringArray(["연격"]) and n.bless_level("hp") == 2 and int(n.found["196"]) == 2, "저장했다가 그대로 불러온다")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	check(Meta.load_or_new("user://없는_파일.json").shards == 0, "저장이 없으면 빈 기록으로 시작")
+
+
+func _test_sheath() -> void:
+	var m := _meta()
+	var common := d.sword_by_name("녹슨 장검")
+	var legend := d.sword_by_name("늙은 사자")
+	var myth := d.sword_by_name("왕의 그늘")
+	m.note_found(common.id)
+	m.fix_sheath(d)
+	check(m.sheath_candidates(d).is_empty() and m.sheath_id == -1, "흔함만 뽑아 봤으면 검집에 넣을 검이 없다")
+	m.note_found(legend.id)
+	m.note_found(myth.id)
+	m.fix_sheath(d)
+	check(m.sheath_candidates(d) == [myth.id, legend.id] and m.sheath_id == myth.id, "전설 이상만, 높은 등급부터. 비었으면 가장 좋은 걸 넣는다")
+	m.sheath_id = common.id
+	m.fix_sheath(d)
+	check(m.sheath_id == myth.id, "자격 없는 검은 빠지고 가장 좋은 걸로 바뀐다")
+	m.sheath_id = legend.id
+	m.sheath_lv = 5
+	m.sheath_ins = PackedStringArray(["처형"])
+	var r := Rules.new(d, 1, m)
+	var s := r.slots[0]
+	check(s != null and s.data == legend and s.from_sheath and r.active == 0, "판을 검집의 검을 들고 시작한다")
+	check(is_equal_approx(s.bonus, 1.4) and s.max_durability == roundf(150.0 * 1.5) and s.ins.has("처형") and s.label() == "+5 늙은 사자", "+5: 피해 ×1.4, 내구 ×1.5, 검집 각인")
+	var e := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	r.start_night()
+	r.lord.face = 0.0
+	var hp0: float = e.hp
+	r.step(_inp(Vector2.ZERO, true))
+	check(is_equal_approx(hp0 - e.hp, 20.0 * 1.6 * 1.4), "검집 보너스가 피해에 들어간다(%.1f)" % (hp0 - e.hp))
+
+
+func _test_forge() -> void:
+	var md := d.meta
+	var m := _meta()
+	m.shards = 30
+	var r := m.forge_sheath(d)
+	check(r.paid and m.shards == 0, "강화 값은 조각 30(0단계)")
+	check(not m.forge_sheath(d).paid, "조각이 모자라면 강화하지 않는다")
+	var ok: int = 0
+	var n: int = 4000
+	for i in n:
+		var t := _meta()
+		t.rng.seed = i + 10
+		t.shards = 99999
+		t.sheath_lv = 6
+		if t.forge_sheath(d).ok:
+			ok += 1
+	check(absf(float(ok) / n - md.sheath_rates[6] / 100.0) < 0.03, "+6에서 성공 확률 %d%% (%.3f)" % [md.sheath_rates[6], float(ok) / n])
+	var drop := _meta()
+	drop.shards = 99999
+	drop.sheath_lv = 5
+	drop.sheath_peak = 5
+	var dropped := false
+	for i in 50:
+		var res := drop.forge_sheath(d)
+		if not res.ok:
+			dropped = res.dropped
+			break
+	check(dropped, "+5부터는 실패하면 한 단계 내려간다")
+	var low := _meta()
+	low.shards = 99999
+	low.sheath_lv = 4
+	var never := true
+	for i in 200:
+		low.sheath_lv = 4
+		var res2 := low.forge_sheath(d)
+		if res2.dropped:
+			never = false
+	check(never, "+4 이하는 실패해도 내려가지 않는다")
+	var up := _meta()
+	up.shards = 99999
+	up.sheath_lv = 4
+	while up.sheath_lv < 5:
+		up.forge_sheath(d)
+	check(up.sheath_ins.size() == 1, "+5에 처음 닿으면 각인이 하나 붙는다")
+	var again := up.sheath_ins.size()
+	up.sheath_lv = 4
+	while up.sheath_lv < 5:
+		up.forge_sheath(d)
+	check(up.sheath_ins.size() == again, "다시 +5에 닿아도 각인은 더 붙지 않는다")
+
+
+func _test_bless() -> void:
+	var m := _meta()
+	m.bless = {"hp": 2, "luck": 5, "cost": 3, "heal": 1}
+	var r := Rules.new(d, 2, m)
+	check(r.max_hp() == 160.0 and r.lord.hp == 160.0, "단단한 몸 2: 최대 체력 160")
+	check(is_equal_approx(r.luck(), 1.4) and r.pull_cost() == 7.0 and r.heal_at_dawn() == 60.0, "운 ×1.4, 뽑기 체력 7, 새벽 회복 60")
+	m.shards = 79
+	check(not m.forge_bless(d.meta, "cost").paid, "가벼운 손 3단계에서 강화하려면 조각 80이 든다")
+	m.shards = 80
+	var res := m.forge_bless(d.meta, "cost")
+	check(res.paid and m.shards == 0, "축복 값은 조각 20 × (단계 + 1)")
+	var full := _meta()
+	full.bless = {"cost": 4}
+	full.shards = 9999
+	check(full.bless_full(d.meta, "cost") and not full.forge_bless(d.meta, "cost").paid, "끝까지 올린 축복은 더 강화하지 않는다")
+	var fail := _meta()
+	fail.shards = 99999
+	fail.bless = {"hp": 9}
+	var lv_ok := true
+	for i in 30:
+		fail.forge_bless(d.meta, "hp")
+		lv_ok = lv_ok and fail.bless_level("hp") >= 9
+	check(lv_ok, "축복은 실패해도 내려가지 않는다")
+
+
+func _test_elite() -> void:
+	var r := Rules.new(d, 13)
+	r.debug_god = true
+	var got: Array[Enemy] = []
+	r.elite_spawned.connect(func(e: Enemy) -> void: got.append(e))
+	r.start_night()
+	var at: float = -1.0
+	for t in roundi(d.run.night_length * d.run.tick_rate):
+		r.step()
+		if got.size() > 0 and at < 0.0:
+			at = 1.0 - r.night_left / d.run.night_length
+	check(got.size() == 1, "밤마다 정예가 하나 온다")
+	check(absf(at - d.run.elite_at) < 0.02, "밤이 %d%% 지나면 온다(%.2f)" % [d.run.elite_at * 100, at])
+	var r2 := _night_rules()
+	r2.give(d.sword_by_name("녹슨 장검"), 0)
+	var e := r2._spawn_elite()
+	check(e.elite and is_equal_approx(e.radius, e.data.radius * d.run.elite_size) and is_equal_approx(e.max_hp, e.data.hp * d.run.elite_hp), "정예는 크고 체력이 4배")
+	r2.hurt(e, 999999.0, Vector2.ZERO, false)
+	check(r2.elites_killed == 1 and r2.free_pulls == 1, "정예를 쓰러뜨리면 공짜 뽑기 하나")
+	var day := Rules.new(d, 14)
+	day.free_pulls = 1
+	var hp0: float = day.lord.hp
+	_pull_once(day)
+	check(day.free_pulls == 0 and day.lord.hp == hp0 and day.slots[0] != null, "공짜 뽑기는 체력을 쓰지 않는다")
+	day.free_pulls = 9
+	day.hurt(day.spawn_at(&"wolf", Vector2(1, 1)), 0.0, Vector2.ZERO, false)
+	var e2 := day.spawn_at(&"wolf", Vector2(1, 1))
+	e2.elite = true
+	day.hurt(e2, 9999.0, Vector2.ZERO, false)
+	check(day.free_pulls == d.run.max_free_pulls, "공짜 뽑기는 %d개까지만 모인다" % d.run.max_free_pulls)
+
+
+func _test_altar() -> void:
+	var r := Rules.new(d, 15)
+	check(r.altar == null, "첫 구역에는 제단이 없다")
+	r.zone = 1
+	r._new_day()
+	check(r.altar != null and not r.altar.used, "2구역부터 낮마다 제단이 선다")
+	var a := r.give(d.sword_by_name("늙은 사자"), 0)
+	var b := r.give(d.sword_by_name("붉은 이삭"), 1)
+	a.durability = 10.0
+	r.lord.pos = r.altar.pos + Vector2(0.3, 0.0)
+	var opened: Array[bool] = []
+	r.altar_opened.connect(func() -> void: opened.append(true))
+	var i := LordInput.new()
+	i.pull = true
+	r.step(i)
+	check(opened.size() == 1 and r.altar_open and r.pull_hilt == null, "제단 앞에서 E를 누르면 제단 창이 열린다")
+	var p0: Vector2 = r.lord.pos
+	r.step(_inp(Vector2.RIGHT))
+	check(r.lord.pos == p0, "제단 창이 열려 있는 동안은 시간이 멈춘다")
+	var kinds: Array = r.altar_options().map(func(o: Dictionary) -> String: return o.kind)
+	check(kinds == ["melt", "melt", "repair", "transfer"], "녹이기 둘, 벼리기, 옮기기(무리 베기) %s" % [kinds])
+	r.use_altar(kinds.find("transfer"))
+	check(a.ins.has("무리 베기") and r.slots[1] == null and r.altar.used and not r.altar_open, "옮기기: 다른 칸의 검을 바치고 각인을 받는다")
+	r.step(i)
+	check(not r.altar_open, "제단은 한 번만 쓴다")
+	var m := Rules.new(d, 16)
+	m.zone = 1
+	m._new_day()
+	m.give(d.sword_by_name("왕의 그늘"), 0)
+	m.lord.pos = m.altar.pos
+	m.step(i)
+	m.use_altar(0)
+	check(m.slots[0] == null and m.melted_by_grade[3] == 1, "녹이기: 신화 검 하나를 녹였다")
+	var rep := Rules.new(d, 17)
+	rep.zone = 1
+	rep._new_day()
+	var s1 := rep.give(d.sword_by_name("늙은 사자"), 0)
+	rep.give(d.sword_by_name("녹슨 단검"), 1)
+	s1.durability = 3.0
+	rep.lord.pos = rep.altar.pos
+	rep.step(i)
+	rep.use_altar(2)
+	check(s1.durability == s1.max_durability and rep.slots[1] == null, "벼리기: 쥔 검의 내구가 다 찬다")
+	var close := Rules.new(d, 18)
+	close.zone = 1
+	close._new_day()
+	close.give(d.swords[0], 0)
+	close.lord.pos = close.altar.pos
+	close.step(i)
+	close.use_altar(-1)
+	check(not close.altar_open and not close.altar.used, "그냥 닫으면 제단은 그대로 남는다")
+
+
+func _test_run_shards() -> void:
+	var r := Rules.new(d, 19)
+	r.kills = 41
+	r.zone = 4
+	r.broken_by_grade[0] = 3
+	r.broken_by_grade[2] = 1
+	r.melted_by_grade[3] = 1
+	r.elites_killed = 2
+	var s := Meta.run_shards(r, d.meta)
+	check(s.kills == 10 and s.zone == 40 and s.broken == 3 + 10 and s.melt == 60 and s.elite == 30 and s.total == 153, "조각: 처치 10, 구역 40, 부러진 검 13, 녹인 검 60, 정예 30 = 153 (%s)" % [s])
+	var m := _meta()
+	r.won = true
+	r.zone = r.zone_count() - 1
+	var got := m.record_run(r, d.meta)
+	check(got.zone == 9 * 10 + 60 and m.best == r.zone_count() + 1 and m.runs == 1 and m.shards == got.total, "정상까지 오르면 조각 60을 더 받고, 기록이 남는다")

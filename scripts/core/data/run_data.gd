@@ -27,6 +27,13 @@ extends Resource
 @export var hilt_spacing: float = 2.2
 @export var hilt_clear: float = 2.5
 
+@export_group("낮: 제단")
+## 이 구역부터(0부터 센다) 낮마다 숫돌 제단이 하나 선다.
+@export var altar_from_zone: int = 1
+@export var altar_reach: float = 1.3
+## 공짜 뽑기(정예가 준다)를 모아 둘 수 있는 수.
+@export var max_free_pulls: int = 3
+
 @export_group("밤")
 @export var night_length: float = 75.0
 ## 날이 밝을 때 되찾는 체력.
@@ -46,3 +53,13 @@ extends Resource
 @export var boss_at: float = 0.55
 ## 적이 영주를 때리는 거리(서로의 크기에 더한다).
 @export var enemy_reach: float = 0.42
+
+@export_group("정예")
+## 밤이 이만큼 지나면(0~1) 정예가 하나 온다.
+@export var elite_at: float = 0.4
+@export var elite_hp: float = 4.0
+@export var elite_damage: float = 1.5
+@export var elite_size: float = 1.3
+## 이 구역부터 정예가 거인일 수 있다. 확률.
+@export var elite_giant_from: int = 2
+@export var elite_giant_chance: float = 0.4
