@@ -147,8 +147,8 @@ func has(state: String) -> bool:
 
 
 ## 상태를 바꾼다. 없는 동작이면 비슷한 것으로, 그것도 없으면 팔을 내린 서 있는 자세.
-## 실제로 튼 동작의 이름을 돌려준다(없으면 "").
-func play(state: String, speed: float = 1.0) -> String:
+## 실제로 튼 동작의 이름을 돌려준다(없으면 ""). from은 한 번 트는 동작을 몇 초째부터 틀지.
+func play(state: String, speed: float = 1.0, from: float = 0.0) -> String:
 	var name: String = state
 	if state == "slash" or state == "big":
 		var slashes: Array[String] = []
@@ -175,7 +175,7 @@ func play(state: String, speed: float = 1.0) -> String:
 	_player.speed_scale = speed
 	_player.play("lord/" + name, blend)
 	if not LOOPING.has(name):
-		_player.seek(0.0, true)
+		_player.seek(minf(from, length(name) * 0.5), true)
 	return name
 
 

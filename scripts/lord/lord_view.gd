@@ -14,6 +14,13 @@ extends Node3D
 @export var slash_speed: float = 1.8
 @export var roll_speed: float = 2.2
 @export var hit_speed: float = 1.4
+## 달리기 동작 빠르기. 영주가 Mixamo 달리기보다 훨씬 빨라서 발이 미끄러지지 않게 올려 둔다.
+@export var run_speed: float = 1.7
+## 베기 동작의 앞쪽 준비 자세를 건너뛰는 시간(초). 규칙은 누르는 순간 벤다.
+@export var slash_skip: float = 0.25
+## 한 번 트는 동작을 길어도 이만큼(초)만 보고 서기·달리기로 돌아간다.
+@export var slash_hold: float = 0.6
+@export var roll_hold: float = 0.7
 
 var rules: Rules
 
@@ -138,18 +145,19 @@ func _animate(L: LordState, delta: float) -> void:
 	_busy = maxf(0.0, _busy - delta)
 	if L.hp <= 0.0:
 		if _state != "death":
-			_one_shot("death", 1.0, 999.0)
+			_one_shot("death", 1.0)
+			_busy = 999.0
 	elif L.dash > _last_dash:
-		_one_shot("roll", roll_speed)
+		_one_shot("roll", roll_speed, roll_hold)
 	elif L.swing > _last_swing:
-		_one_shot("big" if L.big else "slash", slash_speed)
+		_one_shot("big" if L.big else "slash", slash_speed, slash_hold, slash_skip)
 	elif L.invuln > _last_invuln and L.swing <= 0.0 and L.dash <= 0.0:
 		_one_shot("hit", hit_speed)
 	elif _busy <= 0.0:
 		if rules.pull_hilt != null:
 			_loop("pull")
 		elif L.moving:
-			_loop("run")
+			_loop("run", run_speed)
 		else:
 			_loop("idle")
 	_last_swing = L.swing
@@ -157,15 +165,17 @@ func _animate(L: LordState, delta: float) -> void:
 	_last_dash = L.dash
 
 
-func _loop(state: String) -> void:
+func _loop(state: String, speed: float = 1.0) -> void:
 	_state = state
-	character.play(state)
+	character.play(state, speed)
 
 
-func _one_shot(state: String, speed: float, hold: float = -1.0) -> void:
+## cap: 길어도 이만큼만 본다(0 이하면 끝까지). from: 몇 초째부터.
+func _one_shot(state: String, speed: float, cap: float = -1.0, from: float = 0.0) -> void:
 	_state = state
-	var name: String = character.play(state, speed)
-	_busy = hold if hold > 0.0 else character.length(name) / maxf(speed, 0.01)
+	var name: String = character.play(state, speed, from)
+	var whole: float = maxf(0.0, character.length(name) - from) / maxf(speed, 0.01)
+	_busy = minf(whole, cap) if cap > 0.0 else whole
 
 
 ## 규칙의 각도(0 = 동쪽 +x, PI/2 = 남쪽 +z)를 모델의 앞(-Z)이 그쪽을 보게 하는 회전으로 바꾼다.
