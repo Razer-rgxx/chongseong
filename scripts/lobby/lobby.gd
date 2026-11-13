@@ -221,7 +221,7 @@ func _build_ground() -> void:
 	outside.position = Vector3(size.x / 2.0, -1.0, size.y / 2.0)
 	add_child(outside)
 	# 마을 울타리
-	var wood := _mat(Color(0.33, 0.24, 0.16))
+	var wood := VillageMaterials.get_mat("raw_plank_wall", Color(0.33, 0.24, 0.16), 1.0, Color(0.7, 0.62, 0.55))
 	for i in 34:
 		for side in [Vector2(i + 0.5, 0.3), Vector2(i + 0.5, 21.7)]:
 			if side.y < 1.0 and absf(side.x - 17.0) < 2.0:
@@ -331,7 +331,7 @@ func _build_shrine() -> void:
 
 func _build_rack() -> void:
 	var at := Grid.cells_to_world(rack_at)
-	var wood := _mat(Color(0.36, 0.26, 0.17))
+	var wood := VillageMaterials.get_mat("raw_plank_wall", Color(0.36, 0.26, 0.17), 1.0, Color(0.75, 0.66, 0.58))
 	var frame := _box(Vector3(0.5, 0.3, 5.0), wood)
 	frame.position = at + Vector3(0, 0.15, 0)
 	add_child(frame)
