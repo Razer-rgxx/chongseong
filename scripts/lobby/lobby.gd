@@ -301,7 +301,7 @@ func _build_forge() -> void:
 
 func _build_shrine() -> void:
 	var at := Grid.cells_to_world(shrine_at)
-	var stone := VillageMaterials.get_mat("stone_wall", Color(0.5, 0.52, 0.56), 2.0)
+	var stone := VillageMaterials.get_mat("medieval_blocks_03", Color(0.5, 0.52, 0.56), 2.0)
 	var base := _box(Vector3(4.0, 0.4, 4.0), stone)
 	base.position = at + Vector3(0, 0.2, 0)
 	add_child(base)

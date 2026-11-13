@@ -14,10 +14,7 @@ func _ready() -> void:
 	var b := BoxMesh.new()
 	b.size = Vector3(1.6, 0.9, 1.1)
 	base.mesh = b
-	var stone := StandardMaterial3D.new()
-	stone.albedo_color = Color(0.36, 0.35, 0.33)
-	stone.roughness = 1.0
-	base.material_override = stone
+	base.material_override = VillageMaterials.get_mat("medieval_blocks_03", Color(0.36, 0.35, 0.33), 1.2, Color(0.8, 0.8, 0.8))
 	base.position.y = 0.45
 	add_child(base)
 	var top := MeshInstance3D.new()
