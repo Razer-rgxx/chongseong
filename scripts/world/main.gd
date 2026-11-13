@@ -64,7 +64,7 @@ func _ready() -> void:
 	rules.choice_needed.connect(_on_choice_needed)
 	rules.slots_changed.connect(_refresh_cards)
 	rules.sword_broke.connect(_on_broke)
-	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish", _lord.position, -4.0 if big else -8.0))
+	rules.lord_swung.connect(_on_swung)
 	rules.lord_dashed.connect(func() -> void: _sfx.play(&"dash", _lord.position, -6.0))
 	rules.lord_hurt.connect(_on_lord_hurt)
 	rules.enemy_hit.connect(_on_enemy_hit)
@@ -296,6 +296,12 @@ func _on_end(won: bool) -> void:
 	_capture(false)
 
 
+func _on_swung(big: bool) -> void:
+	_sfx.play(&"swish_big" if big else &"swish", _lord.position, -2.0 if big else -6.0)
+	if big:
+		_sfx.play(&"grunt", _lord.position, 0.0)
+
+
 func _on_pull_step(_h: Hilt, st: int) -> void:
 	_camera.add_shake(0.12 + 0.07 * st)
 	_sfx.play(&"thump", _lord.position, -6.0 + st)
@@ -347,7 +353,7 @@ func _on_altar_opened() -> void:
 
 
 func _on_altar_used(kind: String, text: String) -> void:
-	_sfx.play(&"thump", _lord.position, 0.0)
+	_sfx.play(&"anvil", _lord.position, -2.0)
 	_hud.flash(Color(1, 0.91, 0.66), 0.25)
 	match kind:
 		"melt":

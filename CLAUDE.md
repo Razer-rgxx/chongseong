@@ -53,6 +53,7 @@
 - 글꼴은 Noto Serif KR을 쓰는 글자만 남겨 넣었다(`assets/ui/fonts/`). 테마 `assets/ui/theme.tres`는 손으로 고치지 않고 `scripts/debug/build_theme.gd`를 고쳐 다시 만든다. 굵기는 FontVariation에 숫자 태그(2003265652 = wght)로 준다.
 - 화면 글자는 엘든 링식이다. 세계(3D)에 글자를 띄우지 않는다(피해 숫자만 예외). 다가갔을 때 안내와 알림은 `Band`, 새 곳의 이름은 `AreaTitle`, 창은 `UiKit`(모서리 없는 검은 판, 놋쇠빛 줄, 따뜻한 글자색). 표에 드문 글자가 새로 생기면 `assets/ui/fonts/README.md`대로 다시 만든다.
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.
+- 소리(`assets/sound/<이름>/*.wav`)도 약관 문구가 없는 팩이라 git에 올리지 않는다(`assets/sound/README.md`). 파일이 없으면 `Sfx`가 코드로 만든 소리로 대신한다.
 - Mixamo 캐릭터와 동작(`assets/characters/`)은 원본을 다시 나눠 주면 안 되어 git에 올리지 않는다(.gitignore). 무엇을 어디에 두는지는 `assets/characters/README.md`에 적는다. 파일이 없으면 기본 도형으로 돌아가야 한다(`LordCharacter.available()`).
 - 뽑기 연출은 뽑기 데모의 연출을 사용자가 녹화한 영상(.ogv, Ogg Theora)을 등급마다 하나씩 `assets/video/`에 넣어 VideoStreamPlayer로 튼다. 영상이 없으면 0.5초 번쩍임으로 대신한다.
 

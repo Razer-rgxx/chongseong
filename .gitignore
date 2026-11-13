@@ -7,3 +7,8 @@
 # 사용자 PC에만 둔다. 무엇을 어디에 두는지는 assets/characters/README.md에 있다.
 assets/characters/*
 !assets/characters/README.md
+
+# 소리 팩(itch.io)은 원본을 다시 나눠 주는 걸 막는 약관이 흔하고 이 팩들은 약관 문구가 없어서 공개 저장소에 올리지 않는다.
+# 다듬은 파일은 사용자 PC에만 둔다. 무엇을 어디에 두는지는 assets/sound/README.md에 있다.
+assets/sound/*
+!assets/sound/README.md

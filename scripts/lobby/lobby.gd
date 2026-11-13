@@ -147,7 +147,7 @@ func _interact() -> void:
 
 
 func _on_hammer(step: int) -> void:
-	_sfx.play(&"thump", Grid.cells_to_world(forge_at, 1.0), -2.0 + step)
+	_sfx.play(&"anvil", Grid.cells_to_world(forge_at, 1.0), -6.0 + 2.0 * step)
 	_camera.add_shake(0.08 + 0.04 * step)
 	_forge_light.light_energy = 6.0
 	_hud.flash(Color(1, 0.7, 0.35), 0.08 + 0.03 * step, 0.2)
@@ -155,11 +155,11 @@ func _on_hammer(step: int) -> void:
 
 func _on_forged(r: Dictionary, big: bool) -> void:
 	if r.ok:
-		_sfx.play(&"hit_big", Grid.cells_to_world(forge_at, 1.0), 2.0)
+		_sfx.play(&"anvil", Grid.cells_to_world(forge_at, 1.0), 4.0)
 		_hud.flash(Color(1, 0.84, 0.42), 0.7 if big else 0.35, 1.4 if big else 0.6)
 		_camera.add_shake(0.5 if big else 0.25)
 	else:
-		_sfx.play(&"break" if r.get("dropped", false) else &"hurt", Grid.cells_to_world(forge_at, 1.0), -2.0)
+		_sfx.play(&"break" if r.get("dropped", false) else &"thump", Grid.cells_to_world(forge_at, 1.0), -2.0)
 		_hud.flash(Color(0.45, 0.48, 0.55), 0.25, 0.4)
 	_refresh_anvil()
 	_lord.set_sword(meta.sheath_sword(data), data.grades)
