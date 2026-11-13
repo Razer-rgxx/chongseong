@@ -9,3 +9,4 @@
 | Medieval Red Brick (질감, 2K로 줄임) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/medieval_red_brick | 마을의 집 벽 |
 | Raw Plank Wall (질감, 2K로 줄임) | Dimitrios Savva / Poly Haven | CC0 | https://polyhaven.com/a/raw_plank_wall | 마을의 대장간 벽, 울타리, 검 진열대 |
 | Paladin J Nordstrom (캐릭터) | Adobe Mixamo | Mixamo 이용 약관(게임에 써도 되고, 원본 파일만 따로 나눠 주면 안 됨) | https://www.mixamo.com | 영주 (저장소에는 없음) |
+| Noto Serif KR (글꼴, 쓰는 글자만 남김) | Google / Adobe | SIL OFL 1.1 | https://fonts.google.com/noto/specimen/Noto+Serif+KR | 모든 글자(UI, 표지판, 피해 숫자) |

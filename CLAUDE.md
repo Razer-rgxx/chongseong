@@ -50,6 +50,7 @@
 
 - 에셋은 `assets/` 아래에 둔다. AI 생성 에셋은 쓰지 않는다.
 - 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 어두운 사실풍이다(GDD 2.14). 모델이 아직 없는 자리는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `AltarView`, `scenes/lord/lord_model.tscn`과 `LordCharacter`, `main._build_world`, `lobby._build_*`).
+- 글꼴은 Noto Serif KR을 쓰는 글자만 남겨 넣었다(`assets/ui/fonts/`, 테마 `assets/ui/theme.tres`). 굵기는 FontVariation에 숫자 태그(2003265652 = wght)로 준다. 표에 드문 글자가 새로 생기면 `assets/ui/fonts/README.md`대로 다시 만든다.
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.
 - Mixamo 캐릭터와 동작(`assets/characters/`)은 원본을 다시 나눠 주면 안 되어 git에 올리지 않는다(.gitignore). 무엇을 어디에 두는지는 `assets/characters/README.md`에 적는다. 파일이 없으면 기본 도형으로 돌아가야 한다(`LordCharacter.available()`).
 - 뽑기 연출은 뽑기 데모의 연출을 사용자가 녹화한 영상(.ogv, Ogg Theora)을 등급마다 하나씩 `assets/video/`에 넣어 VideoStreamPlayer로 튼다. 영상이 없으면 0.5초 번쩍임으로 대신한다.
