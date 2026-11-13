@@ -1,6 +1,7 @@
 extends Node3D
-## 영주 그리기. 규칙의 LordState를 틱 사이로 이어 그리고, 휘두르는 부채꼴, 칼, 돌진 잔상을 보여 준다.
-## 모델은 자식 "Model" 씬(scenes/lord/lord_model.tscn)이다. KayKit 캐릭터로 바꿔 끼울 때 칼은 "Model/Hand" 밑에 두면 된다.
+## 영주 그리기. 규칙의 LordState를 틱 사이로 이어 그리고, 휘두르는 부채꼴, 쥔 검, 돌진 잔상을 보여 준다.
+## 모델은 자식 "Model" 씬(scenes/lord/lord_model.tscn)이다. 모델을 바꿔 끼울 때 칼은 "Model/Hand/Blade"에 두면 된다.
+## 쥔 검의 형태에 따라 칼날 길이와 두께가, 등급에 따라 코등이 색이 바뀐다.
 
 @export var arc_color: Color = Color(1, 1, 1, 0.22)
 @export var arc_big_color: Color = Color(1, 0.84, 0.42, 0.38)
@@ -13,6 +14,11 @@ var rules: Rules
 
 @onready var _model: Node3D = $Model
 @onready var _hand: Node3D = get_node_or_null("Model/Hand") as Node3D
+@onready var _blade: MeshInstance3D = get_node_or_null("Model/Hand/Blade") as MeshInstance3D
+var _guard := MeshInstance3D.new()
+var _guard_mat := StandardMaterial3D.new()
+## 밤에 영주 둘레만 밝히는 횃불.
+var torch := OmniLight3D.new()
 var _arc := MeshInstance3D.new()
 var _arc_mesh := ImmediateMesh.new()
 var _arc_mat := StandardMaterial3D.new()
@@ -35,21 +41,53 @@ func _ready() -> void:
 	add_child(_arc)
 	_ghost_mesh.radius = 0.42
 	_ghost_mesh.height = 1.6
+	if _hand:
+		var gm := BoxMesh.new()
+		gm.size = Vector3(0.34, 0.07, 0.07)
+		_guard.mesh = gm
+		_guard_mat.emission_enabled = true
+		_guard_mat.emission_energy_multiplier = 0.6
+		_guard.material_override = _guard_mat
+		_guard.position = Vector3(0, 0, -0.3)
+		_hand.add_child(_guard)
+	if _blade:
+		_blade.mesh = (_blade.mesh as BoxMesh).duplicate()
+	torch.position = Vector3(0.4, 2.2, 0.3)
+	torch.light_color = Color(1.0, 0.72, 0.45)
+	torch.omni_range = 9.0
+	torch.light_energy = 0.0
+	torch.shadow_enabled = true
+	add_child(torch)
+
+
+## 쥔 검이 바뀌면 부른다. null이면 맨손.
+func set_sword(s: Sword, grades: GradeTable) -> void:
+	if not _blade:
+		return
+	_blade.visible = s != null
+	_guard.visible = s != null
+	if s == null:
+		return
+	var m := _blade.mesh as BoxMesh
+	m.size = Vector3(s.form.blade_width, 0.05, s.form.blade_length)
+	_blade.position = Vector3(0, 0, -(0.32 + s.form.blade_length / 2.0))
+	var c: Color = grades.colors[s.grade]
+	_guard_mat.albedo_color = c
+	_guard_mat.emission = c
 
 
 ## main이 매 프레임 부른다. alpha는 지난 틱과 이번 틱 사이의 위치(0~1).
 func draw(alpha: float, delta: float) -> void:
 	var L := rules.lord
-	var D := rules.data.lord
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
 	_model.rotation.y = _yaw(L.face)
 	# 휘두르기: 콤보마다 쓸어 가는 방향이 바뀐다
 	var rel: float = idle_blade_angle
 	_arc_mesh.clear_surfaces()
 	if L.swing > 0.0:
-		var arc: float = D.arc * (D.big_arc_mult if L.big else 1.0)
-		var reach_m: float = Grid.cells_to_meters(D.reach * (D.big_reach_mult if L.big else 1.0))
-		var k: float = 1.0 - L.swing / D.swing_time
+		var arc: float = L.swing_arc
+		var reach_m: float = Grid.cells_to_meters(L.swing_reach)
+		var k: float = 1.0 - L.swing / rules.data.lord.swing_time
 		var dir: float = 1.0 if L.combo % 2 == 1 else -1.0
 		var a0: float = -dir * arc / 2.0
 		var a1: float = a0 + dir * arc * minf(1.0, k * 1.6)

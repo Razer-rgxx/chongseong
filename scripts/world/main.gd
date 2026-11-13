@@ -1,69 +1,125 @@
 extends Node3D
 ## 본 장면. 입력을 모아 규칙을 고정 틱으로 돌리고, 규칙의 상태와 신호를 받아 그린다.
-## 2단계: 영주 손맛 시험장. 영주관 둘레에 허수아비를 세워 둔다.
+## 낮: 언덕에 꽂힌 검을 E로 뽑는다. 밤(N): 뽑은 검으로 버틴다. 열 구역을 올라 정상의 언덕지기를 쓰러뜨리면 끝.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
-const DUMMY_SCENE: PackedScene = preload("res://scenes/enemies/dummy.tscn")
 
 ## 0이면 시작할 때 아무 시드나 고른다. 같은 판을 다시 보고 싶으면 값을 넣는다.
 @export var seed_value: int = 0
 ## 한 프레임에 따라잡을 틱의 최대 수. 넘치면 밀린 시간을 버린다.
 @export var max_ticks_per_frame: int = 8
-## 허수아비 자리(영주관 칸에서 떨어진 칸 수).
-@export var dummy_offsets: PackedVector2Array = PackedVector2Array([Vector2(-3, 3), Vector2(0, 4), Vector2(3, 3), Vector2(-4, 0), Vector2(4, 0), Vector2(-2, -4), Vector2(2, -4)])
 @export var hit_number_size: int = 56
 @export var big_number_size: int = 84
+
+@export_group("낮과 밤의 빛")
+@export var day_sun: float = 1.1
+@export var night_sun: float = 0.1
+@export var day_ambient: float = 0.55
+@export var night_ambient: float = 0.1
+@export var night_sun_color: Color = Color(0.55, 0.65, 1.0)
+@export var torch_energy: float = 2.6
+@export var light_change_time: float = 1.5
 
 var data: GameData
 var rules: Rules
 var _acc: float = 0.0
 var _want_attack: bool = false
 var _want_dash: bool = false
+var _want_pull: bool = false
+var _swap_to: int = -1
 var _lord: Node3D
-var _dummies: Dictionary = {}
+var _hilts: Dictionary = {}
+var _enemies: Dictionary = {}
+var _dying: Array[EnemyView] = []
+var _prompt := Label3D.new()
+var _hud_t: float = 0.0
 
+@onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
-@onready var _status: Label = $UI/Status
-@onready var _hp: ProgressBar = $UI/Hp
+@onready var _hud: Hud = $UI
 
 
 func _ready() -> void:
 	data = GameData.load_default()
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
 	rules = Rules.new(data, s)
-	_build_placeholder_world()
+	_build_world()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
-	var c := Vector2(Grid.center()) + Vector2(0.5, 0.5)
-	for off in dummy_offsets:
-		var u := rules.add_dummy(c + off)
-		var v := DUMMY_SCENE.instantiate()
-		v.unit = u
-		add_child(v)
-		_dummies[u.id] = v
-	rules.lord_swung.connect(_on_swung)
-	rules.lord_dashed.connect(_on_dashed)
-	rules.unit_hit.connect(_on_hit)
-	_hp.max_value = data.lord.hp
-	_camera.target = Grid.cells_to_world(rules.lord.pos)
+	_prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_prompt.no_depth_test = true
+	_prompt.font_size = 44
+	_prompt.pixel_size = 0.01
+	_prompt.outline_size = 10
+	add_child(_prompt)
+	rules.day_started.connect(_on_day)
+	rules.night_started.connect(_on_night)
+	rules.run_ended.connect(_on_end)
+	rules.pull_started.connect(func(_h: Hilt, _g: int) -> void: _sfx.play(&"thump", _lord.position, -10.0))
+	rules.pull_step.connect(_on_pull_step)
+	rules.pull_refused.connect(func(t: String) -> void: _hud.toast(t))
+	rules.sword_pulled.connect(_on_pulled)
+	rules.choice_needed.connect(_on_choice_needed)
+	rules.slots_changed.connect(_refresh_cards)
+	rules.sword_broke.connect(_on_broke)
+	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish", _lord.position, -4.0 if big else -8.0))
+	rules.lord_dashed.connect(func() -> void: _sfx.play(&"dash", _lord.position, -6.0))
+	rules.lord_hurt.connect(_on_lord_hurt)
+	rules.enemy_hit.connect(_on_enemy_hit)
+	rules.enemy_died.connect(_on_enemy_died)
+	rules.boss_spawned.connect(func(_e: Enemy) -> void: _hud.toast("언덕지기가 올라온다."); _camera.add_shake(0.5); _sfx.play(&"night", _lord.position, 0.0))
+	_hud.chose.connect(func(k: int) -> void: rules.choose(k))
+	_hud.restart_requested.connect(func() -> void: get_tree().reload_current_scene())
+	_hud.night_button().pressed.connect(func() -> void: rules.start_night())
+	_sync_hilts()
+	_refresh_cards()
+	_set_light(false, true)
+	_camera.target = _lord_world()
 	_camera.snap()
+	_hud.toast("%s. 꽂힌 검 앞에서 E를 눌러 뽑아. 한 번에 체력 %d. 준비되면 N으로 밤을 맞아." % [_zone_name(), data.run.pull_cost])
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("restart") and rules.phase == Rules.Phase.OVER:
+		get_tree().reload_current_scene()
+		return
+	if _hud.choice_open():
+		if event.is_action_pressed("slot_1"):
+			_hud.pick(0)
+		elif event.is_action_pressed("slot_2"):
+			_hud.pick(1)
+		elif event.is_action_pressed("discard"):
+			_hud.pick(-1)
+		return
 	# 틱 사이에 눌렀다 뗀 것도 놓치지 않게 모아 둔다
 	if event.is_action_pressed("attack"):
 		_want_attack = true
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("pull"):
+		_want_pull = true
+	if event.is_action_pressed("swap"):
+		_swap_to = 2
+	if event.is_action_pressed("slot_1"):
+		_swap_to = 0
+	if event.is_action_pressed("slot_2"):
+		_swap_to = 1
+	if event.is_action_pressed("start_night"):
+		rules.start_night()
 	var k := event as InputEventKey
 	if k and k.pressed and not k.echo:
-		if k.physical_keycode == KEY_N:
-			rules.start_night()
-		elif k.physical_keycode == KEY_M:
-			rules.end_night()
+		match k.physical_keycode:
+			KEY_F2:
+				rules.debug_god = not rules.debug_god
+				_hud.toast("관리: 무적 " + ("켬" if rules.debug_god else "끔"))
+			KEY_F3:
+				rules.skip_night()
+			KEY_F4:
+				rules.debug_grade = rules.debug_grade + 1 if rules.debug_grade < 5 else -1
+				_hud.toast("관리: 다음 뽑기 " + ("등급 굴리기" if rules.debug_grade < 0 else data.grades.names[rules.debug_grade] + "로 고정"))
 
 
 func _physics_process(delta: float) -> void:
@@ -73,6 +129,8 @@ func _physics_process(delta: float) -> void:
 		rules.step(_read_input())
 		_want_attack = false
 		_want_dash = false
+		_want_pull = false
+		_swap_to = -1
 		_acc -= rules.dt
 		n += 1
 	if n == max_ticks_per_frame:
@@ -84,6 +142,8 @@ func _read_input() -> LordInput:
 	inp.move = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	inp.attack = Input.is_action_pressed("attack") or _want_attack
 	inp.dash = _want_dash
+	inp.pull = _want_pull
+	inp.swap_to = _swap_to
 	var g: Variant = _camera.ground_point(get_viewport().get_mouse_position())
 	if g != null:
 		inp.aim_valid = true
@@ -94,57 +154,255 @@ func _read_input() -> LordInput:
 func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
 	_lord.draw(alpha, delta)
-	for v in _dummies.values():
-		v.draw(alpha, delta)
+	_sync_enemies(alpha, delta)
 	_camera.target = _lord.position
-	_hp.value = rules.lord.hp
-	var phase_text: String = "낮 · 밤까지 %d초" % ceili(rules.day_left) if rules.phase == Rules.Phase.DAY else ("밤" if rules.phase == Rules.Phase.NIGHT else "끝")
-	_status.text = "%d일째 %s\n나무 %d · 돌 %d · 금화 %d\n틱 %d · 시드 %d" % [rules.day, phase_text, rules.wood, rules.stone, rules.gold, rules.tick, rules.seed_value]
+	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
+	_prompt.visible = near != null
+	if near:
+		_prompt.text = "E  뽑기 · 체력 %d" % data.run.pull_cost
+		_prompt.position = Grid.cells_to_world(near.pos, 1.9)
+	_hud_t -= delta
+	if _hud_t <= 0.0:
+		_hud_t = 0.1
+		_update_hud()
 
 
-func _on_swung(big: bool) -> void:
-	_sfx.play(&"swish", _lord.position, -4.0 if big else -8.0)
+func _lord_world() -> Vector3:
+	return Grid.cells_to_world(rules.lord.pos)
 
 
-func _on_dashed() -> void:
-	_sfx.play(&"dash", _lord.position, -6.0)
+func _zone_name() -> String:
+	return "%d구역 %s" % [rules.zone + 1, data.run.zone_names[rules.zone]]
 
 
-func _on_hit(u: Unit, damage: float, big: bool) -> void:
-	var at: Vector3 = Grid.cells_to_world(u.pos)
-	if _dummies.has(u.id):
-		_dummies[u.id].hit(big)
+func _update_hud() -> void:
+	var night: bool = rules.phase == Rules.Phase.NIGHT
+	var sub: String
+	if night:
+		sub = ("새벽까지 %d초" % ceili(rules.night_left)) if rules.night_left > 0.0 else "언덕지기를 쓰러뜨려"
+		sub += " · 적 %d" % rules.enemies.size()
+	else:
+		var left: int = 0
+		for h in rules.hilts:
+			left += 0 if h.gone else 1
+		sub = "남은 검 %d · 뽑기 운 ×%s" % [left, str(rules.luck())]
+	var k: float = 1.0 - maxf(0.0, rules.night_left) / data.run.night_length if night else 0.0
+	_hud.set_status(rules.lord.hp, data.lord.hp, "%s · %s" % [_zone_name(), "밤" if night else "낮"], sub, k, night or rules.phase == Rules.Phase.OVER)
+	var boss: Enemy = null
+	for e in rules.enemies:
+		if e.data.boss:
+			boss = e
+	_hud.set_boss(boss)
+	_refresh_cards()
+
+
+# ---------------------------------------------------------------- 카드
+
+func _card(s: Sword, slot: int, held: bool) -> String:
+	var key: String = "" if slot < 0 else "  [color=#8b96b3][%d][/color]" % (slot + 1)
+	if s == null:
+		return "[b][color=#8b96b3]%s[/color][/b]%s\n[color=#8b96b3]낮에 검을 뽑아 채워[/color]" % ["맨손" if held else "빈 칸", key]
+	var col: String = data.grades.colors[s.grade].to_html(false)
+	var dmg: int = roundi(s.damage(data))
+	var dur: String = "∞" if not s.breakable() else "%d/%d" % [ceili(s.durability), s.max_durability]
+	var t: String = "[b][color=#%s]%s[/color][/b]%s\n[color=#aab4c8]%s %s · 피해 %d · 내구 %s[/color]" % [col, s.data.display_name, key, data.grades.names[s.grade], s.form.display_name, dmg, dur]
+	for k in s.data.inscriptions:
+		var ins: InscriptionData = data.inscriptions.get(k)
+		if ins:
+			t += "\n[b]%s[/b]  %s" % [k, ins.describe(s.grade)]
+	if s.data.unique_text != "":
+		t += "\n[color=#ffe2a0]%s[/color]" % s.data.unique_text
+		if not s.data.unique_ready:
+			t += " [color=#c0566a](아직 작동 안 함)[/color]"
+	return t
+
+
+func _refresh_cards() -> void:
+	var texts: Array[String] = []
+	var cols: Array[Color] = []
+	for k in 2:
+		var s := rules.slots[k]
+		texts.append(_card(s, k, k == rules.active))
+		cols.append(data.grades.colors[s.grade] if s else Color(0.4, 0.45, 0.55))
+	_hud.set_cards(texts, cols, rules.active)
+	_lord.set_sword(rules.current(), data.grades)
+
+
+# ---------------------------------------------------------------- 신호
+
+func _on_day(_zone: int) -> void:
+	for v in _hilts.values():
+		v.queue_free()
+	_hilts.clear()
+	_sync_hilts()
+	_set_light(false)
+	_hud.toast("날이 밝았다. 체력 +%d. %s(으)로 올라왔어. 뽑기 운 ×%s." % [data.run.heal_per_dawn, _zone_name(), str(rules.luck())])
+
+
+func _on_night(_zone: int) -> void:
+	for v in _hilts.values():
+		v.queue_free()
+	_hilts.clear()
+	_set_light(true)
+	_sfx.play(&"night", _lord.position, -2.0)
+	_hud.toast("밤이 왔다. %d초를 버텨.%s" % [data.run.night_length, " 정상의 언덕지기를 쓰러뜨려야 끝난다." if rules.last_zone() else ""])
+
+
+func _on_end(won: bool) -> void:
+	var best: String = data.grades.names[rules.best_grade] if rules.best_grade >= 0 else "없음"
+	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
+	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s" % [rules.pulls, rules.kills, best])
+
+
+func _on_pull_step(_h: Hilt, st: int) -> void:
+	_camera.add_shake(0.12 + 0.07 * st)
+	_sfx.play(&"thump", _lord.position, -6.0 + st)
+
+
+func _on_pulled(s: Sword) -> void:
+	var c: Color = data.grades.colors[s.grade]
+	_sfx.play(&"draw", _lord.position, -4.0)
+	if s.grade >= data.grades.reveal_from:
+		# 등급 연출 영상은 6단계에서 넣는다. 그전까지는 0.5초 번쩍임.
+		_hud.flash(c, 0.35 + 0.1 * s.grade)
+		_camera.add_shake(0.3 + 0.08 * s.grade)
 	var t := FloatText.new()
-	t.text = str(roundi(damage))
-	t.font_size = big_number_size if big else hit_number_size
-	t.modulate = Color(1, 0.86, 0.45) if big else Color.WHITE
+	t.text = s.data.display_name
+	t.font_size = 64 + 8 * s.grade
+	t.modulate = c
+	t.life = 1.6
 	add_child(t)
-	t.global_position = at + Vector3(0, 2.4, 0)
+	t.global_position = _lord_world() + Vector3(0, 2.6, 0)
+	_hud.toast("%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name])
+
+
+func _on_choice_needed(s: Sword) -> void:
+	_hud.open_choice(_card(s, -1, false), _card(rules.slots[0], 0, false), _card(rules.slots[1], 1, false))
+
+
+func _on_broke(_k: int, s: Sword) -> void:
+	_sfx.play(&"break", _lord.position, 0.0)
+	_camera.add_shake(0.3)
+	_hud.toast(s.data.display_name + "이(가) 부러졌다." + ("" if rules.current() else " 이제 맨손이야."))
+
+
+func _on_lord_hurt(d: float) -> void:
+	_sfx.play(&"hurt", _lord.position, -4.0)
+	_camera.add_shake(0.25)
+	_hud.flash(Color(1, 0.2, 0.25), 0.18, 0.3)
+	_float(_lord_world() + Vector3(0, 2.4, 0), "-%d" % roundi(d), Color(1, 0.42, 0.42), hit_number_size)
+
+
+func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	if _enemies.has(e.id):
+		_enemies[e.id].hit()
+	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.data.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_sfx.play(&"hit_big" if big else &"hit", at)
 
 
-func _build_placeholder_world() -> void:
-	var side: float = Grid.size * Grid.CELL
-	var ground := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(side, side)
-	ground.mesh = plane
-	ground.position = Vector3(side / 2.0, 0.0, side / 2.0)
-	var grass := StandardMaterial3D.new()
-	grass.albedo_color = Color(0.2, 0.3, 0.18)
-	ground.material_override = grass
-	add_child(ground)
+func _on_enemy_died(e: Enemy) -> void:
+	if e.data.boss:
+		_camera.add_shake(0.7)
+		_hud.flash(Color.WHITE, 0.6, 0.8)
 
-	# 영주관 자리: 가운데 칸에 상자 하나(4단계에서 진짜 영주관으로 바꾼다)
-	var hall := MeshInstance3D.new()
+
+func _float(at: Vector3, text: String, c: Color, size: int) -> void:
+	var t := FloatText.new()
+	t.text = text
+	t.font_size = size
+	t.modulate = c
+	add_child(t)
+	t.global_position = at
+
+
+# ---------------------------------------------------------------- 그리기
+
+func _sync_hilts() -> void:
+	for h in rules.hilts:
+		if _hilts.has(h.id):
+			continue
+		var v := HiltView.new()
+		v.setup(rules, h)
+		add_child(v)
+		_hilts[h.id] = v
+
+
+## 규칙의 적 목록과 맞춘다: 새로 나온 적은 만들고, 없어진 적은 쓰러지는 모습을 보여 주고 지운다.
+func _sync_enemies(alpha: float, delta: float) -> void:
+	var alive := {}
+	for e in rules.enemies:
+		alive[e.id] = true
+		if not _enemies.has(e.id):
+			var v := EnemyView.new()
+			v.setup(e)
+			add_child(v)
+			_enemies[e.id] = v
+	for id in _enemies.keys():
+		var v: EnemyView = _enemies[id]
+		if not alive.has(id) or v.enemy.dead:
+			_enemies.erase(id)
+			v.die()
+			_dying.append(v)
+		else:
+			v.draw(alpha, delta)
+	for i in range(_dying.size() - 1, -1, -1):
+		if _dying[i].draw(alpha, delta):
+			_dying[i].queue_free()
+			_dying.remove_at(i)
+
+
+func _set_light(night: bool, instant: bool = false) -> void:
+	var env := _env.environment
+	var t: float = 0.0 if instant else light_change_time
+	var tw := create_tween().set_parallel()
+	tw.tween_property(_sun, "light_energy", night_sun if night else day_sun, t)
+	tw.tween_property(_sun, "light_color", night_sun_color if night else Color.WHITE, t)
+	tw.tween_property(env, "ambient_light_energy", night_ambient if night else day_ambient, t)
+	tw.tween_property(env, "background_color", Color(0.01, 0.015, 0.03) if night else Color(0.06, 0.08, 0.12), t)
+	tw.tween_property(_lord.torch, "light_energy", torch_energy if night else 0.0, t)
+
+
+## 언덕 꼭대기(싸움터)와 그 아래 땅. 에셋이 들어오면 이 함수만 바꾼다.
+func _build_world() -> void:
+	var size := Vector2(Grid.size) * Grid.CELL
+	var top := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(Grid.CELL * 1.4, 2.4, Grid.CELL * 1.4)
-	hall.mesh = box
-	hall.position = Grid.cell_to_world(Grid.center(), box.size.y / 2.0)
-	var stone := StandardMaterial3D.new()
-	stone.albedo_color = Color(0.49, 0.35, 0.53)
-	hall.material_override = stone
-	add_child(hall)
-
+	box.size = Vector3(size.x, 1.6, size.y)
+	top.mesh = box
+	top.position = Vector3(size.x / 2.0, -0.8, size.y / 2.0)
+	var grass := StandardMaterial3D.new()
+	grass.albedo_color = Color(0.23, 0.29, 0.19)
+	grass.roughness = 1.0
+	top.material_override = grass
+	add_child(top)
+	var below := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(size.x + 400.0, size.y + 400.0)
+	below.mesh = plane
+	below.position = Vector3(size.x / 2.0, -1.6, size.y / 2.0)
+	var dirt := StandardMaterial3D.new()
+	dirt.albedo_color = Color(0.11, 0.13, 0.1)
+	dirt.roughness = 1.0
+	below.material_override = dirt
+	add_child(below)
+	# 언덕 아래의 바위(꾸밈. 규칙의 랜덤과 따로 둔다)
+	var deco := RandomNumberGenerator.new()
+	deco.seed = 7
+	var rock := StandardMaterial3D.new()
+	rock.albedo_color = Color(0.2, 0.21, 0.22)
+	for i in 160:
+		var p := Vector3(deco.randf_range(-40.0, size.x + 40.0), -1.6, deco.randf_range(-40.0, size.y + 40.0))
+		if p.x > -2.0 and p.x < size.x + 2.0 and p.z > -2.0 and p.z < size.y + 2.0:
+			continue
+		var m := MeshInstance3D.new()
+		var s := SphereMesh.new()
+		var r: float = deco.randf_range(0.4, 1.6)
+		s.radius = r
+		s.height = r * 1.2
+		m.mesh = s
+		m.material_override = rock
+		m.position = p
+		add_child(m)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)

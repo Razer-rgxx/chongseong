@@ -18,6 +18,11 @@ func _ready() -> void:
 	_streams[&"hit_big"] = _make(110.0, 38.0, 0.24, 0.75, 0.6, 2000.0)
 	_streams[&"swish"] = _make(0.0, 0.0, 0.1, 0.0, 0.22, 1800.0)
 	_streams[&"dash"] = _make(0.0, 0.0, 0.16, 0.0, 0.25, 900.0)
+	_streams[&"thump"] = _make(92.0, 36.0, 0.4, 0.6, 0.25, 700.0)
+	_streams[&"draw"] = _make(150.0, 80.0, 0.16, 0.3, 0.35, 2600.0)
+	_streams[&"break"] = _make(220.0, 60.0, 0.28, 0.3, 0.6, 3200.0)
+	_streams[&"hurt"] = _make(150.0, 70.0, 0.15, 0.5, 0.2, 1200.0)
+	_streams[&"night"] = _make(70.0, 40.0, 1.2, 0.5, 0.15, 600.0)
 	for i in voices:
 		var p := AudioStreamPlayer3D.new()
 		p.unit_size = unit_size
