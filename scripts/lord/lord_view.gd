@@ -11,16 +11,16 @@ extends Node3D
 ## 칼을 들고 있을 때 몸 앞에서 벌어진 각도(라디안).
 @export var idle_blade_angle: float = 0.9
 ## 기사 모델의 베기·구르기·맞기 동작을 트는 빠르기(1 = 원래 빠르기).
-@export var slash_speed: float = 1.8
-@export var roll_speed: float = 2.2
-@export var hit_speed: float = 1.4
-## 달리기 동작 빠르기. 영주가 Mixamo 달리기보다 훨씬 빨라서 발이 미끄러지지 않게 올려 둔다.
-@export var run_speed: float = 1.7
+@export var slash_speed: float = 1.1
+@export var roll_speed: float = 1.3
+@export var hit_speed: float = 1.0
+## 달리기 동작 빠르기. 영주가 Mixamo 달리기보다 빨라서 올리면 발이 덜 미끄러지지만, 사용자가 빠르다고 해서 1.1로 뒀다.
+@export var run_speed: float = 1.1
 ## 베기 동작의 앞쪽 준비 자세를 건너뛰는 시간(초). 규칙은 누르는 순간 벤다.
 @export var slash_skip: float = 0.25
 ## 한 번 트는 동작을 길어도 이만큼(초)만 보고 서기·달리기로 돌아간다.
-@export var slash_hold: float = 0.6
-@export var roll_hold: float = 0.7
+@export var slash_hold: float = 0.8
+@export var roll_hold: float = 0.9
 
 var rules: Rules
 
