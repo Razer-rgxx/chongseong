@@ -2,6 +2,7 @@ extends Node3D
 ## 영주 그리기. 규칙의 LordState를 틱 사이로 이어 그리고, 휘두르는 부채꼴, 쥔 검, 돌진 잔상을 보여 준다.
 ## 모델은 자식 "Model" 씬(scenes/lord/lord_model.tscn)이다. 모델을 바꿔 끼울 때 칼은 "Model/Hand/Blade"에 두면 된다.
 ## 쥔 검의 형태에 따라 칼날 길이와 두께가, 등급에 따라 코등이 색이 바뀐다.
+## assets/characters/lord/paladin.fbx가 있으면 기본 도형 대신 그 기사(LordCharacter)를 세우고 동작을 고른다.
 
 @export var arc_color: Color = Color(1, 1, 1, 0.22)
 @export var arc_big_color: Color = Color(1, 0.84, 0.42, 0.38)
@@ -9,6 +10,10 @@ extends Node3D
 @export var ghost_life: float = 0.2
 ## 칼을 들고 있을 때 몸 앞에서 벌어진 각도(라디안).
 @export var idle_blade_angle: float = 0.9
+## 기사 모델의 베기·구르기·맞기 동작을 트는 빠르기(1 = 원래 빠르기).
+@export var slash_speed: float = 1.8
+@export var roll_speed: float = 2.2
+@export var hit_speed: float = 1.4
 
 var rules: Rules
 
@@ -24,6 +29,13 @@ var _arc_mesh := ImmediateMesh.new()
 var _arc_mat := StandardMaterial3D.new()
 var _ghost_mesh := CapsuleMesh.new()
 var _ghosts: Array[MeshInstance3D] = []
+## 기사 모델(없으면 null, 기본 도형을 쓴다).
+var character: LordCharacter = null
+var _busy: float = 0.0
+var _last_swing: float = 0.0
+var _last_invuln: float = 0.0
+var _last_dash: float = 0.0
+var _state: String = ""
 
 
 func setup(r: Rules) -> void:
@@ -41,6 +53,13 @@ func _ready() -> void:
 	add_child(_arc)
 	_ghost_mesh.radius = 0.42
 	_ghost_mesh.height = 1.6
+	if LordCharacter.available():
+		for c in _model.get_children():
+			c.queue_free()
+		_hand = null
+		_blade = null
+		character = LordCharacter.new()
+		_model.add_child(character)
 	if _hand:
 		var gm := BoxMesh.new()
 		gm.size = Vector3(0.34, 0.07, 0.07)
@@ -62,6 +81,9 @@ func _ready() -> void:
 
 ## 쥔 검이 바뀌면 부른다. null이면 맨손.
 func set_sword(s: Sword, grades: GradeTable) -> void:
+	if character:
+		character.set_sword(s, grades)
+		return
 	if not _blade:
 		return
 	_blade.visible = s != null
@@ -97,6 +119,8 @@ func draw(alpha: float, delta: float) -> void:
 		_fan(position + Vector3(0, 0.12, 0), L.face + minf(a0, a1), L.face + maxf(a0, a1), reach_m, col)
 	if _hand:
 		_hand.rotation.y = -rel
+	if character:
+		_animate(L, delta)
 	for i in range(_ghosts.size() - 1, -1, -1):
 		var g := _ghosts[i]
 		var m := g.material_override as StandardMaterial3D
@@ -106,6 +130,42 @@ func draw(alpha: float, delta: float) -> void:
 			_ghosts.remove_at(i)
 	if L.dash > 0.0:
 		_spawn_ghost()
+
+
+## 기사 모델의 동작을 고른다. 베기·구르기·맞기는 끝날 때까지 두고, 그 밖에는 달리기와 서 있기.
+## 규칙의 값이 새로 커지는 순간(휘두름, 돌진, 무적)을 보고 한 번만 튼다.
+func _animate(L: LordState, delta: float) -> void:
+	_busy = maxf(0.0, _busy - delta)
+	if L.hp <= 0.0:
+		if _state != "death":
+			_one_shot("death", 1.0, 999.0)
+	elif L.dash > _last_dash:
+		_one_shot("roll", roll_speed)
+	elif L.swing > _last_swing:
+		_one_shot("big" if L.big else "slash", slash_speed)
+	elif L.invuln > _last_invuln and L.swing <= 0.0 and L.dash <= 0.0:
+		_one_shot("hit", hit_speed)
+	elif _busy <= 0.0:
+		if rules.pull_hilt != null:
+			_loop("pull")
+		elif L.moving:
+			_loop("run")
+		else:
+			_loop("idle")
+	_last_swing = L.swing
+	_last_invuln = L.invuln
+	_last_dash = L.dash
+
+
+func _loop(state: String) -> void:
+	_state = state
+	character.play(state)
+
+
+func _one_shot(state: String, speed: float, hold: float = -1.0) -> void:
+	_state = state
+	var name: String = character.play(state, speed)
+	_busy = hold if hold > 0.0 else character.length(name) / maxf(speed, 0.01)
 
 
 ## 규칙의 각도(0 = 동쪽 +x, PI/2 = 남쪽 +z)를 모델의 앞(-Z)이 그쪽을 보게 하는 회전으로 바꾼다.
