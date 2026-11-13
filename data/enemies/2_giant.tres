@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"giant"
+display_name = "거인"
+hp = 200
+damage = 16
+speed = 0.9
+radius = 0.62
+cooldown = 1.4
+color = Color(0.49, 0.529, 0.58, 1)
+knockback_mult = 0.4
+big = true
+wraith = false
+boss = false

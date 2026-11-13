@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 249
+display_name = "되돌아오는 칼"
+grade = 4
+form = 0
+inscriptions = PackedStringArray("날랜 발", "잔상")
+unique_text = "돌진하면 칼이 앞으로 날아갔다 돌아오며 길 위의 적을 벤다."
+unique_ready = false
+unbreakable = false
+story = "몇 번을 던져 버려도 아침이면 칼집에 돌아와 있었다."

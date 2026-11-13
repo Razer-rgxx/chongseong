@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 260
+display_name = "폭풍 부르는 자"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("번개", "연격")
+unique_text = "큰 베기가 땅을 쳐서 앞쪽 부채꼴로 번개가 퍼진다."
+unique_ready = false
+unbreakable = false
+story = "이 검을 뽑은 날마다 비가 왔다."

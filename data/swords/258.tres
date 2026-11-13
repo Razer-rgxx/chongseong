@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 258
+display_name = "거인의 무릎"
+grade = 4
+form = 2
+inscriptions = PackedStringArray("거인 베기", "무거움")
+unique_text = "큰 적을 세 번 연달아 베면 무릎을 꿇려 3초 동안 받는 피해가 2배가 된다."
+unique_ready = false
+unbreakable = false
+story = "거인 사냥꾼들은 늘 무릎부터 노렸다."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 299
+display_name = "처음이자 마지막 칼"
+grade = 5
+form = 1
+inscriptions = PackedStringArray()
+unique_text = "밤마다 한 번, 휘두르면 화면의 모든 적이 쓰러진다."
+unique_ready = false
+unbreakable = true
+story = "첫 전쟁을 시작한 칼이자, 마지막 전쟁을 끝낼 칼."

@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "바꿔 쥐기"
+text = "이 검으로 바꿔 쥔 뒤 첫 공격 피해 +N%"
+values = PackedFloat32Array(40, 52, 68, 88, 128, 184)

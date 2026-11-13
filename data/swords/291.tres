@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 291
+display_name = "꺼지지 않는 불"
+grade = 5
+form = 2
+inscriptions = PackedStringArray("불씨", "무거움")
+unique_text = "불이 꺼지지 않는다. 불붙은 적은 쓰러질 때까지 타며 옆으로 번진다."
+unique_ready = false
+unbreakable = false
+story = "꺼뜨린 사람이 아무도 없다."

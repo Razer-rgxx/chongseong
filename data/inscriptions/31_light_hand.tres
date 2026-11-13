@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "가벼운 손"
+text = "들고 있으면 낮에 뽑을 때 체력을 N 덜 씀"
+values = PackedFloat32Array(1, 1, 2, 2, 3, 4)

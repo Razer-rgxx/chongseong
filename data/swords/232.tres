@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 232
+display_name = "우는 칼"
+grade = 3
+form = 3
+inscriptions = PackedStringArray("출혈", "처형")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = ""

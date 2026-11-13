@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 265
+display_name = "핏빛 맹세"
+grade = 4
+form = 0
+inscriptions = PackedStringArray("피의 값", "흡혈")
+unique_text = "큰 베기마다 체력 5를 쓰고 피해가 2배가 된다."
+unique_ready = false
+unbreakable = false
+story = "피로 맹세한 자만 쥘 수 있다."

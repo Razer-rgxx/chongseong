@@ -1,104 +1,48 @@
 class_name RunData
 extends Resource
-## 한 판의 규칙 수치. 거리는 칸(1칸 = 2m), 시간은 초.
+## 한 판의 흐름. 거리는 칸(1칸 = 2m), 시간은 초.
 
-@export_group("판")
-@export var days: int = 7
-@export var day_length: float = 80.0
-@export var map_size: int = 33
 @export var tick_rate: int = 30
+## 언덕 꼭대기 싸움터의 크기(칸).
+@export var arena_size: Vector2i = Vector2i(34, 22)
 
-@export_group("시작")
-@export var start_wood: int = 40
-@export var start_stone: int = 40
-@export var start_gold: int = 0
-## 영주관을 두르는 첫 성벽 고리의 거리(체비쇼프).
-@export var start_wall_ring: int = 3
+@export_group("구역")
+@export var zone_names: PackedStringArray = PackedStringArray(["기슭", "들머리", "비탈", "바위턱", "중턱", "안개 띠", "능선", "칼바람 마루", "봉우리 아래", "정상"])
+## 구역마다 뽑기 운, 적 체력 배수, 적 피해 배수. 길이는 구역 수와 같다.
+@export var zone_luck: PackedFloat32Array = PackedFloat32Array([1, 1.3, 1.7, 2.2, 3, 4, 5, 6.5, 8, 10])
+@export var zone_hp: PackedFloat32Array = PackedFloat32Array([1, 1.25, 1.5, 1.8, 2.2, 2.6, 3.1, 3.7, 4.4, 5.2])
+@export var zone_damage: PackedFloat32Array = PackedFloat32Array([1, 1.1, 1.2, 1.35, 1.5, 1.65, 1.8, 2, 2.2, 2.4])
 
-@export_group("맵")
-@export var tree_chance: float = 0.10
-@export var rock_chance: float = 0.04
-## 영주관에서 이 거리 안에는 나무와 바위를 두지 않는다.
-@export var clear_radius: int = 6
-## 가장자리 몇 줄에는 나무와 바위를 두지 않는다.
-@export var clear_border: int = 2
-@export var tree_hits: int = 4
-@export var rock_hits: int = 5
-@export var wood_per_hit: int = 3
-@export var stone_per_hit: int = 2
-@export var big_hit_bonus: int = 2
+@export_group("낮: 뽑기")
+## 낮마다 꽂히는 검 수.
+@export var hilts_per_day: int = 16
+## 한 번 뽑을 때 드는 체력.
+@export var pull_cost: float = 10.0
+## 이만큼 가까워야 뽑을 수 있다.
+@export var pull_reach: float = 1.1
+## 뽑는 데 걸리는 시간 = 기본 + 등급 × 한 단계. 등급이 높을수록 오래 버틴다.
+@export var pull_time: float = 0.45
+@export var pull_step: float = 0.42
+## 꽂힌 검끼리, 그리고 영주와 떨어진 거리.
+@export var hilt_spacing: float = 2.2
+@export var hilt_clear: float = 2.5
 
-@export_group("설계함")
-@export var boxes_per_day: int = 3
-@export var box_gold: int = 2
-@export var blueprint_slots: int = 6
-## 거르거나 칸이 넘쳐 자원으로 바꿀 때 짓는 값에 곱하는 비율.
-@export var sell_ratio: float = 0.5
-
-@export_group("성벽과 영주관")
-@export var wall_stone: int = 3
-@export var wall_hp: float = 260.0
-@export var wall_refund: int = 1
-@export var hall_hp: float = 1600.0
-## 아침에 영주관 최대 체력의 이만큼이 찬다.
-@export var hall_dawn_heal: float = 0.4
-@export var building_hp_base: float = 140.0
-@export var building_hp_growth: float = 1.6
-## 방어 건물 세기는 defense_growth^등급배.
-@export var defense_growth: float = 2.0
-## 폐허를 고칠 때 짓는 값에 곱하는 비율.
-@export var repair_ratio: float = 0.5
-
-@export_group("사람")
-@export var visitors_per_building: int = 3
-@export var talks_base: int = 3
-@export var talks_bonus_max: int = 5
-@export var pop_base: int = 5
-@export var pop_per_recruit: int = 2
-## 레벨 하나마다 힘이 이만큼 오른다.
-@export var level_power: float = 0.2
-@export var skill_cooldown: float = 9.0
-## 성벽이 무너져 다치면 쉬는 날.
-@export var injury_days: int = 2
-@export var guard_range: float = 3.5
-## 충신이 막아서면 영주 체력이 최대의 이만큼 남는다.
-@export var guard_hp: float = 0.25
-@export var guard_invuln: float = 1.5
-
-@export_group("명성")
-## 설계함과 손님 운 배수 = 1 + fame_luck × 명성.
-@export var fame_luck: float = 0.15
-## 적 체력 배수 = fame_enemy_hp^명성. 적 수 + 올림(명성 / 2).
-@export var fame_enemy_hp: float = 1.06
-
-@export_group("습격")
-@export var wave_base: int = 8
-@export var wave_per_day: int = 5
-@export var enemy_hp_growth: float = 1.28
-@export var enemy_damage_growth: float = 1.15
-@export var boss_hp_mult: float = 2.2
-@export var boss_damage_mult: float = 1.6
-@export var spawn_interval: float = 0.5
-## 3일째부터 순번 % 3 == 1은 늑대, 5일째부터 순번 % 7 == 6은 공성추, 4일째부터 공성추 하나 추가.
-@export var wolf_from_day: int = 3
-@export var ram_from_day: int = 5
-@export var extra_ram_from_day: int = 4
-## 날짜별 습격 방향 수(1일째부터).
-@export var sides_by_day: PackedInt32Array = PackedInt32Array([1, 1, 1, 2, 2, 3, 3])
-## 밤을 당기면 남은 낮 시간 / 이 값만큼 금화.
-@export var call_night_gold_div: float = 4.0
-
-@export_group("시험")
-## 허수아비 체력. 0이 되면 다시 찬다.
-@export var dummy_hp: float = 200.0
-## 밀려난 허수아비가 제자리로 돌아오는 속도(칸/초).
-@export var dummy_return_speed: float = 1.5
-
-@export_group("길찾기 비용")
-@export var cost_empty: float = 1.0
-@export var cost_ruin: float = 1.5
-@export var cost_hall: float = 1.0
-@export var cost_building: float = 6.0
-@export var cost_wall: float = 10.0
-## 적이 칸 중심에서 이 거리 안이면 도착한 것으로 친다.
-@export var arrive_radius: float = 0.22
+@export_group("밤")
+@export var night_length: float = 75.0
+## 날이 밝을 때 되찾는 체력.
+@export var heal_per_dawn: float = 50.0
+## 적이 나오는 간격 = (처음 - 줄어듦 × 밤의 진행) / (1 + 구역 × 구역 배수).
+@export var spawn_start: float = 1.5
+@export var spawn_drop: float = 0.8
+@export var spawn_zone: float = 0.16
+@export var spawn_first: float = 1.5
+@export var max_enemies: int = 70
+## 늑대와 거인이 나올 확률(구역마다 오르고 상한이 있다). 나머지는 망령.
+@export var wolf_chance: Vector3 = Vector3(0.3, 0.03, 0.55)
+@export var giant_chance: Vector3 = Vector3(0.04, 0.02, 0.25)
+## 밤이 이만큼 지난 뒤부터 거인이 나온다(0~1).
+@export var giant_after: float = 0.25
+## 마지막 구역에서 밤이 이만큼 남으면 언덕지기가 나온다(0~1).
+@export var boss_at: float = 0.55
+## 적이 영주를 때리는 거리(서로의 크기에 더한다).
+@export var enemy_reach: float = 0.42

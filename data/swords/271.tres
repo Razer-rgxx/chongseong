@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 271
+display_name = "모래시계"
+grade = 4
+form = 0
+inscriptions = PackedStringArray("날랜 발", "등 뒤")
+unique_text = "돌진하면 1초 동안 둘레 적이 70% 느려진다."
+unique_ready = false
+unbreakable = false
+story = "이 칼에 베인 자는 모두 느리게 쓰러졌다고 한다."

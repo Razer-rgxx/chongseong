@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 289
+display_name = "그림자 왕"
+grade = 5
+form = 0
+inscriptions = PackedStringArray("날랜 발", "잔상")
+unique_text = "돌진한 자리에 내 그림자가 남아 5초 동안 같이 싸운다 (최대 3)."
+unique_ready = false
+unbreakable = false
+story = "왕은 한 번도 혼자 싸운 적이 없다. 그림자가 늘 함께였다."

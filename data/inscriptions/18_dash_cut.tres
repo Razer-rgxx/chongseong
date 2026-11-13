@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "돌진 베기"
+text = "돌진으로 지나간 적에게 N 피해"
+values = PackedFloat32Array(10, 13, 17, 22, 32, 46)

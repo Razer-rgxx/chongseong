@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 256
+display_name = "무덤 파수"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("망령 베기", "사냥")
+unique_text = "쓰러뜨린 적의 30%가 내 편 망령으로 일어나 10초 동안 싸운다."
+unique_ready = false
+unbreakable = false
+story = "무덤지기가 평생 쓴 검. 무덤 속 사람들이 아직 그를 따른다."

@@ -9,3 +9,7 @@ var aim_valid: bool = false
 var aim: Vector2 = Vector2.ZERO
 var attack: bool = false
 var dash: bool = false
+## 가까운 꽂힌 검을 뽑는다(낮).
+var pull: bool = false
+## 다른 칸의 검으로 바꿔 쥔다. -1은 그대로, 0이나 1은 그 칸으로.
+var swap_to: int = -1

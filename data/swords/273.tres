@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 273
+display_name = "언덕을 쌓은 검"
+grade = 4
+form = 2
+inscriptions = PackedStringArray("무거움", "막기")
+unique_text = "큰 베기마다 앞에 흙벽이 솟아 5초 동안 적을 막는다 (벽 최대 3개)."
+unique_ready = false
+unbreakable = false
+story = "땅을 갈라 이 언덕을 쌓아 올렸다는 검."

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 285
+display_name = "부러지지 않는 맹세"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("단단함", "무거움")
+unique_text = "이 검은 부러지지 않는다. 대신 휘두를수록 무거워져 속도가 줄고 피해가 는다."
+unique_ready = false
+unbreakable = true
+story = "천 번을 내리쳐도 부러지지 않았다. 대신 주인이 늙었다."

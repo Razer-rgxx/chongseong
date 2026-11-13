@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 280
+display_name = "멈춘 순간"
+grade = 4
+form = 0
+inscriptions = PackedStringArray("날랜 발", "등 뒤")
+unique_text = "돌진하면 1.5초 동안 나만 빼고 모두 멈춘다 (재사용 12초)."
+unique_ready = false
+unbreakable = false
+story = "이 검을 쥔 기사는 혼자 백 명을 베고도 숨이 차지 않았다."

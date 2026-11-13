@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 277
+display_name = "천 명의 기사"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("연격", "무리 베기")
+unique_text = "기사 망령 3명이 따라다니며 내 베기를 따라 벤다 (피해 30%)."
+unique_ready = false
+unbreakable = false
+story = "언덕에 잠든 기사 천 명이 이 검의 주인을 따른다."

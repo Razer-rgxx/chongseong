@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 209
+display_name = "일곱 상처"
+grade = 3
+form = 0
+inscriptions = PackedStringArray("출혈", "연격")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = ""

@@ -1,30 +1,13 @@
 class_name GradeTable
 extends Resource
-## 사람 등급 6개(병졸~군신). 배열은 모두 등급 순서대로 6칸이다.
+## 검 등급 6단계. 뽑기는 높은 등급부터 "운 / N" 확률로 차례로 굴린다(보장은 없다).
 
-@export var names: PackedStringArray
-## 1/N의 N. 높은 등급부터 차례로 굴린다(병졸은 나머지라 1).
-@export var odds: PackedFloat64Array
-@export var power: PackedFloat32Array
-@export var colors: PackedColorArray
-## 더 캐묻기에 성공해 한 칸 오를 확률. 군신은 0.
-@export var press_chance: PackedFloat32Array
-## 영주가 쓰러질 때 대신 막아설 확률.
-@export var guard_chance: PackedFloat32Array
-## 이 등급부터 대신 막아서도 죽지 않고 다친다(영웅 = 4).
-@export var guard_survive_from: int = 4
-## 이 등급부터 기술을 쓴다(장수 = 3).
-@export var skill_from: int = 3
-
-@export_group("기척")
-## 겉으로 보이는 등급이 맞을 확률, 한 칸 낮게 보일 확률. 나머지는 한 칸 높게.
-@export var hint_exact: float = 0.55
-@export var hint_low: float = 0.25
-## 이 등급부터 몸에 빛이 돈다(정예 = 2).
-@export var aura_from: int = 2
-
-@export_group("대사")
-@export var hint_lines: PackedStringArray
-## 한 칸 오를 때마다 나오는 말. 0번은 비워 둔다(첫인사는 ClassData).
-@export var step_lines: PackedStringArray
-@export var final_lines: PackedStringArray
+@export var names: PackedStringArray = PackedStringArray(["흔함", "귀함", "전설", "신화", "초월", "무한"])
+## 1/N. 흔함은 쓰지 않는다.
+@export var odds: PackedFloat64Array = PackedFloat64Array([1.0, 6.0, 40.0, 200.0, 2000.0, 50000.0])
+@export var damage_mult: PackedFloat32Array = PackedFloat32Array([1.0, 1.25, 1.6, 2.0, 3.0, 5.0])
+## 장검 기준 내구. 형태의 durability를 곱한다.
+@export var durability: PackedFloat32Array = PackedFloat32Array([80, 110, 150, 200, 300, 450])
+@export var colors: PackedColorArray = PackedColorArray()
+## 이 등급부터 큰 연출(영상, 없으면 번쩍임).
+@export var reveal_from: int = 2

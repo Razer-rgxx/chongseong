@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 274
+display_name = "첫 번째 왕"
+grade = 4
+form = 1
+inscriptions = PackedStringArray("날", "버팀")
+unique_text = "들고 있는 두 검의 각인 수치가 50% 오른다."
+unique_ready = false
+unbreakable = false
+story = "첫 왕국의 왕이 들던 검. 그의 기사들은 이 검 앞에서 두 배로 싸웠다."

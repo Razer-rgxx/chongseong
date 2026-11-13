@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 262
+display_name = "바람 가르는 깃"
+grade = 4
+form = 3
+inscriptions = PackedStringArray("날랜 발", "가벼움")
+unique_text = "돌진을 두 번 연달아 할 수 있다."
+unique_ready = false
+unbreakable = false
+story = "전령이 쓰던 칼. 소식보다 칼이 먼저 도착했다."
