@@ -10,8 +10,8 @@ const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
 @export var seed_value: int = 0
 ## 한 프레임에 따라잡을 틱의 최대 수. 넘치면 밀린 시간을 버린다.
 @export var max_ticks_per_frame: int = 8
-@export var hit_number_size: int = 56
-@export var big_number_size: int = 84
+@export var hit_number_size: int = 40
+@export var big_number_size: int = 58
 
 @export_group("낮과 밤의 빛")
 @export var day_sun: float = 1.1
@@ -34,6 +34,7 @@ var _lord: Node3D
 var _hilts: Dictionary = {}
 var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
+var _fx := HitFx.new()
 var _hud_t: float = 0.0
 var _altar_view: Node3D = null
 
@@ -54,6 +55,7 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
+	add_child(_fx)
 	rules.day_started.connect(_on_day)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
@@ -381,7 +383,13 @@ func _on_lord_hurt(d: float) -> void:
 func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	if _enemies.has(e.id):
-		_enemies[e.id].hit()
+		_enemies[e.id].hit(big)
+	var chest: Vector3 = at + Vector3(0, 0.9 + Grid.cells_to_meters(e.radius) * 1.2, 0)
+	var dir: Vector3 = (at - _lord.position).normalized()
+	if e.data.wraith:
+		_fx.wisp(chest, dir, big)
+	else:
+		_fx.blood(chest, dir, big)
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_hit_sound(e, big, at)
@@ -405,6 +413,11 @@ func _hit_sound(e: Enemy, big: bool, at: Vector3) -> void:
 
 
 func _on_enemy_died(e: Enemy) -> void:
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	if e.data.wraith:
+		_fx.wisp(at + Vector3(0, 1.0, 0), Vector3.UP, true)
+	else:
+		_fx.splat(at, true)
 	if e.elite:
 		_float(_lord_world() + Vector3(0, 2.8, 0), "공짜 뽑기 +1", Color(1, 0.84, 0.42), big_number_size)
 		_hud.flash(Color(1, 0.84, 0.42), 0.25)

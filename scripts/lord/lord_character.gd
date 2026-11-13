@@ -21,6 +21,8 @@ const LOOPING: Array[String] = ["idle", "run", "pull"]
 @export var blend: float = 0.12
 
 var anims: Dictionary = {}
+## 구르기 동작에서 실제로 몸이 굴러가는 구간(초). 엉덩이 높이로 찾는다. 못 찾으면 (-1, -1).
+var roll_window: Vector2 = Vector2(-1.0, -1.0)
 var _body: Node3D
 var _skel: Skeleton3D
 var _player: AnimationPlayer
@@ -97,6 +99,8 @@ func _load_anims() -> void:
 			if a == null:
 				continue
 			a = a.duplicate(true)
+			if key == "roll":
+				roll_window = _low_window(a)
 			_in_place(a)
 			a.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(key) else Animation.LOOP_NONE
 			if key == "slash":
@@ -129,6 +133,25 @@ static func _first_animation(ps: PackedScene) -> Animation:
 		a = ap.get_animation(ap.get_animation_list()[0])
 	n.free()
 	return a
+
+
+## 엉덩이가 선 높이의 75%보다 낮은 구간(앞뒤로 조금 넉넉히). 구르기의 도움닫기와 일어서기를 잘라 낸다.
+static func _low_window(a: Animation) -> Vector2:
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_POSITION_3D or not str(a.track_get_path(t)).ends_with("mixamorig_Hips"):
+			continue
+		var stand: float = (a.track_get_key_value(t, 0) as Vector3).y
+		var first: float = -1.0
+		var last: float = -1.0
+		for k in a.track_get_key_count(t):
+			if (a.track_get_key_value(t, k) as Vector3).y < stand * 0.75:
+				var time: float = a.track_get_key_time(t, k)
+				if first < 0.0:
+					first = time
+				last = time
+		if first >= 0.0:
+			return Vector2(maxf(0.0, first - 0.15), minf(a.length, last + 0.1))
+	return Vector2(-1.0, -1.0)
 
 
 ## 엉덩이가 앞뒤·좌우로 움직이는 것을 지워 제자리 동작으로 만든다(위아래는 둔다).
@@ -175,7 +198,7 @@ func play(state: String, speed: float = 1.0, from: float = 0.0) -> String:
 	_player.speed_scale = speed
 	_player.play("lord/" + name, blend)
 	if not LOOPING.has(name):
-		_player.seek(minf(from, length(name) * 0.5), true)
+		_player.seek(minf(from, length(name) * 0.9), true)
 	return name
 
 
@@ -199,6 +222,14 @@ func _stand() -> void:
 		var turn := Basis(Vector3(0, 0, 1), side[1] * deg_to_rad(72.0))
 		var rest: Basis = _skel.get_bone_rest(b).basis.orthonormalized()
 		_skel.set_bone_pose_rotation(b, (pg.inverse() * turn * pg * rest).get_rotation_quaternion())
+
+
+## 칼날의 손잡이 쪽 끝과 끝(세계 좌표). 칼을 들고 있지 않으면 빈 배열.
+func blade_points() -> Array[Vector3]:
+	if not _blade.visible:
+		return []
+	var h: float = (_blade.mesh as BoxMesh).size.y / 2.0
+	return [_blade.global_transform * Vector3(0, -h, 0), _blade.global_transform * Vector3(0, h, 0)]
 
 
 func set_sword(s: Sword, grades: GradeTable) -> void:

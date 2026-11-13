@@ -4,7 +4,10 @@ extends Node3D
 ## 눈은 스스로 빛나서 어두운 밤에도 보인다.
 
 @export var flash_time: float = 0.09
-@export var die_time: float = 0.25
+@export var die_time: float = 0.6
+## 맞으면 뒤로 젖혀지는 각도(라디안)와 돌아오는 빠르기.
+@export var recoil_angle: float = 0.35
+@export var recoil_return: float = 9.0
 
 var enemy: Enemy
 var _mats: Array[StandardMaterial3D] = []
@@ -13,6 +16,7 @@ var _flash: float = 0.0
 var _dying: float = -1.0
 var _body := Node3D.new()
 var _t: float = 0.0
+var _recoil: float = 0.0
 
 
 func setup(e: Enemy) -> void:
@@ -47,8 +51,9 @@ func _ready() -> void:
 	position = Grid.cells_to_world(enemy.pos)
 
 
-func hit() -> void:
+func hit(big: bool = false) -> void:
 	_flash = flash_time
+	_recoil = 1.6 if big else 1.0
 
 
 func die() -> void:
@@ -60,14 +65,22 @@ func draw(alpha: float, delta: float) -> bool:
 	_t += delta
 	if _dying >= 0.0:
 		_dying += delta
+		# 뒤로 넘어간 뒤 땅으로 가라앉는다(유령은 흩어지듯 작아진다)
 		var k: float = _dying / die_time
-		_body.scale = Vector3.ONE * maxf(0.01, 1.0 - k)
-		_body.position.y = -k * 0.5
+		if enemy.data.wraith:
+			_body.scale = Vector3.ONE * maxf(0.01, 1.0 - k)
+			_body.position.y += delta * 1.5
+		else:
+			_body.rotation.x = lerpf(_body.rotation.x, PI / 2.0, 1.0 - pow(1.0 - minf(1.0, k * 1.8), 3.0))
+			_body.position.y = -maxf(0.0, k - 0.6) * 2.0
 		return k >= 1.0
 	position = Grid.cells_to_world(enemy.prev_pos.lerp(enemy.pos, alpha))
 	rotation.y = atan2(-enemy.face.x, -enemy.face.y)
 	if enemy.data.wraith:
 		_body.position.y = 0.25 + sin(_t * 2.5 + enemy.id) * 0.12
+	_recoil = maxf(0.0, _recoil - delta * recoil_return * maxf(0.3, _recoil))
+	_body.rotation.x = recoil_angle * _recoil
+	_body.scale = Vector3(1.0 + 0.06 * _recoil, 1.0 - 0.08 * _recoil, 1.0 + 0.06 * _recoil)
 	_flash -= delta
 	var w: float = clampf(_flash / flash_time, 0.0, 1.0)
 	for i in _mats.size():
