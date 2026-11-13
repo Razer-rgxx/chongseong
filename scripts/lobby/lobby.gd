@@ -198,7 +198,7 @@ func _refresh_anvil() -> void:
 
 func _build_ground() -> void:
 	var size := Vector2(Grid.size) * Grid.CELL
-	var g := _box(Vector3(size.x, 1.0, size.y), _mat(Color(0.26, 0.3, 0.2), 0.0, 1.0))
+	var g := _box(Vector3(size.x, 1.0, size.y), VillageMaterials.get_mat("grass", Color(0.26, 0.3, 0.2), 3.0))
 	g.position = Vector3(size.x / 2.0, -0.5, size.y / 2.0)
 	add_child(g)
 	var plaza := MeshInstance3D.new()
@@ -207,7 +207,7 @@ func _build_ground() -> void:
 	cyl.bottom_radius = 9.0
 	cyl.height = 0.04
 	plaza.mesh = cyl
-	plaza.material_override = _mat(Color(0.42, 0.38, 0.32), 0.0, 1.0)
+	plaza.material_override = VillageMaterials.get_mat("dirt", Color(0.42, 0.38, 0.32), 3.0)
 	plaza.position = Grid.cells_to_world(Vector2(17, 11), 0.02)
 	add_child(plaza)
 	var path := _box(Vector3(3.0, 0.03, 18.0), plaza.material_override)
@@ -238,20 +238,20 @@ func _build_ground() -> void:
 
 func _build_forge() -> void:
 	var at := Grid.cells_to_world(forge_at)
-	var wall := _box(Vector3(7.0, 4.0, 5.0), _mat(Color(0.35, 0.27, 0.2)))
+	var wall := _box(Vector3(7.0, 4.0, 5.0), VillageMaterials.get_mat("raw_plank_wall", Color(0.35, 0.27, 0.2), 2.0))
 	wall.position = at + Vector3(0, 2.0, -1.2)
 	add_child(wall)
 	var roof := MeshInstance3D.new()
 	var pm := PrismMesh.new()
 	pm.size = Vector3(7.6, 2.0, 5.6)
 	roof.mesh = pm
-	roof.material_override = _mat(Color(0.22, 0.12, 0.1))
+	roof.material_override = VillageMaterials.get_mat("roof", Color(0.22, 0.12, 0.1), 2.0)
 	roof.position = at + Vector3(0, 5.0, -1.2)
 	add_child(roof)
-	var chimney := _box(Vector3(1.0, 3.0, 1.0), _mat(Color(0.3, 0.29, 0.28)))
+	var chimney := _box(Vector3(1.0, 3.0, 1.0), VillageMaterials.get_mat("stone_wall", Color(0.3, 0.29, 0.28), 2.0))
 	chimney.position = at + Vector3(2.2, 5.5, -2.2)
 	add_child(chimney)
-	var furnace := _box(Vector3(1.6, 1.4, 1.2), _mat(Color(0.2, 0.18, 0.17)))
+	var furnace := _box(Vector3(1.6, 1.4, 1.2), VillageMaterials.get_mat("stone_wall", Color(0.2, 0.18, 0.17), 1.5, Color(0.6, 0.55, 0.5)))
 	furnace.position = at + Vector3(-2.2, 0.7, 1.6)
 	add_child(furnace)
 	var fire := _box(Vector3(0.9, 0.5, 0.1), _mat(Color(1.0, 0.45, 0.15), 0.0, 1.0, true))
@@ -301,7 +301,7 @@ func _build_forge() -> void:
 
 func _build_shrine() -> void:
 	var at := Grid.cells_to_world(shrine_at)
-	var stone := _mat(Color(0.5, 0.52, 0.56))
+	var stone := VillageMaterials.get_mat("stone_wall", Color(0.5, 0.52, 0.56), 2.0)
 	var base := _box(Vector3(4.0, 0.4, 4.0), stone)
 	base.position = at + Vector3(0, 0.2, 0)
 	add_child(base)
@@ -360,7 +360,7 @@ func _build_rack() -> void:
 
 func _build_gate() -> void:
 	var at := Grid.cells_to_world(gate_at)
-	var stone := _mat(Color(0.42, 0.42, 0.44))
+	var stone := VillageMaterials.get_mat("stone_wall", Color(0.42, 0.42, 0.44), 2.5)
 	for x in [-2.4, 2.4]:
 		var p := _box(Vector3(0.8, 5.0, 0.8), stone)
 		p.position = at + Vector3(x, 2.5, 0)
@@ -398,14 +398,15 @@ func _build_houses() -> void:
 	var spots := [Vector2(27, 15), Vector2(30, 6), Vector2(4, 5), Vector2(4, 19), Vector2(29, 19), Vector2(21, 19)]
 	for c in spots:
 		var at := Grid.cells_to_world(c)
-		var w := _box(Vector3(5.0, 3.0, 4.0), _mat(Color(0.5, 0.44, 0.36).darkened(deco.randf_range(0.0, 0.3))))
+		var dk: float = deco.randf_range(0.0, 0.3)
+		var w := _box(Vector3(5.0, 3.0, 4.0), VillageMaterials.get_mat("medieval_red_brick", Color(0.5, 0.44, 0.36).darkened(dk), 2.0, Color.WHITE.darkened(dk * 0.6)))
 		w.position = at + Vector3(0, 1.5, 0)
 		add_child(w)
 		var roof := MeshInstance3D.new()
 		var pm := PrismMesh.new()
 		pm.size = Vector3(5.6, 1.8, 4.6)
 		roof.mesh = pm
-		roof.material_override = _mat(Color(0.3, 0.16, 0.13).darkened(deco.randf_range(0.0, 0.3)))
+		roof.material_override = VillageMaterials.get_mat("roof", Color(0.3, 0.16, 0.13).darkened(deco.randf_range(0.0, 0.3)), 2.0)
 		roof.position = at + Vector3(0, 3.9, 0)
 		add_child(roof)
 	for c in [Vector2(13, 11), Vector2(21, 11), Vector2(17, 7)]:
