@@ -9,18 +9,20 @@ const SOUND_DIR: String = "res://assets/sound/"
 
 @export var voices: int = 12
 @export var unit_size: float = 10.0
-## 같은 소리를 여러 번 들어도 덜 지겹게 높낮이를 이만큼(비율) 흔든다.
+## 같은 소리를 여러 번 들어도 덜 지겹게 높낮이를 이만큼(비율) 흔든다. 이름마다 따로 줄 수 있다.
 @export var pitch_jitter: float = 0.06
+@export var jitters: Dictionary = {&"hit": 0.12, &"hit_flesh": 0.1, &"hit_heavy": 0.08, &"swish": 0.08}
 ## 이름마다 더하는 크기(dB). 부르는 쪽의 volume_db에 더해진다.
 @export var gains: Dictionary = {
 	&"swish": -2.0, &"swish_big": 0.0, &"dash": -4.0, &"hit": 0.0, &"hit_big": 2.0,
-	&"thump": -2.0, &"anvil": 0.0, &"draw": -2.0, &"break": 0.0, &"hurt": -2.0, &"grunt": -6.0,
+	&"hit_flesh": -3.0, &"hit_heavy": -4.0, &"thump": -2.0, &"anvil": 0.0, &"draw": -2.0, &"break": 0.0, &"hurt": -2.0, &"grunt": -6.0,
 }
 
 var _streams: Dictionary = {}   # 이름 -> Array[AudioStream]
 var _pool: Array[AudioStreamPlayer3D] = []
 var _next: int = 0
 var _rng := RandomNumberGenerator.new()
+var _last: Dictionary = {}   # 이름 -> 지난번에 튼 번호(같은 파일을 연달아 틀지 않는다)
 
 
 func _ready() -> void:
@@ -40,9 +42,10 @@ func _ready() -> void:
 			var m: Array = made[name]
 			files.append(_make(m[0], m[1], m[2], m[3], m[4], m[5]))
 		_streams[name] = files
-	var grunt := _load_dir("grunt")
-	if not grunt.is_empty():
-		_streams[&"grunt"] = grunt
+	for extra in ["grunt", "hit_flesh", "hit_heavy"]:
+		var files := _load_dir(extra)
+		if not files.is_empty():
+			_streams[StringName(extra)] = files
 	for i in voices:
 		var p := AudioStreamPlayer3D.new()
 		p.unit_size = unit_size
@@ -71,16 +74,22 @@ func has(name: StringName) -> bool:
 	return _streams.has(name)
 
 
-func play(name: StringName, at: Vector3, volume_db: float = 0.0) -> void:
+## pitch는 기본 높낮이(1 = 그대로). 여기에 흔들림이 더해진다.
+func play(name: StringName, at: Vector3, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if not _streams.has(name):
 		return
 	var list: Array = _streams[name]
+	var i: int = _rng.randi() % list.size()
+	if list.size() > 1 and i == int(_last.get(name, -1)):
+		i = (i + 1 + _rng.randi() % (list.size() - 1)) % list.size()
+	_last[name] = i
 	var p := _pool[_next]
 	_next = (_next + 1) % _pool.size()
-	p.stream = list[_rng.randi() % list.size()]
+	p.stream = list[i]
 	p.global_position = at
 	p.volume_db = volume_db + float(gains.get(name, 0.0))
-	p.pitch_scale = 1.0 + _rng.randf_range(-pitch_jitter, pitch_jitter)
+	var j: float = float(jitters.get(name, pitch_jitter))
+	p.pitch_scale = pitch * (1.0 + _rng.randf_range(-j, j))
 	p.play()
 
 

@@ -12,6 +12,8 @@ itch.io의 무료 팩에서 골라 다듬은 소리(모노 44.1kHz, 앞의 빈 �
 | dash | 구르기 | Hove Audio, Whooshes |
 | hit | 적을 벰 | Hove Audio, Sword Stabs |
 | hit_big | 크게 벰 | Hove Audio, Sword Stabs w/ Gore |
+| hit_flesh | 베기에 겹치는 살 소리(늑대, 정예 등). 맨손은 이것만 | Gravity Sound, Axe_* |
+| hit_heavy | 거인·언덕지기와 크게 벨 때 겹치는 묵직한 소리 | Gravity Sound, Shield_Bash_* |
 | hurt | 영주가 맞음 | Hove Audio, Damage Grunts |
 | thump | 뽑을 때 땅이 울림, 대장간 실패 | Gravity Sound, Staff_Bash_* |
 | anvil | 망치질, 숫돌 제단 | Gravity Sound, Weapon_Clash_* |

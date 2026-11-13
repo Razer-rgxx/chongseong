@@ -384,7 +384,24 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 		_enemies[e.id].hit()
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
-	_sfx.play(&"hit_big" if big else &"hit", at)
+	_hit_sound(e, big, at)
+
+
+## 때리는 소리: 칼날 소리(hit) 위에 맞는 쪽의 소리를 겹친다. 유령은 칼날만, 거인과 언덕지기는 묵직하게,
+## 나머지는 살 베는 소리. 무거운 형태일수록 낮게, 단검일수록 높게(형태 피해 배수의 제곱근에 반비례).
+func _hit_sound(e: Enemy, big: bool, at: Vector3) -> void:
+	var s := rules.current()
+	var pitch: float = 1.0 / sqrt(s.form.damage) if s else 1.1
+	if s == null:
+		_sfx.play(&"hit_flesh", at, 0.0, pitch)
+		return
+	_sfx.play(&"hit_big" if big else &"hit", at, 0.0, pitch * (1.15 if e.data.wraith else 1.0))
+	if e.data.wraith:
+		return
+	if e.data.big or e.data.boss or big:
+		_sfx.play(&"hit_heavy", at, -2.0 if big else -4.0, pitch)
+	else:
+		_sfx.play(&"hit_flesh", at, -2.0, pitch)
 
 
 func _on_enemy_died(e: Enemy) -> void:
