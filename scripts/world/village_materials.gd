@@ -5,6 +5,8 @@ extends RefCounted
 ## 상자 크기가 제각각이라 월드 좌표 트라이플래너로 붙인다(늘어나지 않는다).
 
 const DIR: String = "res://assets/village/"
+## 언덕의 땅 질감도 같은 이름 규칙이라 같이 찾는다.
+const HILL: String = "res://assets/hill/"
 
 static var _cache: Dictionary = {}
 
@@ -16,6 +18,8 @@ static func get_mat(name: String, fallback: Color, tile: float = 2.5, tint: Colo
 		return _cache[key]
 	var m := StandardMaterial3D.new()
 	var base: String = DIR + name + "/" + name
+	if not ResourceLoader.exists(base + "_diff.jpg"):
+		base = HILL + name + "/" + name
 	if ResourceLoader.exists(base + "_diff.jpg"):
 		m.albedo_texture = load(base + "_diff.jpg")
 		m.albedo_color = tint
@@ -36,4 +40,4 @@ static func get_mat(name: String, fallback: Color, tile: float = 2.5, tint: Colo
 
 
 static func has(name: String) -> bool:
-	return ResourceLoader.exists(DIR + name + "/" + name + "_diff.jpg")
+	return ResourceLoader.exists(DIR + name + "/" + name + "_diff.jpg") or ResourceLoader.exists(HILL + name + "/" + name + "_diff.jpg")

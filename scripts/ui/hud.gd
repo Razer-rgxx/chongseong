@@ -44,6 +44,7 @@ var _altar_t: float = 0.0
 
 
 func _ready() -> void:
+	UiKit.vignette(self)
 	var top := HBoxContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE, Control.PRESET_MODE_MINSIZE, 14)
 	top.add_theme_constant_override("separation", 14)
@@ -53,7 +54,7 @@ func _ready() -> void:
 	top.add_child(hp_box.get_parent())
 	_hp_label = _label("", 16)
 	hp_box.add_child(_hp_label)
-	_hp_bar = _bar(Color(0.43, 1.0, 0.6))
+	_hp_bar = _bar(Color(0.66, 0.12, 0.1))
 	hp_box.add_child(_hp_bar)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -64,7 +65,7 @@ func _ready() -> void:
 	_zone = _label("", 20)
 	_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mid.add_child(_zone)
-	_night_bar = _bar(Color(0.88, 0.2, 0.29))
+	_night_bar = _bar(Color(0.55, 0.47, 0.32))
 	mid.add_child(_night_bar)
 	_sub = _label("", 14)
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

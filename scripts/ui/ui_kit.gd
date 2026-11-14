@@ -99,3 +99,24 @@ static func center_panel(parent: Node, border: Color = Color(LINE, 0.4)) -> VBox
 	box.add_theme_constant_override("separation", 10)
 	p.add_child(box)
 	return box
+
+
+## 화면 가장자리를 어둡게(눈이 가운데로 가게). 다른 UI보다 먼저 그린다.
+static func vignette(parent: Node) -> void:
+	var r := ColorRect.new()
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh := Shader.new()
+	sh.code = """shader_type canvas_item;
+uniform float strength = 0.55;
+uniform float inner = 0.42;
+void fragment() {
+	vec2 d = (UV - 0.5) * vec2(1.25, 1.0);
+	float v = smoothstep(inner, 0.95, length(d));
+	COLOR = vec4(0.0, 0.0, 0.0, v * strength);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	r.material = m
+	parent.add_child(r)

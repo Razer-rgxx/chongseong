@@ -72,12 +72,16 @@ static func glow(c: Color, energy: float = 2.0) -> StandardMaterial3D:
 static func grass() -> StandardMaterial3D:
 	if VillageMaterials.has("grass"):
 		return VillageMaterials.get_mat("grass", Color.DARK_OLIVE_GREEN, 3.0)
+	if VillageMaterials.has("forrest_ground_01"):
+		return VillageMaterials.get_mat("forrest_ground_01", Color.DARK_OLIVE_GREEN, 3.5, Color(0.6, 0.62, 0.54))
 	return noise_mat("grass", Color(0.13, 0.17, 0.08), Color(0.3, 0.33, 0.17), 6.0, 0.035)
 
 
 static func dirt() -> StandardMaterial3D:
 	if VillageMaterials.has("dirt"):
 		return VillageMaterials.get_mat("dirt", Color.SADDLE_BROWN, 3.0)
+	if VillageMaterials.has("forest_ground_04"):
+		return VillageMaterials.get_mat("forest_ground_04", Color.SADDLE_BROWN, 3.0, Color(0.55, 0.5, 0.46))
 	return noise_mat("dirt", Color(0.13, 0.11, 0.09), Color(0.3, 0.26, 0.21), 4.0, 0.05)
 
 
@@ -265,50 +269,48 @@ static func _window(h: Node3D, at: Vector3, rng: RandomNumberGenerator, turn: fl
 
 # ---------------------------------------------------------------- 나무와 풀
 
-## 침엽수(원뿔을 겹쳐 쌓음) 또는 활엽수(줄기 + 잎 덩어리 여러 개).
+## 전나무 또는 잎 없는 나무(언덕과 같은 메시를 쓴다).
 static func tree(parent: Node3D, at: Vector3, rng: RandomNumberGenerator, pine: bool) -> void:
-	var t := place(parent, at, rng.randf() * TAU)
-	var s: float = rng.randf_range(0.8, 1.35)
+	var mi := MeshInstance3D.new()
 	if pine:
-		var h: float = 7.0 * s
-		cyl(t, 0.12 * s, 0.3 * s, h * 0.5, Vector3(0, h * 0.25, 0), bark(), 8)
-		var layers: int = 4
-		for i in layers:
-			var k: float = float(i) / layers
-			var r: float = lerpf(2.2, 0.7, k) * s
-			var ch: float = lerpf(2.6, 1.8, k) * s
-			var c := cyl(t, 0.0, r, ch, Vector3(0, h * (0.28 + k * 0.62), 0), leaves(true), 9)
-			c.rotation.y = rng.randf() * TAU
+		mi.mesh = HillBuilder.pine(rng.randi() % 3)
+		mi.material_override = HillBuilder.pine_mat()
+		mi.scale = Vector3.ONE * rng.randf_range(0.5, 0.8)
 	else:
-		var h: float = 4.0 * s
-		var trunk := cyl(t, 0.16 * s, 0.32 * s, h, Vector3(0, h / 2.0, 0), bark(), 8)
-		trunk.rotation.z = rng.randf_range(-0.08, 0.08)
-		for i in rng.randi_range(5, 8):
-			var a: float = rng.randf() * TAU
-			var r: float = rng.randf_range(0.6, 1.6) * s
-			var p := Vector3(cos(a) * r, h + rng.randf_range(-0.4, 1.4) * s, sin(a) * r)
-			ball(t, rng.randf_range(1.1, 1.8) * s, p, leaves(false), Vector3(1.0, rng.randf_range(0.7, 0.9), 1.0))
+		mi.mesh = HillBuilder.bare_tree(rng.randi() % 4)
+		mi.material_override = HillBuilder.bark()
+		mi.scale = Vector3.ONE * rng.randf_range(0.9, 1.3)
+	mi.position = at
+	mi.rotation.y = rng.randf() * TAU
+	parent.add_child(mi)
 
 
 ## 잎 없는 죽은 나무(어두운 분위기용).
 static func dead_tree(parent: Node3D, at: Vector3, rng: RandomNumberGenerator) -> void:
-	var t := place(parent, at, rng.randf() * TAU)
-	var h: float = rng.randf_range(3.5, 5.5)
-	cyl(t, 0.1, 0.28, h, Vector3(0, h / 2.0, 0), bark(), 7)
-	for i in rng.randi_range(3, 5):
-		var b := cyl(t, 0.02, 0.09, rng.randf_range(1.2, 2.2), Vector3(0, h * rng.randf_range(0.55, 0.95), 0), bark(), 5)
-		b.rotation = Vector3(rng.randf_range(0.5, 1.1), rng.randf() * TAU, 0)
-		b.position += b.basis.y * 0.6
+	tree(parent, at, rng, false)
 
 
+## 덤불 자리: 이끼 낀 돌 몇 개와 마른 가지(Poly Haven). 없으면 둥근 덤불.
 static func bush(parent: Node3D, at: Vector3, rng: RandomNumberGenerator) -> void:
-	for i in rng.randi_range(2, 4):
-		ball(parent, rng.randf_range(0.4, 0.8), at + Vector3(rng.randf_range(-0.6, 0.6), 0.25, rng.randf_range(-0.6, 0.6)), leaves(rng.randf() < 0.5), Vector3(1, 0.7, 1))
+	var rocks := HillBuilder.rock_parts()
+	if rocks.is_empty():
+		for i in rng.randi_range(2, 4):
+			ball(parent, rng.randf_range(0.4, 0.8), at + Vector3(rng.randf_range(-0.6, 0.6), 0.25, rng.randf_range(-0.6, 0.6)), leaves(rng.randf() < 0.5), Vector3(1, 0.7, 1))
+		return
+	for i in rng.randi_range(1, 3):
+		HillBuilder.put_flat(parent, rocks[rng.randi() % rocks.size()], at + Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.8, 0.8)), rng.randf() * TAU, rng.randf_range(0.25, 0.5))
+	var br := HillBuilder.branch_parts()
+	if not br.is_empty():
+		HillBuilder.put_flat(parent, br[rng.randi() % br.size()], at + Vector3(rng.randf_range(-0.6, 0.6), 0, rng.randf_range(-0.6, 0.6)), rng.randf() * TAU, rng.randf_range(0.8, 1.2), 0.1)
 
 
 static func rock(parent: Node3D, at: Vector3, rng: RandomNumberGenerator, size: float = 1.0) -> void:
-	var r := ball(parent, size * rng.randf_range(0.4, 0.8), at, stone(), Vector3(rng.randf_range(0.9, 1.5), rng.randf_range(0.5, 0.8), rng.randf_range(0.8, 1.3)))
-	r.rotation = Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * TAU, 0)
+	var rocks := HillBuilder.rock_parts()
+	if rocks.is_empty():
+		var r := ball(parent, size * rng.randf_range(0.4, 0.8), at, stone(), Vector3(rng.randf_range(0.9, 1.5), rng.randf_range(0.5, 0.8), rng.randf_range(0.8, 1.3)))
+		r.rotation = Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * TAU, 0)
+		return
+	HillBuilder.put_flat(parent, rocks[rng.randi() % rocks.size()], at, rng.randf() * TAU, size * rng.randf_range(0.4, 0.7))
 
 
 # ---------------------------------------------------------------- 소품
@@ -368,8 +370,12 @@ static func stall(parent: Node3D, at: Vector3, facing: float, cloth: Color, rng:
 			box(s, Vector3(0.1, 2.3 if z < 0.0 else 2.0, 0.1), Vector3(x, 1.15 if z < 0.0 else 1.0, z), timber())
 	var c := plain(cloth, 0.95)
 	box(s, Vector3(2.9, 0.04, 1.6), Vector3(0, 2.15, 0.1), c, Vector3(-0.25, 0, 0))
-	for i in 4:
-		ball(s, rng.randf_range(0.15, 0.25), Vector3(-0.9 + i * 0.6, 1.1, rng.randf_range(-0.2, 0.2)), plain(Color(0.5, 0.42, 0.28)), Vector3(1, 0.8, 1))
+	# 자루와 작은 궤짝
+	var sack := plain(Color(0.36, 0.31, 0.24), 1.0)
+	for i in 3:
+		var sk := cyl(s, 0.12, 0.2, 0.42, Vector3(-0.9 + i * 0.55, 1.16, rng.randf_range(-0.25, 0.15)), sack, 8)
+		sk.rotation = Vector3(rng.randf_range(-0.15, 0.15), rng.randf() * TAU, rng.randf_range(-0.15, 0.15))
+	box(s, Vector3(0.5, 0.32, 0.4), Vector3(0.85, 1.11, -0.05), planks(), Vector3(0, rng.randf_range(-0.3, 0.3), 0))
 
 
 ## 등불 기둥: 기둥, 팔, 빛나는 등, 따뜻한 빛.

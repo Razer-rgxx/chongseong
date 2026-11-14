@@ -50,7 +50,7 @@
 ## 에셋
 
 - 에셋은 `assets/` 아래에 둔다. AI 생성 에셋은 쓰지 않는다.
-- 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 어두운 사실풍이다(GDD 2.14). 모델이 아직 없는 자리는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `AltarView`, `scenes/lord/lord_model.tscn`과 `LordCharacter`, `main._build_world`, `lobby._build_*`와 `VillageBuilder`). 마을의 집·나무·소품은 VillageBuilder가 기본 도형과 잡음 질감으로 짓는다. 칼은 모두 `SwordModel`(형태·등급·칼 번호로 모양이 정해진다)로 그리고, 베기 궤적과 베기 빛은 `SlashFx`다.
+- 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 어두운 사실풍이다(GDD 2.14). 모델이 아직 없는 자리는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `AltarView`, `scenes/lord/lord_model.tscn`과 `LordCharacter`, `HillBuilder`, `lobby._build_*`와 `VillageBuilder`). 마을의 집·소품은 VillageBuilder가 기본 도형과 질감으로 짓는다. 언덕의 땅·하늘·바위·꽂힌 검·먼 숲은 `HillBuilder`가 짓고(땅 셰이더 `terrain.gdshader`, 하늘 `hill_sky.gdshader`), Poly Haven(CC0) 질감·모델·HDRI를 저장소에 넣어 쓴다(`assets/hill/`, `assets/nature/`, `assets/sky/`). 나무와 돌은 마을도 HillBuilder의 것을 같이 쓴다. 적: 망령은 해진 망토 셰이더(`wraith_cloak.gdshader`), 늑대는 `CreatureMesh`로 짓고 다리를 코드로 움직인다. 거인과 언덕지기는 기사 모델(`LordCharacter`)을 어둡게 칠해 키우고, 없으면 도형이다. 칼은 모두 `SwordModel`(형태·등급·칼 번호로 모양이 정해진다)로 그리고, 베기 궤적과 베기 빛은 `SlashFx`다.
 - 글꼴은 Noto Serif KR을 쓰는 글자만 남겨 넣었다(`assets/ui/fonts/`). 테마 `assets/ui/theme.tres`는 손으로 고치지 않고 `scripts/debug/build_theme.gd`를 고쳐 다시 만든다. 굵기는 FontVariation에 숫자 태그(2003265652 = wght)로 준다.
 - 화면 글자는 엘든 링식이다. 세계(3D)에 글자를 띄우지 않는다(피해 숫자만 예외). 다가갔을 때 안내와 알림은 `Band`, 새 곳의 이름은 `AreaTitle`, 창은 `UiKit`(모서리 없는 검은 판, 놋쇠빛 줄, 따뜻한 글자색). 표에 드문 글자가 새로 생기면 `assets/ui/fonts/README.md`대로 다시 만든다.
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.

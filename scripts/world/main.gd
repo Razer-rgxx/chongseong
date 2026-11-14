@@ -14,11 +14,16 @@ const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
 @export var big_number_size: int = 58
 
 @export_group("낮과 밤의 빛")
-@export var day_sun: float = 1.1
-@export var night_sun: float = 0.1
-@export var day_ambient: float = 0.55
-@export var night_ambient: float = 0.1
+@export var day_sun: float = 0.75
+@export var night_sun: float = 1.1
+@export var day_ambient: float = 1.0
+@export var night_ambient: float = 1.2
+## 밤에는 하늘빛 대신 이 색을 둘레 빛으로 쓴다(밤 하늘 사진이 너무 어두워서).
+@export var night_ambient_color: Color = Color(0.3, 0.36, 0.52)
+@export var day_sun_color: Color = Color(1.0, 0.93, 0.84)
 @export var night_sun_color: Color = Color(0.55, 0.65, 1.0)
+@export var day_fog: Color = Color(0.44, 0.46, 0.48)
+@export var night_fog: Color = Color(0.05, 0.06, 0.09)
 @export var torch_energy: float = 2.6
 @export var light_change_time: float = 1.5
 
@@ -518,51 +523,18 @@ func _set_light(night: bool, instant: bool = false) -> void:
 	var t: float = 0.0 if instant else light_change_time
 	var tw := create_tween().set_parallel()
 	tw.tween_property(_sun, "light_energy", night_sun if night else day_sun, t)
-	tw.tween_property(_sun, "light_color", night_sun_color if night else Color.WHITE, t)
+	tw.tween_property(_sun, "light_color", night_sun_color if night else day_sun_color, t)
+	tw.tween_property(env, "fog_light_color", night_fog if night else day_fog, t)
+	env.ambient_light_color = night_ambient_color
+	tw.tween_property(env, "ambient_light_sky_contribution", 0.15 if night else 1.0, t)
 	tw.tween_property(env, "ambient_light_energy", night_ambient if night else day_ambient, t)
 	tw.tween_property(env, "background_color", Color(0.01, 0.015, 0.03) if night else Color(0.06, 0.08, 0.12), t)
 	tw.tween_property(_lord.torch, "light_energy", torch_energy if night else 0.0, t)
+	if HillBuilder.sky_material:
+		tw.tween_property(HillBuilder.sky_material, "shader_parameter/night", 1.0 if night else 0.0, t)
 
 
-## 언덕 꼭대기(싸움터)와 그 아래 땅. 에셋이 들어오면 이 함수만 바꾼다.
+## 언덕 꼭대기(싸움터)와 둘레의 땅, 하늘, 바위, 꽂힌 검. 에셋을 바꿀 때는 HillBuilder만 고친다.
 func _build_world() -> void:
-	var size := Vector2(Grid.size) * Grid.CELL
-	var top := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(size.x, 1.6, size.y)
-	top.mesh = box
-	top.position = Vector3(size.x / 2.0, -0.8, size.y / 2.0)
-	var grass := StandardMaterial3D.new()
-	grass.albedo_color = Color(0.23, 0.29, 0.19)
-	grass.roughness = 1.0
-	top.material_override = grass
-	add_child(top)
-	var below := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(size.x + 400.0, size.y + 400.0)
-	below.mesh = plane
-	below.position = Vector3(size.x / 2.0, -1.6, size.y / 2.0)
-	var dirt := StandardMaterial3D.new()
-	dirt.albedo_color = Color(0.11, 0.13, 0.1)
-	dirt.roughness = 1.0
-	below.material_override = dirt
-	add_child(below)
-	# 언덕 아래의 바위(꾸밈. 규칙의 랜덤과 따로 둔다)
-	var deco := RandomNumberGenerator.new()
-	deco.seed = 7
-	var rock := StandardMaterial3D.new()
-	rock.albedo_color = Color(0.2, 0.21, 0.22)
-	for i in 160:
-		var p := Vector3(deco.randf_range(-40.0, size.x + 40.0), -1.6, deco.randf_range(-40.0, size.y + 40.0))
-		if p.x > -2.0 and p.x < size.x + 2.0 and p.z > -2.0 and p.z < size.y + 2.0:
-			continue
-		var m := MeshInstance3D.new()
-		var s := SphereMesh.new()
-		var r: float = deco.randf_range(0.4, 1.6)
-		s.radius = r
-		s.height = r * 1.2
-		m.mesh = s
-		m.material_override = rock
-		m.position = p
-		add_child(m)
+	HillBuilder.build(self, _env.environment, data.forms)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)

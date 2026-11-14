@@ -24,13 +24,17 @@ func _ready() -> void:
 	_sword.rotation.z = hilt.tilt
 	_sword.rotation.y = hilt.tilt * 3.0
 	add_child(_sword)
-	var disc := CylinderMesh.new()
-	disc.top_radius = 0.22
-	disc.bottom_radius = 0.22
-	disc.height = 0.02
-	_hole.mesh = disc
-	_hole.material_override = _mat(Color(0.05, 0.04, 0.03))
-	_hole.position.y = 0.01
+	# 칼이 박힌 자리의 흙 둔덕(땅 질감을 어둡게)
+	var mound := SphereMesh.new()
+	mound.radius = 0.32
+	mound.height = 0.16
+	mound.radial_segments = 12
+	mound.rings = 4
+	_hole.mesh = mound
+	_hole.material_override = _dirt()
+	_hole.position.y = -0.02
+	_hole.scale = Vector3(1.0, 1.0, 0.85)
+	_hole.rotation.y = float(hilt.id) * 1.7
 	add_child(_hole)
 
 
@@ -54,6 +58,29 @@ func _build() -> void:
 	m.rotation.x = PI
 	m.position.y = 0.55 + m.grip_length * 0.3
 	_sword.add_child(m)
+
+
+static var _dirt_mat: StandardMaterial3D = null
+
+
+static func _dirt() -> StandardMaterial3D:
+	if _dirt_mat:
+		return _dirt_mat
+	var m := StandardMaterial3D.new()
+	var base: String = "res://assets/hill/forest_ground_04/forest_ground_04"
+	if ResourceLoader.exists(base + "_diff.jpg"):
+		m.albedo_texture = load(base + "_diff.jpg")
+		m.albedo_color = Color(0.32, 0.29, 0.26)
+		m.normal_enabled = true
+		m.normal_texture = load(base + "_nor_gl.jpg")
+		m.uv1_triplanar = true
+		m.uv1_world_triplanar = true
+		m.uv1_scale = Vector3.ONE / 1.5
+	else:
+		m.albedo_color = Color(0.1, 0.08, 0.06)
+	m.roughness = 1.0
+	_dirt_mat = m
+	return m
 
 
 static func _box(size: Vector3, m: Material) -> MeshInstance3D:

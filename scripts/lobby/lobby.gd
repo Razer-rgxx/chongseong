@@ -51,6 +51,8 @@ func _ready() -> void:
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
 	_deco.seed = 7
+	# 언덕과 같은 하늘 사진을 저녁빛으로
+	HillBuilder.apply_sky(($Environment as WorldEnvironment).environment, Color(1.0, 0.8, 0.68), 0.75)
 	_build_ground()
 	_build_forge()
 	_build_shrine()
@@ -448,7 +450,7 @@ func _build_houses() -> void:
 	_circles.append([well_at, 0.75])
 	VillageBuilder.bench(self, Grid.cells_to_world(Vector2(21.0, 15.4)), 0.0)
 	VillageBuilder.bench(self, Grid.cells_to_world(Vector2(22.8, 13.6)), -PI / 2.0)
-	VillageBuilder.stall(self, Grid.cells_to_world(Vector2(13.0, 14.0)), PI / 2.0, Color(0.3, 0.09, 0.08), _deco)
+	VillageBuilder.stall(self, Grid.cells_to_world(Vector2(13.0, 14.0)), PI / 2.0, Color(0.24, 0.1, 0.08), _deco)
 	_rects.append(Rect2(Vector2(12.4, 13.2), Vector2(1.0, 1.6)))
 	VillageBuilder.stall(self, Grid.cells_to_world(Vector2(21.4, 9.6)), -PI / 2.0, Color(0.16, 0.19, 0.24), _deco)
 	_rects.append(Rect2(Vector2(20.9, 8.8), Vector2(1.0, 1.6)))

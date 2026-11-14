@@ -38,6 +38,7 @@ func setup(d: GameData, m: Meta) -> void:
 
 
 func _ready() -> void:
+	UiKit.vignette(self)
 	var sb := PanelContainer.new()
 	var st := UiKit.style(Color(UiKit.LINE, 0.35), 1, Color(0.02, 0.018, 0.015, 0.75))
 	st.content_margin_top = 6
