@@ -18,11 +18,11 @@ extends Node3D
 ## 몸을 돌리는 빠르기(클수록 빨리). 휘두르거나 구를 때는 turn_fast로 거의 바로 돌린다.
 @export var turn_speed: float = 12.0
 @export var turn_fast: float = 40.0
-@export_group("칼 궤적")
-## 휘두르기 시작부터 이 시간 동안 칼끝이 지나간 자리를 그린다.
-@export var trail_time: float = 0.32
-@export var trail_life: float = 0.16
-@export var trail_color: Color = Color(1.0, 0.94, 0.82, 0.8)
+@export_group("칼 궤적과 베기 빛")
+## 휘두르기 시작부터 이 시간 동안 칼끝이 지나간 자리를 그린다(궤적의 길이와 모양은 SlashFx).
+@export var trail_time: float = 0.26
+## 베기 빛을 사선으로 기울이는 각(라디안). 번갈아 반대로 기운다. 큰 베기는 수평.
+@export var arc_tilt: float = 0.35
 @export_group("")
 @export var hit_speed: float = 1.0
 ## 달리기 동작 빠르기. 영주가 Mixamo 달리기보다 빨라서 올리면 발이 덜 미끄러지지만, 사용자가 빠르다고 해서 1.1로 뒀다.
@@ -57,10 +57,8 @@ var _state: String = ""
 var _yaw_now: float = 0.0
 var _yaw_ready: bool = false
 var _swing_t: float = 99.0
-var _trail := MeshInstance3D.new()
-var _trail_mesh := ImmediateMesh.new()
-var _trail_mat := StandardMaterial3D.new()
-var _trail_pts: Array = []   # [손잡이 쪽, 칼끝, 나이]
+var _fx: SlashFx = null
+var _sweep: float = 1.0
 
 
 func setup(r: Rules) -> void:
@@ -85,15 +83,8 @@ func _ready() -> void:
 		_blade = null
 		character = LordCharacter.new()
 		_model.add_child(character)
-		_trail.mesh = _trail_mesh
-		_trail.top_level = true
-		_trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_trail_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_trail_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_trail_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_trail_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_trail_mat.vertex_color_use_as_albedo = true
-		add_child(_trail)
+		_fx = SlashFx.new()
+		add_child(_fx)
 	if _hand:
 		var gm := BoxMesh.new()
 		gm.size = Vector3(0.34, 0.07, 0.07)
@@ -117,6 +108,8 @@ func _ready() -> void:
 func set_sword(s: Sword, grades: GradeTable) -> void:
 	if character:
 		character.set_sword(s, grades)
+		if s:
+			_fx.color = Color(0.9, 0.92, 1.0) if s.grade == 0 else (grades.colors[s.grade] as Color).lightened(0.25)
 		return
 	if not _blade:
 		return
@@ -156,6 +149,7 @@ func draw(alpha: float, delta: float) -> void:
 	if _hand:
 		_hand.rotation.y = -rel
 	if character:
+		character.set_frozen(rules.freeze > 0)
 		_animate(L, delta)
 		_turn(L, delta)
 		_draw_trail(delta)
@@ -187,6 +181,9 @@ func _animate(L: LordState, delta: float) -> void:
 	elif L.swing > _last_swing:
 		_one_shot("big" if L.big else "slash", slash_speed, slash_hold, slash_skip)
 		_swing_t = 0.0
+		_fx.clear_trail()
+		_fx.arc(position + Vector3(0, _fx.arc_height, 0), L.face, L.swing_arc, Grid.cells_to_meters(L.swing_reach), _sweep, 0.0 if L.big else arc_tilt * _sweep, L.big)
+		_sweep = -_sweep
 	elif L.invuln > _last_invuln and L.swing <= 0.0 and L.dash <= 0.0:
 		_one_shot("hit", hit_speed)
 	elif _busy <= 0.0:
@@ -222,29 +219,14 @@ func _turn(L: LordState, delta: float) -> void:
 	_model.rotation.y = _yaw_now
 
 
-## 휘두르기 시작부터 trail_time 동안 칼의 두 끝을 모아 띠로 그린다. 오래된 쪽부터 옅어진다.
+## 휘두르기 시작부터 trail_time 동안 칼날의 두 끝을 SlashFx에 넘긴다.
 func _draw_trail(delta: float) -> void:
 	_swing_t += delta
-	for p in _trail_pts:
-		p[2] += delta
-	while not _trail_pts.is_empty() and _trail_pts[0][2] > trail_life:
-		_trail_pts.pop_front()
-	if _swing_t < trail_time and (_state == "slash" or _state == "big"):
-		var bp: Array[Vector3] = character.blade_points()
-		if not bp.is_empty():
-			_trail_pts.append([bp[0].lerp(bp[1], 0.2), bp[1], 0.0])
-	_trail_mesh.clear_surfaces()
-	if _trail_pts.size() < 2:
-		return
-	_trail_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, _trail_mat)
-	for p in _trail_pts:
-		var c := trail_color
-		c.a *= 1.0 - p[2] / trail_life
-		_trail_mesh.surface_set_color(Color(c, c.a * 0.15))
-		_trail_mesh.surface_add_vertex(p[0])
-		_trail_mesh.surface_set_color(c)
-		_trail_mesh.surface_add_vertex(p[1])
-	_trail_mesh.surface_end()
+	var bp: Array[Vector3] = character.blade_points()
+	var active: bool = _swing_t < trail_time and (_state == "slash" or _state == "big") and not bp.is_empty()
+	if bp.is_empty():
+		bp = [Vector3.ZERO, Vector3.ZERO]
+	_fx.trail_step(delta, active, bp[0].lerp(bp[1], 0.25), bp[1])
 
 
 func _loop(state: String, speed: float = 1.0) -> void:

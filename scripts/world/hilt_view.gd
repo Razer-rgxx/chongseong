@@ -46,25 +46,14 @@ func _process(_delta: float) -> void:
 		_sword.position = Vector3.ZERO
 
 
+## 뽑기 전에는 무엇인지 모르니 모두 흔함(녹슨 쇠)의 모습으로, 형태와 생김새만 자리마다 다르게.
+## 칼날이 땅에 박히도록 뒤집어 세운다(코등이가 무릎 높이).
 func _build() -> void:
-	var steel := _mat(Color(0.72, 0.76, 0.82), 0.8, 0.3)
-	var blade := _box(Vector3(0.11, 1.0, 0.035), steel)
-	blade.position.y = 0.3
-	_sword.add_child(blade)
-	var guard := _box(Vector3(0.46, 0.07, 0.09), _mat(Color(0.42, 0.35, 0.27), 0.4, 0.5))
-	guard.position.y = 0.82
-	_sword.add_child(guard)
-	var grip := _box(Vector3(0.07, 0.34, 0.07), _mat(Color(0.23, 0.17, 0.12)))
-	grip.position.y = 1.02
-	_sword.add_child(grip)
-	var pommel := MeshInstance3D.new()
-	var s := SphereMesh.new()
-	s.radius = 0.06
-	s.height = 0.12
-	pommel.mesh = s
-	pommel.material_override = guard.material_override
-	pommel.position.y = 1.22
-	_sword.add_child(pommel)
+	var forms: Array[FormData] = rules.data.forms
+	var m := SwordModel.make(forms[hilt.id % forms.size()], 0, hilt.id * 31 + 7, Color.WHITE)
+	m.rotation.x = PI
+	m.position.y = 0.55 + m.grip_length * 0.3
+	_sword.add_child(m)
 
 
 static func _box(size: Vector3, m: Material) -> MeshInstance3D:

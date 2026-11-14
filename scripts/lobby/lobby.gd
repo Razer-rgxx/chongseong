@@ -180,16 +180,10 @@ func _refresh_anvil() -> void:
 	var s := meta.sheath_sword(data)
 	if s == null:
 		return
-	var col: Color = data.grades.colors[s.grade]
-	var blade := _box(Vector3(s.form.blade_length, 0.04, s.form.blade_width * 1.4), _mat(Color(0.82, 0.85, 0.9), 0.85, 0.25))
-	blade.position = Vector3(s.form.blade_length / 2.0 - 0.15, 0, 0)
-	_anvil_sword.add_child(blade)
-	var guard := _box(Vector3(0.07, 0.06, 0.38), _mat(col, 0.5, 0.4, true))
-	guard.position = Vector3(-0.18, 0, 0)
-	_anvil_sword.add_child(guard)
-	var grip := _box(Vector3(0.3, 0.05, 0.06), _mat(Color(0.25, 0.18, 0.12)))
-	grip.position = Vector3(-0.37, 0, 0)
-	_anvil_sword.add_child(grip)
+	var m := SwordModel.for_sword(s, data.grades)
+	m.rotation = Vector3(PI / 2.0, 0, -PI / 2.0)
+	m.position = Vector3(-0.2, 0.02, 0)
+	_anvil_sword.add_child(m)
 
 
 # ---------------------------------------------------------------- 마을 짓기
@@ -378,12 +372,15 @@ func _build_rack() -> void:
 				break
 		if not any:
 			continue
-		var blade := _box(Vector3(0.06, 1.6, 0.12), _mat(Color(0.8, 0.83, 0.88), 0.8, 0.3))
-		blade.position = at + Vector3(0, 1.0, -2.0 + shown * 0.8)
-		add_child(blade)
-		var guard := _box(Vector3(0.1, 0.06, 0.4), _mat(data.grades.colors[g], 0.5, 0.4, true))
-		guard.position = at + Vector3(0, 1.75, -2.0 + shown * 0.8)
-		add_child(guard)
+		var first: SwordData = null
+		for i in data.swords_by_grade[g]:
+			if meta.has_found(data.swords[i].id):
+				first = data.swords[i]
+				break
+		var m := SwordModel.make(data.forms[first.form], g, first.id, data.grades.colors[g])
+		m.position = at + Vector3(0, 0.5, -2.0 + shown * 0.8)
+		m.rotation.x = 0.12
+		add_child(m)
 		shown += 1
 
 

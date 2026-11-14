@@ -27,9 +27,10 @@ var _body: Node3D
 var _skel: Skeleton3D
 var _player: AnimationPlayer
 var _hand := BoneAttachment3D.new()
-var _blade := MeshInstance3D.new()
-var _guard := MeshInstance3D.new()
-var _guard_mat := StandardMaterial3D.new()
+var _grip := Node3D.new()
+var _sword: SwordModel = null
+var _speed: float = 1.0
+var _frozen: bool = false
 var _state: String = ""
 var _slash_i: int = 0
 
@@ -47,25 +48,8 @@ func _ready() -> void:
 	_load_anims()
 	_hand.bone_name = HAND_BONE
 	_skel.add_child(_hand)
-	var grip := Node3D.new()
-	grip.transform = _grip_transform()
-	_hand.add_child(grip)
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.08, 1.2, 0.03)
-	_blade.mesh = bm
-	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color(0.85, 0.88, 0.93)
-	steel.metallic = 0.85
-	steel.roughness = 0.25
-	_blade.material_override = steel
-	grip.add_child(_blade)
-	var gm := BoxMesh.new()
-	gm.size = Vector3(0.26, 0.05, 0.06)
-	_guard.mesh = gm
-	_guard_mat.emission_enabled = true
-	_guard_mat.emission_energy_multiplier = 0.6
-	_guard.material_override = _guard_mat
-	grip.add_child(_guard)
+	_grip.transform = _grip_transform()
+	_hand.add_child(_grip)
 	play("idle")
 
 
@@ -191,11 +175,12 @@ func play(state: String, speed: float = 1.0, from: float = 0.0) -> String:
 	if not has(name):
 		_stand()
 		return ""
+	_speed = speed
 	if name == _state and _player.is_playing() and LOOPING.has(name):
-		_player.speed_scale = speed
+		_player.speed_scale = 0.0 if _frozen else speed
 		return name
 	_state = name
-	_player.speed_scale = speed
+	_player.speed_scale = 0.0 if _frozen else speed
 	_player.play("lord/" + name, blend)
 	if not LOOPING.has(name):
 		_player.seek(minf(from, length(name) * 0.9), true)
@@ -226,21 +211,24 @@ func _stand() -> void:
 
 ## 칼날의 손잡이 쪽 끝과 끝(세계 좌표). 칼을 들고 있지 않으면 빈 배열.
 func blade_points() -> Array[Vector3]:
-	if not _blade.visible:
-		return []
-	var h: float = (_blade.mesh as BoxMesh).size.y / 2.0
-	return [_blade.global_transform * Vector3(0, -h, 0), _blade.global_transform * Vector3(0, h, 0)]
+	return _sword.blade_points() if _sword else ([] as Array[Vector3])
 
 
+## 손에 쥔 칼을 바꾼다(SwordModel: 형태·등급·번호로 모양이 정해진다). 손잡이 가운데쯤을 쥔다.
 func set_sword(s: Sword, grades: GradeTable) -> void:
-	_blade.visible = s != null
-	_guard.visible = s != null
+	if _sword:
+		_sword.queue_free()
+		_sword = null
 	if s == null:
 		return
-	var m := _blade.mesh as BoxMesh
-	m.size = Vector3(maxf(s.form.blade_width, 0.04), s.form.blade_length, 0.025)
-	_blade.position = Vector3(0, 0.07 + s.form.blade_length / 2.0, 0)
-	_guard.position = Vector3(0, 0.05, 0)
-	var c: Color = grades.colors[s.grade]
-	_guard_mat.albedo_color = c
-	_guard_mat.emission = c
+	_sword = SwordModel.for_sword(s, grades)
+	_sword.position = Vector3(0, _sword.grip_length * 0.4, 0)
+	_grip.add_child(_sword)
+
+
+## 히트스톱 동안 동작을 멈춘다.
+func set_frozen(on: bool) -> void:
+	if on == _frozen:
+		return
+	_frozen = on
+	_player.speed_scale = 0.0 if on else _speed
