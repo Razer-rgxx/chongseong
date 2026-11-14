@@ -9,10 +9,10 @@ const ANIM_DIR: String = "res://assets/characters/lord/anims/"
 const HAND_BONE: String = "mixamorig_RightHand"
 ## 파일 이름에 이 낱말이 있으면 그 동작으로 쓴다(앞의 것부터 본다). 베기는 _key_for에서 따로 고른다.
 const KEYWORDS: Array = [
-	["idle", "idle"], ["run", "run"], ["roll", "roll"], ["impact", "hit"], ["hit", "hit"],
+	["idle", "idle"], ["walk", "walk"], ["run", "run"], ["roll", "roll"], ["impact", "hit"], ["hit", "hit"],
 	["death", "death"], ["dying", "death"], ["pull", "pull"],
 ]
-const LOOPING: Array[String] = ["idle", "run", "pull"]
+const LOOPING: Array[String] = ["idle", "walk", "run", "pull"]
 
 ## 칼을 쥔 자리. T자세에서 손바닥 가운데, 칼날은 몸 앞쪽(엄지 쪽)으로 뻗게 스스로 맞춘다.
 ## 동작을 넣고 칼이 손에서 어긋나 보이면 이 두 값으로 더 맞춘다(쥔 자리 기준, 미터와 도).
@@ -21,6 +21,10 @@ const LOOPING: Array[String] = ["idle", "run", "pull"]
 @export var blend: float = 0.12
 
 var anims: Dictionary = {}
+## 동작 파일은 한 번만 읽어 모든 캐릭터(영주, 거인 적)가 같이 쓴다.
+static var _lib_cache: AnimationLibrary = null
+static var _anims_cache: Dictionary = {}
+static var _roll_cache: Vector2 = Vector2(-1.0, -1.0)
 ## 구르기 동작에서 실제로 몸이 굴러가는 구간(초). 엉덩이 높이로 찾는다. 못 찾으면 (-1, -1).
 var roll_window: Vector2 = Vector2(-1.0, -1.0)
 var _body: Node3D
@@ -68,6 +72,11 @@ func _grip_transform() -> Transform3D:
 
 ## 동작 파일을 읽어 이 캐릭터의 AnimationPlayer에 붙인다.
 func _load_anims() -> void:
+	if _lib_cache:
+		anims = _anims_cache
+		roll_window = _roll_cache
+		_player.add_animation_library("lord", _lib_cache)
+		return
 	var lib := AnimationLibrary.new()
 	if DirAccess.dir_exists_absolute(ANIM_DIR):
 		var files: Array[String] = []
@@ -96,6 +105,9 @@ func _load_anims() -> void:
 				lib.add_animation(key, a)
 				anims[key] = a.length
 	_player.add_animation_library("lord", lib)
+	_lib_cache = lib
+	_anims_cache = anims
+	_roll_cache = roll_window
 
 
 static func _key_for(name: String) -> String:
@@ -224,6 +236,40 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 	_sword = SwordModel.for_sword(s, grades)
 	_sword.position = Vector3(0, _sword.grip_length * 0.4, 0)
 	_grip.add_child(_sword)
+
+
+## 손에 아무 모델이나 쥐게 한다(적 거인의 칼). 손잡이 가운데쯤을 쥔다.
+func hold(model: SwordModel) -> void:
+	model.position = Vector3(0, model.grip_length * 0.4, 0)
+	_grip.add_child(model)
+
+
+## 뼈에 붙인다(적의 빛나는 눈 같은 것). 뼈 이름은 mixamorig_Head처럼.
+func attach(bone: String, node: Node3D) -> void:
+	var at := BoneAttachment3D.new()
+	at.bone_name = bone
+	_skel.add_child(at)
+	at.add_child(node)
+
+
+## 적으로 쓸 때: 갑옷 색에 mul을 곱하고 glow로 은은하게 빛나게 한다. 바꾼 재질들을 돌려준다(맞을 때 번쩍임에 쓴다).
+func recolor(mul: Color, glow: Color = Color.BLACK, glow_energy: float = 0.0) -> Array[StandardMaterial3D]:
+	var out: Array[StandardMaterial3D] = []
+	for node in _body.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var src := mi.get_active_material(i) as StandardMaterial3D
+			if src == null:
+				continue
+			var m := src.duplicate() as StandardMaterial3D
+			m.albedo_color = src.albedo_color * mul
+			if glow_energy > 0.0:
+				m.emission_enabled = true
+				m.emission = glow
+				m.emission_energy_multiplier = glow_energy
+			mi.set_surface_override_material(i, m)
+			out.append(m)
+	return out
 
 
 ## 히트스톱 동안 동작을 멈춘다.
