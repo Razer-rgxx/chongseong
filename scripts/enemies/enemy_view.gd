@@ -552,7 +552,7 @@ func _animate_knight(delta: float) -> void:
 	var walk: String = "walk" if _knight.has("walk") else "run"
 	if _attack >= 0.0:
 		if _attack <= delta + 0.0001:
-			_knight.play("slash", 0.85, 0.15)
+			_knight.play("slash", 0.85, -0.12)
 		if _attack > maxf(0.6, _knight.length("slash1") / 0.85 - 0.3):
 			_attack = -1.0
 	elif _hit_anim >= 0.0:

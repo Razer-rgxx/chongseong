@@ -25,6 +25,10 @@ var anims: Dictionary = {}
 static var _lib_cache: AnimationLibrary = null
 static var _anims_cache: Dictionary = {}
 static var _roll_cache: Vector2 = Vector2(-1.0, -1.0)
+## 베기 동작마다 칼이 실제로 지나가는 때(초). 손이 가장 빨리 움직이는 때로 찾는다.
+static var _contact_cache: Dictionary = {}
+## 마지막으로 튼 한 번짜리 동작을 몇 초째부터 틀었는지.
+var last_from: float = 0.0
 ## 구르기 동작에서 실제로 몸이 굴러가는 구간(초). 엉덩이 높이로 찾는다. 못 찾으면 (-1, -1).
 var roll_window: Vector2 = Vector2(-1.0, -1.0)
 var _body: Node3D
@@ -54,7 +58,42 @@ func _ready() -> void:
 	_skel.add_child(_hand)
 	_grip.transform = _grip_transform()
 	_hand.add_child(_grip)
+	if _contact_cache.is_empty():
+		_find_contacts()
 	play("idle")
+
+
+## 베기 동작마다 손이 가장 빠른 때(= 칼이 맞는 때)를 찾아 둔다. 규칙은 누르는 순간 베므로
+## 화면은 그 순간에 맞춰 동작의 중간부터 튼다(play의 from이 음수일 때).
+func _find_contacts() -> void:
+	var b: int = _skel.find_bone(HAND_BONE)
+	for k in anims:
+		var name: String = k
+		if not (name.begins_with("slash") or name == "big"):
+			continue
+		_player.play("lord/" + name, 0.0)
+		var L: float = anims[k]
+		var prev := Vector3.ZERO
+		var best: float = -1.0
+		var at: float = 0.0
+		var t: float = 0.0
+		# 앞쪽 3/4 안에서 찾는다(끝의 되돌아오는 동작은 뺀다)
+		while t <= L * 0.75:
+			_player.seek(t, true)
+			var p: Vector3 = _skel.get_bone_global_pose(b).origin
+			if t > 0.0:
+				var v: float = (p - prev).length()
+				if v > best:
+					best = v
+					at = t
+			prev = p
+			t += 1.0 / 30.0
+		_contact_cache[name] = at
+	_player.stop()
+
+
+func contact(name: String) -> float:
+	return _contact_cache.get(name, 0.0)
 
 
 ## 손 뼈 기준으로 칼을 쥔 자리와 방향. 쥔 자리의 Y가 칼날, X가 날이 선 쪽이다.
@@ -167,6 +206,7 @@ func has(state: String) -> bool:
 
 ## 상태를 바꾼다. 없는 동작이면 비슷한 것으로, 그것도 없으면 팔을 내린 서 있는 자세.
 ## 실제로 튼 동작의 이름을 돌려준다(없으면 ""). from은 한 번 트는 동작을 몇 초째부터 틀지.
+## from이 음수면 베기 동작에서 칼이 맞는 때보다 그만큼(초) 앞에서부터 튼다.
 func play(state: String, speed: float = 1.0, from: float = 0.0) -> String:
 	var name: String = state
 	if state == "slash" or state == "big":
@@ -195,7 +235,11 @@ func play(state: String, speed: float = 1.0, from: float = 0.0) -> String:
 	_player.speed_scale = 0.0 if _frozen else speed
 	_player.play("lord/" + name, blend)
 	if not LOOPING.has(name):
-		_player.seek(minf(from, length(name) * 0.9), true)
+		var start: float = from
+		if from < 0.0:
+			start = maxf(0.0, contact(name) + from)
+		last_from = minf(start, length(name) * 0.9)
+		_player.seek(last_from, true)
 	return name
 
 

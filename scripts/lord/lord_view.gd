@@ -27,8 +27,9 @@ extends Node3D
 @export var hit_speed: float = 1.0
 ## 달리기 동작 빠르기. 영주가 Mixamo 달리기보다 빨라서 올리면 발이 덜 미끄러지지만, 사용자가 빠르다고 해서 1.1로 뒀다.
 @export var run_speed: float = 1.1
-## 베기 동작의 앞쪽 준비 자세를 건너뛰는 시간(초). 규칙은 누르는 순간 벤다.
-@export var slash_skip: float = 0.25
+## 규칙은 누르는 순간 벤다. 화면은 베기 동작을 칼이 맞는 때보다 이만큼(초) 앞에서부터 틀어
+## 숫자·피·히트스톱이 칼이 지나가는 순간과 겹치게 한다. 늘리면 휘두르는 모습이 길게 보이지만 맞는 것이 늦어 보인다.
+@export var slash_lead: float = 0.06
 ## 한 번 트는 동작을 길어도 이만큼(초)만 보고 서기·달리기로 돌아간다.
 @export var slash_hold: float = 0.8
 @export var roll_hold: float = 0.9
@@ -185,7 +186,7 @@ func _animate(L: LordState, delta: float) -> void:
 		else:
 			_one_shot("roll", roll_speed, roll_hold)
 	elif L.swing > _last_swing:
-		_one_shot("big" if L.big else "slash", slash_speed, slash_hold, slash_skip)
+		_one_shot("big" if L.big else "slash", slash_speed, slash_hold, -slash_lead)
 		_swing_t = 0.0
 		_fx.clear_trail()
 		_fx.arc(position + Vector3(0, _fx.arc_height, 0), L.face, L.swing_arc, Grid.cells_to_meters(L.swing_reach), _sweep, 0.0 if L.big else arc_tilt * _sweep, L.big)
@@ -244,7 +245,7 @@ func _loop(state: String, speed: float = 1.0) -> void:
 func _one_shot(state: String, speed: float, cap: float = -1.0, from: float = 0.0) -> void:
 	_state = state
 	var name: String = character.play(state, speed, from)
-	var whole: float = maxf(0.0, character.length(name) - from) / maxf(speed, 0.01)
+	var whole: float = maxf(0.0, character.length(name) - character.last_from) / maxf(speed, 0.01)
 	_busy = minf(whole, cap) if cap > 0.0 else whole
 
 
