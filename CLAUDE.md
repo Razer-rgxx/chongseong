@@ -56,7 +56,7 @@
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.
 - 소리(`assets/sound/<이름>/*.wav`)도 약관 문구가 없는 팩이라 git에 올리지 않는다(`assets/sound/README.md`). 파일이 없으면 `Sfx`가 코드로 만든 소리로 대신한다.
 - Mixamo 캐릭터와 동작(`assets/characters/`)은 원본을 다시 나눠 주면 안 되어 git에 올리지 않는다(.gitignore). 무엇을 어디에 두는지는 `assets/characters/README.md`에 적는다. 파일이 없으면 기본 도형으로 돌아가야 한다(`LordCharacter.available()`).
-- 뽑기 연출은 뽑기 데모의 연출을 사용자가 녹화한 영상(.ogv, Ogg Theora)을 등급마다 하나씩 `assets/video/`에 넣어 VideoStreamPlayer로 튼다. 영상이 없으면 0.5초 번쩍임으로 대신한다.
+- 뽑기 연출은 `PullFx`다: 당기는 동안 땅이 갈라지고, 뽑히면 등급만큼 먼지·불똥·불씨·빛·충격파가 커지고 뽑힌 칼이 땅에서 솟아 떠 있다. 전설 이상은 사용자가 녹화한 영상(`assets/video/grade_<등급>.ogv`, Ogg Theora)이 있으면 화면 가득 튼다(`assets/video/README.md`). 연출 중에는 글자를 띄우지 않고, 끝난 뒤 이름 알림과 고르기 창을 연다.
 
 ## 확인
 

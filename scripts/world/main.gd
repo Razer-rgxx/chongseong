@@ -41,6 +41,9 @@ var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
 var _fx := HitFx.new()
 var _pfx := PowerFx.new()
+var _pull_fx := PullFx.new()
+## 뽑기 연출이 끝나는 때(밀리초). 그전에는 고르기 창과 이름 알림을 미룬다.
+var _reveal_until: int = 0
 var _hud_t: float = 0.0
 var _altar_view: Node3D = null
 
@@ -64,11 +67,15 @@ func _ready() -> void:
 	add_child(_fx)
 	_pfx.setup(rules)
 	add_child(_pfx)
+	_pull_fx.env = _env.environment
+	add_child(_pull_fx)
 	rules.effect.connect(_on_effect)
 	rules.day_started.connect(_on_day)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
-	rules.pull_started.connect(func(_h: Hilt, _g: int) -> void: _sfx.play(&"thump", _lord.position, -10.0))
+	rules.pull_started.connect(func(h: Hilt, _g: int) -> void:
+		_sfx.play(&"thump", _lord.position, -10.0)
+		_pull_fx.begin(Grid.cells_to_world(h.pos), h.id))
 	rules.pull_step.connect(_on_pull_step)
 	rules.pull_refused.connect(func(t: String) -> void: _hud.toast(t))
 	rules.sword_pulled.connect(_on_pulled)
@@ -316,6 +323,13 @@ func _on_swung(big: bool) -> void:
 func _on_pull_step(_h: Hilt, st: int) -> void:
 	_camera.add_shake(0.12 + 0.07 * st)
 	_sfx.play(&"thump", _lord.position, -6.0 + st)
+	_pull_fx.step(st)
+
+
+## 등급 연출 영상(assets/video/grade_<등급>.ogv). 없으면 "".
+func _reveal_video(grade: int) -> String:
+	var path: String = "res://assets/video/grade_%d.ogv" % grade
+	return path if ResourceLoader.exists(path) else ""
 
 
 func _on_pulled(s: Sword) -> void:
@@ -323,21 +337,31 @@ func _on_pulled(s: Sword) -> void:
 	meta.save()
 	var c: Color = data.grades.colors[s.grade]
 	_sfx.play(&"draw", _lord.position, -4.0)
+	# 땅에서 나오는 연출(먼지·불똥·불씨·빛). 전설부터는 영상이 있으면 영상을 튼다
+	var hold: float = _pull_fx.reveal(s.grade, c, SwordModel.for_sword(s, data.grades), _lord.position)
+	var video: String = _reveal_video(s.grade) if s.grade >= data.grades.reveal_from else ""
+	if video != "":
+		hold = maxf(hold, _hud.play_video(video))
 	if s.grade >= data.grades.reveal_from:
-		# 등급 연출 영상은 6단계에서 넣는다. 그전까지는 0.5초 번쩍임.
-		_hud.flash(c, 0.35 + 0.1 * s.grade)
 		_camera.add_shake(0.3 + 0.08 * s.grade)
-	var t := FloatText.new()
-	t.text = s.data.display_name
-	t.font_size = 64 + 8 * s.grade
-	t.modulate = c
-	t.life = 1.6
-	add_child(t)
-	t.global_position = _lord_world() + Vector3(0, 2.6, 0)
-	_hud.toast("%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name])
+	_reveal_until = Time.get_ticks_msec() + int(hold * 1000.0)
+	# 연출 중에는 글자를 띄우지 않는다. 끝나면 이름을 알린다
+	var text: String = "%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name]
+	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void: _hud.toast(text))
 
 
 func _on_choice_needed(s: Sword) -> void:
+	# 뽑기 연출이 끝난 뒤에 연다(연출을 보다가 누른 키가 창에 들어가지 않게)
+	var wait: float = maxf(0.0, (_reveal_until - Time.get_ticks_msec()) / 1000.0)
+	if wait > 0.0:
+		get_tree().create_timer(wait, true, false, true).timeout.connect(func() -> void: _open_choice(s))
+	else:
+		_open_choice(s)
+
+
+func _open_choice(s: Sword) -> void:
+	if rules.pending != s:
+		return
 	_hud.open_choice(_card(s, -1, false), _card(rules.slots[0], 0, false), _card(rules.slots[1], 1, false))
 	_capture(false)
 

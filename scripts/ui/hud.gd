@@ -188,6 +188,23 @@ func set_prompt(key: String, t: String) -> void:
 
 
 ## 새 구역에 올라섰을 때 가운데 큰 글자.
+## 뽑기 연출 영상을 화면 가득 튼다. 영상 길이(초)를 돌려준다(못 틀면 0).
+func play_video(path: String) -> float:
+	var stream := load(path) as VideoStream
+	if stream == null:
+		return 0.0
+	var v := VideoStreamPlayer.new()
+	v.stream = stream
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.expand = true
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(v)
+	v.play()
+	v.finished.connect(v.queue_free)
+	var length: float = v.get_stream_length()
+	return length if length > 0.0 else 3.0
+
+
 func area_title(t: String) -> void:
 	_title.show_title(t)
 
