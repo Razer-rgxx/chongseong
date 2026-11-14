@@ -544,7 +544,7 @@ func _test_bless() -> void:
 	m.bless = {"hp": 2, "luck": 5, "cost": 3, "heal": 1}
 	var r := Rules.new(d, 2, m)
 	check(r.max_hp() == 160.0 and r.lord.hp == 160.0, "단단한 몸 2: 최대 체력 160")
-	check(is_equal_approx(r.luck(), 1.4) and r.pull_cost() == 7.0 and r.heal_at_dawn() == 60.0, "운 ×1.4, 뽑기 체력 7, 새벽 회복 60")
+	check(is_equal_approx(r.luck(), 1.4) and r.pull_cost() == d.run.pull_cost - 3.0 and r.heal_at_dawn() == 60.0, "운 ×1.4, 뽑기 체력 -3, 새벽 회복 60")
 	m.shards = 79
 	check(not m.forge_bless(d.meta, "cost").paid, "가벼운 손 3단계에서 강화하려면 조각 80이 든다")
 	m.shards = 80

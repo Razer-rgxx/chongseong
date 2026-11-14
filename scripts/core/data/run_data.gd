@@ -17,7 +17,7 @@ extends Resource
 ## 낮마다 꽂히는 검 수.
 @export var hilts_per_day: int = 16
 ## 한 번 뽑을 때 드는 체력.
-@export var pull_cost: float = 10.0
+@export var pull_cost: float = 6.0
 ## 이만큼 가까워야 뽑을 수 있다.
 @export var pull_reach: float = 1.1
 ## 뽑는 데 걸리는 시간 = 기본 + 등급 × 한 단계. 등급이 높을수록 오래 버틴다.
