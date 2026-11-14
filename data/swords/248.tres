@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("단단함", "행운")
 unique_text = "들고 있으면 낮에 뽑은 검의 내구가 20% 늘어난다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "이 언덕에 맨 처음 꽂힌 검. 다른 검들은 이 검을 따라 꽂혔다고 한다."

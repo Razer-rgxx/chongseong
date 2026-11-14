@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("날", "버팀")
 unique_text = "들고 있는 두 검의 각인 수치가 50% 오른다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "첫 왕국의 왕이 들던 검. 그의 기사들은 이 검 앞에서 두 배로 싸웠다."

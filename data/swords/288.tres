@@ -10,6 +10,6 @@ grade = 5
 form = 2
 inscriptions = PackedStringArray("무리 베기", "날")
 unique_text = "휘두를 때마다 언덕에 꽂힌 검 5자루가 땅에서 솟아 둘레 적을 찌른다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "언덕 한가운데 가장 깊이 꽂힌 검. 모든 검이 이 검을 둘러싸고 있다."

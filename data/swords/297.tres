@@ -10,6 +10,6 @@ grade = 5
 form = 1
 inscriptions = PackedStringArray("행운", "가벼운 손")
 unique_text = "들고 있으면 낮에 뽑는 모든 검이 각인을 하나 더 달고 나온다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "언덕의 검들은 모두 이 검에서 갈라져 나왔다."

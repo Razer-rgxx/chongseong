@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("잔상", "넓은 날")
 unique_text = "휘두르고 0.5초 뒤 같은 자리에 같은 베기가 한 번 더 일어난다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "계곡에서 휘두르면 한 번 더 들린다고 해서 붙은 이름."

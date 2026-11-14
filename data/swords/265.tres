@@ -10,6 +10,6 @@ grade = 4
 form = 0
 inscriptions = PackedStringArray("피의 값", "흡혈")
 unique_text = "큰 베기마다 체력 5를 쓰고 피해가 2배가 된다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "피로 맹세한 자만 쥘 수 있다."

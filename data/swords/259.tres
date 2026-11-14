@@ -10,6 +10,6 @@ grade = 4
 form = 0
 inscriptions = PackedStringArray("바꿔 쥐기", "연격")
 unique_text = "다른 칸에 든 검의 각인도 함께 발동한다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "형제 기사가 하나씩 나눠 들던 검. 혼자 들어도 둘이 싸운다."

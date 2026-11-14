@@ -10,6 +10,6 @@ grade = 5
 form = 1
 inscriptions = PackedStringArray("흡혈", "광기")
 unique_text = "흡혈로 체력이 넘치면 넘친 만큼 보호막이 된다 (최대 100)."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "왕좌에 오른 자는 피를 흘리지 않았다. 남의 피로 충분했다."

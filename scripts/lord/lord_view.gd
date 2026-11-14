@@ -164,6 +164,12 @@ func draw(alpha: float, delta: float) -> void:
 		_spawn_ghost()
 
 
+## 메아리 계곡 같은 두 번째 베기: 그 자리에 베기 빛만 다시 그린다.
+func echo_arc(at: Vector2, face: float, arc: float, reach: float) -> void:
+	if _fx:
+		_fx.arc(Grid.cells_to_world(at, _fx.arc_height), face, arc, Grid.cells_to_meters(minf(reach, 12.0)), -_sweep, 0.0, false)
+
+
 ## 기사 모델의 동작을 고른다. 베기·구르기·맞기는 끝날 때까지 두고, 그 밖에는 달리기와 서 있기.
 ## 규칙의 값이 새로 커지는 순간(휘두름, 돌진, 무적)을 보고 한 번만 튼다.
 func _animate(L: LordState, delta: float) -> void:

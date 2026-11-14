@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("번개", "연격")
 unique_text = "큰 베기가 땅을 쳐서 앞쪽 부채꼴로 번개가 퍼진다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "이 검을 뽑은 날마다 비가 왔다."

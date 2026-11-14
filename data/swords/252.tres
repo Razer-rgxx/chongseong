@@ -10,6 +10,6 @@ grade = 4
 form = 3
 inscriptions = PackedStringArray("서리", "꿰뚫기")
 unique_text = "느려진 적을 찌르면 1.5초 얼어붙고, 언 적을 다시 베면 부서지며 둘레에 서리가 퍼진다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "북쪽 기사단이 통째로 얼어붙은 자리에서 나왔다."

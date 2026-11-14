@@ -10,6 +10,6 @@ grade = 4
 form = 2
 inscriptions = PackedStringArray("거인 베기", "무거움")
 unique_text = "큰 적을 세 번 연달아 베면 무릎을 꿇려 3초 동안 받는 피해가 2배가 된다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "거인 사냥꾼들은 늘 무릎부터 노렸다."

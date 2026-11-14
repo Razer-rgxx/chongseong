@@ -34,6 +34,8 @@ func _init() -> void:
 	_test_elite()
 	_test_altar()
 	_test_run_shards()
+	_test_inscriptions()
+	_test_uniques()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -300,8 +302,8 @@ func _test_swing_forms() -> void:
 	var e := z.spawn_at(&"wraith", z.lord.pos + Vector2(1.0, 0.0))
 	var hp0: float = e.hp
 	z.step(_inp(Vector2.ZERO, true))
-	var expect: float = d.lord.damage * 1.0 * 1.0 * (1.0 - 0.1 * 0.0)
-	check(is_equal_approx(hp0 - e.hp, expect), "흔함 장검 한 번 = %d 피해(%.1f)" % [expect, hp0 - e.hp])
+	var expect: float = d.lord.damage * 1.0 * 1.0 * d.powers.i("투박함_피해")
+	check(is_equal_approx(hp0 - e.hp, expect), "흔함 장검(투박함) 한 번 = %d 피해(%.1f)" % [expect, hp0 - e.hp])
 	var behind := z.spawn_at(&"wraith", z.lord.pos + Vector2(-1.2, 0.0))
 	var hb: float = behind.hp
 	z.lord.cooldown = 0.0
@@ -662,3 +664,291 @@ func _test_run_shards() -> void:
 	r.zone = r.zone_count() - 1
 	var got := m.record_run(r, d.meta)
 	check(got.zone == 9 * 10 + 60 and m.best == r.zone_count() + 1 and m.runs == 1 and m.shards == got.total, "정상까지 오르면 조각 60을 더 받고, 기록이 남는다")
+
+
+# ---------------------------------------------------------------- 각인과 고유 능력
+
+## 각인 하나만 단 흔함 장검을 쥔 밤. 다른 각인은 지운다.
+func _ins_rules(key: String = "", v: float = 0.0, name: String = "녹슨 장검") -> Rules:
+	var r := _night_rules()
+	var s := r.give(d.sword_by_name(name), 0)
+	s.ins.clear()
+	if key != "":
+		s.ins[key] = v
+	r.lord.hp = r.max_hp()
+	return r
+
+
+## 바로 앞(오른쪽 1칸)의 적을 한 번 벤 피해. 연타가 이어지지 않게 매번 첫 타로 친다.
+func _hit(r: Rules, kind: StringName = &"wraith", at: Vector2 = Vector2(1.0, 0.0), hp_frac: float = 1.0) -> float:
+	var e := r.spawn_at(kind, r.lord.pos + at)
+	e.hp = e.max_hp * hp_frac
+	var h0: float = e.hp
+	_swing_once(r)
+	return h0 - e.hp
+
+
+func _swing_once(r: Rules) -> void:
+	r.lord.cooldown = 0.0
+	r.lord.combo_timer = 0.0
+	r.freeze = 0
+	r.step(_inp(Vector2.ZERO, true))
+
+
+func _test_inscriptions() -> void:
+	var base: float = _hit(_ins_rules())
+	check(is_equal_approx(base, d.lord.damage), "각인 없는 흔함 장검 = %d 피해(%.1f)" % [d.lord.damage, base])
+	var pct := func(key: String) -> float: return d.inscriptions[key].value(0) / 100.0
+	check(is_equal_approx(_hit(_ins_rules("날", 10)), base * 1.1), "날: 피해 +N%")
+	var r := _ins_rules("가벼움", 50)
+	_swing_once(r)
+	check(is_equal_approx(r.lord.cooldown, d.lord.cooldown / 1.5), "가벼움: 휘두르기 간격이 짧아진다(%.3f)" % r.lord.cooldown)
+	var far: Vector2 = Vector2(d.lord.reach + 0.6, 0.0)
+	check(_hit(_ins_rules(), &"wraith", far) == 0.0 and _hit(_ins_rules("긴 날", 100), &"wraith", far) > 0.0, "긴 날: 사거리가 늘어 먼 적도 닿는다")
+	var side: Vector2 = Vector2.from_angle(d.lord.arc / 2.0 + 0.3) * 1.3
+	check(_hit(_ins_rules(), &"wraith", side) == 0.0 and _hit(_ins_rules("넓은 날", 100), &"wraith", side) > 0.0, "넓은 날: 각도가 넓어 옆의 적도 벤다")
+	r = _ins_rules("출혈", 9)
+	var e := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	_swing_once(r)
+	var after: float = e.hp
+	for i in 100:
+		r.step(_inp())
+	check(e.bleed_t <= 0.0 and is_equal_approx(after - e.hp, 9.0), "출혈: 3초 동안 N 피해를 더 입는다(%.2f)" % (after - e.hp))
+	check(is_equal_approx(_hit(_ins_rules("처형", 50), &"giant", Vector2(1, 0), 0.25), base * 1.5) and is_equal_approx(_hit(_ins_rules("처형", 50), &"giant"), base), "처형: 체력 30% 이하만 피해 +N%")
+	r = _ins_rules("연격", 50)
+	var g := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	var hits: Array[float] = []
+	for i in 3:
+		var h0: float = g.hp
+		r.lord.cooldown = 0.0
+		r.freeze = 0
+		r.step(_inp(Vector2.ZERO, true))
+		hits.append(h0 - g.hp)
+	check(is_equal_approx(hits[2], base * d.lord.big_damage_mult * 1.5), "연격: 마지막 타 피해 +N%")
+	r = _ins_rules("밀쳐내기", 100)
+	var w := r.spawn_at(&"wraith", r.lord.pos + Vector2(1.0, 0.0))
+	_swing_once(r)
+	var r0 := _ins_rules()
+	var w0 := r0.spawn_at(&"wraith", r0.lord.pos + Vector2(1.0, 0.0))
+	_swing_once(r0)
+	check(is_equal_approx(w.push.length(), w0.push.length() * 2.0), "밀쳐내기: 넉백 +N%")
+	r = _ins_rules("무거움", 50)
+	_swing_once(r)
+	check(is_equal_approx(r.lord.cooldown, d.lord.cooldown / d.powers.i("무거움_속도")), "무거움: 속도 -10%")
+	r = _ins_rules("꿰뚫기", 1, "녹슨 세검")
+	var row: Array[Enemy] = []
+	for i in 4:
+		row.append(r.spawn_at(&"wraith", r.lord.pos + Vector2(0.7 + i * 0.5, 0.0)))
+	_swing_once(r)
+	check(row.filter(func(x: Enemy) -> bool: return x.hp < x.max_hp).size() == 3, "꿰뚫기: 세검이 한 명 더 꿰뚫는다")
+	r = _ins_rules("불씨", 100)
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	_swing_once(r)
+	check(e.burn > 0.0, "불씨: 확률로 불이 붙는다")
+	r = _ins_rules("서리", 2)
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	_swing_once(r)
+	check(e.slow_k > 0.0 and e.slow_t > 1.9 and e.slow_t <= 2.0, "서리: N초 동안 느려진다")
+	r = _ins_rules("번개", 2)
+	var zaps: Array = [0]
+	r.effect.connect(func(k: StringName, _a: Vector2, _i: Dictionary) -> void:
+		if k == &"zap":
+			zaps[0] += 1)
+	r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	r.spawn_at(&"wraith", r.lord.pos + Vector2(6.0, 0.0))
+	_swing_once(r)
+	_swing_once(r)
+	check(zaps[0] == 1, "번개: N번째 타격마다 둘레 적에게 번개")
+	r = _ins_rules("흡혈", 50)
+	r.lord.hp = 50.0
+	_hit(r, &"giant")
+	check(is_equal_approx(r.lord.hp, 50.0 + base * 0.5), "흡혈: 준 피해의 N%만큼 회복")
+	r = _ins_rules("사냥", 7)
+	r.lord.hp = 50.0
+	_hit(r, &"wraith", Vector2(1, 0), 0.01)
+	check(is_equal_approx(r.lord.hp, 57.0), "사냥: 쓰러뜨리면 체력 +N")
+	r = _ins_rules("광기", 100)
+	r.lord.hp = r.max_hp() * 0.5
+	check(is_equal_approx(_hit(r, &"giant"), base * 1.5), "광기: 체력이 낮을수록 피해가 는다")
+	r = _ins_rules("첫 타", 100)
+	g = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	var a0: float = g.hp
+	_swing_once(r)
+	var a1: float = g.hp
+	_swing_once(r)
+	check(is_equal_approx(a0 - a1, base * 2.0) and is_equal_approx(a1 - g.hp, base), "첫 타: 처음 베는 적에게만 피해 +N%")
+	r = _ins_rules("등 뒤", 100)
+	g = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	g.face = Vector2.RIGHT
+	var b0: float = g.hp
+	_swing_once(r)
+	check(is_equal_approx(b0 - g.hp, base * 2.0), "등 뒤: 등을 보인 적에게 피해 +N%")
+	r = _ins_rules("돌진 베기", 15)
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(0.0, 1.0))
+	var c0: float = e.hp
+	r.lord.move_dir = Vector2.DOWN
+	r.step(_inp(Vector2.DOWN, false, true))
+	for i in 5:
+		r.step(_inp(Vector2.DOWN))
+	check(is_equal_approx(c0 - e.hp, 15.0), "돌진 베기: 지나간 적에게 N 피해")
+	r = _ins_rules("날랜 발", 50)
+	check(is_equal_approx(r.powers.dash_cooldown(), d.lord.dash_cooldown * 0.5), "날랜 발: 돌진 재사용 -N%")
+	var tough := Sword.new(d.sword_by_name("녹슨 장검"), d)
+	check(tough.max_durability == roundf(d.grades.durability[0] * d.forms[1].durability * (1.0 + d.inscriptions["투박함"].value(0) / 100.0)), "투박함·단단함: 내구 +N%")
+	r = _ins_rules("숫돌", 3)
+	var s := r.current()
+	s.durability = 10.0
+	_hit(r, &"wraith", Vector2(1, 0), 0.01)
+	check(is_equal_approx(s.durability, 12.0), "숫돌: 쓰러뜨리면 내구 +N(한 번 닳고 3 참)")
+	r = _ins_rules("막기", 50)
+	r.lord.swing = 0.1
+	check(is_equal_approx(r.powers.lord_damage(10.0, null), 5.0), "막기: 휘두르는 동안 받는 피해 -N%")
+	r = _ins_rules("버팀", 20)
+	check(is_equal_approx(r.powers.lord_damage(10.0, null), 8.0), "버팀: 받는 피해 -N%")
+	r = _ins_rules("가시", 9)
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	var t0: float = e.hp
+	r.powers.lord_damage(5.0, e)
+	check(is_equal_approx(t0 - e.hp, 9.0), "가시: 나를 때린 적에게 N 피해")
+	check(is_equal_approx(_hit(_ins_rules("잔상", 100), &"giant"), base * 2.0), "잔상: 확률로 한 번 더 벤다")
+	r = _ins_rules("바꿔 쥐기", 100)
+	r.give(d.sword_by_name("녹슨 장검"), 1)
+	r.swap(1)
+	r.swap(0)
+	check(is_equal_approx(_hit(r, &"giant"), base * 2.0) and is_equal_approx(_hit(r, &"giant"), base), "바꿔 쥐기: 바꿔 쥔 뒤 첫 공격만 피해 +N%")
+	r = _ins_rules("무리 베기", 100)
+	var trio: Array[Enemy] = []
+	for i in 3:
+		trio.append(r.spawn_at(&"giant", r.lord.pos + Vector2.from_angle((i - 1) * 0.4) * 1.2))
+	_swing_once(r)
+	check(trio.all(func(x: Enemy) -> bool: return is_equal_approx(x.max_hp - x.hp, base * 2.0)), "무리 베기: 셋 이상 베면 피해 +N%")
+	check(is_equal_approx(_hit(_ins_rules("거인 베기", 100), &"giant"), base * 2.0) and is_equal_approx(_hit(_ins_rules("거인 베기", 100), &"wraith"), base), "거인 베기: 큰 적에게만")
+	check(is_equal_approx(_hit(_ins_rules("망령 베기", 100), &"wraith"), base * 2.0) and is_equal_approx(_hit(_ins_rules("망령 베기", 100), &"giant"), base), "망령 베기: 망령에게만")
+	r = _ins_rules("마지막 일격", 30)
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	var m0: float = e.hp
+	r.current().durability = 1.0
+	_swing_once(r)
+	check(r.slots[0] == null and is_equal_approx(m0 - e.hp, base + 30.0), "마지막 일격: 부러질 때 둘레에 N 피해")
+	r = _ins_rules("가벼운 손", 2)
+	check(is_equal_approx(r.pull_cost(), d.run.pull_cost - 2.0), "가벼운 손: 뽑을 때 체력을 N 덜 쓴다")
+	r = _ins_rules("행운", 50)
+	check(is_equal_approx(r.luck(), d.run.zone_luck[0] * 1.5), "행운: 뽑기 운 +N%")
+	r = _ins_rules("피의 값", 50)
+	var hp_before: float = r.lord.hp
+	check(is_equal_approx(_hit(r, &"giant"), base * 1.5) and is_equal_approx(r.lord.hp, hp_before - 1.0), "피의 값: 휘두를 때 체력 1, 피해 +N%")
+	r = _ins_rules("새벽", 100)
+	r.night_left = 20.0
+	check(is_equal_approx(_hit(r, &"giant"), base * 2.0), "새벽: 밤의 마지막 30초 피해 +N%")
+	check(d.inscriptions.size() == 36, "각인은 36종")
+
+
+func _named(name: String, k: int = 0) -> Rules:
+	var r := _night_rules()
+	var s := r.give(d.sword_by_name(name), k)
+	s.ins.clear()
+	r.active = k
+	r.lord.hp = r.max_hp()
+	return r
+
+
+func _test_uniques() -> void:
+	var ready: Array = []
+	for sw in d.swords:
+		if sw.unique_ready:
+			ready.append(sw.display_name)
+		if sw.unique_ready != Powers.READY.has(sw.display_name) and sw.unique_text != "":
+			check(false, "unique_ready가 규칙과 다르다: " + sw.display_name)
+	check(ready.size() == Powers.READY.size(), "unique_ready %d개 = 규칙에 들어간 고유 능력 %d개" % [ready.size(), Powers.READY.size()])
+	var base: float = d.lord.damage * d.forms[1].damage
+	var r := _named("성주의 저울")
+	var s := r.current()
+	var gm: float = d.grades.damage_mult[s.grade] * d.forms[s.data.form].damage / d.forms[1].damage
+	check(is_equal_approx(_hit(r, &"giant"), base * gm * 1.4), "성주의 저울: 체력 절반 이상이면 피해 +40%")
+	r.lord.hp = 10.0
+	check(is_equal_approx(r.powers.lord_damage(10.0, null), 6.0), "성주의 저울: 절반 아래면 받는 피해 -40%")
+	r = _named("마지막 숨")
+	r.lord.hp = r.max_hp() * 0.1
+	_swing_once(r)
+	check(r.lord.big, "마지막 숨: 체력 20% 이하면 늘 큰 베기")
+	r = _named("처음이자 마지막 칼")
+	var many: Array[Enemy] = []
+	for i in 5:
+		many.append(r.spawn_at(&"giant", Vector2(3 + i * 4, 3)))
+	_swing_once(r)
+	check(many.all(func(x: Enemy) -> bool: return x.dead), "처음이자 마지막 칼: 밤마다 한 번 모든 적이 쓰러진다")
+	r = _named("충신", 1)
+	r.give(d.sword_by_name("녹슨 장검"), 0)
+	r.active = 0
+	r.lord.hp = 5.0
+	r._hurt_lord(50.0)
+	check(r.phase == Rules.Phase.NIGHT and r.lord.hp == 30.0 and r.slots[1] == null, "충신: 대신 부러지고 체력 30으로 버틴다")
+	r = _named("영원한 파수")
+	r.lord.hp = 5.0
+	r._hurt_lord(50.0)
+	check(r.phase == Rules.Phase.NIGHT and r.powers.undying > 0.0, "영원한 파수: 10초 동안 쓰러지지 않는다")
+	for i in 320:
+		r.step(_inp())
+	check(r.phase == Rules.Phase.OVER, "영원한 파수: 시간이 다하도록 체력을 못 되찾으면 쓰러진다")
+	r = Rules.new(d, 3)
+	r.give(d.sword_by_name("두 번째 기회"), 0)
+	r.start_night()
+	r.lord.hp = 5.0
+	r.enemies.clear()
+	r._hurt_lord(50.0)
+	check(r.phase == Rules.Phase.NIGHT and is_equal_approx(r.lord.hp, r.max_hp()) and r.powers.run_used.has("second"), "두 번째 기회: 그 밤을 처음부터 다시 한다")
+	r = _named("바람 가르는 깃")
+	r.powers.dash_charges = r.powers.max_charges()
+	r.step(_inp(Vector2.DOWN, false, true))
+	for i in 6:
+		r.step(_inp(Vector2.DOWN))
+	r.step(_inp(Vector2.DOWN, false, true))
+	check(r.lord.dash > 0.0, "바람 가르는 깃: 돌진을 두 번 연달아 한다")
+	r = _named("쌍칼 서약")
+	var other := r.give(d.sword_by_name("녹슨 장검"), 1)
+	other.ins.clear()
+	other.ins["날"] = 50.0
+	check(is_equal_approx(r.powers.ins("날"), 50.0), "쌍칼 서약: 다른 칸의 각인도 발동한다")
+	r = _named("첫 번째 왕", 1)
+	var w := r.give(d.sword_by_name("녹슨 장검"), 0)
+	w.ins.clear()
+	w.ins["날"] = 20.0
+	r.active = 0
+	check(is_equal_approx(r.powers.ins("날"), 30.0), "첫 번째 왕: 두 검의 각인 수치 +50%")
+	r = _named("행운의 녹")
+	var l0: float = r.luck()
+	r.current().durability = 1.0
+	r.spawn_at(&"giant", r.lord.pos + Vector2(1, 0))
+	_swing_once(r)
+	check(r.slots[0] == null and is_equal_approx(r.luck(), l0 * 3.0), "행운의 녹: 부러지면 다음 뽑기 운 ×3")
+	r = Rules.new(d, 4)
+	r.give(d.sword_by_name("언덕의 첫 검"), 0)
+	r.give(d.sword_by_name("모든 검의 어머니"), 1)
+	var plain := Sword.new(d.sword_by_name("녹슨 장검"), d)
+	var dur0: float = plain.max_durability
+	var n_ins: int = plain.ins.size()
+	r.powers.on_pulled(plain)
+	check(plain.max_durability == roundf(dur0 * 1.2) and plain.ins.size() == n_ins + 1, "언덕의 첫 검(+20% 내구)과 모든 검의 어머니(각인 하나 더)")
+	r = _named("메아리 계곡")
+	var e := r.spawn_at(&"giant", r.lord.pos + Vector2(1, 0))
+	_swing_once(r)
+	var e1: float = e.hp
+	for i in 20:
+		r.step(_inp())
+	check(e.hp < e1, "메아리 계곡: 0.5초 뒤 같은 베기가 한 번 더")
+	r = _named("망각")
+	var fool := r.spawn_at(&"wolf", r.lord.pos + Vector2(1, 0))
+	var victim := r.spawn_at(&"giant", r.lord.pos + Vector2(1.6, 0.2))
+	_swing_once(r)
+	var v0: float = victim.hp
+	var hp0: float = r.lord.hp
+	for i in 40:
+		r.step(_inp())
+	check(fool.confused > 0.0 or victim.hp < v0, "망각: 찔린 적이 다른 적을 친다")
+	check(r.lord.hp >= hp0 - victim.damage * 2.0, "망각: 그동안 나를 덜 때린다")
+	r = _named("늪지기")
+	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1, 0))
+	_swing_once(r)
+	r.step(_inp())
+	r.step(_inp())
+	check(r.powers.zones.size() == 1 and e.slow_k > 0.0, "늪지기: 찌른 자리에 늪이 생겨 느려진다")

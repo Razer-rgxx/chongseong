@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("새벽", "버팀")
 unique_text = "밤이 30초 남으면 체력을 모두 회복하고 피해 +50%."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "밤새 버틴 병사들은 이 검이 빛나면 해가 뜬다는 걸 알았다."

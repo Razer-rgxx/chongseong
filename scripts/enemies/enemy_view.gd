@@ -83,8 +83,21 @@ func draw(alpha: float, delta: float) -> bool:
 	_body.scale = Vector3(1.0 + 0.06 * _recoil, 1.0 - 0.08 * _recoil, 1.0 + 0.06 * _recoil)
 	_flash -= delta
 	var w: float = clampf(_flash / flash_time, 0.0, 1.0)
+	# 상태 빛: 불(주황 깜빡임), 얼음(푸른 흰빛), 느림(푸른 기), 망각(보라), 출혈(붉은 기)
+	var tint := Color(0, 0, 0, 0)
+	if enemy.burn > 0.0:
+		tint = Color(1.0, 0.45, 0.1, 0.45 + 0.2 * sin(_t * 18.0))
+	elif enemy.frozen:
+		tint = Color(0.75, 0.92, 1.0, 0.7)
+	elif enemy.confused > 0.0:
+		tint = Color(0.65, 0.4, 1.0, 0.45)
+	elif enemy.slow_k > 0.0:
+		tint = Color(0.45, 0.65, 1.0, 0.35)
+	elif enemy.bleed_t > 0.0:
+		tint = Color(0.6, 0.0, 0.0, 0.35)
 	for i in _mats.size():
-		_mats[i].albedo_color = _base[i].lerp(Color.WHITE, w)
+		var c: Color = _base[i].lerp(Color(tint.r, tint.g, tint.b), tint.a)
+		_mats[i].albedo_color = c.lerp(Color.WHITE, w)
 	return false
 
 

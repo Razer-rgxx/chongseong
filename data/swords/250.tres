@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("막기", "날")
 unique_text = "체력이 절반 이상이면 피해 +40%, 절반 아래면 받는 피해 -40%."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "성주는 이 검으로 재판을 했다. 이긴 쪽이 옳았다."

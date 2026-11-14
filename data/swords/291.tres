@@ -10,6 +10,6 @@ grade = 5
 form = 2
 inscriptions = PackedStringArray("불씨", "무거움")
 unique_text = "불이 꺼지지 않는다. 불붙은 적은 쓰러질 때까지 타며 옆으로 번진다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "꺼뜨린 사람이 아무도 없다."

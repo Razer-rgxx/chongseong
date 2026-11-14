@@ -35,6 +35,7 @@ var _hilts: Dictionary = {}
 var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
 var _fx := HitFx.new()
+var _pfx := PowerFx.new()
 var _hud_t: float = 0.0
 var _altar_view: Node3D = null
 
@@ -56,6 +57,9 @@ func _ready() -> void:
 	_lord.setup(rules)
 	add_child(_lord)
 	add_child(_fx)
+	_pfx.setup(rules)
+	add_child(_pfx)
+	rules.effect.connect(_on_effect)
 	rules.day_started.connect(_on_day)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
@@ -410,6 +414,34 @@ func _hit_sound(e: Enemy, big: bool, at: Vector3) -> void:
 		_sfx.play(&"hit_heavy", at, -2.0 if big else -4.0, pitch)
 	else:
 		_sfx.play(&"hit_flesh", at, -2.0, pitch)
+
+
+## 각인·고유 능력이 낸 일 중 화면 전체에 걸치는 것(번쩍임, 흔들림, 알림). 땅과 공중의 그림은 PowerFx.
+func _on_effect(kind: StringName, at: Vector2, info: Dictionary) -> void:
+	match kind:
+		&"flash":
+			_hud.flash(info.get("color", Color.WHITE), 0.5)
+			_camera.add_shake(0.5)
+		&"fall":
+			_camera.add_shake(0.6)
+			_sfx.play(&"hit_heavy", Grid.cells_to_world(at), 4.0, 0.7)
+		&"zap":
+			_sfx.play(&"anvil", Grid.cells_to_world(info.to), -6.0, 1.6)
+		&"stop":
+			_hud.flash(Color(0.6, 0.8, 1.0), 0.25)
+			_hud.toast("멈춘 순간. 나만 움직인다.")
+		&"saved":
+			_hud.flash(Color(1.0, 0.9, 0.6), 0.4)
+			_hud.toast({"충신": "충신이 대신 부러졌다.", "영원한 파수": "영원한 파수: 10초 동안 쓰러지지 않는다. 벤 만큼 체력을 되찾는다.", "두 번째 기회": "두 번째 기회: 이 밤을 처음부터 다시 한다."}.get(info.get("by", ""), "버텼다."))
+		&"echo":
+			_lord.echo_arc(at, info.face, info.arc, info.reach)
+		&"free_pull":
+			_hud.toast("산 자의 몫: 공짜 뽑기 +1")
+		&"dex_all":
+			for sw in data.swords:
+				meta.note_found(sw.id)
+			meta.save()
+			_hud.toast("언덕의 모든 검이 함께 뽑혀 나왔다. 도감이 다 채워졌다.")
 
 
 func _on_enemy_died(e: Enemy) -> void:

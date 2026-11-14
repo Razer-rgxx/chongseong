@@ -10,6 +10,6 @@ grade = 4
 form = 2
 inscriptions = PackedStringArray("무리 베기", "연격")
 unique_text = "그 밤에 쓰러뜨린 적 10마리마다 피해 +2% (최대 +60%)."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "칼날에 백 개의 이름이 새겨져 있다. 마지막 칸은 비어 있다."

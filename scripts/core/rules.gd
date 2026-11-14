@@ -5,7 +5,7 @@ extends RefCounted
 ## 화면은 신호와 상태를 받아 그린다.
 ## 지금(1단계): 낮에 꽂힌 검 뽑기, 두 칸과 바꿔 쥐기, 밤의 적, 형태별 베기, 내구와 부러짐, 구역 오르기, 언덕지기.
 ## 판 사이 성장(Meta): 축복(체력, 운, 뽑기 값, 새벽 회복)과 검집의 검을 들고 시작한다. 정예와 숫돌 제단.
-## 각인과 고유 능력은 표에 수치만 있고 규칙에는 아직 없다.
+## 각인 36종과 고유 능력은 Powers(powers.gd)가 맡고, 이 파일은 정해진 자리에서 부른다.
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -27,6 +27,8 @@ signal boss_spawned(enemy: Enemy)
 signal elite_spawned(enemy: Enemy)
 signal altar_opened()
 signal altar_used(kind: String, text: String)
+## 각인·고유 능력이 낸 일(번개, 고리, 떨어진 검, 멈춤, 살아남음 …). 화면이 그린다. info는 종류마다 다르다.
+signal effect(kind: StringName, at: Vector2, info: Dictionary)
 
 enum Phase { DAY, NIGHT, OVER }
 
@@ -79,6 +81,8 @@ var debug_god: bool = false
 var debug_grade: int = -1
 var _spawn_t: float = 0.0
 var _next_id: int = 1
+## 각인과 고유 능력.
+var powers: Powers
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -88,6 +92,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
 	Grid.size = data.run.arena_size
+	powers = Powers.new(self)
 	lord.hp = max_hp()
 	_new_day()
 	if meta:
@@ -106,7 +111,7 @@ func max_hp() -> float:
 
 
 func pull_cost() -> float:
-	return maxf(1.0, data.run.pull_cost - _bless("cost"))
+	return maxf(1.0, data.run.pull_cost - _bless("cost") - (powers.pull_discount() if powers else 0.0))
 
 
 func heal_at_dawn() -> float:
@@ -126,7 +131,7 @@ func current() -> Sword:
 
 
 func luck() -> float:
-	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck"))
+	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult()
 
 
 func step(input: LordInput = null) -> void:
@@ -143,6 +148,9 @@ func step(input: LordInput = null) -> void:
 		return
 	if pull_hilt != null:
 		_step_pull()
+		return
+	powers.tick(dt)
+	if phase == Phase.OVER:
 		return
 	_step_lord(input)
 	if phase == Phase.NIGHT:
@@ -164,6 +172,7 @@ func start_night() -> void:
 	elite_out = false
 	hilts.clear()
 	altar = null
+	powers.on_night_start()
 	night_started.emit(zone)
 
 
@@ -291,6 +300,7 @@ func _step_pull() -> void:
 	best_grade = maxi(best_grade, pull_grade)
 	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
 	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
+	powers.on_pulled(s)
 	sword_pulled.emit(s)
 	_receive(s)
 
@@ -335,6 +345,7 @@ func swap(k: int) -> void:
 		return
 	active = k
 	lord.combo = 0
+	powers.swapped = true
 	slots_changed.emit()
 
 
@@ -361,16 +372,21 @@ func _step_lord(input: LordInput) -> void:
 	L.moving = mv.length() > 0.1
 	if L.moving:
 		L.move_dir = mv.normalized()
-	if input and input.dash and L.dash_cooldown <= 0.0 and L.dash <= 0.0:
+	if input and input.dash and powers.dash_charges > 0 and L.dash <= 0.0:
+		powers.dash_charges -= 1
+		if powers.dash_recharge <= 0.0:
+			powers.dash_recharge = powers.dash_cooldown()
 		L.dash = D.dash_time
-		L.dash_cooldown = D.dash_cooldown
+		L.dash_cooldown = powers.dash_recharge
 		L.invuln = maxf(L.invuln, D.dash_time + 0.05)
 		L.dash_dir = L.move_dir if L.moving else Vector2.from_angle(L.face)
+		powers.on_dash()
 		lord_dashed.emit()
 	var v: Vector2
 	if L.dash > 0.0:
 		L.dash -= dt
 		v = L.dash_dir * D.dash_speed
+		powers.dash_tick()
 	else:
 		v = mv * D.speed * (D.swing_move_mult if L.swing > 0.0 else 1.0)
 	var lim := Vector2(Grid.size) - Vector2(0.5, 0.5)
@@ -384,27 +400,31 @@ func _step_lord(input: LordInput) -> void:
 
 
 ## 형태마다 연타 수가 다르다(대검 2, 나머지 3). 연타의 마지막이 큰 베기다.
-## 부채꼴 안이거나 아주 가까운 적을 가까운 순서로 벤다(세검은 앞의 2명까지).
+## 부채꼴 안이거나 아주 가까운 적을 가까운 순서로 벤다(세검은 앞의 2명 + 꿰뚫기).
+## 피해·속도·사거리·각도는 Powers.stats()가 각인과 고유 능력을 넣어 계산한다.
 func _swing() -> void:
 	var L := lord
 	var D := data.lord
 	var s := current()
-	var F: FormData = s.form if s else data.unarmed
-	var g_mult: float = data.grades.damage_mult[s.grade] * s.bonus if s else 1.0
+	var st: Dictionary = powers.stats()
+	var F: FormData = st.form
 	if L.combo_timer <= 0.0:
 		L.combo = 0
 	L.combo = L.combo % F.combo + 1
 	L.combo_timer = D.combo_window
-	var big: bool = L.combo == F.combo
+	var big: bool = L.combo == F.combo or powers.force_big()
 	L.big = big
-	L.cooldown = D.cooldown / F.speed * (D.big_cooldown_mult if big else 1.0)
-	var reach: float = D.reach * F.reach
-	var arc: float = minf(D.arc * F.arc, TAU)
+	L.cooldown = D.cooldown / maxf(0.05, st.spd) * (D.big_cooldown_mult if big else 1.0)
+	var reach: float = st.reach
+	var arc: float = st.arc
 	L.swing = D.swing_time
 	L.swing_arc = arc
-	L.swing_reach = reach
-	var dmg: float = D.damage * F.damage * g_mult * (D.big_damage_mult if big else 1.0)
-	var knock: float = D.knockback * F.knockback * (D.big_knockback_mult if big else 1.0)
+	L.swing_reach = minf(reach, 12.0)
+	if powers.before_swing():
+		lord_swung.emit(true)
+		return
+	var dmg: float = powers.swing_damage(st.dmg * (D.big_damage_mult if big else 1.0), big)
+	var knock: float = D.knockback * F.knockback * (D.big_knockback_mult if big else 1.0) * powers.knock_mult()
 	var hit: Array[Enemy] = []
 	for e in enemies:
 		if e.dead:
@@ -418,25 +438,36 @@ func _swing() -> void:
 		hit.append(e)
 	var at: Vector2 = L.pos
 	hit.sort_custom(func(a: Enemy, b: Enemy) -> bool: return a.pos.distance_squared_to(at) < b.pos.distance_squared_to(at))
-	if F.pierce > 0 and hit.size() > F.pierce:
-		hit.resize(F.pierce)
+	if st.pierce > 0 and hit.size() > st.pierce:
+		hit.resize(st.pierce)
+	dmg *= powers.crowd_mult(hit.size())
 	for e in hit:
 		var dir: Vector2 = e.pos - L.pos
 		dir = dir / dir.length() if dir.length() > 0.001 else Vector2.from_angle(L.face)
-		hurt(e, dmg, dir * knock, big)
+		var res: Dictionary = powers.strike(e, dmg, dir * knock)
+		hurt(e, res.dmg, res.knock, big)
+		powers.after_strike(e, res.dmg, dmg)
 	lord_swung.emit(big)
+	powers.after_swing(hit, st, dmg, big)
 	if hit.size() > 0:
 		freeze = maxi(freeze, roundi((D.hitstop_big if big else D.hitstop) / dt))
-		if s and s.breakable():
+		if s and s == current() and s.breakable() and powers.wears():
 			s.durability -= 1.0
 			if s.durability <= 0.0:
 				_break(active)
+
+
+## 그 칸의 검을 부러뜨린다(충신이 대신 부러질 때도).
+func break_slot(k: int) -> void:
+	if slots[k] != null:
+		_break(k)
 
 
 func _break(k: int) -> void:
 	var s := slots[k]
 	slots[k] = null
 	broken_by_grade[s.grade] += 1
+	powers.on_break(s)
 	if k == active and slots[1 - k] != null:
 		active = 1 - k
 	lord.combo = 0
@@ -444,33 +475,42 @@ func _break(k: int) -> void:
 	slots_changed.emit()
 
 
-func hurt(e: Enemy, damage: float, knock: Vector2, big: bool) -> void:
+## dot: 출혈·불처럼 틱마다 조금씩 들어가는 피해(화면에 맞음 신호를 보내지 않는다).
+func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false) -> void:
 	if e.dead:
 		return
+	powers.on_damage(e, damage)
 	e.hp -= damage
 	e.push += knock * e.data.knockback_mult * data.lord.knock_speed
-	enemy_hit.emit(e, damage, big)
+	if not dot:
+		enemy_hit.emit(e, damage, big)
 	if e.hp <= 0.0:
 		e.dead = true
 		kills += 1
 		if e.elite:
 			elites_killed += 1
 			free_pulls = mini(data.run.max_free_pulls, free_pulls + 1)
+		powers.on_kill(e)
 		enemy_died.emit(e)
 
 
-func _hurt_lord(d: float) -> void:
+func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	var L := lord
 	if L.invuln > 0.0 or L.dash > 0.0 or phase != Phase.NIGHT or debug_god:
 		return
+	d = powers.lord_damage(d, attacker)
 	L.hp -= d
 	L.invuln = data.lord.hurt_invuln
 	lord_hurt.emit(d)
-	if L.hp <= 0.0:
-		L.hp = 0.0
-		phase = Phase.OVER
-		won = false
-		run_ended.emit(false)
+	if L.hp <= 0.0 and not powers.save_from_death():
+		lord_died()
+
+
+func lord_died() -> void:
+	lord.hp = 0.0
+	phase = Phase.OVER
+	won = false
+	run_ended.emit(false)
 
 
 # ---------------------------------------------------------------- 적
@@ -547,21 +587,36 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 func _step_enemies() -> void:
 	var keep: float = pow(data.lord.knock_keep, dt)
 	var reach: float = data.run.enemy_reach
-	for e in enemies:
+	for e in enemies.duplicate():
 		if e.dead:
 			continue
 		e.pos += e.push * dt
 		e.push *= keep
-		var to: Vector2 = lord.pos - e.pos
+		var k: float = powers.enemy_tick(e, dt)
+		if e.dead or k <= 0.0 or phase != Phase.NIGHT:
+			continue
+		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
+		var foe: Enemy = null
+		if e.confused > 0.0:
+			var best: float = 1e9
+			for o in enemies:
+				if o != e and not o.dead and o.pos.distance_squared_to(e.pos) < best:
+					best = o.pos.distance_squared_to(e.pos)
+					foe = o
+		var target: Vector2 = foe.pos if foe else lord.pos
+		var to: Vector2 = target - e.pos
 		var d: float = to.length()
 		if d > 0.001:
 			e.face = to / d
 		e.cooldown -= dt
-		if d > e.radius + reach:
-			e.pos += e.face * e.data.speed * dt
+		if d > e.radius + reach + (foe.radius if foe else 0.0):
+			e.pos += e.face * e.data.speed * k * dt
 		elif e.cooldown <= 0.0:
 			e.cooldown = e.data.cooldown
-			_hurt_lord(e.damage)
+			if foe:
+				hurt(foe, e.damage, Vector2.ZERO, false)
+			else:
+				_hurt_lord(e.damage, e)
 	var n: int = enemies.size()
 	for i in n:
 		var a := enemies[i]

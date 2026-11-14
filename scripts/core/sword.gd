@@ -30,7 +30,8 @@ func _init(d: SwordData, game: GameData) -> void:
 	if d.unbreakable:
 		max_durability = -1.0
 	else:
-		max_durability = roundf(game.grades.durability[grade] * form.durability)
+		var tough: float = float(ins.get("단단함", 0.0)) + float(ins.get("투박함", 0.0))
+		max_durability = roundf(game.grades.durability[grade] * form.durability * (1.0 + tough / 100.0))
 	durability = max_durability
 
 

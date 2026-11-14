@@ -10,6 +10,6 @@ grade = 4
 form = 1
 inscriptions = PackedStringArray("광기", "처형")
 unique_text = "체력이 20% 이하면 모든 공격이 큰 베기가 된다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "다 쓰러진 뒤에야 제 힘을 낸다."

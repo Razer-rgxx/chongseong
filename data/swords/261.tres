@@ -10,6 +10,6 @@ grade = 4
 form = 2
 inscriptions = PackedStringArray("흡혈", "숫돌")
 unique_text = "적을 쓰러뜨리면 내구가 닳지 않고 오히려 찬다. 10초 동안 아무도 못 베면 체력을 1씩 빨아먹는다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "베지 않으면 주인을 먹는다."

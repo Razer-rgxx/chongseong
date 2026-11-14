@@ -10,6 +10,6 @@ grade = 5
 form = 1
 inscriptions = PackedStringArray("연격", "버팀")
 unique_text = "밤이 깊을수록 강해진다. 10초마다 피해 +5% (상한 없음)."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "백 년 동안 한 번도 칼집에 들어가지 않았다."

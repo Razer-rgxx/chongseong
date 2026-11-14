@@ -10,6 +10,6 @@ grade = 5
 form = 1
 inscriptions = PackedStringArray()
 unique_text = "밤마다 한 번, 휘두르면 화면의 모든 적이 쓰러진다."
-unique_ready = false
+unique_ready = true
 unbreakable = true
 story = "첫 전쟁을 시작한 칼이자, 마지막 전쟁을 끝낼 칼."

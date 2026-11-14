@@ -10,6 +10,6 @@ grade = 5
 form = 3
 inscriptions = PackedStringArray("서리", "처형")
 unique_text = "언 적이 부서질 때마다 다음 찌르기가 화면 끝까지 닿는 얼음 창이 된다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "끝나지 않는 겨울을 끝낸 검."

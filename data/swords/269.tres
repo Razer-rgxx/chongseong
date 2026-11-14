@@ -10,6 +10,6 @@ grade = 4
 form = 3
 inscriptions = PackedStringArray("긴 날", "사냥")
 unique_text = "찌른 자리에 2초 동안 늪이 생겨 적이 60% 느려진다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "늪을 지키던 자의 검. 칼끝이 늘 젖어 있다."

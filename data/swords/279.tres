@@ -10,6 +10,6 @@ grade = 4
 form = 0
 inscriptions = PackedStringArray("출혈", "흡혈")
 unique_text = "출혈로 쓰러진 적이 피 웅덩이를 남기고, 웅덩이를 밟으면 체력이 찬다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "언덕 아래 개울이 한때 붉었던 이유."

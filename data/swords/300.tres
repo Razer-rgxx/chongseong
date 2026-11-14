@@ -10,6 +10,6 @@ grade = 5
 form = 0
 inscriptions = PackedStringArray()
 unique_text = "뽑는 순간 언덕의 모든 검이 함께 뽑혀 나와 도감이 다 채워진다."
-unique_ready = false
+unique_ready = true
 unbreakable = true
 story = "아무도 이 검의 이름을 기억하지 못한다. 뽑은 사람도."
