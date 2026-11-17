@@ -139,14 +139,14 @@ code.id { color: var(--line); font-size: 12.5px; }
 <script>
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
-  stage: "9단계: 검마다 다른 좌클릭 · 끝 · 설계서 docs/attacks.md",
-  updated: "2026-11-17 22:00",
+  stage: "10단계: 공격 토큰(몰려와도 몇 마리만 덤빈다) · 설계서 docs/attack_tokens.md · 9단계(좌클릭 150가지)는 끝",
+  updated: "2026-11-17 22:10",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
     does: "설계서로 팀 사이의 약속(동작 id, 신호, 자료 모양)을 정하고, 팀을 차례로 부르고, 끝나면 테스트·화면 확인·커밋·푸시를 한다.",
-    status: "done",
-    note: "네 팀 모두 끝. 테스트 270개 통과, 푸시함. 다음은 사용자가 PC에서 손맛 확인."
+    status: "doing",
+    note: "10단계 공격 토큰: 규칙과 적 화면만 바뀌어 기능팀 혼자 맡는다(아트·모션·이펙트는 할 일 없음)."
   },
   teams: [
     { key: "art", name: "아트팀", model: "Claude Opus 5.5 에이전트", status: "done",
@@ -161,7 +161,7 @@ const STATE = {
       does: ["동작 20개의 맞는 자리 보이기", "날아가는 것, 착지 먼지, 순간 이동 연기", "속성 4가지 효과", "가짜 신호로 하나씩 틀어 보는 도구"],
       files: ["scripts/world/move_fx.gd", "scripts/debug/move_gallery.gd"],
       gets: "설계서의 신호, 아트팀의 모양", gives: "MoveFx → 기능팀이 main에 잇는다", note: "끝: 동작 20가지의 맞는 자리(부채꼴·띠·원·고리), 늦게 터지는 것의 미리 보임, 날아가는 검기·던진 칼, 속성 4가지, 메아리. 사용량 한도로 한 번 멈췄다가 이어서 마침. 커밋 0d471f9" },
-    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "done",
+    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
       does: ["규칙: 동작 실행(각인·고유 능력과 함께), 날아가는 것", "조합 150개 만들기, 검 300자루 배정", "카드에 방식 이름·아이콘, 화면 연결", "테스트"],
       files: ["scripts/core/", "data/attacks/", "data/swords/*.tres", "scripts/debug/build_attacks.gd", "tests/", "main.gd · lord_view.gd · hud.gd"],
       gets: "앞 세 팀이 만든 것 전부", gives: "게임에서 도는 좌클릭 150가지", note: "끝: 동작 실행기(20가지, 날아가는 것, 반격, 속성, 메아리), 방식 150가지와 검 300자루 배정, 갈고리 검 12방식·24자루, 카드에 이름·아이콘, 테스트 186 → 270. 한도와 서버 재시작으로 두 번 멈췄다가 이어서 마침. 커밋 f67fda7 · 17b1833 · c1a83ff" }
@@ -183,6 +183,7 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-17 22:10", "사용자: 공격 토큰(둠·갓 오브 워·하프라이프 2 방식). 설계서 docs/attack_tokens.md. 기능팀 시작(10단계)."],
     ["11-17 22:00", "기능팀 끝. 총괄 확인: 테스트 270 통과, 화면 확인, 푸시. 9단계 끝."],
     ["11-17 20:45", "기능팀이 시작하자마자 사용량 한도로 멈춤(파일 변경 없음) → 한도가 풀려 이어서 다시 돌림."],
     ["11-17 17:40", "이펙트팀 끝(갤러리 59장). 기능팀 시작."],
