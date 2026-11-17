@@ -46,6 +46,14 @@ func _init() -> void:
 	_test_echo()
 	_test_moves_with_powers()
 	_test_replay_moves()
+	_test_tokens_cap()
+	_test_tokens_cost()
+	_test_tokens_boss()
+	_test_tokens_cooldown()
+	_test_tokens_order()
+	_test_tokens_release()
+	_test_tokens_ring()
+	_test_tokens_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -491,7 +499,8 @@ func _test_lord_dies() -> void:
 	r.lord.hp = 5.0
 	var e := r.spawn_at(&"wolf", r.lord.pos + Vector2(0.5, 0.0))
 	e.cooldown = 0.0
-	for t in 30:
+	# 두 번 물어야 한다: 표를 받고 0.25초, 돌려놓은 표가 0.5초 식은 뒤 다시 받고 0.25초
+	for t in 60:
 		r.step()
 		if r.phase == Rules.Phase.OVER:
 			break
@@ -1625,3 +1634,353 @@ func _test_replay_moves() -> void:
 		kills.append(r.kills)
 	check(hashes[0] == hashes[1] and kills[0] == kills[1], "같은 시드·같은 입력이면 여러 방식으로 싸워도 똑같이 돈다")
 	check(kills[0] > 10, "다시 돌린 밤에서 실제로 싸웠다(처치 %d)" % kills[0])
+
+
+# ---------------------------------------------------------------- 공격 표(docs/attack_tokens.md)
+
+## 표 수만 바꾼 표(구역마다 같은 수). 다른 테스트의 d는 건드리지 않는다.
+func _tok_data(n: int) -> GameData:
+	var g := GameData.load_default()
+	g.run = d.run.duplicate() as RunData
+	g.run.attack_tokens = PackedInt32Array([n])
+	return g
+
+
+## 표를 시험할 밤: 적이 저절로 나오지 않고, 영주는 다치지 않는다(맞은 것은 간격이 다시 차는 것으로 센다).
+func _tok_rules(g: GameData = null) -> Rules:
+	var r := Rules.new(g if g else d, 1)
+	r.start_night()
+	r.enemies.clear()
+	r.debug_god = true
+	r._spawn_t = 1e9
+	r.elite_out = true
+	return r
+
+
+## 영주 둘레 각 a(라디안), 거리 dist에 선 적.
+func _at(r: Rules, kind: StringName, a: float, dist: float) -> Enemy:
+	return r.spawn_at(kind, r.lord.pos + Vector2.from_angle(a) * dist)
+
+
+## 사거리 안(바로 때릴 수 있는 자리)에 선 적.
+func _close(r: Rules, kind: StringName, a: float) -> Enemy:
+	var e := _at(r, kind, a, 0.0)
+	e.pos = r.lord.pos + Vector2.from_angle(a) * (e.radius + d.run.enemy_reach - 0.05)
+	e.prev_pos = e.pos
+	return e
+
+
+## 기다림 거리 둘레에 선 적.
+func _ringed(r: Rules, kind: StringName, a: float) -> Enemy:
+	var e := _at(r, kind, a, 0.0)
+	e.pos = r.lord.pos + Vector2.from_angle(a) * r.tokens.wait_dist(e)
+	e.prev_pos = e.pos
+	return e
+
+
+## n틱 돌리며 영주를 때린 것을 적는다: [틱, 적, 때리기 직전에 든 표]. 간격이 다시 차면 때린 것.
+func _run_log(r: Rules, n: int, log: Array, each: Callable = Callable()) -> void:
+	for t in n:
+		var before := {}
+		for e in r.enemies:
+			before[e] = [e.cooldown, e.token]
+		r.freeze = 0
+		r.step(_inp())
+		for e in r.enemies:
+			if before.has(e) and e.cooldown > float(before[e][0]) + 0.05:
+				log.append([r.tick, e, int(before[e][1])])
+		if each.is_valid():
+			each.call()
+
+
+## 표 수만큼만 동시에 때린다. 표 없이 때리는 적이 없다. 1초에 때리는 수가 표 수로 묶인다.
+func _test_tokens_cap() -> void:
+	var r := _tok_rules()
+	check(r.tokens.total() == 4 and d.run.attack_tokens.size() == 10 and d.run.attack_tokens[9] == 10, "표: 구역 10개, 첫 구역 4장, 마지막 10장")
+	for i in 12:
+		_at(r, &"wolf", TAU * i / 12.0, 5.0)
+	var log: Array = []
+	var worst: Array[int] = [0, 0]
+	_run_log(r, 300, log, func() -> void:
+		var holders: int = 0
+		for e in r.enemies:
+			if e.token > 0:
+				holders += 1
+		worst[0] = maxi(worst[0], r.tokens.held() + r.tokens.cooling_count())
+		worst[1] = maxi(worst[1], holders))
+	var no_token: int = 0
+	var per_sec := {}
+	for a in log:
+		if int(a[2]) <= 0:
+			no_token += 1
+		per_sec[int(a[0]) / 30] = int(per_sec.get(int(a[0]) / 30, 0)) + 1
+	var most: int = 0
+	for k in per_sec:
+		most = maxi(most, int(per_sec[k]))
+	check(worst[0] <= 4 and worst[1] <= 4, "표: 늑대 12마리가 몰려도 든 표 + 식는 표는 4장을 넘지 않는다(가장 많을 때 %d, 표 든 늑대 %d)" % worst)
+	check(no_token == 0 and log.size() > 8, "표: 표를 든 늑대만 때린다(때림 %d, 표 없이 %d)" % [log.size(), no_token])
+	# 표 한 장은 받고 0.25초 뒤에 때리고, 돌려놓으면 0.5초 식는다: 1초에 4 × 1/0.75 ≈ 5번을 넘지 못한다(표가 없으면 늑대 12마리 × 1/0.7 ≈ 17번)
+	var cap: int = ceili(4.0 / (d.run.token_warn + d.run.token_cooldown))
+	check(most <= cap, "표: 1초에 때리는 수가 표로 묶인다(가장 많을 때 %d번, 한도 %d)" % [most, cap])
+	var free := _tok_rules(_tok_data(0))
+	for i in 12:
+		_at(free, &"wolf", TAU * i / 12.0, 5.0)
+	var flog: Array = []
+	_run_log(free, 300, flog)
+	check(flog.size() > log.size() * 2, "표: 표 수가 0이면 꺼진다(모두 덤빈다, %d번 대 %d번)" % [flog.size(), log.size()])
+
+
+## 거인은 표 3장, 정예는 +1. 맨 앞의 큰 적이 받을 만큼 표가 없으면 뒤의 작은 적도 기다린다.
+func _test_tokens_cost() -> void:
+	var r := _tok_rules()
+	var g := _ringed(r, &"giant", 0.0)
+	var a := _ringed(r, &"wraith", 2.0)
+	var b := _ringed(r, &"wraith", 4.0)
+	r.step(_inp())
+	check(g.token == 3 and a.token == 1 and b.token == 0 and r.tokens.free_count() == 0, "표: 거인은 3장을 가져간다(거인 %d, 망령 %d·%d)" % [g.token, a.token, b.token])
+	var eg := r.spawn_at(&"giant", Vector2(1, 1))
+	eg.elite = true
+	var ew := r.spawn_at(&"wolf", Vector2(1, 1))
+	ew.elite = true
+	var z := _tok_rules()
+	z.zone = 5
+	check(r.tokens.cost(eg) == 4 and r.tokens.cost(ew) == 2 and z.tokens.cost(eg) == 4, "표: 정예는 한 장 더(거인 4, 늑대 2)")
+	check(_tok_rules(_tok_data(2)).tokens.cost(eg) == 2, "표: 표 값은 그 밤의 표 수를 넘지 않는다(언젠가는 받는다)")
+	# 망령 둘이 먼저 2장을 들고, 거인이 와서 기다리고, 늦게 온 망령은 남은 2장이 있어도 거인 뒤에 선다
+	var q := _tok_rules()
+	var h1 := _close(q, &"wraith", 0.0)
+	var h2 := _close(q, &"wraith", PI)
+	q.step(_inp())
+	h1.cooldown = 99.0
+	h2.cooldown = 99.0
+	var big := _ringed(q, &"giant", PI / 2.0)
+	q.step(_inp())
+	var late := _ringed(q, &"wraith", -PI / 2.0)
+	q.step(_inp())
+	check(h1.token == 1 and h2.token == 1 and big.token == 0 and late.token == 0 and q.tokens.free_count() == 2, "표: 먼저 기다린 거인이 받을 만큼 표가 없으면 늦게 온 망령도 기다린다(남은 표 %d)" % q.tokens.free_count())
+	q.hurt(h1, 99999.0, Vector2.ZERO, false)
+	_wait(q, 16)
+	check(big.token == 3 and late.token == 0, "표: 표가 식어 3장이 되면 거인이 받는다")
+
+
+## 언덕지기는 표 없이 때리고 남의 표도 막지 않는다.
+func _test_tokens_boss() -> void:
+	var r := _tok_rules()
+	var full: Array[Enemy] = []
+	for i in r.tokens.total():
+		full.append(_ringed(r, &"wraith", -0.9 + 0.6 * i))
+	r.step(_inp())
+	for e in full:
+		e.cooldown = 99.0
+	var boss := _close(r, &"boss", PI)
+	boss.cooldown = 0.0
+	var log: Array = []
+	_run_log(r, 10, log)
+	var boss_hit: bool = log.any(func(x: Array) -> bool: return x[1] == boss)
+	check(r.tokens.cost(boss) == 0 and boss.token == 0 and boss_hit, "표: 언덕지기는 표 없이 덤빈다")
+	check(r.tokens.held() == r.tokens.total() and full.all(func(e: Enemy) -> bool: return e.token == 1), "표: 언덕지기는 남의 표를 가져가지 않는다")
+
+
+## 때리면(막혔어도) 표를 돌려놓고, 돌려놓은 표는 0.5초 식은 뒤에 다음 적이 받는다. 받고 0.25초 동안은 눈이 번쩍이고 때리지 않는다.
+func _test_tokens_cooldown() -> void:
+	var r := _tok_rules(_tok_data(1))
+	var a := _close(r, &"wraith", 0.0)
+	a.cooldown = 0.0
+	var b := _ringed(r, &"wraith", PI)
+	r.step(_inp())
+	check(a.token == 1 and b.token == 0 and a.attack_soon and not b.attack_soon, "표: 받자마자 곧 때린다고 알린다(attack_soon)")
+	var t0: int = r.tick
+	var log: Array = []
+	var gone: Array[int] = [-1, -1]
+	_run_log(r, 60, log, func() -> void:
+		if gone[0] < 0 and a.token == 0:
+			gone[0] = r.tick
+		if gone[1] < 0 and b.token == 1:
+			gone[1] = r.tick)
+	var warn: int = roundi(d.run.token_warn * d.run.tick_rate)
+	check(log.size() >= 1 and log[0][1] == a and int(log[0][0]) - t0 >= warn - 1, "표: 받고 %d틱 뒤에 때린다(%d틱)" % [warn, int(log[0][0]) - t0 if log.size() > 0 else -1])
+	check(gone[0] == int(log[0][0]) if log.size() > 0 else false, "표: 때린 틱에 표를 돌려놓는다")
+	var cool: int = roundi(d.run.token_cooldown * d.run.tick_rate)
+	var gap: int = gone[1] - gone[0]
+	check(gap >= cool - 1 and gap <= cool + 1, "표: 돌려놓은 표는 0.5초(%d틱) 뒤에 다음 적이 받는다(%d틱)" % [cool, gap])
+	check(a.token == 0, "표: 막 때린 적보다 오래 기다린 적이 먼저 받는다")
+	# 반격 자세에 막혀도 때린 것으로 친다
+	var p := _mv(["parry"])
+	p.debug_god = false
+	p.tokens.cooling.clear()
+	var wolf := _close(p, &"wolf", 0.0)
+	wolf.max_hp = 9999.0
+	wolf.hp = 9999.0
+	wolf.cooldown = 0.0
+	p.step(_inp())
+	var hp0: float = p.lord.hp
+	var had: int = wolf.token
+	p.step(_inp(Vector2.ZERO, true))
+	_wait(p, 12)
+	# 늑대 하나뿐이라 식는 표 한 장은 늑대가 돌려놓은 것이다(남은 표로 다시 받았을 수는 있다)
+	check(had == 1 and p.lord.hp == hp0 and _hurt_by(wolf) > 0.0 and p.tokens.cooling_count() == 1, "표: 반격 자세에 막혀도 때린 것이라 표를 돌려놓는다")
+	# 돌진 무적에 막혀도
+	var q := _tok_rules(_tok_data(1))
+	var w := _close(q, &"wraith", 0.0)
+	w.cooldown = 0.0
+	q.step(_inp())
+	q.lord.invuln = 5.0
+	_wait(q, 12)
+	check(w.token == 0 and q.tokens.cooling_count() == 1, "표: 무적에 막혀도 한 번 때리면 돌려놓는다")
+
+
+## 가장 오래 기다린 적이 먼저 받는다(목록 순서가 앞이어도 늦게 온 적은 뒤).
+func _test_tokens_order() -> void:
+	var r := _tok_rules(_tok_data(1))
+	var h := _close(r, &"wraith", 0.0)
+	var late := _at(r, &"wraith", PI / 2.0, 0.0)
+	late.pos = r.lord.pos + Vector2(0.0, r.tokens.wait_dist(late) + 1.2)
+	late.prev_pos = late.pos
+	var early := _ringed(r, &"wraith", PI)
+	r.step(_inp())
+	h.cooldown = 99.0
+	_wait(r, 40)
+	check(h.token == 1 and early.waiting and late.waiting and early.wait_t > late.wait_t, "표: 둘 다 둘레에서 기다린다(먼저 온 쪽 %.2f초, 늦게 온 쪽 %.2f초)" % [early.wait_t, late.wait_t])
+	r.hurt(h, 99999.0, Vector2.ZERO, false)
+	_wait(r, 16)
+	check(early.token == 1 and late.token == 0, "표: 가장 오래 기다린 적이 먼저 받는다(목록 순서는 늦게 온 쪽이 앞)")
+	r.hurt(early, 99999.0, Vector2.ZERO, false)
+	_wait(r, 16)
+	check(late.token == 1, "표: 그다음 적이 받는다")
+
+
+## 표를 내려놓는 경우: 2.5초 못 때림(식는 시간 없이), 기절, 얼음, 망각, 멀리 밀려남, 죽음.
+func _test_tokens_release() -> void:
+	var r := _tok_rules(_tok_data(1))
+	var h := _close(r, &"wraith", 0.0)
+	var w := _ringed(r, &"wraith", PI)
+	r.step(_inp())
+	h.cooldown = 99.0
+	var t0: int = r.tick
+	var dropped: Array[int] = [-1, -1]
+	for i in 100:
+		_wait(r, 1)
+		if dropped[0] < 0 and h.token == 0:
+			dropped[0] = r.tick - t0
+		if dropped[1] < 0 and w.token == 1:
+			dropped[1] = r.tick - t0
+	var hold: int = roundi(d.run.token_hold_max * d.run.tick_rate)
+	check(absi(dropped[0] - hold) <= 1, "표: %.1f초(%d틱) 못 때리면 내려놓는다(%d틱)" % [d.run.token_hold_max, hold, dropped[0]])
+	check(dropped[1] == dropped[0], "표: 오래 못 때려 내려놓은 표는 식지 않고 바로 다음 적에게 간다")
+	var cases: Array = [
+		["기절", func(e: Enemy, _rr: Rules) -> void: e.stun = 1.0],
+		["얼음", func(e: Enemy, _rr: Rules) -> void:
+			e.frozen = true
+			e.stun = 1.0],
+		["망각", func(e: Enemy, _rr: Rules) -> void: e.confused = 2.0],
+		["멀리 밀려남", func(e: Enemy, rr: Rules) -> void: e.pos = rr.lord.pos + (e.pos - rr.lord.pos).normalized() * rr.tokens.wait_dist(e) * 2.5],
+	]
+	for c in cases:
+		r = _tok_rules()
+		var e := _close(r, &"wraith", 0.0)
+		e.cooldown = 99.0
+		_close(r, &"wraith", PI).cooldown = 99.0
+		r.step(_inp())
+		var had: int = e.token
+		(c[1] as Callable).call(e, r)
+		r.step(_inp())
+		var free_now: int = r.tokens.free_count()
+		check(had == 1 and e.token == 0 and r.tokens.cooling_count() == 1 and free_now == 2, "표: %s이면 내려놓는다(식는 표 %d)" % [c[0], r.tokens.cooling_count()])
+		_wait(r, 20)
+		if c[0] != "멀리 밀려남":
+			check(e.token == 0, "표: %s 동안은 표를 청하지 않는다" % c[0])
+	r = _tok_rules()
+	var k := _close(r, &"wraith", 0.0)
+	r.step(_inp())
+	r.hurt(k, 99999.0, Vector2.ZERO, false)
+	check(k.dead and k.token == 0 and r.tokens.cooling_count() == 1, "표: 죽으면 내려놓는다")
+	r.skip_night()
+	check(r.phase == Rules.Phase.DAY and not r.tokens.cooling.is_empty(), "표: (낮이 되어도 식는 표가 남아 있다가)")
+	r.start_night()
+	check(r.tokens.cooling.is_empty(), "표: 밤이 시작되면 식는 표가 없다")
+
+
+## 표 없는 적은 기다림 거리 안으로 들어오지 않고, 영주를 보며 둘레를 돈다(짝수 번호 시계, 홀수 반시계).
+func _test_tokens_ring() -> void:
+	var r := _tok_rules(_tok_data(1))
+	for i in 10:
+		_at(r, &"wraith" if i % 3 else &"wolf", TAU * i / 10.0 + 0.1, 6.0)
+	var ever := {}
+	var deep: Array[float] = [99.0]
+	var sum: Array[float] = [0.0, 0.0]
+	var waited := {}
+	var prev := {}
+	# 덜컥거림: 기다리는 동안 한 틱의 걸음이 앞 틱과 얼마나 다른지(합, 수)
+	var jolts: Array[float] = [0.0, 0.0]
+	_run_log(r, 240, [], func() -> void:
+		for e in r.enemies:
+			if e.token > 0:
+				ever[e] = true
+			var to: Vector2 = r.lord.pos - e.pos
+			if not ever.has(e):
+				deep[0] = minf(deep[0], to.length() - r.tokens.wait_dist(e))
+			if e.waiting and e.token == 0 and not ever.has(e):
+				waited[e] = true
+				sum[0] += e.face.dot(to.normalized())
+				sum[1] += 1.0
+			var v: Vector2 = e.pos - e.prev_pos
+			if prev.has(e) and e.waiting and e.token == 0 and r.tick > 120:
+				jolts[0] += (v - prev[e]).length()
+				jolts[1] += 1.0
+			prev[e] = v)
+	var jolt: float = jolts[0] / maxf(1.0, jolts[1])
+	var worst: Array[float] = deep
+	check(worst[0] > -0.05 and waited.size() >= 5, "표: 표 없는 적은 기다림 거리 안으로 들어오지 않는다(가장 깊이 %.3f칸, 기다린 적 %d)" % [worst[0], waited.size()])
+	check(sum[1] > 0.0 and sum[0] / sum[1] > 0.99, "표: 기다리는 적은 영주 쪽을 본다(%.3f)" % (sum[0] / maxf(1.0, sum[1])))
+	var step_len: float = d.enemies[&"wraith"].speed * d.run.token_strafe / d.run.tick_rate
+	check(jolt < step_len * 0.25, "표: 기다리는 적이 덜컥거리지 않는다(틱마다 걸음 차이 %.4f칸, 옆걸음 %.4f칸)" % [jolt, step_len])
+	# 돌 방향: 짝수 번호는 각이 커지는 쪽(위에서 보면 시계), 홀수는 반대. 너무 가까우면 물러난다.
+	var q := _tok_rules(_tok_data(1))
+	var h := _close(q, &"wraith", PI / 2.0)
+	q.step(_inp())
+	h.cooldown = 99.0
+	var a := _ringed(q, &"wraith", 0.0)
+	var b := _ringed(q, &"wraith", PI)
+	var even: Enemy = a if a.id % 2 == 0 else b
+	var odd: Enemy = b if even == a else a
+	var ae: float = (even.pos - q.lord.pos).angle()
+	var ao: float = (odd.pos - q.lord.pos).angle()
+	_wait(q, 20)
+	var de: float = angle_difference(ae, (even.pos - q.lord.pos).angle())
+	var dd: float = angle_difference(ao, (odd.pos - q.lord.pos).angle())
+	check(de > 0.05 and dd < -0.05, "표: 짝수 번호는 시계, 홀수는 반시계로 돈다(%.2f, %.2f)" % [de, dd])
+	check(absf(even.pos.distance_to(q.lord.pos) - q.tokens.wait_dist(even)) < 0.05, "표: 돌면서 기다림 거리를 지킨다")
+	var c := _close(q, &"wraith", -PI / 2.0)
+	_wait(q, 45)
+	check(c.token == 0 and c.pos.distance_to(q.lord.pos) > q.tokens.wait_dist(c) - 0.1, "표: 너무 가까운 표 없는 적은 기다림 거리까지 물러난다(%.2f칸)" % c.pos.distance_to(q.lord.pos))
+
+
+## 같은 시드·같은 입력이면 표 나누기도 같다(랜덤을 쓰지 않는다).
+func _test_tokens_replay() -> void:
+	var logs: Array[String] = []
+	var hashes: Array[int] = []
+	var waits: Array[int] = []
+	for run_i in 2:
+		var r := Rules.new(d, 31)
+		r.zone = 3
+		r.debug_god = true
+		r.start_night()
+		var rec := RandomNumberGenerator.new()
+		rec.seed = 4
+		var text: String = ""
+		var waited: int = 0
+		for k in 1200:
+			var inp := _inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)) * 0.3, rec.randf() < 0.3, rec.randf() < 0.02)
+			r.step(inp)
+			for e in r.enemies:
+				if e.waiting and e.token == 0:
+					waited += 1
+			if k % 30 == 0:
+				for e in r.enemies:
+					if e.token > 0:
+						text += "%d:%d:%d " % [r.tick, e.id, e.token]
+		logs.append(text)
+		hashes.append(r.state_hash())
+		waits.append(waited)
+	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].length() > 0, "표: 같은 시드·같은 입력이면 누가 언제 표를 받는지도 같다")
+	check(waits[0] > 100, "표: 다시 돌린 밤에서 실제로 표를 기다린 적이 있다(%d)" % waits[0])

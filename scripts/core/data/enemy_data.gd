@@ -18,3 +18,5 @@ extends Resource
 @export var wraith: bool = false
 ## 구역에 따라 체력과 피해가 오르지 않는다(언덕지기).
 @export var boss: bool = false
+## 영주를 때리려면 가져가야 하는 공격 표 수(정예는 +1). 0이면 표 없이 덤빈다(언덕지기).
+@export var token_cost: int = 1

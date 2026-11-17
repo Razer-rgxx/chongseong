@@ -54,6 +54,22 @@ extends Resource
 ## 적이 영주를 때리는 거리(서로의 크기에 더한다).
 @export var enemy_reach: float = 0.42
 
+@export_group("밤: 공격 표")
+## 구역마다 밤의 공격 표 수(docs/attack_tokens.md). 표를 가진 적만 영주를 때린다. 0이면 표 없이 모두 덤빈다.
+@export var attack_tokens: PackedInt32Array = PackedInt32Array([4, 4, 5, 5, 6, 6, 7, 8, 9, 10])
+## 기다림 거리 = 사거리(적 크기 + enemy_reach) + 이것. 이 안에 들면 표를 청하고, 못 받으면 이 둘레에 머문다.
+@export var token_wait_gap: float = 1.5
+## 기다리는 적이 옆으로 도는 빠르기(이동 빠르기 × 이것).
+@export var token_strafe: float = 0.35
+## 때리고 돌려놓은 표가 다시 나가기까지(초).
+@export var token_cooldown: float = 0.5
+## 표를 들고 이만큼(초) 못 때리면 내려놓는다(식는 시간 없이).
+@export var token_hold_max: float = 2.5
+## 표를 받고 때리기까지 적어도 이만큼(초). 그동안 눈이 번쩍인다(누가 덤빌지 보이게).
+@export var token_warn: float = 0.25
+## 기다리는 적이 둘레에서 벗어난 거리를 이 시간(초)에 걸쳐 되돌린다. 작으면 딱딱하고 크면 무르다.
+@export var token_settle: float = 0.3
+
 @export_group("정예")
 ## 밤이 이만큼 지나면(0~1) 정예가 하나 온다.
 @export var elite_at: float = 0.4

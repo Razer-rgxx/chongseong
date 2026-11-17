@@ -97,6 +97,8 @@ var _next_id: int = 1
 var powers: Powers
 ## 좌클릭 동작.
 var moves: Moves
+## 공격 표: 표를 가진 적만 영주를 때린다(docs/attack_tokens.md).
+var tokens: Tokens
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -108,6 +110,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	Grid.size = data.run.arena_size
 	powers = Powers.new(self)
 	moves = Moves.new(self)
+	tokens = Tokens.new(self)
 	lord.hp = max_hp()
 	_new_day()
 	if meta:
@@ -197,6 +200,7 @@ func start_night() -> void:
 	hilts.clear()
 	altar = null
 	moves.clear()
+	tokens.reset()
 	powers.on_night_start()
 	night_started.emit(zone)
 
@@ -559,6 +563,7 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false)
 		enemy_hit.emit(e, damage, big)
 	if e.hp <= 0.0:
 		e.dead = true
+		tokens.release(e, true)
 		kills += 1
 		if e.elite:
 			elites_killed += 1
@@ -661,7 +666,8 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 	return e
 
 
-## 영주에게 곧장 다가가 닿으면 때린다. 서로 겹치지 않게 밀어낸다.
+## 표를 가진 적(Tokens)과 언덕지기는 영주에게 곧장 다가가 닿으면 때린다. 표 없는 적은 기다림 거리 둘레를 돈다.
+## 서로 겹치지 않게 밀어내고, 틱 끝에 표를 나눠 준다.
 func _step_enemies() -> void:
 	var keep: float = pow(data.lord.knock_keep, dt)
 	var reach: float = data.run.enemy_reach
@@ -671,7 +677,11 @@ func _step_enemies() -> void:
 		e.pos += e.push * dt
 		e.push *= keep
 		var k: float = powers.enemy_tick(e, dt)
-		if e.dead or k <= 0.0 or phase != Phase.NIGHT:
+		if e.dead or phase != Phase.NIGHT:
+			continue
+		# 묶였거나(기절·얼음) 망각이면 표를 내려놓는다
+		tokens.check_state(e)
+		if k <= 0.0:
 			continue
 		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
 		var foe: Enemy = null
@@ -687,14 +697,22 @@ func _step_enemies() -> void:
 		if d > 0.001:
 			e.face = to / d
 		e.cooldown -= dt
-		if d > e.radius + reach + (foe.radius if foe else 0.0):
+		# 망각으로 다른 적을 치거나 표가 들지 않는 적(언덕지기)은 표 없이 덤빈다
+		var free_hand: bool = foe != null or tokens.cost(e) <= 0
+		if not free_hand:
+			tokens.hold(e, d, dt)
+		if not free_hand and e.token <= 0:
+			tokens.wait_move(e, to, d, e.data.speed * k, dt)
+		elif d > e.radius + reach + (foe.radius if foe else 0.0):
 			e.pos += e.face * e.data.speed * k * dt
-		elif e.cooldown <= 0.0:
+		elif e.cooldown <= 0.0 and e.windup <= 0.0:
 			e.cooldown = e.data.cooldown
 			if foe:
 				hurt(foe, e.damage, Vector2.ZERO, false)
 			else:
 				_hurt_lord(e.damage, e)
+				# 한 번 때리면(피해를 줬든 막혔든) 표를 돌려놓는다
+				tokens.release(e, true)
 	var n: int = enemies.size()
 	for i in n:
 		var a := enemies[i]
@@ -712,6 +730,7 @@ func _step_enemies() -> void:
 		if not e.dead:
 			alive.append(e)
 	enemies = alive
+	tokens.deal(dt)
 
 
 ## 정예: 체력과 피해가 몇 배, 몸이 크다. 쓰러뜨리면 공짜 뽑기.
@@ -801,9 +820,11 @@ func state_hash() -> int:
 	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
 	for p in projectiles:
 		parts.append(p.pos)
+	parts.append(tokens.cooling)
 	for e in enemies:
 		parts.append(e.pos)
 		parts.append(e.hp)
+		parts.append(e.token)
 	for s in slots:
 		parts.append(s.data.id if s else -1)
 		parts.append(s.durability if s else -1.0)

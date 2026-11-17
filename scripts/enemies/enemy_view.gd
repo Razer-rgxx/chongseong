@@ -3,6 +3,7 @@ extends Node3D
 ## 적 하나. 종류마다 몸을 짓고(망령: 해진 망토, 늑대: 네발짐승, 거인·언덕지기: 기사 모델을 어둡게 키운 것),
 ## 규칙의 위치를 틱 사이로 이어 그린다. 싸움터 밖으로 밀려나면 언덕 비탈 높이에 선다.
 ## 나타날 때는 비탈 아래에서 기어 올라오고(망령은 연기처럼 맺힌다), 눈은 스스로 빛나 어두운 밤에도 보인다.
+## 공격 표를 든 적은 눈이 더 밝고, 때리기 직전에는 번쩍인다. 몸은 늘 face(기다릴 때는 영주 쪽)를 본다.
 ## 모델 에셋이 들어오면 _build_* 만 바꾼다. 기사 모델(assets/characters/lord/paladin.fbx)이 없으면 거인은 기본 도형이다.
 
 const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshader")
@@ -20,6 +21,11 @@ const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshade
 ## 거인 걸음 동작의 빠르기(이동 1m/초당). 걷기 동작이 있으면 그것을, 없으면 달리기를 느리게 튼다.
 @export var giant_anim_per_speed: float = 0.32
 @export var turn_speed: float = 8.0
+## 공격 표를 든 적의 눈: 밝기 배수와 크기 배수. 때리기 직전(attack_soon)에는 더 번쩍인다.
+@export var token_eye_bright: float = 1.8
+@export var token_eye_size: float = 1.3
+@export var soon_eye_bright: float = 3.2
+@export var soon_eye_size: float = 1.6
 
 var enemy: Enemy
 var _mats: Array[StandardMaterial3D] = []
@@ -53,6 +59,13 @@ var _knight_scale: float = 1.0
 var _eyes_placed: bool = false
 var _eyes: Node3D = null
 var _hit_anim: float = -1.0
+# 눈빛(공격 표)
+var _eye_mats: Array[StandardMaterial3D] = []
+var _eye_base: Array[Color] = []
+var _eye_nodes: Array[Node3D] = []
+var _eye_scale: Array[Vector3] = []
+var _token_glow: float = 0.0
+var _soon_glow: float = 0.0
 
 
 func setup(e: Enemy) -> void:
@@ -162,6 +175,7 @@ func draw(alpha: float, delta: float) -> bool:
 		if _attack > 0.4:
 			_attack = -1.0
 	_paint()
+	_paint_eyes(delta)
 	return false
 
 
@@ -195,6 +209,28 @@ func _eyes_list() -> Array[Node3D]:
 	for n in _body.find_children("Eye*", "MeshInstance3D", true, false):
 		out.append(n as Node3D)
 	return out
+
+
+## 공격 표를 든 적은 눈이 더 밝고 조금 크다. 때리기 직전(attack_soon)에는 더 번쩍인다. 누가 덤빌지 보이게.
+## 기다리는 적은 그대로(어둠 속의 작은 눈).
+func _paint_eyes(delta: float) -> void:
+	# 기사 모델은 첫 프레임에 눈을 머리 앞에 맞춘 뒤의 크기를 바탕으로 삼는다
+	if _eye_nodes.is_empty() and (_knight == null or _eyes_placed):
+		for n in _eyes_list():
+			_eye_nodes.append(n)
+			_eye_scale.append(n.scale)
+	_token_glow = lerpf(_token_glow, 1.0 if enemy.token > 0 else 0.0, 1.0 - exp(-10.0 * delta))
+	_soon_glow = lerpf(_soon_glow, 1.0 if enemy.attack_soon else 0.0, 1.0 - exp(-30.0 * delta))
+	var bright: float = lerpf(lerpf(1.0, token_eye_bright, _token_glow), soon_eye_bright, _soon_glow)
+	var size: float = lerpf(lerpf(1.0, token_eye_size, _token_glow), soon_eye_size, _soon_glow)
+	for i in _eye_mats.size():
+		var c: Color = _eye_base[i]
+		# 번쩍일 때는 흰빛으로 조금 기운다
+		c = c.lerp(Color.WHITE, 0.3 * _soon_glow)
+		_eye_mats[i].albedo_color = Color(c.r * bright, c.g * bright, c.b * bright, 1.0)
+		_eye_mats[i].emission = _eye_mats[i].albedo_color
+	for i in _eye_nodes.size():
+		_eye_nodes[i].scale = _eye_scale[i] * size
 
 
 ## 맞았을 때 번쩍임과 상태 빛: 불(주황 깜빡임), 얼음(푸른 흰빛), 망각(보라), 느림(푸른 기), 출혈(붉은 기)
@@ -252,6 +288,8 @@ func _eyes_at(parent: Node3D, at: Vector3, gap: float, size: float, c: Color) ->
 	s.radial_segments = 8
 	s.rings = 4
 	var m := _mat(Color(1.0, 0.8, 0.35) if enemy.elite else c, true)
+	_eye_mats.append(m)
+	_eye_base.append(m.albedo_color)
 	for side in [-1.0, 1.0]:
 		var e := _add(parent, s, m, at + Vector3(gap * side, 0, 0))
 		e.name = "Eye%d" % (0 if side < 0 else 1)

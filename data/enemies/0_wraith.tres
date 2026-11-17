@@ -16,3 +16,4 @@ knockback_mult = 1.0
 big = false
 wraith = true
 boss = false
+token_cost = 1

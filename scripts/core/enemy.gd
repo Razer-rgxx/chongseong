@@ -20,6 +20,20 @@ var elite: bool = false
 var cooldown: float = 0.0
 var dead: bool = false
 
+# ---- 공격 표(Tokens, docs/attack_tokens.md). 화면은 읽기만 한다.
+## 들고 있는 표 수(없으면 0). 표가 있어야 영주를 때린다.
+var token: int = 0
+## 표를 든 지 얼마나 됐는지(token_hold_max가 지나면 내려놓는다).
+var token_t: float = 0.0
+## 표를 받은 뒤 때리기 전에 기다리는 남은 시간(token_warn).
+var windup: float = 0.0
+## 곧(token_warn 안에) 때린다. 화면이 눈을 번쩍인다.
+var attack_soon: bool = false
+## 기다림 거리 안에 들어와 표를 청하는 중(기다림 거리 × 2 밖으로 나가면 그친다).
+var waiting: bool = false
+## 표를 청하며 기다린 시간. 가장 오래 기다린 적이 먼저 받는다.
+var wait_t: float = 0.0
+
 # ---- 각인과 고유 능력이 붙이는 상태(Powers)
 ## 처음 베였는지(첫 타 각인).
 var was_hit: bool = false
