@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+	<path d="M32 5 L32 43" fill="none" stroke="#A88F61" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8"/>
+	<path d="M22 44 L42 44" fill="none" stroke="#A88F61" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8"/>
+	<path d="M32 47 L32 54" fill="none" stroke="#A88F61" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8"/>
+	<path d="M32 55.5 L35 58.5 L32 61.5 L29 58.5 Z" fill="#A88F61" stroke="none"/>
+	<path d="M32 9 L33.7 20.3 L45 22 L33.7 23.7 L32 35 L30.3 23.7 L19 22 L30.3 20.3 Z" fill="#A88F61" stroke="none"/>
+	<path d="M12 10 L17 14" fill="none" stroke="#A88F61" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8" stroke-opacity="0.55"/>
+	<path d="M52 10 L47 14" fill="none" stroke="#A88F61" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8" stroke-opacity="0.55"/>
+	<path d="M10 26 L16 25" fill="none" stroke="#A88F61" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8" stroke-opacity="0.55"/>
+	<path d="M54 26 L48 25" fill="none" stroke="#A88F61" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="8" stroke-opacity="0.55"/>
+</svg>
