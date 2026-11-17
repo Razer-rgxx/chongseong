@@ -61,6 +61,8 @@ var _altar_view: Node3D = null
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
 @onready var _hud: Hud = $UI
+## 관리: 원하는 검 받기(` 또는 F6). 열려 있는 동안 싸움이 멈춘다.
+var _console := SwordConsole.new()
 
 
 func _ready() -> void:
@@ -70,6 +72,7 @@ func _ready() -> void:
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
 	rules = Rules.new(data, s, meta)
 	_build_world()
+	_setup_console()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -127,8 +130,24 @@ func _ready() -> void:
 
 
 ## 3인칭에서는 마우스를 가둬 둘러보게 한다. 창이 열리면 풀어 준다.
+func _setup_console() -> void:
+	_console.setup(data)
+	_hud.add_child(_console)
+	_console.closed.connect(func() -> void: _capture(true))
+	_console.picked.connect(_on_console_pick)
+
+
+## 관리 창에서 고른 검을 칸에 쥐여 준다. slot이 -1이면 지금 쥔 칸.
+func _on_console_pick(d: SwordData, slot: int) -> void:
+	var k: int = slot if slot >= 0 else rules.active
+	rules.give(d, k)
+	if rules.active != k:
+		rules.swap(k)
+	_hud.toast("관리: %s · %s을(를) %d번 칸에 받았다." % [data.grades.names[d.grade], d.display_name, k + 1])
+
+
 func _capture(on: bool) -> void:
-	var want: bool = on and _camera.third() and rules.phase != Rules.Phase.OVER and not _hud.choice_open() and not _hud.altar_is_open()
+	var want: bool = on and _camera.third() and rules.phase != Rules.Phase.OVER and not _hud.choice_open() and not _hud.altar_is_open() and not _console.visible
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if want else Input.MOUSE_MODE_VISIBLE
 
 
@@ -197,12 +216,18 @@ func _unhandled_input(event: InputEvent) -> void:
 				_hud.toast("관리: 무적 " + ("켬" if rules.debug_god else "끔"))
 			KEY_F3:
 				rules.skip_night()
+			KEY_QUOTELEFT, KEY_F6:
+				_capture(false)
+				_console.open()
+				get_viewport().set_input_as_handled()
 			KEY_F4:
 				rules.debug_grade = rules.debug_grade + 1 if rules.debug_grade < 5 else -1
 				_hud.toast("관리: 다음 뽑기 " + ("등급 굴리기" if rules.debug_grade < 0 else data.grades.names[rules.debug_grade] + "로 고정"))
 
 
 func _physics_process(delta: float) -> void:
+	if _console.visible:
+		return
 	_acc += delta
 	var n: int = 0
 	while _acc >= rules.dt and n < max_ticks_per_frame:
