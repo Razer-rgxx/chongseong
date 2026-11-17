@@ -12,3 +12,5 @@ python -m fontTools.subset "NotoSerifKR[wght].ttf" --text-file=chars.txt --layou
 ```
 
 `chars.txt`에는 위의 글자들을 넣는다(2350자는 `len(c.encode('euc-kr')) == 2`인 한글 음절).
+
+2026-11-17(기능팀): 카드의 `›`가 없어서 다시 만들었다. `chars.txt`는 지금 글꼴에 있는 글자 전부 + 2350자 + 저장소의 `.gd`·`.tres`·`.tscn` 문자열에 나오는 글자로 채웠다(글자가 빠지지 않게). 새 글자를 넣은 뒤에는 문자열을 이 글꼴의 cmap과 맞춰 보고(fontTools `TTFont(...).getBestCmap()`), 없는 글자가 있으면 이렇게 다시 만든다.

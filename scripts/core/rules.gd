@@ -569,10 +569,12 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false)
 
 func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	var L := lord
-	if L.invuln > 0.0 or L.dash > 0.0 or phase != Phase.NIGHT or debug_god:
+	if L.invuln > 0.0 or L.dash > 0.0 or phase != Phase.NIGHT:
 		return
-	# 반격 자세: 피해 없이 둘레를 반격한다
+	# 반격 자세: 피해 없이 둘레를 반격한다(관리용 무적이어도)
 	if moves.parried(attacker):
+		return
+	if debug_god:
 		return
 	d = powers.lord_damage(d, attacker)
 	L.hp -= d

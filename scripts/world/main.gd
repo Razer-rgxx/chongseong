@@ -46,6 +46,11 @@ var _dying: Array[EnemyView] = []
 var _fx := HitFx.new()
 var _pfx := PowerFx.new()
 var _pull_fx := PullFx.new()
+## 좌클릭 동작 20가지와 속성의 효과(판정 모양, 날아가는 것, 착지 먼지 …). Rules의 move_* 신호를 받는다.
+var _move_fx := MoveFx.new()
+## 지금 쥔 검(바뀔 때만 손의 칼과 효과 색을 바꾼다).
+var _held: Sword = null
+var _held_set: bool = false
 ## 뽑기 연출이 끝나는 때(밀리초). 그전에는 고르기 창과 이름 알림을 미룬다.
 var _reveal_until: int = 0
 var _hud_t: float = 0.0
@@ -73,6 +78,9 @@ func _ready() -> void:
 	add_child(_pfx)
 	_pull_fx.env = _env.environment
 	add_child(_pull_fx)
+	add_child(_move_fx)
+	_move_fx.setup(rules)
+	rules.move_area.connect(_on_move_area)
 	rules.effect.connect(_on_effect)
 	rules.day_started.connect(_on_day)
 	rules.night_started.connect(_on_night)
@@ -233,6 +241,7 @@ func _read_input() -> LordInput:
 func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
 	_lord.draw(alpha, delta)
+	_move_fx.draw(alpha)
 	_sync_enemies(alpha, delta)
 	_camera.target = _lord.position
 	# 빠르게 움직일 때 화면 가장자리가 빨려 든다
@@ -297,12 +306,18 @@ func _refresh_cards() -> void:
 		texts.append(_card(s, k, k == rules.active))
 		cols.append(data.grades.colors[s.grade] if s else Color(0.4, 0.45, 0.55))
 	_hud.set_cards(texts, cols, rules.active)
-	_lord.set_sword(rules.current(), data.grades)
+	var s := rules.current()
+	if s != _held or not _held_set:
+		_held = s
+		_held_set = true
+		_lord.set_sword(s, data.grades)
+		_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
 
 
 # ---------------------------------------------------------------- 신호
 
 func _on_day(_zone: int) -> void:
+	_move_fx.clear()
 	for v in _hilts.values():
 		v.queue_free()
 	_hilts.clear()
@@ -328,6 +343,7 @@ func _on_end(won: bool) -> void:
 	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
 	var r := meta.record_run(rules, data.meta)
 	meta.save()
+	_move_fx.clear()
 	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt])
 	_capture(false)
 
@@ -336,6 +352,30 @@ func _on_swung(big: bool) -> void:
 	_sfx.play(&"swish_big" if big else &"swish", _lord.position, -2.0 if big else -6.0)
 	if big:
 		_sfx.play(&"grunt", _lord.position, 0.0)
+
+
+## 늦게 터지는 판정의 소리와 흔들림. 휘두르는 소리는 _on_swung(누를 때)이 낸다.
+func _on_move_area(move: StringName, info: Dictionary) -> void:
+	var at: Vector3 = Grid.cells_to_world(info.get("at", rules.lord.pos))
+	var echo: bool = bool(info.get("echo", false))
+	var quiet: float = -6.0 if echo else 0.0
+	match move:
+		&"flurry", &"whirl":
+			_sfx.play(&"swish", _lord.position, -10.0 + quiet, 1.15 if move == &"flurry" else 0.95)
+		&"smash", &"leap":
+			_sfx.play(&"thump", at, -2.0 + quiet, 0.8)
+			_camera.add_shake(0.12 if echo else 0.25)
+		&"quake":
+			_sfx.play(&"thump", at, -8.0 + quiet, 0.7)
+			_camera.add_shake(0.06 if echo else 0.12)
+		&"iaido":
+			_sfx.play(&"swish_big", _lord.position, -2.0 + quiet, 1.2)
+		&"parry":
+			if info.get("shape", &"") == &"circle" and not echo:
+				_sfx.play(&"anvil", _lord.position, -4.0, 1.4)
+				_camera.add_shake(0.2)
+		&"hook":
+			pass
 
 
 func _on_pull_step(_h: Hilt, st: int) -> void:

@@ -45,6 +45,8 @@ var _speed: float = 1.0
 var _frozen: bool = false
 var _state: String = ""
 var _slash_i: int = 0
+## 손의 칼을 보이는지(칼 던지기 동안 숨긴다).
+var _sword_visible: bool = true
 
 
 static func available() -> bool:
@@ -283,7 +285,15 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 		return
 	_sword = SwordModel.for_sword(s, grades)
 	_sword.position = Vector3(0, _sword.grip_length * 0.4, 0)
+	_sword.visible = _sword_visible
 	_grip.add_child(_sword)
+
+
+## 손의 칼을 숨기거나 다시 보인다(칼 던지기: 던지는 순간 숨기고, 던진 칼이 돌아오면 보인다). 칼을 바꿔 쥐어도 이어진다.
+func set_sword_visible(on: bool) -> void:
+	_sword_visible = on
+	if _sword:
+		_sword.visible = on
 
 
 ## 손에 아무 모델이나 쥐게 한다(적 거인의 칼). 손잡이 가운데쯤을 쥔다.

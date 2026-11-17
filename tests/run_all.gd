@@ -1436,6 +1436,13 @@ func _test_parry() -> void:
 		r.step(_inp())
 	check(r.lord.hp == hp0, "반격 자세: 맞아도 피해가 없다")
 	check(areas.size() == 1 and areas[0].shape == &"circle" and is_equal_approx(_hurt_by(wolf), d.lord.damage * 2.5), "반격 자세: 둘레 원으로 × 2.5 반격(%.1f)" % _hurt_by(wolf))
+	var g := _mv(["parry"])
+	var gw := _foe(g, Vector2(0.5, 0.0), &"wolf")
+	gw.stun = 0.0
+	gw.cooldown = 0.2
+	g.step(_inp(Vector2.ZERO, true))
+	_wait(g, 12)
+	check(_hurt_by(gw) > 0.0, "반격 자세: 관리용 무적이어도 반격한다")
 	var q := _mv(["parry"])
 	var front := _foe(q, Vector2(1.0, 0.0))
 	var qa: Array[Dictionary] = []

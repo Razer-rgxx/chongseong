@@ -1,11 +1,11 @@
 extends Node3D
-## 영주 그리기. 규칙의 LordState를 틱 사이로 이어 그리고, 휘두르는 부채꼴, 쥔 검, 돌진 잔상을 보여 준다.
+## 영주 그리기. 규칙의 LordState를 틱 사이로 이어 그리고, 쥔 검, 칼 궤적, 돌진 잔상을 보여 준다.
+## 좌클릭 동작(Rules.move_started)마다 MoveMotion.plan으로 동작을 고르고, 매 화면 MoveMotion.pose로 돌기·뜨기·숙이기를 얹는다.
+## 판정 모양(부채꼴, 띠, 원 …)은 MoveFx(main)가 그린다.
 ## 모델은 자식 "Model" 씬(scenes/lord/lord_model.tscn)이다. 모델을 바꿔 끼울 때 칼은 "Model/Hand/Blade"에 두면 된다.
 ## 쥔 검의 형태에 따라 칼날 길이와 두께가, 등급에 따라 코등이 색이 바뀐다.
 ## assets/characters/lord/paladin.fbx가 있으면 기본 도형 대신 그 기사(LordCharacter)를 세우고 동작을 고른다.
 
-@export var arc_color: Color = Color(1, 1, 1, 0.22)
-@export var arc_big_color: Color = Color(1, 0.84, 0.42, 0.38)
 @export var ghost_color: Color = Color(0.5, 0.7, 1.0, 0.35)
 @export var ghost_life: float = 0.2
 ## 칼을 들고 있을 때 몸 앞에서 벌어진 각도(라디안).
@@ -19,9 +19,7 @@ extends Node3D
 @export var turn_speed: float = 12.0
 @export var turn_fast: float = 40.0
 @export_group("칼 궤적과 베기 빛")
-## 휘두르기 시작부터 이 시간 동안 칼끝이 지나간 자리를 그린다(궤적의 길이와 모양은 SlashFx).
-@export var trail_time: float = 0.26
-## 베기 빛을 사선으로 기울이는 각(라디안). 번갈아 반대로 기운다. 큰 베기는 수평.
+## 메아리 계곡 같은 두 번째 베기 빛을 사선으로 기울이는 각(라디안).
 @export var arc_tilt: float = 0.35
 @export_group("")
 @export var hit_speed: float = 1.0
@@ -51,18 +49,14 @@ var _guard := MeshInstance3D.new()
 var _guard_mat := StandardMaterial3D.new()
 ## 밤에 영주 둘레만 밝히는 횃불.
 var torch := OmniLight3D.new()
-var _arc := MeshInstance3D.new()
-var _arc_mesh := ImmediateMesh.new()
-var _arc_mat := StandardMaterial3D.new()
 var _ghost_mesh := CapsuleMesh.new()
 var _ghosts: Array[MeshInstance3D] = []
 ## 기사 모델(없으면 null, 기본 도형을 쓴다).
 var character: LordCharacter = null
 var _busy: float = 0.0
-var _last_swing: float = 0.0
-var _last_invuln: float = 0.0
 var _last_dash: float = 0.0
-var _last_hook: float = 0.0
+## 맞았다(lord_hurt). 다음 화면에 맞는 동작을 튼다.
+var _hurt: bool = false
 var _rope := MeshInstance3D.new()
 var _rope_head := MeshInstance3D.new()
 var _air: float = 0.0
@@ -73,24 +67,27 @@ var _rope_to := Vector3.ZERO
 var _state: String = ""
 var _yaw_now: float = 0.0
 var _yaw_ready: bool = false
-var _swing_t: float = 99.0
 var _fx: SlashFx = null
 var _sweep: float = 1.0
+## 지금 트는 좌클릭 동작(MoveMotion.plan의 결과)과 시작한 뒤 지난 시간. 비어 있으면 동작이 없다.
+var _plan: Dictionary = {}
+var _plan_t: float = 0.0
+var _then_done: bool = true
+## 칼 궤적을 그릴 때(동작 시작부터 초, x < 0이면 안 그림)와 face_lock으로 고정한 몸의 돌기.
+var _trail_window := Vector2(-1.0, -1.0)
+var _lock_yaw: float = 0.0
+var _hide_done: bool = false
 
 
 func setup(r: Rules) -> void:
 	rules = r
+	r.move_started.connect(_on_move_started)
+	r.move_area.connect(_on_move_area)
+	r.projectile_ended.connect(func(_p: Projectile) -> void: _show_sword(true))
+	r.lord_hurt.connect(func(_d: float) -> void: _hurt = true)
 
 
 func _ready() -> void:
-	_arc.mesh = _arc_mesh
-	_arc.top_level = true
-	_arc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_arc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_arc_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_arc_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_arc_mat.vertex_color_use_as_albedo = true
-	add_child(_arc)
 	_ghost_mesh.radius = 0.42
 	_ghost_mesh.height = 1.6
 	if LordCharacter.available():
@@ -148,30 +145,34 @@ func draw(alpha: float, delta: float) -> void:
 	var L := rules.lord
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
 	_draw_hook(L, delta)
-	if character == null:
-		_model.rotation.y = _yaw(L.face)
-	# 휘두르기: 콤보마다 쓸어 가는 방향이 바뀐다
+	if not _plan.is_empty():
+		_plan_t += delta
+		if _plan_t >= maxf(float(_plan.hold), float(_plan.time)):
+			_plan = {}
+			if character:
+				character.set_frozen(rules.freeze > 0)
+	# 기본 도형: 손을 휘두르는 쪽으로 돌린다(칼 궤적 대신)
 	var rel: float = idle_blade_angle
-	_arc_mesh.clear_surfaces()
 	if L.swing > 0.0:
-		var arc: float = L.swing_arc
-		var reach_m: float = Grid.cells_to_meters(L.swing_reach)
 		var k: float = 1.0 - L.swing / rules.data.lord.swing_time
-		var dir: float = 1.0 if L.combo % 2 == 1 else -1.0
-		var a0: float = -dir * arc / 2.0
-		var a1: float = a0 + dir * arc * minf(1.0, k * 1.6)
-		rel = a1
-		var col: Color = arc_big_color if L.big else arc_color
-		col.a *= 1.0 - k * 0.6
-		if character == null:   # 기사 모델이 있으면 바닥 부채꼴 대신 칼 궤적을 그린다
-			_fan(position + Vector3(0, 0.12, 0), L.face + minf(a0, a1), L.face + maxf(a0, a1), reach_m, col)
+		var dir: float = float(_plan.get("side", 1.0)) if not _plan.is_empty() else 1.0
+		rel = -dir * L.swing_arc / 2.0 + dir * L.swing_arc * minf(1.0, k * 1.6)
 	if _hand:
 		_hand.rotation.y = -rel
 	if character:
-		character.set_frozen(rules.freeze > 0)
+		character.set_frozen(rules.freeze > 0 or _paused())
+		_step_then()
 		_animate(L, delta)
 		_turn(L, delta)
 		_draw_trail(delta)
+		_step_hide()
+	else:
+		_yaw_now = _yaw(L.face)
+	# 동작의 돌기·뜨기·숙이기를 얹는다(갈고리는 _draw_hook이 이미 띄우니 한 번만)
+	var pose: Dictionary = MoveMotion.pose(_plan, _plan_t, float(_plan.get("time", 0.0))) if not _plan.is_empty() else MoveMotion.pose({}, 0.0, 0.0)
+	if _plan.get("move", &"") == &"hook":
+		pose["y"] = 0.0
+	MoveMotion.apply(_model, pose, _yaw_now, _air)
 	for i in range(_ghosts.size() - 1, -1, -1):
 		var g := _ghosts[i]
 		var m := g.material_override as StandardMaterial3D
@@ -189,35 +190,104 @@ func echo_arc(at: Vector2, face: float, arc: float, reach: float) -> void:
 		_fx.arc(Grid.cells_to_world(at, _fx.arc_height), face, arc, Grid.cells_to_meters(minf(reach, 12.0)), -_sweep, 0.0, false)
 
 
-## 기사 모델의 동작을 고른다. 베기·구르기·맞기는 끝날 때까지 두고, 그 밖에는 달리기와 서 있기.
-## 규칙의 값이 새로 커지는 순간(휘두름, 돌진, 무적)을 보고 한 번만 튼다.
+# ---------------------------------------------------------------- 좌클릭 동작(MoveMotion)
+
+## 좌클릭 동작 하나가 시작됐다. 메아리(효과만 다시 울림)는 몸을 움직이지 않는다.
+func _on_move_started(move: StringName, info: Dictionary) -> void:
+	if bool(info.get("echo", false)):
+		return
+	_start_plan(MoveMotion.plan(move, info, character), info)
+
+
+## 반격 자세에서 맞아 반격이 나가면 반격 동작으로 바꿔 튼다.
+func _on_move_area(move: StringName, info: Dictionary) -> void:
+	if move == &"parry" and info.get("shape", &"") == &"circle" and not bool(info.get("echo", false)):
+		_start_plan(MoveMotion.plan(&"parry_counter", info, character), info)
+
+
+func _start_plan(p: Dictionary, info: Dictionary) -> void:
+	_plan = p
+	_plan_t = 0.0
+	_then_done = (p.then as Dictionary).is_empty()
+	_hide_done = false
+	_trail_window = p.trail
+	_lock_yaw = _yaw(float(info.get("face", rules.lord.face)))
+	if bool(p.face_lock):
+		_yaw_now = _lock_yaw
+	if character == null:
+		return
+	character.set_frozen(false)
+	_fx.clear_trail()
+	if String(p.anim) != "":
+		character.play(String(p.anim), float(p.speed), float(p.from))
+		_state = "move"
+		_busy = float(p.hold)
+
+
+## 멈춰 세우는 동작(발도, 반격 자세, 지진 …): pause_at초부터 resume_after초 동안. hold가 끝나면 반드시 푼다.
+func _paused() -> bool:
+	if _plan.is_empty() or _plan_t >= float(_plan.hold):
+		return false
+	var at: float = float(_plan.pause_at)
+	return at >= 0.0 and _plan_t >= at and _plan_t < at + float(_plan.resume_after)
+
+
+## then.at초에 이어 튼다(물러나 베기의 뒤로 뛰기, 갈고리의 닿아서 베기, 반격 자세의 약한 베기).
+func _step_then() -> void:
+	if _then_done or _plan.is_empty():
+		return
+	var t: Dictionary = _plan.then
+	if _plan_t < float(t.at):
+		return
+	_then_done = true
+	character.set_frozen(rules.freeze > 0)
+	if String(t.get("anim", "")) != "":
+		character.play(String(t.anim), float(t.get("speed", 1.0)), float(t.get("from", 0.0)))
+		_state = "move"
+	var tr: Vector2 = t.get("trail", Vector2(-1.0, -1.0))
+	if tr.x >= 0.0:
+		_trail_window = tr + Vector2(float(t.at), float(t.at))
+		_fx.clear_trail()
+
+
+## 칼 던지기: 놓는 순간 손의 칼을 숨긴다. 던진 칼이 돌아오면(projectile_ended) 다시 보인다.
+func _step_hide() -> void:
+	if _plan.is_empty() or _hide_done:
+		return
+	var at: float = float(_plan.get("hide_sword", -1.0))
+	if at < 0.0 or _plan_t < at:
+		return
+	_hide_done = true
+	for p in rules.projectiles:
+		if p.kind == &"boomerang":
+			_show_sword(false)
+			return
+
+
+func _show_sword(on: bool) -> void:
+	if character:
+		character.set_sword_visible(on)
+	elif _blade:
+		_blade.visible = on and rules.current() != null
+		_guard.visible = _blade.visible
+
+
+## 기사 모델의 동작을 고른다. 좌클릭 동작(_start_plan)·구르기·맞기는 끝날 때까지 두고, 그 밖에는 달리기와 서 있기.
+## 규칙의 값이 새로 커지는 순간(돌진)이나 신호(맞음)를 보고 한 번만 튼다.
 func _animate(L: LordState, delta: float) -> void:
 	_busy = maxf(0.0, _busy - delta)
 	if L.hp <= 0.0:
 		if _state != "death":
 			_one_shot("death", 1.0)
 			_busy = 999.0
-	elif L.hook > _last_hook and L.hook_target != null:
-		# 갈고리: 날아가는 동안 공중제비(구르기 동작의 구르는 부분만)
-		var flight: float = clampf(L.pos.distance_to(L.hook_target.pos) / rules.data.lord.hook_speed, 0.15, rules.data.lord.hook_max_time)
-		var w2: Vector2 = character.roll_window
-		if w2.x >= 0.0:
-			_one_shot("roll", (w2.y - w2.x) / flight, flight, w2.x)
-		else:
-			_one_shot("roll", roll_speed, flight)
 	elif L.dash > _last_dash:
+		_plan = {}
 		var w: Vector2 = character.roll_window
 		if w.x >= 0.0:
 			_one_shot("roll", (w.y - w.x) / roll_time, roll_time, w.x)
 		else:
 			_one_shot("roll", roll_speed, roll_hold)
-	elif L.swing > _last_swing:
-		_one_shot("big" if L.big else "slash", slash_speed, slash_hold, -slash_lead)
-		_swing_t = 0.0
-		_fx.clear_trail()
-		_fx.arc(position + Vector3(0, _fx.arc_height, 0), L.face, L.swing_arc, Grid.cells_to_meters(L.swing_reach), _sweep, 0.0 if L.big else arc_tilt * _sweep, L.big)
-		_sweep = -_sweep
-	elif L.invuln > _last_invuln and L.swing <= 0.0 and L.dash <= 0.0:
+	elif _hurt and _plan.is_empty() and L.dash <= 0.0:
 		_one_shot("hit", hit_speed)
 	elif _busy <= 0.0:
 		if rules.pull_hilt != null:
@@ -226,34 +296,35 @@ func _animate(L: LordState, delta: float) -> void:
 			_loop("run", run_speed)
 		else:
 			_loop("idle")
-	_last_swing = L.swing
-	_last_invuln = L.invuln
+	_hurt = false
 	_last_dash = L.dash
-	_last_hook = L.hook
 
 
-## 모델이 보는 쪽: 구를 때는 구르는 쪽, 휘두를 때는 겨눈 쪽(규칙의 face), 걸을 때는 걷는 쪽.
-## 서 있으면 그대로 둔다. 확 돌리지 않고 부드럽게 돌려 걸음이 촐랑대지 않게 한다.
+## 모델이 보는 쪽: 구를 때는 구르는 쪽, 좌클릭 동작이 face_lock이면 그 방향에 고정, 휘두를 때는 겨눈 쪽(규칙의 face),
+## 걸을 때는 걷는 쪽. 서 있으면 그대로 둔다. 확 돌리지 않고 부드럽게 돌려 걸음이 촐랑대지 않게 한다.
 func _turn(L: LordState, delta: float) -> void:
 	if not _yaw_ready:
 		_yaw_now = _yaw(L.face)
 		_yaw_ready = true
 	var target: float = _yaw_now
 	var fast: bool = false
+	var planned: bool = not _plan.is_empty() and _plan_t < float(_plan.hold)
 	if L.hook > 0.0:
 		target = _yaw(L.face)
 		fast = true
 	elif (_state == "roll" and _busy > 0.0) or L.dash > 0.0:
 		target = _yaw(L.dash_dir.angle())
 		fast = true
-	elif L.swing > 0.0 or ((_state == "slash" or _state == "big") and _swing_t < slash_hold * 0.5):
+	elif planned and bool(_plan.face_lock):
+		_yaw_now = _lock_yaw
+		return
+	elif L.swing > 0.0 or (planned and _plan_t < minf(float(_plan.hold), slash_hold) * 0.5):
 		target = _yaw(L.face)
 		fast = true
 	elif L.moving:
 		target = _yaw(L.move_dir.angle())
 	var k: float = 1.0 - exp(-(turn_fast if fast else turn_speed) * delta)
 	_yaw_now = lerp_angle(_yaw_now, target, k)
-	_model.rotation.y = _yaw_now
 
 
 # ---------------------------------------------------------------- 갈고리
@@ -328,11 +399,11 @@ func _draw_hook(L: LordState, delta: float) -> void:
 	_rope_head.global_transform = Transform3D(basis, b)
 
 
-## 휘두르기 시작부터 trail_time 동안 칼날의 두 끝을 SlashFx에 넘긴다.
+## 동작의 trail 구간(MoveMotion.plan의 trail, then이 있으면 then의 것) 동안 칼날의 두 끝을 SlashFx에 넘긴다.
 func _draw_trail(delta: float) -> void:
-	_swing_t += delta
 	var bp: Array[Vector3] = character.blade_points()
-	var active: bool = _swing_t < trail_time and (_state == "slash" or _state == "big") and not bp.is_empty()
+	var w: Vector2 = _trail_window
+	var active: bool = not _plan.is_empty() and w.x >= 0.0 and _plan_t >= w.x and _plan_t <= w.y and not bp.is_empty()
 	if bp.is_empty():
 		bp = [Vector3.ZERO, Vector3.ZERO]
 	_fx.trail_step(delta, active, bp[0].lerp(bp[1], 0.25), bp[1])
@@ -354,18 +425,6 @@ func _one_shot(state: String, speed: float, cap: float = -1.0, from: float = 0.0
 ## 규칙의 각도(0 = 동쪽 +x, PI/2 = 남쪽 +z)를 모델의 앞(-Z)이 그쪽을 보게 하는 회전으로 바꾼다.
 static func _yaw(face: float) -> float:
 	return atan2(-cos(face), -sin(face))
-
-
-func _fan(c: Vector3, from: float, to: float, r: float, col: Color) -> void:
-	var seg: int = 18
-	_arc_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES, _arc_mat)
-	for i in seg:
-		var t0: float = lerpf(from, to, float(i) / seg)
-		var t1: float = lerpf(from, to, float(i + 1) / seg)
-		for v in [c, c + Vector3(cos(t0), 0, sin(t0)) * r, c + Vector3(cos(t1), 0, sin(t1)) * r]:
-			_arc_mesh.surface_set_color(col)
-			_arc_mesh.surface_add_vertex(v)
-	_arc_mesh.surface_end()
 
 
 func _spawn_ghost() -> void:
