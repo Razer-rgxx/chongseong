@@ -20,11 +20,13 @@
   - `data/forms/*.tres` (FormData: 단검, 장검, 대검, 세검), `data/unarmed.tres` (맨손)
   - `data/grades.tres` (GradeTable), `data/enemies/*.tres` (EnemyData), `data/lord.tres` (LordData), `data/run.tres` (RunData: 구역, 낮의 뽑기와 제단, 밤의 적과 정예)
   - `data/meta.tres` (MetaData: 조각, 대장간 검집, 성소 축복), `data/powers.tres` (PowerTable: 각인 규칙과 고유 능력의 정해진 수치)
+  - `data/attacks/moves/<id>.tres` (MoveData: 좌클릭 기본 동작 20개), `data/attacks/patterns/000.tres` … `150.tres` (PatternData: 공격 방식, 000은 맨손). 001~150과 검 표의 `attack`은 `scripts/debug/build_attacks.gd`가 만든다(손으로 고치지 않는다)
 - 게임 규칙(뽑기, 판정, 체력, 내구, 적, 구역)은 화면 코드와 섞지 않는다. `scripts/core/` 아래에 노드에 기대지 않는 RefCounted 클래스로 쓰고(`Rules`가 중심), 화면은 신호와 상태를 받아 그린다. 나중에 서버 판정으로 옮기기 쉽게 다음을 지킨다.
   - 규칙은 고정 틱(30Hz)으로 돈다. `_physics_process`에서 누적 시간을 틱으로 쪼갠다.
   - 랜덤은 전부 시드가 있는 `RandomNumberGenerator` 하나(`Rules.rng`)를 거친다. 전역 `randf()`, `randi()`는 쓰지 않는다. 같은 시드와 같은 입력이면 결과가 같아야 한다(`Rules.state_hash()`로 테스트한다). 화면 흔들림 같은 꾸밈용 랜덤은 화면 쪽에 따로 둔다.
   - 영주의 입력은 틱마다 `LordInput` 하나로 넘긴다. 밤 시작(`start_night`), 고르기(`choose`), 제단(`use_altar`)은 틱 사이에 부르는 함수다.
 - 각인 36종과 고유 능력은 `Powers`(scripts/core/powers.gd)가 맡는다. Rules는 휘두르기·베기·쓰러뜨림·맞기·돌진·뽑기·부러짐 자리에서 부르고, 정해진 수치는 `data/powers.tres`(PowerTable)에 있다. 고유 능력은 검 이름으로 찾고, 넣은 것은 `Powers.READY`와 검 표의 `unique_ready`를 같이 켠다(테스트가 둘이 같은지 본다). 화면에 그릴 일은 `Rules.effect` 신호로 보내고 `PowerFx`가 그린다.
+- 좌클릭은 `Moves`(scripts/core/moves.gd)가 맡는다: 쥔 검의 PatternData에서 다음 MoveData를 골라 판정·늦게 터지는 것·날아가는 것(`Rules.projectiles`)·반격 자세·속성·메아리를 돌리고, 맞힐 때마다 Powers의 자리를 예전 베기와 같은 순서로 부른다. 화면에는 `move_started`·`move_area`·`projectile_spawned`·`projectile_ended` 신호(docs/attacks.md 4절)로 알리고, `MoveFx`(scripts/world/move_fx.gd, 판정 모양·효과)와 `MoveMotion`(scripts/lord/move_motion.gd, 영주의 몸, LordView가 부른다)이 그린다. 우클릭 갈고리는 방식에 갈고리 베기가 든 검만.
 - 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
 - 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
 - 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
@@ -71,7 +73,7 @@
 project.godot
 scenes/   lobby/ (마을, 시작 장면), world/ (언덕), lord/, debug/
 scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, lord/, enemies/, ui/, debug/
-data/     swords/, inscriptions/, forms/, enemies/, grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres
+data/     swords/, inscriptions/, forms/, enemies/, attacks/ (moves/, patterns/), grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres, powers.tres
 assets/   characters/, nature/, ui/, video/, sound/
 tests/
 prototype/  HTML 시험판 (고치지 않는다)
