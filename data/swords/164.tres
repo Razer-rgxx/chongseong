@@ -8,6 +8,7 @@ id = 164
 display_name = "첫눈"
 grade = 2
 form = 3
+attack = 82
 inscriptions = PackedStringArray("첫 타")
 unique_text = ""
 unique_ready = false

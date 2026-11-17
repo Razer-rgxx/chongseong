@@ -8,6 +8,7 @@ id = 239
 display_name = "천둥새"
 grade = 3
 form = 3
+attack = 120
 inscriptions = PackedStringArray("번개", "가벼움")
 unique_text = ""
 unique_ready = false

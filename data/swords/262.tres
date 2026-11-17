@@ -8,6 +8,7 @@ id = 262
 display_name = "바람 가르는 깃"
 grade = 4
 form = 3
+attack = 132
 inscriptions = PackedStringArray("날랜 발", "가벼움")
 unique_text = "돌진을 두 번 연달아 할 수 있다."
 unique_ready = true

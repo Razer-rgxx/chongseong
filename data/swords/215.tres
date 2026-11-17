@@ -8,6 +8,7 @@ id = 215
 display_name = "끝없는 행군"
 grade = 3
 form = 1
+attack = 108
 inscriptions = PackedStringArray("단단함", "숫돌")
 unique_text = ""
 unique_ready = false

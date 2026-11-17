@@ -8,6 +8,7 @@ id = 56
 display_name = "진흙 묻은 장검"
 grade = 0
 form = 1
+attack = 28
 inscriptions = PackedStringArray("버팀")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 195
 display_name = "바늘"
 grade = 2
 form = 3
+attack = 98
 inscriptions = PackedStringArray("꿰뚫기")
 unique_text = ""
 unique_ready = false

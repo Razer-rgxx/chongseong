@@ -8,6 +8,7 @@ id = 198
 display_name = "큰 짐승 사냥꾼"
 grade = 2
 form = 2
+attack = 99
 inscriptions = PackedStringArray("거인 베기")
 unique_text = ""
 unique_ready = false

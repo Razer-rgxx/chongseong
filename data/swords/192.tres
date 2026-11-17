@@ -8,6 +8,7 @@ id = 192
 display_name = "다섯째 기사"
 grade = 2
 form = 1
+attack = 96
 inscriptions = PackedStringArray("날")
 unique_text = ""
 unique_ready = false

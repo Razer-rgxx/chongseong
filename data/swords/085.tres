@@ -8,6 +8,7 @@ id = 85
 display_name = "성문 파수병의 대검"
 grade = 1
 form = 2
+attack = 43
 inscriptions = PackedStringArray("막기")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 275
 display_name = "끝나지 않는 겨울"
 grade = 4
 form = 3
+attack = 138
 inscriptions = PackedStringArray("서리", "꿰뚫기")
 unique_text = "밤 동안 눈이 내려 모든 적이 20% 느려지고, 찌른 적은 1초 얼어붙는다."
 unique_ready = true

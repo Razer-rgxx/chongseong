@@ -8,6 +8,7 @@ id = 175
 display_name = "갈림길"
 grade = 2
 form = 1
+attack = 88
 inscriptions = PackedStringArray("바꿔 쥐기")
 unique_text = ""
 unique_ready = false

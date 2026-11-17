@@ -8,6 +8,7 @@ id = 286
 display_name = "마지막 장례"
 grade = 4
 form = 2
+attack = 144
 inscriptions = PackedStringArray("마지막 일격", "숫돌")
 unique_text = "다른 검이 부러지면 그 검의 각인 하나를 이 검이 가져간다 (그 판 동안, 최대 4개)."
 unique_ready = true

@@ -8,6 +8,7 @@ id = 174
 display_name = "굶주림"
 grade = 2
 form = 0
+attack = 87
 inscriptions = PackedStringArray("사냥")
 unique_text = ""
 unique_ready = false

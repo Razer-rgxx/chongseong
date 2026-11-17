@@ -8,6 +8,7 @@ id = 40
 display_name = "순찰병의 장검"
 grade = 0
 form = 1
+attack = 20
 inscriptions = PackedStringArray("날랜 발")
 unique_text = ""
 unique_ready = false

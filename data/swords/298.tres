@@ -8,6 +8,7 @@ id = 298
 display_name = "언덕"
 grade = 5
 form = 2
+attack = 149
 inscriptions = PackedStringArray()
 unique_text = "부러지지 않는다. 들면 이 판에서 뽑은 모든 검의 각인이 함께 발동한다."
 unique_ready = true

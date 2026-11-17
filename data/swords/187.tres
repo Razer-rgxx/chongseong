@@ -8,6 +8,7 @@ id = 187
 display_name = "개울 돌"
 grade = 2
 form = 0
+attack = 94
 inscriptions = PackedStringArray("숫돌")
 unique_text = ""
 unique_ready = false

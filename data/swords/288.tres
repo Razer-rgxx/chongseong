@@ -8,6 +8,7 @@ id = 288
 display_name = "언덕의 심장"
 grade = 5
 form = 2
+attack = 145
 inscriptions = PackedStringArray("무리 베기", "날")
 unique_text = "휘두를 때마다 언덕에 꽂힌 검 5자루가 땅에서 솟아 둘레 적을 찌른다."
 unique_ready = true

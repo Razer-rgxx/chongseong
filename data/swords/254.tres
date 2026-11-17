@@ -8,6 +8,7 @@ id = 254
 display_name = "상처 세는 자"
 grade = 4
 form = 0
+attack = 128
 inscriptions = PackedStringArray("출혈", "가벼움")
 unique_text = "출혈 중인 적을 베면 남은 출혈 피해를 한꺼번에 준다."
 unique_ready = true

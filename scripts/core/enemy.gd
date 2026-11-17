@@ -40,3 +40,5 @@ var vuln: float = 0.0
 var knee: int = 0
 ## 망각: 남은 시간 동안 영주 대신 가까운 적을 친다.
 var confused: float = 0.0
+## 서리 속성에 맞은 횟수(세 번째면 얼음).
+var ice_hits: int = 0

@@ -8,6 +8,7 @@ id = 223
 display_name = "가시 왕관"
 grade = 3
 form = 1
+attack = 112
 inscriptions = PackedStringArray("가시", "버팀")
 unique_text = ""
 unique_ready = false

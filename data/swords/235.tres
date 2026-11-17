@@ -8,6 +8,7 @@ id = 235
 display_name = "사냥의 여왕"
 grade = 3
 form = 3
+attack = 118
 inscriptions = PackedStringArray("사냥", "긴 날")
 unique_text = ""
 unique_ready = false

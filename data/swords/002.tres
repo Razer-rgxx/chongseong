@@ -8,6 +8,7 @@ id = 2
 display_name = "녹슨 장검"
 grade = 0
 form = 1
+attack = 1
 inscriptions = PackedStringArray("투박함")
 unique_text = ""
 unique_ready = false

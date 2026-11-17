@@ -8,6 +8,7 @@ id = 264
 display_name = "메아리 계곡"
 grade = 4
 form = 1
+attack = 133
 inscriptions = PackedStringArray("잔상", "넓은 날")
 unique_text = "휘두르고 0.5초 뒤 같은 자리에 같은 베기가 한 번 더 일어난다."
 unique_ready = true

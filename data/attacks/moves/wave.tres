@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"wave"
+display_name = "검기"
+link_name = "검기 날리고"
+end_name = "검기"
+role = "finish"
+shape = &"shot"
+damage = 1.2
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.2
+delay = 0.0
+lock = 0.0
+walk = -1.0
+reach = 1.0
+arc = 1.0
+speed = 16.0
+distance = 8.0
+shot_width = 1.2
+shot_max_time = 1.0

@@ -8,6 +8,7 @@ id = 212
 display_name = "백 번째 밤"
 grade = 3
 form = 1
+attack = 107
 inscriptions = PackedStringArray("새벽", "버팀")
 unique_text = ""
 unique_ready = false

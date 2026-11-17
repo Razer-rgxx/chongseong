@@ -8,6 +8,7 @@ id = 94
 display_name = "궁정 결투가의 세검"
 grade = 1
 form = 3
+attack = 47
 inscriptions = PackedStringArray("첫 타")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 252
 display_name = "얼음 무덤"
 grade = 4
 form = 3
+attack = 127
 inscriptions = PackedStringArray("서리", "꿰뚫기")
 unique_text = "느려진 적을 찌르면 1.5초 얼어붙고, 언 적을 다시 베면 부서지며 둘레에 서리가 퍼진다."
 unique_ready = true

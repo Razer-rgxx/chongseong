@@ -8,6 +8,7 @@ id = 227
 display_name = "성벽"
 grade = 3
 form = 2
+attack = 114
 inscriptions = PackedStringArray("막기", "단단함")
 unique_text = ""
 unique_ready = false

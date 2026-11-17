@@ -8,6 +8,7 @@ id = 221
 display_name = "폭풍의 맹세"
 grade = 3
 form = 1
+attack = 111
 inscriptions = PackedStringArray("번개", "연격")
 unique_text = ""
 unique_ready = false

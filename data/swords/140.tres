@@ -8,6 +8,7 @@ id = 140
 display_name = "순례자의 세검"
 grade = 1
 form = 3
+attack = 70
 inscriptions = PackedStringArray("사냥")
 unique_text = ""
 unique_ready = false

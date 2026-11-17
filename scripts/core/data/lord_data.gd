@@ -53,3 +53,23 @@ extends Resource
 @export var hook_damage_mult: float = 1.5
 ## 적의 몸에서 이만큼(칸) 앞에서 멈춘다.
 @export var hook_gap: float = 0.3
+
+@export_group("좌클릭")
+## 메아리(초월·무한의 방식): 마무리의 판정이 이만큼(초) 뒤 같은 자리에서 한 번 더, 피해는 이 배수.
+@export var echo_delay: float = 0.3
+@export var echo_damage: float = 0.5
+## 불꽃: 맞은 적에 불이 붙는 시간(초). 불의 초당 피해는 data/powers.tres의 "불_초당", "불_등급당".
+@export var fire_burn: float = 2.0
+## 서리: 느리게 하는 정도와 시간. 같은 적이 이만큼 맞으면 얼음(묶임)이 된다.
+@export var ice_slow: float = 0.3
+@export var ice_slow_time: float = 2.0
+@export var ice_freeze_hits: int = 3
+@export var ice_freeze_time: float = 1.0
+## 벼락: 맞은 적 둘레 이 거리(칸) 안의 다른 적 몇 마리에게 이 피해 배수로 번개.
+@export var bolt_count: int = 2
+@export var bolt_range: float = 3.0
+@export var bolt_damage: float = 0.5
+## 피: 준 피해의 이만큼을 출혈로 bleed_time초 동안 더 입히고, 준 피해의 blood_heal만큼 체력을 되찾는다.
+@export var blood_bleed: float = 0.3
+@export var blood_bleed_time: float = 3.0
+@export var blood_heal: float = 0.02

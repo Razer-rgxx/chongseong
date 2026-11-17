@@ -8,6 +8,7 @@ id = 107
 display_name = "사냥개 조련사의 단검"
 grade = 1
 form = 0
+attack = 54
 inscriptions = PackedStringArray("출혈")
 unique_text = ""
 unique_ready = false

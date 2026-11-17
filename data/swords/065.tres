@@ -8,6 +8,7 @@ id = 65
 display_name = "결투용 대검"
 grade = 0
 form = 2
+attack = 33
 inscriptions = PackedStringArray("첫 타")
 unique_text = ""
 unique_ready = false

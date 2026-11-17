@@ -21,6 +21,10 @@ var swords_by_grade: Array[PackedInt32Array] = []
 var inscriptions: Dictionary = {}
 ## id → EnemyData
 var enemies: Dictionary = {}
+## 좌클릭 기본 동작: id(StringName) → MoveData
+var moves: Dictionary = {}
+## 공격 방식. 번호가 곧 자리다(0 맨손, 1 … 150).
+var patterns: Array[PatternData] = []
 
 
 static func load_default() -> GameData:
@@ -39,6 +43,14 @@ static func load_default() -> GameData:
 	for path in _tres_in(DIR + "enemies/"):
 		var e := load(path) as EnemyData
 		d.enemies[e.id] = e
+	for path in _tres_in(DIR + "attacks/moves/"):
+		var m := load(path) as MoveData
+		d.moves[m.id] = m
+	for path in _tres_in(DIR + "attacks/patterns/"):
+		var pat := load(path) as PatternData
+		while d.patterns.size() <= pat.id:
+			d.patterns.append(null)
+		d.patterns[pat.id] = pat
 	for g in d.grades.names.size():
 		d.swords_by_grade.append(PackedInt32Array())
 	for path in _tres_in(DIR + "swords/"):
@@ -56,6 +68,28 @@ func sword_by_id(id: int) -> SwordData:
 		if s.id == id:
 			return s
 	return null
+
+
+## 그 검의 공격 방식. 표에 없으면 맨손(0번).
+func pattern_for(s: SwordData) -> PatternData:
+	if s != null and s.attack > 0 and s.attack < patterns.size() and patterns[s.attack] != null:
+		return patterns[s.attack]
+	return unarmed_pattern()
+
+
+func unarmed_pattern() -> PatternData:
+	return patterns[0] if not patterns.is_empty() else null
+
+
+func pattern_by_name(n: String) -> PatternData:
+	for p in patterns:
+		if p and p.display_name == n:
+			return p
+	return null
+
+
+func move(id: StringName) -> MoveData:
+	return moves.get(id) as MoveData
 
 
 func sword_by_name(n: String) -> SwordData:

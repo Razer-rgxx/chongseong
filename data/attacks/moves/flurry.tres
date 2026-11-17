@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"flurry"
+display_name = "연속 찌르기"
+link_name = "몰아찌르고"
+end_name = "연속 찌르기"
+role = "link"
+shape = &"line"
+damage = 0.35
+hits = 4
+interval = 0.1
+stun = 0.0
+knock = 0.3
+cooldown = 1.0
+time = 0.3
+delay = 0.0
+lock = 0.3
+walk = -1.0
+reach = 1.2
+arc = 1.0
+width = 0.4

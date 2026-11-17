@@ -8,6 +8,7 @@ id = 209
 display_name = "일곱 상처"
 grade = 3
 form = 0
+attack = 105
 inscriptions = PackedStringArray("출혈", "연격")
 unique_text = ""
 unique_ready = false

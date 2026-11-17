@@ -8,6 +8,7 @@ id = 206
 display_name = "독수리 발톱"
 grade = 2
 form = 0
+attack = 103
 inscriptions = PackedStringArray("등 뒤")
 unique_text = ""
 unique_ready = false

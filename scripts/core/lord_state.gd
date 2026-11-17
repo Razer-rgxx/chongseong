@@ -27,3 +27,13 @@ var hook: float = 0.0
 var hook_target: Enemy = null
 var hook_from: Vector2 = Vector2.ZERO
 var hook_cooldown: float = 0.0
+## 좌클릭 동작(docs/attacks.md 4절). 화면이 읽는다. 움직이는 동작(돌진, 물러남, 도약, 순간, 갈고리)은 move_from → move_to.
+var move: StringName = &""
+var move_t: float = 0.0
+var move_time: float = 0.0
+var move_from: Vector2 = Vector2.ZERO
+var move_to: Vector2 = Vector2.ZERO
+## 이 시간이 남아 있으면 걷지 못하고 돌진·갈고리·좌클릭도 못 한다(발도, 지진, 반격 자세, 연속 찌르기, 물러나 베기).
+var move_lock: float = 0.0
+## 반격 자세가 남은 시간. 이 동안 맞으면 피해 없이 반격한다.
+var parry: float = 0.0

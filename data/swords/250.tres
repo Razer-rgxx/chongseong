@@ -8,6 +8,7 @@ id = 250
 display_name = "성주의 저울"
 grade = 4
 form = 1
+attack = 126
 inscriptions = PackedStringArray("막기", "날")
 unique_text = "체력이 절반 이상이면 피해 +40%, 절반 아래면 받는 피해 -40%."
 unique_ready = true

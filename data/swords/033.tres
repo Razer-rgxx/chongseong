@@ -8,6 +8,7 @@ id = 33
 display_name = "넓적한 장검"
 grade = 0
 form = 1
+attack = 17
 inscriptions = PackedStringArray("넓은 날")
 unique_text = ""
 unique_ready = false

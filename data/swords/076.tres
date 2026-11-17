@@ -8,6 +8,7 @@ id = 76
 display_name = "피 묻은 장검"
 grade = 0
 form = 1
+attack = 38
 inscriptions = PackedStringArray("흡혈")
 unique_text = ""
 unique_ready = false

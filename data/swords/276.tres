@@ -8,6 +8,7 @@ id = 276
 display_name = "대화재"
 grade = 4
 form = 2
+attack = 139
 inscriptions = PackedStringArray("불씨", "넓은 날")
 unique_text = "휘두른 자리에 3초 동안 불길이 남는다."
 unique_ready = true

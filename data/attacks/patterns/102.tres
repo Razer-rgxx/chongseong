@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PatternData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/pattern_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 102
+display_name = "피의 찌르고 당기고 검기"
+grade = 2
+moves = PackedStringArray("thrust", "pull", "wave")
+element = &"blood"
+echo = false

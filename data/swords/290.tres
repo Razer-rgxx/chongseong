@@ -8,6 +8,7 @@ id = 290
 display_name = "겨울의 끝"
 grade = 5
 form = 3
+attack = 145
 inscriptions = PackedStringArray("서리", "처형")
 unique_text = "언 적이 부서질 때마다 다음 찌르기가 화면 끝까지 닿는 얼음 창이 된다."
 unique_ready = true

@@ -8,6 +8,7 @@ id = 220
 display_name = "천 개의 바늘"
 grade = 3
 form = 3
+attack = 111
 inscriptions = PackedStringArray("꿰뚫기", "잔상")
 unique_text = ""
 unique_ready = false

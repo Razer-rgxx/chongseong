@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"quake"
+display_name = "지진"
+link_name = "땅 울리고"
+end_name = "지진"
+role = "finish"
+shape = &"circle"
+damage = 1.0
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.6
+delay = 0.0
+lock = 0.6
+walk = -1.0
+reach = 1.0
+arc = 1.0
+radius = 1.5
+ring_radii = PackedFloat32Array(2.5, 3.5, 4.5)
+ring_times = PackedFloat32Array(0.2, 0.4, 0.6)
+ring_thick = 1.0
+ring_damage = 0.6

@@ -8,6 +8,7 @@ id = 152
 display_name = "노병의 세검"
 grade = 1
 form = 3
+attack = 76
 inscriptions = PackedStringArray("연격")
 unique_text = ""
 unique_ready = false

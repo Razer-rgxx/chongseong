@@ -8,6 +8,7 @@ id = 265
 display_name = "핏빛 맹세"
 grade = 4
 form = 0
+attack = 133
 inscriptions = PackedStringArray("피의 값", "흡혈")
 unique_text = "큰 베기마다 체력 5를 쓰고 피해가 2배가 된다."
 unique_ready = true

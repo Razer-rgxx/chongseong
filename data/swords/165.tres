@@ -8,6 +8,7 @@ id = 165
 display_name = "쇠사슬 끊개"
 grade = 2
 form = 2
+attack = 83
 inscriptions = PackedStringArray("밀쳐내기")
 unique_text = ""
 unique_ready = false

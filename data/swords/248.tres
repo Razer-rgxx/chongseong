@@ -8,6 +8,7 @@ id = 248
 display_name = "언덕의 첫 검"
 grade = 4
 form = 1
+attack = 125
 inscriptions = PackedStringArray("단단함", "행운")
 unique_text = "들고 있으면 낮에 뽑은 검의 내구가 20% 늘어난다."
 unique_ready = true

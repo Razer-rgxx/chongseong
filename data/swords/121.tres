@@ -8,6 +8,7 @@ id = 121
 display_name = "척후병의 단검"
 grade = 1
 form = 0
+attack = 61
 inscriptions = PackedStringArray("등 뒤")
 unique_text = ""
 unique_ready = false

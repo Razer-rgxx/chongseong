@@ -8,6 +8,7 @@ id = 201
 display_name = "겨우살이"
 grade = 2
 form = 1
+attack = 101
 inscriptions = PackedStringArray("흡혈")
 unique_text = ""
 unique_ready = false

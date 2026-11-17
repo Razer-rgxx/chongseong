@@ -8,6 +8,7 @@ id = 126
 display_name = "대장장이의 장검"
 grade = 1
 form = 1
+attack = 63
 inscriptions = PackedStringArray("단단함")
 unique_text = ""
 unique_ready = false

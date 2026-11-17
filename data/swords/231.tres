@@ -8,6 +8,7 @@ id = 231
 display_name = "장작더미"
 grade = 3
 form = 2
+attack = 116
 inscriptions = PackedStringArray("불씨", "마지막 일격")
 unique_text = ""
 unique_ready = false

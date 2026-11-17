@@ -8,6 +8,7 @@ id = 189
 display_name = "얼어붙은 호수"
 grade = 2
 form = 2
+attack = 95
 inscriptions = PackedStringArray("서리")
 unique_text = ""
 unique_ready = false

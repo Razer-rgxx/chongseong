@@ -17,12 +17,15 @@ var sheath_lv: int = 0
 var from_sheath: bool = false
 ## 표에 없는데 붙은 각인(검집, 제단 옮기기).
 var extra_ins: PackedStringArray = PackedStringArray()
+## 좌클릭 공격 방식(표의 attack). 테스트는 다른 방식을 넣어 볼 수 있다.
+var pattern: PatternData
 
 
 func _init(d: SwordData, game: GameData) -> void:
 	data = d
 	grade = d.grade
 	form = game.forms[d.form]
+	pattern = game.pattern_for(d)
 	for k in d.inscriptions:
 		var ins_data: InscriptionData = game.inscriptions.get(k)
 		if ins_data:

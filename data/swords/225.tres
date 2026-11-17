@@ -8,6 +8,7 @@ id = 225
 display_name = "겨울 늑대"
 grade = 3
 form = 0
+attack = 113
 inscriptions = PackedStringArray("서리", "출혈")
 unique_text = ""
 unique_ready = false

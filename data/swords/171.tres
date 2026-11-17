@@ -8,6 +8,7 @@ id = 171
 display_name = "메아리"
 grade = 2
 form = 3
+attack = 86
 inscriptions = PackedStringArray("잔상")
 unique_text = ""
 unique_ready = false

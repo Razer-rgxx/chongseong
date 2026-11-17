@@ -8,6 +8,7 @@ id = 169
 display_name = "늙은 사자"
 grade = 2
 form = 1
+attack = 85
 inscriptions = PackedStringArray("연격")
 unique_text = ""
 unique_ready = false

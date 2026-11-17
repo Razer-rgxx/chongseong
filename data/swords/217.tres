@@ -8,6 +8,7 @@ id = 217
 display_name = "처형대"
 grade = 3
 form = 2
+attack = 109
 inscriptions = PackedStringArray("처형", "무거움")
 unique_text = ""
 unique_ready = false

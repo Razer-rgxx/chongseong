@@ -8,6 +8,7 @@ id = 172
 display_name = "곰의 앞발"
 grade = 2
 form = 2
+attack = 86
 inscriptions = PackedStringArray("무거움")
 unique_text = ""
 unique_ready = false

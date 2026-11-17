@@ -8,6 +8,7 @@ id = 284
 display_name = "망자들의 왕관"
 grade = 4
 form = 1
+attack = 143
 inscriptions = PackedStringArray("망령 베기", "사냥")
 unique_text = "쓰러뜨린 적이 모두 내 편 망령으로 일어난다 (최대 8)."
 unique_ready = false

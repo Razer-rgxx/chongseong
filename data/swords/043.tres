@@ -8,6 +8,7 @@ id = 43
 display_name = "사냥꾼의 단검"
 grade = 0
 form = 0
+attack = 22
 inscriptions = PackedStringArray("등 뒤")
 unique_text = ""
 unique_ready = false

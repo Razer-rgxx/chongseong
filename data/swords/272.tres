@@ -8,6 +8,7 @@ id = 272
 display_name = "무너진 왕좌"
 grade = 4
 form = 2
+attack = 137
 inscriptions = PackedStringArray("버팀", "무리 베기")
 unique_text = "둘레 3칸 안의 적 하나마다 받는 피해 -5% (최대 -50%)."
 unique_ready = true

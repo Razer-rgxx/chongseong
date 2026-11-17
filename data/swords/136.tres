@@ -8,6 +8,7 @@ id = 136
 display_name = "탈영병의 세검"
 grade = 1
 form = 3
+attack = 68
 inscriptions = PackedStringArray("날랜 발")
 unique_text = ""
 unique_ready = false

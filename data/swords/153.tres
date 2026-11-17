@@ -8,6 +8,7 @@ id = 153
 display_name = "회색 서약"
 grade = 2
 form = 1
+attack = 77
 inscriptions = PackedStringArray("버팀")
 unique_text = ""
 unique_ready = false

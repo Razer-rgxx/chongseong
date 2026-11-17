@@ -8,6 +8,7 @@ id = 60
 display_name = "휜 장검"
 grade = 0
 form = 1
+attack = 30
 inscriptions = PackedStringArray("잔상")
 unique_text = ""
 unique_ready = false

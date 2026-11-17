@@ -8,6 +8,7 @@ id = 159
 display_name = "겨울 숨"
 grade = 2
 form = 3
+attack = 80
 inscriptions = PackedStringArray("서리")
 unique_text = ""
 unique_ready = false

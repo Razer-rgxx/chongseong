@@ -8,6 +8,7 @@ id = 203
 display_name = "깨진 투구"
 grade = 2
 form = 2
+attack = 102
 inscriptions = PackedStringArray("버팀")
 unique_text = ""
 unique_ready = false

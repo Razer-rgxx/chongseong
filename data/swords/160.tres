@@ -8,6 +8,7 @@ id = 160
 display_name = "들불"
 grade = 2
 form = 1
+attack = 80
 inscriptions = PackedStringArray("불씨")
 unique_text = ""
 unique_ready = false

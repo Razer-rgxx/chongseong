@@ -8,6 +8,7 @@ id = 268
 display_name = "새벽 나팔"
 grade = 4
 form = 1
+attack = 135
 inscriptions = PackedStringArray("새벽", "버팀")
 unique_text = "밤이 30초 남으면 체력을 모두 회복하고 피해 +50%."
 unique_ready = true

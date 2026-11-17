@@ -8,6 +8,7 @@ id = 145
 display_name = "폭풍 기사단의 단검"
 grade = 1
 form = 0
+attack = 73
 inscriptions = PackedStringArray("번개")
 unique_text = ""
 unique_ready = false

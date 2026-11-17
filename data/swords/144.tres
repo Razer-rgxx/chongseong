@@ -8,6 +8,7 @@ id = 144
 display_name = "쌍검사의 세검"
 grade = 1
 form = 3
+attack = 72
 inscriptions = PackedStringArray("바꿔 쥐기")
 unique_text = ""
 unique_ready = false

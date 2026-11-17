@@ -8,6 +8,7 @@ id = 266
 display_name = "쇠말뚝"
 grade = 4
 form = 2
+attack = 134
 inscriptions = PackedStringArray("밀쳐내기", "막기")
 unique_text = "큰 베기 자리에 검 그림자가 꽂혀 4초 동안 적이 지나가지 못한다."
 unique_ready = false

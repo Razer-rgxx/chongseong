@@ -8,6 +8,7 @@ id = 101
 display_name = "북방 용병의 대검"
 grade = 1
 form = 2
+attack = 51
 inscriptions = PackedStringArray("서리")
 unique_text = ""
 unique_ready = false

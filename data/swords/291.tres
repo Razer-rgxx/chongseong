@@ -8,6 +8,7 @@ id = 291
 display_name = "꺼지지 않는 불"
 grade = 5
 form = 2
+attack = 146
 inscriptions = PackedStringArray("불씨", "무거움")
 unique_text = "불이 꺼지지 않는다. 불붙은 적은 쓰러질 때까지 타며 옆으로 번진다."
 unique_ready = true

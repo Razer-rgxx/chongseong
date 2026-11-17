@@ -8,6 +8,7 @@ id = 157
 display_name = "까마귀 깃"
 grade = 2
 form = 0
+attack = 79
 inscriptions = PackedStringArray("가벼움")
 unique_text = ""
 unique_ready = false

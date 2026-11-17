@@ -8,6 +8,7 @@ id = 90
 display_name = "기마대의 세검"
 grade = 1
 form = 3
+attack = 45
 inscriptions = PackedStringArray("돌진 베기")
 unique_text = ""
 unique_ready = false

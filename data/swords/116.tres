@@ -8,6 +8,7 @@ id = 116
 display_name = "공성병의 장검"
 grade = 1
 form = 1
+attack = 58
 inscriptions = PackedStringArray("거인 베기")
 unique_text = ""
 unique_ready = false

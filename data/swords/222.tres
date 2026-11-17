@@ -8,6 +8,7 @@ id = 222
 display_name = "무너뜨리는 자"
 grade = 3
 form = 2
+attack = 112
 inscriptions = PackedStringArray("밀쳐내기", "거인 베기")
 unique_text = ""
 unique_ready = false

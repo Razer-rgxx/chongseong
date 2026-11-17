@@ -8,6 +8,7 @@ id = 97
 display_name = "처형인의 대검"
 grade = 1
 form = 2
+attack = 49
 inscriptions = PackedStringArray("처형")
 unique_text = ""
 unique_ready = false

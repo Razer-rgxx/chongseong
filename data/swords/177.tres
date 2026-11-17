@@ -8,6 +8,7 @@ id = 177
 display_name = "추수"
 grade = 2
 form = 2
+attack = 89
 inscriptions = PackedStringArray("넓은 날")
 unique_text = ""
 unique_ready = false

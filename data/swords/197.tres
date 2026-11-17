@@ -8,6 +8,7 @@ id = 197
 display_name = "엉겅퀴"
 grade = 2
 form = 3
+attack = 99
 inscriptions = PackedStringArray("가시")
 unique_text = ""
 unique_ready = false

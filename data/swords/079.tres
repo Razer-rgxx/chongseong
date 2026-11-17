@@ -8,6 +8,7 @@ id = 79
 display_name = "마부의 단검"
 grade = 0
 form = 0
+attack = 40
 inscriptions = PackedStringArray("돌진 베기")
 unique_text = ""
 unique_ready = false

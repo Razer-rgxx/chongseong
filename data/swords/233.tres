@@ -8,6 +8,7 @@ id = 233
 display_name = "무쇠 황소"
 grade = 3
 form = 2
+attack = 117
 inscriptions = PackedStringArray("돌진 베기", "밀쳐내기")
 unique_text = ""
 unique_ready = false

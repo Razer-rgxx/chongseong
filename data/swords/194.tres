@@ -8,6 +8,7 @@ id = 194
 display_name = "장례 행렬"
 grade = 2
 form = 2
+attack = 97
 inscriptions = PackedStringArray("무리 베기")
 unique_text = ""
 unique_ready = false

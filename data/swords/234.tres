@@ -8,6 +8,7 @@ id = 234
 display_name = "끝없는 겨울바람"
 grade = 3
 form = 1
+attack = 118
 inscriptions = PackedStringArray("서리", "넓은 날")
 unique_text = ""
 unique_ready = false

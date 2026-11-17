@@ -8,6 +8,7 @@ id = 72
 display_name = "가시 돋친 장검"
 grade = 0
 form = 1
+attack = 36
 inscriptions = PackedStringArray("가시")
 unique_text = ""
 unique_ready = false

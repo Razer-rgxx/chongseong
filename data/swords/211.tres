@@ -8,6 +8,7 @@ id = 211
 display_name = "불타는 들판"
 grade = 3
 form = 2
+attack = 106
 inscriptions = PackedStringArray("불씨", "무리 베기")
 unique_text = ""
 unique_ready = false

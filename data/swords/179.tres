@@ -8,6 +8,7 @@ id = 179
 display_name = "동틀 녘"
 grade = 2
 form = 1
+attack = 90
 inscriptions = PackedStringArray("새벽")
 unique_text = ""
 unique_ready = false

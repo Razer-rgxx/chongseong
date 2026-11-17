@@ -8,6 +8,7 @@ id = 232
 display_name = "우는 칼"
 grade = 3
 form = 3
+attack = 117
 inscriptions = PackedStringArray("출혈", "처형")
 unique_text = ""
 unique_ready = false

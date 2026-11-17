@@ -8,6 +8,7 @@ id = 180
 display_name = "마지막 한마디"
 grade = 2
 form = 0
+attack = 90
 inscriptions = PackedStringArray("처형")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 279
 display_name = "피의 강"
 grade = 4
 form = 0
+attack = 140
 inscriptions = PackedStringArray("출혈", "흡혈")
 unique_text = "출혈로 쓰러진 적이 피 웅덩이를 남기고, 웅덩이를 밟으면 체력이 찬다."
 unique_ready = true

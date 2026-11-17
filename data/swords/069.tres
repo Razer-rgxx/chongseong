@@ -8,6 +8,7 @@ id = 69
 display_name = "방패병의 대검"
 grade = 0
 form = 2
+attack = 35
 inscriptions = PackedStringArray("막기")
 unique_text = ""
 unique_ready = false

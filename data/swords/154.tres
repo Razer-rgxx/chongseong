@@ -8,6 +8,7 @@ id = 154
 display_name = "늑대 송곳니"
 grade = 2
 form = 0
+attack = 77
 inscriptions = PackedStringArray("출혈")
 unique_text = ""
 unique_ready = false

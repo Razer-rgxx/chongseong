@@ -8,6 +8,7 @@ id = 155
 display_name = "마지막 파수"
 grade = 2
 form = 1
+attack = 78
 inscriptions = PackedStringArray("막기")
 unique_text = ""
 unique_ready = false

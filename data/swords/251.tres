@@ -8,6 +8,7 @@ id = 251
 display_name = "백 명의 이름"
 grade = 4
 form = 2
+attack = 126
 inscriptions = PackedStringArray("무리 베기", "연격")
 unique_text = "그 밤에 쓰러뜨린 적 10마리마다 피해 +2% (최대 +60%)."
 unique_ready = true

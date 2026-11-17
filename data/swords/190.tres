@@ -8,6 +8,7 @@ id = 190
 display_name = "여우 꼬리"
 grade = 2
 form = 0
+attack = 95
 inscriptions = PackedStringArray("첫 타")
 unique_text = ""
 unique_ready = false

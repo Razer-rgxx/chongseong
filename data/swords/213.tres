@@ -8,6 +8,7 @@ id = 213
 display_name = "늑대 왕"
 grade = 3
 form = 0
+attack = 107
 inscriptions = PackedStringArray("사냥", "등 뒤")
 unique_text = ""
 unique_ready = false

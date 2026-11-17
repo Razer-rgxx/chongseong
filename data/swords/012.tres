@@ -8,6 +8,7 @@ id = 12
 display_name = "농부의 세검"
 grade = 0
 form = 3
+attack = 6
 inscriptions = PackedStringArray("사냥")
 unique_text = ""
 unique_ready = false

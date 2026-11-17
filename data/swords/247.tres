@@ -8,6 +8,7 @@ id = 247
 display_name = "바위 심장"
 grade = 3
 form = 2
+attack = 124
 inscriptions = PackedStringArray("버팀", "가시")
 unique_text = ""
 unique_ready = false

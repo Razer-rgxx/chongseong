@@ -8,6 +8,7 @@ id = 204
 display_name = "새벽 닭"
 grade = 2
 form = 0
+attack = 102
 inscriptions = PackedStringArray("새벽")
 unique_text = ""
 unique_ready = false

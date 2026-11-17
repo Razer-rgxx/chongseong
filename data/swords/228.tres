@@ -8,6 +8,7 @@ id = 228
 display_name = "침묵"
 grade = 3
 form = 3
+attack = 115
 inscriptions = PackedStringArray("첫 타", "처형")
 unique_text = ""
 unique_ready = false

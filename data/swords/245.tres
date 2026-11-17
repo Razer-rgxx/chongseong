@@ -8,6 +8,7 @@ id = 245
 display_name = "잿더미 왕관"
 grade = 3
 form = 1
+attack = 123
 inscriptions = PackedStringArray("불씨", "행운")
 unique_text = ""
 unique_ready = false

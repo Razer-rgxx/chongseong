@@ -8,6 +8,7 @@ id = 218
 display_name = "바람의 길"
 grade = 3
 form = 3
+attack = 110
 inscriptions = PackedStringArray("가벼움", "잔상")
 unique_text = ""
 unique_ready = false

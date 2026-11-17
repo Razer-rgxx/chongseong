@@ -8,6 +8,7 @@ id = 296
 display_name = "두 번째 기회"
 grade = 5
 form = 1
+attack = 148
 inscriptions = PackedStringArray("버팀", "행운")
 unique_text = "밤에 쓰러지면 그 밤을 처음부터 다시 한다 (판마다 1번)."
 unique_ready = true

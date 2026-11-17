@@ -4,6 +4,7 @@ extends RefCounted
 ## 랜덤은 전부 rng 하나를 거친다. 같은 시드와 같은 입력이면 결과가 같다.
 ## 화면은 신호와 상태를 받아 그린다.
 ## 지금(1단계): 낮에 꽂힌 검 뽑기, 두 칸과 바꿔 쥐기, 밤의 적, 형태별 베기, 내구와 부러짐, 구역 오르기, 언덕지기.
+## 좌클릭은 검마다 다른 공격 방식(PatternData, 동작 2~4개)이고 Moves(moves.gd)가 돌린다(docs/attacks.md).
 ## 판 사이 성장(Meta): 축복(체력, 운, 뽑기 값, 새벽 회복)과 검집의 검을 들고 시작한다. 정예와 숫돌 제단.
 ## 각인 36종과 고유 능력은 Powers(powers.gd)가 맡고, 이 파일은 정해진 자리에서 부른다.
 
@@ -31,6 +32,13 @@ signal altar_opened()
 signal altar_used(kind: String, text: String)
 ## 각인·고유 능력이 낸 일(번개, 고리, 떨어진 검, 멈춤, 살아남음 …). 화면이 그린다. info는 종류마다 다르다.
 signal effect(kind: StringName, at: Vector2, info: Dictionary)
+## 좌클릭 동작 하나가 시작됐다(docs/attacks.md 4절의 info). 모션팀(MoveMotion)과 이펙트팀(MoveFx)이 이것으로 그린다.
+signal move_started(move: StringName, info: Dictionary)
+## 늦게 터지는 판정(내려찍기·도약 착지, 지진 고리, 발도의 띠, 반격, 소용돌이의 한 바퀴, 연속 찌르기의 한 번, 갈고리 도착, 메아리).
+signal move_area(move: StringName, info: Dictionary)
+## 날아가는 것(검기, 던진 칼)이 생겼다 / 사라졌다. 위치는 projectiles에서 틱마다 읽는다.
+signal projectile_spawned(p: Projectile)
+signal projectile_ended(p: Projectile)
 
 enum Phase { DAY, NIGHT, OVER }
 
@@ -78,8 +86,8 @@ var altar_open: bool = false
 var _pull_free: bool = false
 ## 남은 히트스톱 틱. 0보다 크면 그 틱은 시간이 멈춘다.
 var freeze: int = 0
-## 갈고리로 닿아서 하는 베기인지(_swing 안에서만 참).
-var _hook_strike: bool = false
+## 날아가는 것(검기, 던진 칼).
+var projectiles: Array[Projectile] = []
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
 var debug_grade: int = -1
@@ -87,6 +95,8 @@ var _spawn_t: float = 0.0
 var _next_id: int = 1
 ## 각인과 고유 능력.
 var powers: Powers
+## 좌클릭 동작.
+var moves: Moves
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -97,6 +107,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	dt = 1.0 / float(data.run.tick_rate)
 	Grid.size = data.run.arena_size
 	powers = Powers.new(self)
+	moves = Moves.new(self)
 	lord.hp = max_hp()
 	_new_day()
 	if meta:
@@ -134,6 +145,11 @@ func current() -> Sword:
 	return slots[active]
 
 
+## 쥔 검(없으면 맨손)의 좌클릭 공격 방식.
+func pattern() -> PatternData:
+	return moves.pattern()
+
+
 func luck() -> float:
 	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult()
 
@@ -145,6 +161,8 @@ func step(input: LordInput = null) -> void:
 	lord.prev_pos = lord.pos
 	for e in enemies:
 		e.prev_pos = e.pos
+	for p in projectiles:
+		p.prev_pos = p.pos
 	if freeze > 0:
 		freeze -= 1
 		return
@@ -153,10 +171,12 @@ func step(input: LordInput = null) -> void:
 	if pull_hilt != null:
 		_step_pull()
 		return
+	moves.advance(dt)
 	powers.tick(dt)
 	if phase == Phase.OVER:
 		return
 	_step_lord(input)
+	moves.tick(dt)
 	if phase == Phase.NIGHT:
 		_step_night()
 		if phase == Phase.NIGHT:
@@ -176,6 +196,7 @@ func start_night() -> void:
 	elite_out = false
 	hilts.clear()
 	altar = null
+	moves.clear()
 	powers.on_night_start()
 	night_started.emit(zone)
 
@@ -226,6 +247,7 @@ func _hilt_spot_ok(p: Vector2) -> bool:
 func _end_night() -> void:
 	enemies.clear()
 	_end_hook()
+	moves.clear()
 	if last_zone():
 		phase = Phase.OVER
 		won = true
@@ -365,6 +387,7 @@ func _step_lord(input: LordInput) -> void:
 	L.dash_cooldown -= dt
 	L.hook_cooldown -= dt
 	L.combo_timer -= dt
+	L.move_lock -= dt
 	if input and input.swap_to >= 0:
 		swap(input.swap_to)
 	if input and input.pull:
@@ -378,7 +401,9 @@ func _step_lord(input: LordInput) -> void:
 	L.moving = mv.length() > 0.1
 	if L.moving:
 		L.move_dir = mv.normalized()
-	if input and input.dash and powers.dash_charges > 0 and L.dash <= 0.0:
+	# 발도·지진·반격 자세처럼 멈추는 동작과 영주를 옮기는 동작(돌진베기, 도약 …) 동안은 걷지도, 돌진·갈고리도 못 한다
+	var busy: bool = L.move_lock > 0.0 or moves.steering()
+	if input and input.dash and not busy and powers.dash_charges > 0 and L.dash <= 0.0:
 		powers.dash_charges -= 1
 		if powers.dash_recharge <= 0.0:
 			powers.dash_recharge = powers.dash_cooldown()
@@ -388,7 +413,7 @@ func _step_lord(input: LordInput) -> void:
 		L.dash_dir = L.move_dir if L.moving else Vector2.from_angle(L.face)
 		powers.on_dash()
 		lord_dashed.emit()
-	if input and input.hook and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
+	if input and input.hook and not busy and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
 		_try_hook(input)
 	if L.hook > 0.0:
 		_step_hook()
@@ -398,25 +423,29 @@ func _step_lord(input: LordInput) -> void:
 		L.dash -= dt
 		v = L.dash_dir * D.dash_speed
 		powers.dash_tick()
+	elif busy:
+		v = Vector2.ZERO
+		L.moving = false
 	else:
-		v = mv * D.speed * (D.swing_move_mult if L.swing > 0.0 else 1.0)
+		var walk: float = moves.walk_mult()
+		if walk < 0.0:
+			walk = D.swing_move_mult if L.swing > 0.0 else 1.0
+		v = mv * D.speed * walk
 	var lim := Vector2(Grid.size) - Vector2(0.5, 0.5)
 	L.pos = (L.pos + v * dt).clamp(Vector2(0.5, 0.5), lim)
-	if input and input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
-		L.face = (input.aim - L.pos).angle()
-	elif L.moving:
-		L.face = mv.angle()
-	if input and input.attack and phase == Phase.NIGHT and L.cooldown <= 0.0 and L.dash <= 0.0:
-		_swing()
+	if not busy:
+		if input and input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
+			L.face = (input.aim - L.pos).angle()
+		elif L.moving:
+			L.face = mv.angle()
+	if input and input.attack and phase == Phase.NIGHT and L.cooldown <= 0.0 and L.dash <= 0.0 and not busy:
+		moves.attack(input)
 
 
-## 겨눈 쪽 부채꼴(hook_cone) 안, hook_range 안의 적 중 겨눈 선에 가장 가까운 적에게 건다. 없으면 아무 일도 없다.
-func _try_hook(input: LordInput) -> void:
+## 겨눈 쪽 부채꼴(hook_cone) 안, hook_range 안의 적 중 겨눈 선에 가장 가까운 적. 없으면 null.
+func find_hook_target(face: float) -> Enemy:
 	var L := lord
 	var D := data.lord
-	var face: float = L.face
-	if input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
-		face = (input.aim - L.pos).angle()
 	var best: Enemy = null
 	var best_a: float = INF
 	for e in enemies:
@@ -432,18 +461,41 @@ func _try_hook(input: LordInput) -> void:
 		if a < best_a - 0.0001 or (absf(a - best_a) <= 0.0001 and best and d < L.pos.distance_to(best.pos)):
 			best = e
 			best_a = a
+	return best
+
+
+## 우클릭(F) 갈고리: 갈고리 검(방식에 갈고리 베기가 든 검)을 쥐었을 때만. 걸 적이 없으면 아무 일도 없다.
+func _try_hook(input: LordInput) -> void:
+	if not moves.has_hook():
+		return
+	var L := lord
+	var face: float = L.face
+	if input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
+		face = (input.aim - L.pos).angle()
+	var best := find_hook_target(face)
 	if best == null:
 		return
+	L.hook_cooldown = data.lord.hook_cooldown
+	start_hook(best, null)
+
+
+## 그 적에게 줄을 걸고 날아가기 시작한다. run이 있으면 좌클릭의 갈고리 베기, null이면 우클릭.
+func start_hook(target: Enemy, run: MoveRun) -> void:
+	var L := lord
+	var D := data.lord
 	L.hook = D.hook_max_time
-	L.hook_target = best
+	L.hook_target = target
 	L.hook_from = L.pos
-	L.hook_cooldown = D.hook_cooldown
 	L.invuln = maxf(L.invuln, D.hook_max_time + 0.1)
-	L.face = (best.pos - L.pos).angle()
-	lord_hooked.emit(best)
+	L.face = (target.pos - L.pos).angle()
+	if run:
+		run.face = L.face
+		run.from = L.pos
+	moves.hook_started(target, run)
+	lord_hooked.emit(target)
 
 
-## 날아가는 중: 적에게 곧장 간다. 닿으면 큰 베기(hook_damage_mult배), 적이 죽거나 시간이 다 되면 멈춘다.
+## 날아가는 중: 적에게 곧장 간다. 닿으면 큰 베기, 적이 죽거나 시간이 다 되면 멈춘다.
 func _step_hook() -> void:
 	var L := lord
 	var D := data.lord
@@ -461,11 +513,10 @@ func _step_hook() -> void:
 	if to.length() - stop <= step:
 		var lim := Vector2(Grid.size) - Vector2(0.5, 0.5)
 		L.pos = (e.pos - to.normalized() * stop).clamp(Vector2(0.5, 0.5), lim)
-		_end_hook()
+		lord.hook = 0.0
+		lord.hook_target = null
 		L.cooldown = 0.0
-		_hook_strike = true
-		_swing()
-		_hook_strike = false
+		moves.hook_arrived()
 		return
 	var lim2 := Vector2(Grid.size) - Vector2(0.5, 0.5)
 	L.pos = (L.pos + to.normalized() * step).clamp(Vector2(0.5, 0.5), lim2)
@@ -476,66 +527,7 @@ func _step_hook() -> void:
 func _end_hook() -> void:
 	lord.hook = 0.0
 	lord.hook_target = null
-
-
-## 형태마다 연타 수가 다르다(대검 2, 나머지 3). 연타의 마지막이 큰 베기다.
-## 부채꼴 안이거나 아주 가까운 적을 가까운 순서로 벤다(세검은 앞의 2명 + 꿰뚫기).
-## 피해·속도·사거리·각도는 Powers.stats()가 각인과 고유 능력을 넣어 계산한다.
-func _swing() -> void:
-	var L := lord
-	var D := data.lord
-	var s := current()
-	var st: Dictionary = powers.stats()
-	var F: FormData = st.form
-	if L.combo_timer <= 0.0:
-		L.combo = 0
-	L.combo = L.combo % F.combo + 1
-	L.combo_timer = D.combo_window
-	var big: bool = L.combo == F.combo or powers.force_big() or _hook_strike
-	L.big = big
-	L.cooldown = D.cooldown / maxf(0.05, st.spd) * (D.big_cooldown_mult if big else 1.0)
-	var reach: float = st.reach
-	var arc: float = st.arc
-	L.swing = D.swing_time
-	L.swing_arc = arc
-	L.swing_reach = minf(reach, 12.0)
-	if powers.before_swing():
-		lord_swung.emit(true)
-		return
-	var dmg: float = powers.swing_damage(st.dmg * (D.big_damage_mult if big else 1.0), big)
-	if _hook_strike:
-		dmg *= D.hook_damage_mult
-	var knock: float = D.knockback * F.knockback * (D.big_knockback_mult if big else 1.0) * powers.knock_mult()
-	var hit: Array[Enemy] = []
-	for e in enemies:
-		if e.dead:
-			continue
-		var to: Vector2 = e.pos - L.pos
-		var d: float = to.length()
-		if d > reach + e.radius:
-			continue
-		if absf(angle_difference(L.face, to.angle())) > arc / 2.0 and d > e.radius + D.close_hit:
-			continue
-		hit.append(e)
-	var at: Vector2 = L.pos
-	hit.sort_custom(func(a: Enemy, b: Enemy) -> bool: return a.pos.distance_squared_to(at) < b.pos.distance_squared_to(at))
-	if st.pierce > 0 and hit.size() > st.pierce:
-		hit.resize(st.pierce)
-	dmg *= powers.crowd_mult(hit.size())
-	for e in hit:
-		var dir: Vector2 = e.pos - L.pos
-		dir = dir / dir.length() if dir.length() > 0.001 else Vector2.from_angle(L.face)
-		var res: Dictionary = powers.strike(e, dmg, dir * knock)
-		hurt(e, res.dmg, res.knock, big)
-		powers.after_strike(e, res.dmg, dmg)
-	lord_swung.emit(big)
-	powers.after_swing(hit, st, dmg, big)
-	if hit.size() > 0:
-		freeze = maxi(freeze, roundi((D.hitstop_big if big else D.hitstop) / dt))
-		if s and s == current() and s.breakable() and powers.wears():
-			s.durability -= 1.0
-			if s.durability <= 0.0:
-				_break(active)
+	moves.hook_ended()
 
 
 ## 그 칸의 검을 부러뜨린다(충신이 대신 부러질 때도).
@@ -578,6 +570,9 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false)
 func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	var L := lord
 	if L.invuln > 0.0 or L.dash > 0.0 or phase != Phase.NIGHT or debug_god:
+		return
+	# 반격 자세: 피해 없이 둘레를 반격한다
+	if moves.parried(attacker):
 		return
 	d = powers.lord_damage(d, attacker)
 	L.hp -= d
@@ -801,7 +796,9 @@ func _new_id() -> int:
 
 ## 같은 시드·같은 입력이면 같은 값이 나와야 한다(테스트용).
 func state_hash() -> int:
-	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null]
+	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
+	for p in projectiles:
+		parts.append(p.pos)
 	for e in enemies:
 		parts.append(e.pos)
 		parts.append(e.hp)

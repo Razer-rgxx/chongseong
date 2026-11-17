@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"crescent"
+display_name = "반월"
+link_name = "휘두르고"
+end_name = "반월베기"
+role = "link"
+shape = &"arc"
+damage = 0.8
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.2
+delay = 0.0
+lock = 0.0
+walk = -1.0
+reach = 0.9
+arc = 1.0
+arc_deg = 220.0

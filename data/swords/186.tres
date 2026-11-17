@@ -8,6 +8,7 @@ id = 186
 display_name = "부서진 맹세"
 grade = 2
 form = 1
+attack = 93
 inscriptions = PackedStringArray("광기")
 unique_text = ""
 unique_ready = false

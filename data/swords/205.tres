@@ -8,6 +8,7 @@ id = 205
 display_name = "빈 칼집"
 grade = 2
 form = 1
+attack = 103
 inscriptions = PackedStringArray("바꿔 쥐기")
 unique_text = ""
 unique_ready = false

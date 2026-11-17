@@ -8,6 +8,7 @@ id = 255
 display_name = "충신"
 grade = 4
 form = 1
+attack = 128
 inscriptions = PackedStringArray("버팀", "막기")
 unique_text = "체력이 0이 되면 이 검이 대신 부러지고 체력 30으로 버틴다 (밤마다 1번)."
 unique_ready = true

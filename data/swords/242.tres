@@ -8,6 +8,7 @@ id = 242
 display_name = "독사"
 grade = 3
 form = 0
+attack = 122
 inscriptions = PackedStringArray("출혈", "잔상")
 unique_text = ""
 unique_ready = false

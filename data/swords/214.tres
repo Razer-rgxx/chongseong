@@ -8,6 +8,7 @@ id = 214
 display_name = "은빛 고삐"
 grade = 3
 form = 3
+attack = 108
 inscriptions = PackedStringArray("돌진 베기", "날랜 발")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 202
 display_name = "산지기"
 grade = 2
 form = 1
+attack = 101
 inscriptions = PackedStringArray("사냥")
 unique_text = ""
 unique_ready = false

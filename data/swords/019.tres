@@ -8,6 +8,7 @@ id = 19
 display_name = "훈련용 대검"
 grade = 0
 form = 2
+attack = 10
 inscriptions = PackedStringArray("밀쳐내기")
 unique_text = ""
 unique_ready = false

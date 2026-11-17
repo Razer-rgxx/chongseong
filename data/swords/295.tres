@@ -8,6 +8,7 @@ id = 295
 display_name = "망각"
 grade = 5
 form = 3
+attack = 148
 inscriptions = PackedStringArray("첫 타", "꿰뚫기")
 unique_text = "찔린 적은 나를 잊고 3초 동안 다른 적을 공격한다."
 unique_ready = true

@@ -8,6 +8,7 @@ id = 243
 display_name = "깃발 없는 군대"
 grade = 3
 form = 1
+attack = 122
 inscriptions = PackedStringArray("무리 베기", "광기")
 unique_text = ""
 unique_ready = false

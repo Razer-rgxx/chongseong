@@ -8,6 +8,7 @@ id = 191
 display_name = "빗장"
 grade = 2
 form = 1
+attack = 96
 inscriptions = PackedStringArray("막기")
 unique_text = ""
 unique_ready = false

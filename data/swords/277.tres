@@ -8,6 +8,7 @@ id = 277
 display_name = "천 명의 기사"
 grade = 4
 form = 1
+attack = 139
 inscriptions = PackedStringArray("연격", "무리 베기")
 unique_text = "기사 망령 3명이 따라다니며 내 베기를 따라 벤다 (피해 30%)."
 unique_ready = false

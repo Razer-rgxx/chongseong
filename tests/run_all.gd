@@ -37,6 +37,15 @@ func _init() -> void:
 	_test_inscriptions()
 	_test_uniques()
 	_test_hook()
+	_test_patterns()
+	_test_moves()
+	_test_moving_moves()
+	_test_shots()
+	_test_parry()
+	_test_elements()
+	_test_echo()
+	_test_moves_with_powers()
+	_test_replay_moves()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -82,6 +91,57 @@ func _night_rules(seed: int = 1) -> Rules:
 	return r
 
 
+## 동작들만으로 된 공격 방식(테스트용).
+func _pat(moves: Array, element: StringName = &"", echo: bool = false) -> PatternData:
+	var p := PatternData.new()
+	p.moves = PackedStringArray(moves)
+	p.element = element
+	p.echo = echo
+	return p
+
+
+## 녹슨 장검(각인 없음)에 그 방식을 넣어 쥔 밤. 영주는 가운데에서 동쪽(+x)을 본다. 무적.
+func _mv(moves: Array, element: StringName = &"", echo: bool = false) -> Rules:
+	var r := _ins_rules()
+	r.current().pattern = _pat(moves, element, echo)
+	r.debug_god = true
+	return r
+
+
+## 영주 기준 그 자리에 서 있는 적(묶어 둬서 걷지 않는다, 체력이 많다).
+func _foe(r: Rules, at: Vector2, kind: StringName = &"giant") -> Enemy:
+	var e := r.spawn_at(kind, r.lord.pos + at)
+	e.max_hp = 99999.0
+	e.hp = e.max_hp
+	e.stun = 99.0
+	return e
+
+
+## 맞은 횟수(적 id → 수)를 센다.
+func _count_hits(r: Rules) -> Dictionary:
+	var n := {}
+	r.enemy_hit.connect(func(e: Enemy, _d: float, _b: bool) -> void: n[e.id] = int(n.get(e.id, 0)) + 1)
+	return n
+
+
+## 입력 없이 n틱. 히트스톱은 건너뛴다(때를 재기 쉽게).
+func _wait(r: Rules, n: int) -> void:
+	for i in n:
+		r.freeze = 0
+		r.step(_inp())
+
+
+## 연타를 끊지 않고 한 번 누른다(간격과 히트스톱은 건너뛴다).
+func _click(r: Rules) -> void:
+	r.lord.cooldown = 0.0
+	r.freeze = 0
+	r.step(_inp(Vector2.ZERO, true))
+
+
+func _hurt_by(e: Enemy) -> float:
+	return e.max_hp - e.hp
+
+
 func _test_grid() -> void:
 	Grid.size = Vector2i(34, 22)
 	check(Grid.cell_to_world(Vector2i(0, 0)) == Vector3(1, 0, 1), "칸 (0,0)의 가운데는 (1, 0, 1)m")
@@ -110,7 +170,15 @@ func _test_data() -> void:
 	for k in d.inscriptions:
 		six = six and (d.inscriptions[k] as InscriptionData).values.size() == 6
 	check(six, "각인마다 등급별 수치 6개")
-	check(d.forms.size() == 4 and d.forms[2].display_name == "대검" and d.forms[2].combo == 2 and d.forms[3].pierce == 2, "형태 4종(대검 2연타, 세검 2명 꿰뚫기)")
+	check(d.forms.size() == 4 and d.forms[2].display_name == "대검" and d.forms[3].pierce == 2, "형태 4종(세검 2명 꿰뚫기)")
+	check(d.moves.size() == 20 and d.patterns.size() == 151 and d.patterns.all(func(p: PatternData) -> bool: return p != null), "좌클릭: 기본 동작 20, 공격 방식 151(맨손 + 150)")
+	var unknown: Array[String] = []
+	for p in d.patterns:
+		for m in p.moves:
+			if not d.moves.has(StringName(m)):
+				unknown.append(m)
+	check(unknown.is_empty(), "방식의 동작이 모두 표에 있다 %s" % [unknown])
+	check(d.patterns[0].moves == PackedStringArray(["sweep"]) and d.pattern_for(null) == d.patterns[0], "맨손은 횡베기 하나뿐인 0번 방식")
 	check(d.grades.odds.size() == 6 and d.grades.odds[2] == 40.0 and d.grades.odds[5] == 50000.0, "등급 확률 1/6, 1/40 … 1/50000")
 	check(d.enemies.size() == 4 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 4종")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
@@ -271,24 +339,53 @@ func _test_lord_move_dash() -> void:
 	check(moved > d.lord.dash_speed * d.lord.dash_time * 0.9, "돌진은 걷기보다 멀리 간다(%.2f칸)" % moved)
 
 
-## 장검은 3번째, 대검은 2번째가 큰 베기. 세검은 앞의 2명만 꿰뚫는다.
+## 좌클릭 한 번이 방식의 다음 동작이고 마지막이 큰 베기다. 간격은 형태 빠르기와 동작에서. 세검은 부채꼴에서 앞의 2명만 꿰뚫는다.
 func _test_swing_forms() -> void:
 	var r := _night_rules()
-	r.give(d.sword_by_name("녹슨 장검"), 0)
+	var sw := r.give(d.sword_by_name("녹슨 장검"), 0)
+	var n: int = sw.pattern.steps()
 	var big: Array[bool] = []
+	var moved: Array[StringName] = []
 	r.lord_swung.connect(func(b: bool) -> void: big.append(b))
-	for t in 90:
+	r.move_started.connect(func(m: StringName, i: Dictionary) -> void:
+		if not i.echo:
+			moved.append(m))
+	for t in 150:
+		r.freeze = 0
 		r.step(_inp(Vector2.ZERO, true))
-	check(big.slice(0, 4) == [false, false, true, false], "장검은 세 번째가 큰 베기 %s" % [big.slice(0, 4)])
-	var g := _night_rules()
-	g.give(d.sword_by_name("녹슨 대검"), 0)
+	var want: Array[bool] = []
+	for k in n + 1:
+		want.append(k == n - 1)
+	check(n >= 2 and big.slice(0, n + 1) == want, "녹슨 장검(%s): %d연타, 마지막이 큰 베기 %s" % [sw.pattern.display_name, n, big.slice(0, n + 1)])
+	var names: Array[StringName] = []
+	for m in sw.pattern.moves:
+		names.append(StringName(m))
+	check(moved.slice(0, n) == names, "누를 때마다 방식의 다음 동작 %s" % [moved.slice(0, n)])
+	var two := _mv(["sweep", "smash"])
 	var gbig: Array[bool] = []
-	g.lord_swung.connect(func(b: bool) -> void: gbig.append(b))
+	two.lord_swung.connect(func(b: bool) -> void: gbig.append(b))
 	for t in 120:
-		g.step(_inp(Vector2.ZERO, true))
-	check(gbig.slice(0, 3) == [false, true, false], "대검은 두 번째가 큰 베기 %s" % [gbig.slice(0, 3)])
+		two.freeze = 0
+		two.step(_inp(Vector2.ZERO, true))
+	check(gbig.slice(0, 3) == [false, true, false], "두 동작 방식은 두 번째가 큰 베기 %s" % [gbig.slice(0, 3)])
+	var gap := func(name: String) -> float:
+		var q := _night_rules()
+		q.give(d.sword_by_name(name), 0).pattern = _pat(["sweep", "sweep", "sweep"])
+		q.step(_inp(Vector2.ZERO, true))
+		return q.lord.cooldown
+	check(gap.call("녹슨 단검") < gap.call("녹슨 장검") and gap.call("녹슨 장검") < gap.call("녹슨 대검"), "간격은 형태 빠르기에서(단검 < 장검 < 대검)")
+	var w := _mv(["sweep", "sweep", "spin"])
+	w.lord.combo_timer = 0.0
+	for k in 2:
+		w.lord.cooldown = 0.0
+		w.step(_inp(Vector2.ZERO, true))
+	check(w.lord.combo == 2, "연타가 이어진다(%d)" % w.lord.combo)
+	_wait(w, 40)
+	w.lord.cooldown = 0.0
+	w.step(_inp(Vector2.ZERO, true))
+	check(w.lord.combo == 1, "combo_window가 지나면 처음 동작부터")
 	var x := _night_rules()
-	x.give(d.sword_by_name("녹슨 세검"), 0)
+	x.give(d.sword_by_name("녹슨 세검"), 0).pattern = _pat(["sweep"])
 	x.debug_god = true
 	var row: Array[Enemy] = []
 	for k in 3:
@@ -299,18 +396,25 @@ func _test_swing_forms() -> void:
 		hits += 1 if e.hp < e.max_hp else 0
 	check(hits == 2, "세검은 일직선의 2명까지만 벤다(%d)" % hits)
 	var z := _night_rules()
-	z.give(d.sword_by_name("녹슨 장검"), 0)
+	z.give(d.sword_by_name("녹슨 장검"), 0).pattern = _pat(["sweep", "sweep", "sweep"])
 	var e := z.spawn_at(&"wraith", z.lord.pos + Vector2(1.0, 0.0))
 	var hp0: float = e.hp
 	z.step(_inp(Vector2.ZERO, true))
 	var expect: float = d.lord.damage * 1.0 * 1.0 * d.powers.i("투박함_피해")
-	check(is_equal_approx(hp0 - e.hp, expect), "흔함 장검(투박함) 한 번 = %d 피해(%.1f)" % [expect, hp0 - e.hp])
+	check(is_equal_approx(hp0 - e.hp, expect), "흔함 장검(투박함) 횡베기 한 번 = %d 피해(%.1f)" % [expect, hp0 - e.hp])
 	var behind := z.spawn_at(&"wraith", z.lord.pos + Vector2(-1.2, 0.0))
 	var hb: float = behind.hp
 	z.lord.cooldown = 0.0
 	z.freeze = 0
 	z.step(_inp(Vector2.ZERO, true))
 	check(behind.hp == hb, "등 뒤 멀리 있는 적은 안 맞는다")
+	var u := _night_rules()
+	var fist: Array[StringName] = []
+	u.move_started.connect(func(m: StringName, _i: Dictionary) -> void: fist.append(m))
+	var ub: Array[bool] = []
+	u.lord_swung.connect(func(b: bool) -> void: ub.append(b))
+	u.step(_inp(Vector2.ZERO, true))
+	check(fist == [&"sweep"] and ub == [false], "맨손: 횡베기 하나, 마무리가 없다")
 
 
 func _test_durability_break() -> void:
@@ -318,6 +422,7 @@ func _test_durability_break() -> void:
 	r.debug_god = true
 	var a := r.give(d.sword_by_name("녹슨 장검"), 0)
 	var b := r.give(d.sword_by_name("녹슨 대검"), 1)
+	a.pattern = _pat(["sweep", "sweep", "sweep"])
 	check(r.active == 0, "1번 칸을 쥐고 있다")
 	var broke: Array[int] = []
 	r.sword_broke.connect(func(k: int, _s: Sword) -> void: broke.append(k))
@@ -342,7 +447,7 @@ func _test_durability_break() -> void:
 
 func _test_hitstop() -> void:
 	var r := _night_rules()
-	r.give(d.sword_by_name("녹슨 장검"), 0)
+	r.give(d.sword_by_name("녹슨 장검"), 0).pattern = _pat(["sweep", "sweep", "sweep"])
 	r.debug_god = true
 	var e := r.spawn_at(&"wraith", r.lord.pos + Vector2(1.0, 0.0))
 	var x0: float = e.pos.x
@@ -424,6 +529,7 @@ func _test_replay() -> void:
 		inp.aim = Vector2(rec.randf_range(5, 29), rec.randf_range(3, 19))
 		inp.pull = rec.randf() < 0.1
 		inp.swap_to = 2 if rec.randf() < 0.02 else -1
+		inp.hook = rec.randf() < 0.03
 		inputs.append(inp)
 	for r in [a, b]:
 		for k in inputs.size():
@@ -480,6 +586,7 @@ func _test_sheath() -> void:
 	var r := Rules.new(d, 1, m)
 	var s := r.slots[0]
 	check(s != null and s.data == legend and s.from_sheath and r.active == 0, "판을 검집의 검을 들고 시작한다")
+	s.pattern = _pat(["sweep", "sweep", "sweep"])
 	check(is_equal_approx(s.bonus, 1.4) and s.max_durability == roundf(150.0 * 1.5) and s.ins.has("처형") and s.label() == "+5 늙은 사자", "+5: 피해 ×1.4, 내구 ×1.5, 검집 각인")
 	var e := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
 	r.start_night()
@@ -674,6 +781,7 @@ func _ins_rules(key: String = "", v: float = 0.0, name: String = "녹슨 장검"
 	var r := _night_rules()
 	var s := r.give(d.sword_by_name(name), 0)
 	s.ins.clear()
+	s.pattern = _pat(["sweep", "sweep", "sweep"])
 	if key != "":
 		s.ins[key] = v
 	r.lord.hp = r.max_hp()
@@ -725,7 +833,7 @@ func _test_inscriptions() -> void:
 		r.freeze = 0
 		r.step(_inp(Vector2.ZERO, true))
 		hits.append(h0 - g.hp)
-	check(is_equal_approx(hits[2], base * d.lord.big_damage_mult * 1.5), "연격: 마지막 타 피해 +N%")
+	check(is_equal_approx(hits[0], base) and is_equal_approx(hits[2], base * 1.5), "연격: 마지막 타(마무리) 피해 +N%% (%.1f, %.1f)" % [hits[0], hits[2]])
 	r = _ins_rules("밀쳐내기", 100)
 	var w := r.spawn_at(&"wraith", r.lord.pos + Vector2(1.0, 0.0))
 	_swing_once(r)
@@ -848,6 +956,7 @@ func _named(name: String, k: int = 0) -> Rules:
 	var r := _night_rules()
 	var s := r.give(d.sword_by_name(name), k)
 	s.ins.clear()
+	s.pattern = _pat(["sweep", "sweep", "sweep"])
 	r.active = k
 	r.lord.hp = r.max_hp()
 	return r
@@ -963,6 +1072,7 @@ func _hook_in() -> LordInput:
 
 func _test_hook() -> void:
 	var r := _ins_rules()
+	r.current().pattern = _pat(["hook", "sweep", "spin"])
 	var e := r.spawn_at(&"wraith", r.lord.pos + Vector2(6.0, 0.5))
 	var side := r.spawn_at(&"wraith", r.lord.pos + Vector2(0.0, 4.0))
 	e.hp = 9999.0
@@ -985,12 +1095,526 @@ func _test_hook() -> void:
 	r.step(_hook_in())
 	check(r.lord.hook <= 0.0, "갈고리: 다시 쓰려면 기다려야 한다")
 	var r2 := _ins_rules()
+	r2.current().pattern = _pat(["hook", "sweep", "spin"])
 	r2.spawn_at(&"wraith", r2.lord.pos + Vector2(0.0, 4.0))
 	r2.spawn_at(&"wraith", r2.lord.pos + Vector2(d.lord.hook_range + 2.0, 0.0))
 	r2.step(_hook_in())
 	check(r2.lord.hook <= 0.0 and r2.lord.hook_cooldown <= 0.0, "갈고리: 겨눈 쪽 사거리 안에 적이 없으면 안 걸고 기다림도 없다")
 	var r3 := Rules.new(d, 1)
+	r3.give(d.sword_by_name("녹슨 장검"), 0).pattern = _pat(["hook", "sweep", "spin"])
 	r3.lord.face = 0.0
 	r3.spawn_at(&"wraith", r3.lord.pos + Vector2(3.0, 0.0))
 	r3.step(_hook_in())
 	check(r3.lord.hook <= 0.0, "갈고리: 낮에는 안 걸린다")
+	# 갈고리 검이 아니면 우클릭 갈고리가 안 걸린다
+	var plain := _ins_rules()
+	plain.spawn_at(&"wraith", plain.lord.pos + Vector2(4.0, 0.0))
+	plain.step(_hook_in())
+	check(not plain.pattern().has_hook() and plain.lord.hook <= 0.0 and plain.lord.hook_cooldown <= 0.0, "갈고리: 갈고리 검이 아니면 우클릭이 안 걸린다")
+	var bare := _night_rules()
+	bare.spawn_at(&"wraith", bare.lord.pos + Vector2(4.0, 0.0))
+	bare.step(_hook_in())
+	check(bare.lord.hook <= 0.0, "갈고리: 맨손으로도 안 걸린다")
+	var real: SwordData = null
+	for sd in d.swords:
+		if d.pattern_for(sd).has_hook():
+			real = sd
+			break
+	var hr := _night_rules()
+	hr.give(real, 0)
+	var t := hr.spawn_at(&"wraith", hr.lord.pos + Vector2(4.0, 0.0))
+	hr.step(_hook_in())
+	check(hr.lord.hook > 0.0 and hr.lord.hook_target == t, "갈고리: 표의 갈고리 검(%s, %s)으로는 걸린다" % [real.display_name, d.pattern_for(real).display_name])
+	# 좌클릭의 갈고리 베기: 겨눈 쪽 적에게 날아가 동작의 배수로 벤다. 우클릭의 재사용 시간은 쓰지 않는다
+	var lm := _mv(["hook", "sweep", "spin"])
+	var far := _foe(lm, Vector2(5.0, 0.0), &"wraith")
+	var started: Array[Dictionary] = []
+	lm.move_started.connect(func(m: StringName, i: Dictionary) -> void:
+		if m == &"hook":
+			started.append(i))
+	var arrived: Array[Dictionary] = []
+	lm.move_area.connect(func(m: StringName, i: Dictionary) -> void:
+		if m == &"hook":
+			arrived.append(i))
+	var from: Vector2 = lm.lord.pos
+	lm.step(_inp(Vector2.ZERO, true))
+	check(lm.lord.hook > 0.0 and lm.lord.hook_cooldown <= 0.0 and started.size() == 1 and started[0].has("from") and started[0].has("to"), "갈고리 베기: 좌클릭으로 날아간다(우클릭 재사용 없음)")
+	_wait(lm, 20)
+	check(arrived.size() == 1 and lm.lord.pos.x - from.x > 3.5 and is_equal_approx(_hurt_by(far), d.lord.damage * 1.3), "갈고리 베기: 닿으면 × 1.3 (%.1f, %.2f칸)" % [_hurt_by(far), lm.lord.pos.x - from.x])
+	var none := _mv(["hook", "sweep", "spin"])
+	var near := _foe(none, Vector2(0.0, 0.8))
+	none.step(_inp(Vector2.ZERO, true))
+	check(none.lord.hook <= 0.0 and is_equal_approx(_hurt_by(near), d.lord.damage), "갈고리 베기: 겨눈 쪽에 적이 없으면 횡베기")
+
+
+# ---------------------------------------------------------------- 좌클릭: 공격 방식 150가지
+
+## build_attacks.gd가 만든 표: 검마다 방식 1~150, 모두 쓰인다, 등급대 수, 갈고리 12가지, 이름이 겹치지 않는다.
+func _test_patterns() -> void:
+	var used := {}
+	var range_ok := true
+	var grade_ok := true
+	for s in d.swords:
+		range_ok = range_ok and s.attack >= 1 and s.attack <= 150
+		if s.attack >= 1 and s.attack <= 150:
+			used[s.attack] = true
+			grade_ok = grade_ok and d.patterns[s.attack].grade == s.grade
+	check(range_ok, "검마다 공격 방식 번호가 1~150")
+	check(used.size() == 150, "방식 150가지가 모두 검에 쓰인다(%d)" % used.size())
+	check(grade_ok, "검은 자기 등급대의 방식을 받는다")
+	var per: Array[int] = [0, 0, 0, 0, 0, 0]
+	var hooks: Array[int] = [0, 0, 0, 0, 0, 0]
+	var names := {}
+	var keys := {}
+	var shape_ok := true
+	for i in range(1, 151):
+		var p := d.patterns[i]
+		per[p.grade] += 1
+		if p.has_hook():
+			hooks[p.grade] += 1
+		names[p.display_name] = true
+		keys["%s|%s|%s" % [",".join(p.moves), p.element, p.echo]] = true
+		var n: int = p.steps()
+		var last: MoveData = d.move(StringName(p.moves[n - 1]))
+		match p.grade:
+			0:
+				shape_ok = shape_ok and n >= 2 and n <= 3 and p.element == &"" and not p.echo
+			1:
+				shape_ok = shape_ok and n == 3 and p.element == &"" and not p.echo
+			2:
+				shape_ok = shape_ok and n == 3 and p.element != &"" and not p.echo
+			3:
+				shape_ok = shape_ok and n >= 3 and n <= 4 and p.element != &"" and not p.echo
+			4:
+				shape_ok = shape_ok and n == 4 and p.element != &"" and p.echo
+			5:
+				shape_ok = shape_ok and p.element != &"" and p.echo
+		shape_ok = shape_ok and last.role != "link"
+	check(per == [41, 35, 28, 20, 20, 6], "등급대별 방식 수 %s" % [per])
+	check(hooks == [0, 0, 4, 4, 3, 1], "갈고리 베기가 든 방식은 12가지(전설 4, 신화 4, 초월 3, 무한 1) %s" % [hooks])
+	check(names.size() == 150 and keys.size() == 150, "방식 이름과 내용이 겹치지 않는다(%d, %d)" % [names.size(), keys.size()])
+	check(shape_ok, "등급대의 모양(이음 수, 속성, 메아리, 마지막은 마무리)")
+	var hook_swords: int = 0
+	for s in d.swords:
+		hook_swords += 1 if d.pattern_for(s).has_hook() else 0
+	check(hook_swords >= 20 and hook_swords <= 28, "갈고리 검은 약 24자루(%d)" % hook_swords)
+	var sw := Sword.new(d.sword_by_name("녹슨 단검"), d)
+	check(sw.pattern == d.patterns[d.sword_by_name("녹슨 단검").attack], "검을 들면 표의 방식이 붙는다")
+
+
+## 모양마다 덮는 곳만 맞는지.
+func _test_moves() -> void:
+	var B: float = d.lord.reach
+	# 횡베기: 앞 부채꼴
+	var r := _mv(["sweep"])
+	var front := _foe(r, Vector2(1.0, 0.2))
+	var back := _foe(r, Vector2(-1.2, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(_hurt_by(front) > 0.0 and _hurt_by(back) == 0.0, "횡베기: 앞 부채꼴만")
+	# 찌르기: 곧은 띠 안 모두(꿰뚫음), 띠 밖은 안 맞는다, 반 칸 앞으로
+	r = _mv(["thrust"])
+	var row: Array[Enemy] = []
+	for k in 3:
+		row.append(_foe(r, Vector2(0.7 + 0.7 * k, 0.0)))
+	var off := _foe(r, Vector2(1.2, 1.0))
+	var x0: float = r.lord.pos.x
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 4)
+	check(row.all(func(e: Enemy) -> bool: return is_equal_approx(_hurt_by(e), d.lord.damage * 0.9)), "찌르기: 띠 안의 셋을 모두 꿰뚫는다(× 0.9)")
+	check(_hurt_by(off) == 0.0, "찌르기: 띠 밖(옆 1칸)은 안 맞는다")
+	check(absf(r.lord.pos.x - x0 - 0.5) < 0.01, "찌르기: 반 칸 앞으로(%.2f)" % (r.lord.pos.x - x0))
+	# 반월: 넓은 부채꼴(220°)
+	r = _mv(["crescent"])
+	var wide := _foe(r, Vector2.from_angle(deg_to_rad(100.0)) * 1.2)
+	var dead_back := _foe(r, Vector2(-1.2, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	var s2 := _mv(["sweep"])
+	var wide2 := _foe(s2, Vector2.from_angle(deg_to_rad(100.0)) * 1.2)
+	s2.step(_inp(Vector2.ZERO, true))
+	check(_hurt_by(wide) > 0.0 and _hurt_by(wide2) == 0.0 and _hurt_by(dead_back) == 0.0, "반월: 옆 100°도 벤다(횡베기는 못 벤다), 바로 뒤는 안 맞는다")
+	# 올려베기: 맞은 적이 묶인다
+	r = _mv(["rising"])
+	var up := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(up.stun > 0.3 and is_equal_approx(_hurt_by(up), d.lord.damage * 0.9), "올려베기: × 0.9, 0.35초 묶임")
+	# 회전베기: 등 뒤도
+	r = _mv(["sweep", "spin"])
+	r.lord.combo = 1
+	r.lord.combo_timer = 1.0
+	var behind := _foe(r, Vector2(-1.2, 0.0))
+	var out := _foe(r, Vector2(0.0, B + 1.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(_hurt_by(behind) > 0.0 and _hurt_by(out) == 0.0 and r.lord.big, "회전베기: 등 뒤의 적도 벤다, 칼 길이 밖은 안 맞는다(마무리)")
+	# 내려찍기: 0.12초 뒤 앞의 원
+	r = _mv(["smash"])
+	var c := _foe(r, Vector2(B * 0.8 + 1.0, 0.0))
+	var far := _foe(r, Vector2(-1.0, 0.0))
+	var areas: Array[Dictionary] = []
+	r.move_area.connect(func(_m: StringName, i: Dictionary) -> void: areas.append(i))
+	r.step(_inp(Vector2.ZERO, true))
+	var at0: float = _hurt_by(c)
+	_wait(r, 4)
+	check(at0 == 0.0 and _hurt_by(c) > 0.0 and _hurt_by(far) == 0.0, "내려찍기: 바로는 안 맞고 0.12초 뒤 앞의 원 안만")
+	check(areas.size() == 1 and areas[0].shape == &"circle" and is_equal_approx(float(areas[0].radius), 1.6) and int(areas[0].hits) == 1, "내려찍기: move_area(circle, 반지름 1.6, 맞힌 수)")
+	# 십자 베기: 앞 띠 + 가로지르는 띠
+	r = _mv(["cross"])
+	var side := _foe(r, Vector2(B * 1.3 / 2.0, -B * 1.6 / 2.0 + 0.1))
+	var nope := _foe(r, Vector2(-1.5, -1.5))
+	r.step(_inp(Vector2.ZERO, true))
+	check(_hurt_by(side) > 0.0 and _hurt_by(nope) == 0.0, "십자 베기: 가로지르는 띠의 끝도 벤다")
+	# 발도: 0.25초 멈췄다가 아주 긴 띠
+	r = _mv(["iaido"])
+	var line_far := _foe(r, Vector2(B * 3.0 - 0.2, 0.0))
+	var past := _foe(r, Vector2(B * 3.0 + 1.0, 0.0))
+	var beside := _foe(r, Vector2(2.0, 1.0))
+	var p0: Vector2 = r.lord.pos
+	r.step(_inp(Vector2.ZERO, true))
+	r.freeze = 0
+	r.step(_inp(Vector2.RIGHT))
+	var still: bool = r.lord.pos == p0
+	var early: float = _hurt_by(line_far)
+	_wait(r, 8)
+	check(still and early == 0.0 and is_equal_approx(_hurt_by(line_far), d.lord.damage * 2.4), "발도: 멈췄다가 0.25초 뒤 칼 길이 × 3의 띠, × 2.4")
+	check(_hurt_by(past) == 0.0 and _hurt_by(beside) == 0.0, "발도: 띠 끝 너머와 옆은 안 맞는다")
+	# 지진: 둘레 원 + 퍼지는 고리 셋
+	r = _mv(["quake"])
+	var inner := _foe(r, Vector2(1.0, 0.0))
+	var ring2 := _foe(r, Vector2(0.0, 3.5), &"wolf")
+	var rings: Array[Dictionary] = []
+	r.move_area.connect(func(m: StringName, i: Dictionary) -> void:
+		if m == &"quake":
+			rings.append(i))
+	var hits := _count_hits(r)
+	r.step(_inp(Vector2.ZERO, true))
+	var ring_first: float = _hurt_by(ring2)
+	_wait(r, 25)
+	check(_hurt_by(inner) > 0.0 and ring_first == 0.0, "지진: 둘레 원(1.5)이 바로, 먼 적은 아직")
+	check(rings.size() == 3 and rings.all(func(i: Dictionary) -> bool: return i.shape == &"ring"), "지진: 고리 셋(move_area ring %d)" % rings.size())
+	check(int(hits.get(ring2.id, 0)) == 1 and is_equal_approx(_hurt_by(ring2), d.lord.damage * 0.6), "지진: 반지름 3.5의 적은 두 번째 고리에 한 번(× 0.6)")
+	# 소용돌이: 0.15초마다 둘레 원 4번, 그동안 걸을 수 있다
+	r = _mv(["whirl"])
+	var wf := _foe(r, Vector2(1.0, 0.0))
+	var ticks: Array[int] = [0]
+	r.move_area.connect(func(m: StringName, _i: Dictionary) -> void:
+		if m == &"whirl":
+			ticks[0] += 1)
+	hits = _count_hits(r)
+	var wx: float = r.lord.pos.x
+	r.step(_inp(Vector2.ZERO, true))
+	for i in 20:
+		r.freeze = 0
+		r.step(_inp(Vector2.DOWN))
+	check(int(hits.get(wf.id, 0)) == 4 and ticks[0] == 4, "소용돌이: 네 번 벤다(%d, move_area %d)" % [int(hits.get(wf.id, 0)), ticks[0]])
+	check(r.lord.pos.y > Grid.middle().y + 1.0 and is_equal_approx(r.lord.pos.x, wx), "소용돌이: 도는 동안 걷는다")
+	# 연속 찌르기: 4번
+	r = _mv(["flurry"])
+	var ff := _foe(r, Vector2(1.0, 0.0))
+	hits = _count_hits(r)
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 12)
+	check(int(hits.get(ff.id, 0)) == 4 and is_equal_approx(_hurt_by(ff), d.lord.damage * 0.35 * 4.0), "연속 찌르기: 네 번, 한 번에 × 0.35 (%d번)" % int(hits.get(ff.id, 0)))
+	# 끌어당기기: 앞 60° 안의 먼 적을 영주 앞으로
+	r = _mv(["pull"])
+	var pulled := _foe(r, Vector2(3.0, 0.3), &"wraith")
+	var aside := _foe(r, Vector2(0.0, 3.0), &"wraith")
+	r.step(_inp(Vector2.ZERO, true))
+	var pd: float = pulled.pos.distance_to(r.lord.pos)
+	check(pd < 1.4 and pulled.pos.x > r.lord.pos.x and _hurt_by(pulled) > 0.0, "끌어당기기: 앞의 적을 영주 앞 1칸으로(%.2f칸)" % pd)
+	check(aside.pos.distance_to(r.lord.pos) > 2.9 and _hurt_by(aside) == 0.0, "끌어당기기: 부채꼴 밖은 그대로")
+
+
+## 영주를 옮기는 동작: 돌진베기, 도약, 순간 베기, 물러나 베기.
+func _test_moving_moves() -> void:
+	var r := _mv(["lunge"])
+	var on_path := _foe(r, Vector2(2.0, 0.5))
+	var off_path := _foe(r, Vector2(2.0, 2.0))
+	var start: Vector2 = r.lord.pos
+	var info: Array[Dictionary] = []
+	r.move_started.connect(func(_m: StringName, i: Dictionary) -> void: info.append(i))
+	r.step(_inp(Vector2.ZERO, true))
+	r.freeze = 0
+	r.step(_inp())
+	var inv: bool = r.lord.invuln > 0.0
+	_wait(r, 8)
+	check(absf(r.lord.pos.x - start.x - 3.5) < 0.01 and inv, "돌진베기: 0.15초에 3.5칸 앞으로, 무적(%.2f)" % (r.lord.pos.x - start.x))
+	check(_hurt_by(on_path) > 0.0 and _hurt_by(off_path) == 0.0, "돌진베기: 지나간 길 0.8칸 안만 벤다")
+	check(info.size() == 1 and info[0].has("from") and info[0].has("to") and is_equal_approx(float(info[0].time), 0.15), "돌진베기: move_started에 from·to·time")
+	# 도약: 겨눈 쪽 적의 자리로 뛰어 원(2.0), 밖으로 넉백
+	r = _mv(["leap"])
+	var target := _foe(r, Vector2(4.0, 0.0))
+	var near := _foe(r, Vector2(4.0, 1.5), &"wraith")
+	var far := _foe(r, Vector2(4.0, 4.0))
+	var land := r.lord.pos + Vector2(4.0, 0.0)
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 3)
+	var mid_air: bool = r.lord.invuln > 0.0 and _hurt_by(target) == 0.0
+	_wait(r, 10)
+	check(mid_air and r.lord.pos.distance_to(land) < 0.01, "도약: 0.35초 날아 겨눈 쪽 적의 자리에 내린다(무적)")
+	check(_hurt_by(target) > 0.0 and _hurt_by(near) > 0.0 and _hurt_by(far) == 0.0 and near.pos.y > land.y + 1.5, "도약: 내린 자리 반지름 2.0, 밖으로 넉백")
+	var open := _mv(["leap"])
+	var aim := _inp(Vector2.ZERO, true)
+	aim.aim_valid = true
+	aim.aim = open.lord.pos + Vector2(2.0, 0.0)
+	var o0: Vector2 = open.lord.pos
+	open.step(aim)
+	_wait(open, 14)
+	check(absf(open.lord.pos.x - o0.x - 2.0) < 0.01, "도약: 적이 없으면 겨눈 곳(최대 5칸)")
+	# 순간 베기: 앞의 가장 가까운 적 뒤 1칸으로 옮겨 그 적을 벤다
+	r = _mv(["blink"])
+	var mark := _foe(r, Vector2(3.0, 0.0))
+	var behind: Vector2 = mark.pos + Vector2(1.0, 0.0)
+	r.step(_inp(Vector2.ZERO, true))
+	check(r.lord.pos.distance_to(behind) < 0.05 and absf(angle_difference(r.lord.face, PI)) < 0.01 and _hurt_by(mark) > 0.0, "순간 베기: 적 뒤 1칸에 나타나 돌아서 벤다")
+	var empty := _mv(["blink"])
+	var e0: Vector2 = empty.lord.pos
+	var close := _foe(empty, Vector2(-1.0, 0.0) * 0.0 + Vector2(0.0, 0.8))
+	empty.step(_inp(Vector2.ZERO, true))
+	check(empty.lord.pos == e0, "순간 베기: 앞에 적이 없으면 제자리에서 횡베기")
+	check(_hurt_by(close) > 0.0, "순간 베기: 대신 하는 횡베기도 아주 가까운 적은 벤다")
+	# 물러나 베기: 벤 뒤 2칸 뒤로(무적)
+	r = _mv(["retreat"])
+	var rf := _foe(r, Vector2(1.0, 0.0))
+	var rx: float = r.lord.pos.x
+	r.step(_inp(Vector2.ZERO, true))
+	var first_inv: bool = r.lord.invuln > 0.0
+	_wait(r, 10)
+	check(_hurt_by(rf) > 0.0 and absf(rx - r.lord.pos.x - 2.0) < 0.01 and first_inv, "물러나 베기: 베고 2칸 뒤로 물러난다(%.2f, 무적)" % (rx - r.lord.pos.x))
+
+
+## 날아가는 것: 검기(꿰뚫고 적마다 한 번), 칼 던지기(갈 때 한 번, 올 때 한 번).
+func _test_shots() -> void:
+	var r := _mv(["wave"])
+	var a := _foe(r, Vector2(3.0, 0.0))
+	var b := _foe(r, Vector2(5.0, 0.3))
+	var c := _foe(r, Vector2(11.0, 0.0))
+	var hits := _count_hits(r)
+	var spawned: Array[Projectile] = []
+	var ended: Array[Projectile] = []
+	r.projectile_spawned.connect(func(p: Projectile) -> void: spawned.append(p))
+	r.projectile_ended.connect(func(p: Projectile) -> void: ended.append(p))
+	r.step(_inp(Vector2.ZERO, true))
+	var first: float = _hurt_by(b)
+	var moved: bool = r.projectiles.size() == 1
+	_wait(r, 4)
+	var travelling: bool = r.projectiles.size() == 1 and r.projectiles[0].pos.x > r.lord.pos.x + 2.0
+	_wait(r, 30)
+	check(spawned.size() == 1 and moved and travelling and first == 0.0, "검기: 날아가는 초승달이 생겨 앞으로 간다")
+	check(int(hits.get(a.id, 0)) == 1 and int(hits.get(b.id, 0)) == 1 and _hurt_by(c) == 0.0, "검기: 꿰뚫고 적마다 한 번, 8칸 너머는 안 닿는다")
+	check(ended.size() == 1 and r.projectiles.is_empty() and spawned[0].kind == &"wave", "검기: 다 가면 사라진다(projectile_ended)")
+	r = _mv(["boomerang"])
+	var g := _foe(r, Vector2(3.0, 0.0))
+	hits = _count_hits(r)
+	var ret: Array[bool] = [false]
+	r.step(_inp(Vector2.ZERO, true))
+	for i in 60:
+		r.freeze = 0
+		r.step(_inp())
+		if not r.projectiles.is_empty() and r.projectiles[0].returning:
+			ret[0] = true
+		if r.projectiles.is_empty():
+			break
+	check(ret[0] and r.projectiles.is_empty(), "칼 던지기: 6칸 갔다가 돌아와 사라진다")
+	check(int(hits.get(g.id, 0)) == 2, "칼 던지기: 갈 때 한 번, 올 때 한 번(%d)" % int(hits.get(g.id, 0)))
+
+
+## 반격 자세: 맞으면 피해 없이 둘레를 반격한다. 안 맞으면 끝에 약한 베기.
+func _test_parry() -> void:
+	var r := _mv(["parry"])
+	r.debug_god = false
+	var wolf := r.spawn_at(&"wolf", r.lord.pos + Vector2(0.5, 0.0))
+	wolf.max_hp = 9999.0
+	wolf.hp = 9999.0
+	wolf.cooldown = 0.2
+	var areas: Array[Dictionary] = []
+	r.move_area.connect(func(m: StringName, i: Dictionary) -> void:
+		if m == &"parry":
+			areas.append(i))
+	var hp0: float = r.lord.hp
+	r.step(_inp(Vector2.ZERO, true))
+	for i in 12:
+		r.freeze = 0
+		r.step(_inp())
+	check(r.lord.hp == hp0, "반격 자세: 맞아도 피해가 없다")
+	check(areas.size() == 1 and areas[0].shape == &"circle" and is_equal_approx(_hurt_by(wolf), d.lord.damage * 2.5), "반격 자세: 둘레 원으로 × 2.5 반격(%.1f)" % _hurt_by(wolf))
+	var q := _mv(["parry"])
+	var front := _foe(q, Vector2(1.0, 0.0))
+	var qa: Array[Dictionary] = []
+	q.move_area.connect(func(_m: StringName, i: Dictionary) -> void: qa.append(i))
+	q.step(_inp(Vector2.ZERO, true))
+	var during: float = _hurt_by(front)
+	_wait(q, 14)
+	check(during == 0.0 and qa.size() == 1 and qa[0].shape == &"arc" and is_equal_approx(_hurt_by(front), d.lord.damage * 0.6), "반격 자세: 안 맞으면 끝에 약한 횡베기 × 0.6")
+
+
+## 속성: 불꽃은 불, 서리는 느림(세 번째면 얼음), 벼락은 둘레로 번개, 피는 출혈과 회복.
+func _test_elements() -> void:
+	var r := _mv(["sweep", "sweep", "sweep"], &"fire")
+	var e := _foe(r, Vector2(1.0, 0.0))
+	_swing_once(r)
+	check(e.burn > 0.0, "불꽃: 맞은 적에 불이 붙는다")
+	var hp1: float = e.hp
+	e.stun = 0.0
+	_wait(r, 15)
+	check(e.hp < hp1, "불꽃: 불이 타며 피해를 준다")
+	r = _mv(["sweep", "sweep", "sweep"], &"ice")
+	e = _foe(r, Vector2(1.0, 0.0))
+	e.stun = 0.0
+	_swing_once(r)
+	var slowed: bool = e.slow_k > 0.0 and not e.frozen
+	_swing_once(r)
+	_swing_once(r)
+	check(slowed and e.frozen and e.stun > 0.0, "서리: 느려지고, 같은 적이 세 번째 맞으면 얼음")
+	r = _mv(["sweep", "sweep", "sweep"], &"bolt")
+	var zaps: Array = [0]
+	r.effect.connect(func(k: StringName, _a: Vector2, _i: Dictionary) -> void:
+		if k == &"zap":
+			zaps[0] += 1)
+	e = _foe(r, Vector2(1.0, 0.0))
+	var o1 := _foe(r, Vector2(3.0, 1.0))
+	var o2 := _foe(r, Vector2(3.0, -1.0))
+	var o3 := _foe(r, Vector2(7.0, 0.0))
+	_swing_once(r)
+	check(zaps[0] == 2 and is_equal_approx(_hurt_by(o1), d.lord.damage * 0.5) and _hurt_by(o2) > 0.0 and _hurt_by(o3) == 0.0, "벼락: 3칸 안의 다른 적 둘에 × 0.5 번개")
+	r = _mv(["sweep", "sweep", "sweep"], &"blood")
+	r.lord.hp = 50.0
+	e = _foe(r, Vector2(1.0, 0.0))
+	_swing_once(r)
+	check(e.bleed_t > 0.0 and is_equal_approx(r.lord.hp, 50.0 + d.lord.damage * d.lord.blood_heal), "피: 출혈이 걸리고 준 피해의 2%를 되찾는다")
+	var h1: float = e.hp
+	_wait(r, 30)
+	check(e.hp < h1, "피: 출혈로 피해가 이어진다")
+	var info: Array[StringName] = []
+	r.move_started.connect(func(_m: StringName, i: Dictionary) -> void: info.append(i.element))
+	_swing_once(r)
+	check(info == [&"blood"], "속성은 move_started의 element로 화면에 간다")
+
+
+## 메아리: 마무리가 0.3초 뒤 같은 자리에서 한 번 더(피해 × echo_damage).
+func _test_echo() -> void:
+	var r := _mv(["sweep", "spin"], &"", true)
+	var e := _foe(r, Vector2(1.0, 0.0))
+	var hits := _count_hits(r)
+	var echoes: Array[StringName] = []
+	r.move_started.connect(func(m: StringName, i: Dictionary) -> void:
+		if i.echo:
+			echoes.append(m))
+	_click(r)
+	var after1: float = _hurt_by(e)
+	_click(r)
+	var after2: float = _hurt_by(e)
+	_wait(r, 6)
+	var early: float = _hurt_by(e)
+	_wait(r, 6)
+	var spin: float = after2 - after1
+	check(is_equal_approx(spin, d.lord.damage * 1.3) and early == after2, "메아리: 마무리 직후에는 아직")
+	check(int(hits.get(e.id, 0)) == 3 and is_equal_approx(_hurt_by(e) - after2, spin * d.lord.echo_damage), "메아리: 0.3초 뒤 × %.1f로 한 번 더(%.1f)" % [d.lord.echo_damage, _hurt_by(e) - after2])
+	check(echoes == [&"spin"], "메아리: move_started(echo = true)를 한 번 보낸다")
+	var plain := _mv(["sweep", "spin"])
+	var pe := _foe(plain, Vector2(1.0, 0.0))
+	_click(plain)
+	_click(plain)
+	var ph: float = _hurt_by(pe)
+	_wait(plain, 15)
+	check(_hurt_by(pe) == ph, "메아리가 없는 방식은 한 번뿐")
+	var link := _mv(["sweep", "spin"], &"", true)
+	var le := _foe(link, Vector2(1.0, 0.0))
+	_click(link)
+	var lh: float = _hurt_by(le)
+	_wait(link, 15)
+	check(_hurt_by(le) == lh, "메아리는 마무리만 울린다")
+	var shot := _mv(["sweep", "wave"], &"", true)
+	var se := _foe(shot, Vector2(4.0, 0.0))
+	var spawned: Array[int] = [0]
+	shot.projectile_spawned.connect(func(_p: Projectile) -> void: spawned[0] += 1)
+	hits = _count_hits(shot)
+	_click(shot)
+	_click(shot)
+	_wait(shot, 40)
+	check(spawned[0] == 2 and int(hits.get(se.id, 0)) == 2, "메아리: 검기는 0.3초 뒤 한 번 더 날아간다")
+
+
+## 새 동작도 각인·고유 능력·내구·히트스톱을 거친다.
+func _test_moves_with_powers() -> void:
+	var r := _mv(["thrust"])
+	r.current().ins["날"] = 50.0
+	var e := _foe(r, Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(is_equal_approx(_hurt_by(e), d.lord.damage * 0.9 * 1.5), "각인(날)이 찌르기에도 든다")
+	r = _mv(["sweep", "smash"])
+	r.current().ins["연격"] = 50.0
+	e = _foe(r, Vector2(B_SMASH, 0.0))
+	_click(r)
+	var h1: float = _hurt_by(e)
+	_click(r)
+	_wait(r, 5)
+	check(is_equal_approx(_hurt_by(e) - h1, d.lord.damage * 1.8 * 1.5), "각인(연격)이 늦게 터지는 마무리(내려찍기)에도 든다")
+	r = _mv(["wave"])
+	r.current().ins["흡혈"] = 50.0
+	r.lord.hp = 50.0
+	e = _foe(r, Vector2(3.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 10)
+	check(is_equal_approx(r.lord.hp, 50.0 + d.lord.damage * 1.2 * 0.5), "각인(흡혈)이 날아가는 검기에도 든다")
+	r = _mv(["flurry"])
+	r.current().ins["출혈"] = 9.0
+	e = _foe(r, Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(e.bleed_t > 0.0, "각인(출혈)이 연속 찌르기에도 든다")
+	r = _mv(["flurry"])
+	var s := r.current()
+	var dur: float = s.durability
+	e = _foe(r, Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 12)
+	check(s.durability == dur - 1.0, "내구는 동작마다 한 번 닳는다(네 번 찔러도 1)")
+	r = _mv(["sweep", "spin"])
+	e = _foe(r, Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	var small: int = r.freeze
+	r.freeze = 0
+	r.lord.cooldown = 0.0
+	r.step(_inp(Vector2.ZERO, true))
+	check(small == roundi(d.lord.hitstop / r.dt) and r.freeze == roundi(d.lord.hitstop_big / r.dt), "히트스톱: 이음은 짧게, 마무리는 길게")
+	r = _named("메아리 계곡")
+	r.current().pattern = _pat(["iaido"])
+	e = _foe(r, Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	_wait(r, 10)
+	var after_iaido: float = _hurt_by(e)
+	_wait(r, 20)
+	check(after_iaido > 0.0 and _hurt_by(e) > after_iaido, "고유 능력(메아리 계곡)이 늦게 터지는 발도 뒤에도 울린다")
+
+
+const B_SMASH: float = 1.55 * 0.8 + 0.5
+
+
+## 같은 시드·같은 입력이면 같은 결과: 여러 방식(갈고리·날아가는 것·속성·메아리 포함)으로 싸우는 밤.
+func _test_replay_moves() -> void:
+	var picks: Array[int] = [5, 40, 80, 88, 110, 115, 130, 135, 145, 146, 148]
+	var hashes: Array[int] = []
+	var kills: Array[int] = []
+	for run_i in 2:
+		var r := Rules.new(d, 77)
+		r.debug_god = true
+		r.start_night()
+		var rec := RandomNumberGenerator.new()
+		rec.seed = 9
+		for k in 1800:
+			if k % 160 == 0:
+				var p: int = picks[(k / 160) % picks.size()]
+				var sd: SwordData = null
+				for s in d.swords:
+					if s.attack == p:
+						sd = s
+						break
+				r.give(sd, (k / 160) % 2)
+				r.active = (k / 160) % 2
+			var inp := _inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)), rec.randf() < 0.6, rec.randf() < 0.03)
+			inp.aim_valid = rec.randf() < 0.8
+			inp.aim = Vector2(rec.randf_range(5, 29), rec.randf_range(3, 19))
+			inp.hook = rec.randf() < 0.05
+			r.step(inp)
+		hashes.append(r.state_hash())
+		kills.append(r.kills)
+	check(hashes[0] == hashes[1] and kills[0] == kills[1], "같은 시드·같은 입력이면 여러 방식으로 싸워도 똑같이 돈다")
+	check(kills[0] > 10, "다시 돌린 밤에서 실제로 싸웠다(처치 %d)" % kills[0])

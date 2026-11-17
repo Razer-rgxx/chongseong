@@ -8,6 +8,7 @@ id = 156
 display_name = "검은 개울"
 grade = 2
 form = 3
+attack = 78
 inscriptions = PackedStringArray("꿰뚫기")
 unique_text = ""
 unique_ready = false

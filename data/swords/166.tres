@@ -8,6 +8,7 @@ id = 166
 display_name = "고요한 손"
 grade = 2
 form = 0
+attack = 83
 inscriptions = PackedStringArray("등 뒤")
 unique_text = ""
 unique_ready = false

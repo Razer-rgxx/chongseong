@@ -8,6 +8,7 @@ id = 119
 display_name = "광전사의 장검"
 grade = 1
 form = 1
+attack = 60
 inscriptions = PackedStringArray("광기")
 unique_text = ""
 unique_ready = false

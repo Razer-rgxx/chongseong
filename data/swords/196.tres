@@ -8,6 +8,7 @@ id = 196
 display_name = "굽은 등"
 grade = 2
 form = 0
+attack = 98
 inscriptions = PackedStringArray("가벼운 손")
 unique_text = ""
 unique_ready = false

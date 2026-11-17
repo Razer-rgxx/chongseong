@@ -8,6 +8,7 @@ id = 104
 display_name = "봉화지기의 장검"
 grade = 1
 form = 1
+attack = 52
 inscriptions = PackedStringArray("불씨")
 unique_text = ""
 unique_ready = false

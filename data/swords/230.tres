@@ -8,6 +8,7 @@ id = 230
 display_name = "핏빛 잔"
 grade = 3
 form = 0
+attack = 116
 inscriptions = PackedStringArray("피의 값", "흡혈")
 unique_text = ""
 unique_ready = false

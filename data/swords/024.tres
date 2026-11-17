@@ -8,6 +8,7 @@ id = 24
 display_name = "가벼운 세검"
 grade = 0
 form = 3
+attack = 12
 inscriptions = PackedStringArray("가벼움")
 unique_text = ""
 unique_ready = false

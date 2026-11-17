@@ -8,6 +8,7 @@ id = 8
 display_name = "이 빠진 세검"
 grade = 0
 form = 3
+attack = 4
 inscriptions = PackedStringArray("출혈")
 unique_text = ""
 unique_ready = false

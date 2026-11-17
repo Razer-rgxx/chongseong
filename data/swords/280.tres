@@ -8,6 +8,7 @@ id = 280
 display_name = "멈춘 순간"
 grade = 4
 form = 0
+attack = 141
 inscriptions = PackedStringArray("날랜 발", "등 뒤")
 unique_text = "돌진하면 1.5초 동안 나만 빼고 모두 멈춘다 (재사용 12초)."
 unique_ready = true

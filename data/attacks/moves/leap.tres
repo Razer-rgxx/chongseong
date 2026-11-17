@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"leap"
+display_name = "도약 내려찍기"
+link_name = "뛰어올라"
+end_name = "도약 내려찍기"
+role = "finish"
+shape = &"circle"
+damage = 1.6
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.35
+delay = 0.0
+lock = 0.0
+walk = -1.0
+reach = 1.0
+arc = 1.0
+radius = 2.0
+dist = 5.0
+go_time = 0.35
+invuln = true
+seek_range = 5.0
+seek_cone = 60.0

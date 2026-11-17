@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"thrust"
+display_name = "찌르기"
+link_name = "찌르고"
+end_name = "찌르기"
+role = "link"
+shape = &"line"
+damage = 0.9
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.2
+delay = 0.0
+lock = 0.0
+walk = -1.0
+reach = 1.5
+arc = 1.0
+width = 0.5
+dist = 0.5
+go_time = 0.08

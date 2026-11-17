@@ -9,7 +9,7 @@ extends Resource
 @export var reach: float = 1.0
 @export var arc: float = 1.0
 @export var durability: float = 1.0
-## 몇 번째 휘두르기가 큰 베기인지(연타 수).
+## 예전의 연타 수. 이제 좌클릭에 쓰지 않는다(공격 방식 PatternData의 동작 수가 연타 수다). 표에는 남겨 둔다.
 @export_range(1, 5) var combo: int = 3
 @export var knockback: float = 1.0
 ## 한 번에 벨 수 있는 적의 수. 0이면 제한 없다.

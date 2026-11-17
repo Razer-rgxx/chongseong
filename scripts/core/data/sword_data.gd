@@ -8,6 +8,8 @@ extends Resource
 @export_range(0, 5) var grade: int = 0
 ## 0 단검, 1 장검, 2 대검, 3 세검. data/forms/의 파일 순서와 같다.
 @export_range(0, 3) var form: int = 0
+## 좌클릭 공격 방식 번호(data/attacks/patterns/<번호>.tres, 1~150). scripts/debug/build_attacks.gd가 채운다.
+@export var attack: int = 0
 ## 각인 이름. 수치는 InscriptionData에서 등급으로 찾는다.
 @export var inscriptions: PackedStringArray = PackedStringArray()
 ## 유물(초월) 이상만 있다. 비어 있으면 없다.

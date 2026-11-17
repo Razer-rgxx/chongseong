@@ -8,6 +8,7 @@ id = 168
 display_name = "피 젖은 깃발"
 grade = 2
 form = 1
+attack = 84
 inscriptions = PackedStringArray("흡혈")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 170
 display_name = "가시덤불"
 grade = 2
 form = 1
+attack = 85
 inscriptions = PackedStringArray("가시")
 unique_text = ""
 unique_ready = false

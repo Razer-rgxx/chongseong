@@ -8,6 +8,7 @@ id = 185
 display_name = "핏값"
 grade = 2
 form = 2
+attack = 93
 inscriptions = PackedStringArray("피의 값")
 unique_text = ""
 unique_ready = false

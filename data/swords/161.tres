@@ -8,6 +8,7 @@ id = 161
 display_name = "맹세 지킴이"
 grade = 2
 form = 1
+attack = 81
 inscriptions = PackedStringArray("단단함")
 unique_text = ""
 unique_ready = false

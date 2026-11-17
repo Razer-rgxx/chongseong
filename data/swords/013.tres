@@ -8,6 +8,7 @@ id = 13
 display_name = "병사의 단검"
 grade = 0
 form = 0
+attack = 7
 inscriptions = PackedStringArray("단단함")
 unique_text = ""
 unique_ready = false

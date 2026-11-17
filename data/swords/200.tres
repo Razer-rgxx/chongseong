@@ -8,6 +8,7 @@ id = 200
 display_name = "전령"
 grade = 2
 form = 0
+attack = 100
 inscriptions = PackedStringArray("날랜 발")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 47
 display_name = "대장간 시험작 단검"
 grade = 0
 form = 0
+attack = 24
 inscriptions = PackedStringArray("숫돌")
 unique_text = ""
 unique_ready = false

@@ -8,6 +8,7 @@ id = 300
 display_name = "이름을 잃은 검"
 grade = 5
 form = 0
+attack = 150
 inscriptions = PackedStringArray()
 unique_text = "뽑는 순간 언덕의 모든 검이 함께 뽑혀 나와 도감이 다 채워진다."
 unique_ready = true

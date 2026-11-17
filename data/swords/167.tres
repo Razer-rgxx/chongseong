@@ -8,6 +8,7 @@ id = 167
 display_name = "천둥소리"
 grade = 2
 form = 2
+attack = 84
 inscriptions = PackedStringArray("번개")
 unique_text = ""
 unique_ready = false
