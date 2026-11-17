@@ -9,6 +9,10 @@ const ANIM_DIR: String = "res://assets/characters/lord/anims/"
 const HAND_BONE: String = "mixamorig_RightHand"
 ## 파일 이름에 이 낱말이 있으면 그 동작으로 쓴다(앞의 것부터 본다). 베기는 _key_for에서 따로 고른다.
 const KEYWORDS: Array = [
+	# 좌클릭 동작용(MoveMotion이 있으면 쓴다, assets/characters/README.md "동작별로 받으면 좋은 것"). 앞에 둬서 idle·run보다 먼저 본다.
+	# slash·attack이 든 이름은 _key_for가 먼저 베기로 읽으니, 받은 파일 이름에서 그 낱말을 빼고 이 낱말을 넣는다.
+	["block", "block"], ["parry", "block"], ["stab", "stab"], ["thrust", "stab"], ["spin", "spin"],
+	["leap", "leap"], ["jump", "leap"], ["draw", "draw"], ["throw", "throw"], ["slam", "slam"], ["dodge", "dodge"],
 	["idle", "idle"], ["walk", "walk"], ["run", "run"], ["roll", "roll"], ["impact", "hit"], ["hit", "hit"],
 	["death", "death"], ["dying", "death"], ["pull", "pull"],
 ]
