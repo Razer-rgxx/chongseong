@@ -139,29 +139,29 @@ code.id { color: var(--line); font-size: 12.5px; }
 <script>
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
-  stage: "10단계: 공격 토큰(몰려와도 몇 마리만 덤빈다) · 설계서 docs/attack_tokens.md · 9단계(좌클릭 150가지)는 끝",
-  updated: "2026-11-17 22:10",
+  stage: "11단계: 적 행동(새 적 5종) · 설계서 docs/content.md · 다음: 12 밤 목표, 13 낮 사건·갈림길, 14 뽑기 손맛",
+  updated: "2026-11-18 07:45",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
     does: "설계서로 팀 사이의 약속(동작 id, 신호, 자료 모양)을 정하고, 팀을 차례로 부르고, 끝나면 테스트·화면 확인·커밋·푸시를 한다.",
     status: "doing",
-    note: "10단계 공격 토큰: 규칙과 적 화면만 바뀌어 기능팀 혼자 맡는다(아트·모션·이펙트는 할 일 없음)."
+    note: "10단계(공격 토큰) 끝. 11~14단계 설계서(docs/content.md)를 썼다. 11단계 아트팀이 일하는 중."
   },
   teams: [
-    { key: "art", name: "아트팀", model: "Claude Opus 5.5 에이전트", status: "done",
+    { key: "art", name: "아트팀", model: "Claude Opus 5.5 에이전트", status: "doing",
       does: ["검기 초승달, 땅의 고리·띠·금 모양", "반격 번쩍임, 속성 4가지 색", "동작 20개 + 속성 4개 아이콘(코드로 그린 SVG)"],
       files: ["scripts/world/move_art.gd", "scripts/ui/move_icons.gd", "assets/ui/moves/*.svg"],
       gets: "설계서", gives: "모양과 아이콘 → 이펙트팀·기능팀", note: "끝(17분): MoveArt(검기·고리·띠·금·별빛·잔상과 재질), MoveIcons, 놋쇠빛 아이콘 24개. 커밋 3a16204" },
-    { key: "motion", name: "모션팀", model: "Claude Opus 5.5 에이전트", status: "done",
+    { key: "motion", name: "모션팀", model: "Claude Opus 5.5 에이전트", status: "wait",
       does: ["동작마다 영주의 움직임(있는 Mixamo 동작 + 코드로 돌기·뛰기·기울기)", "받으면 좋은 Mixamo 동작 목록"],
       files: ["scripts/lord/move_motion.gd", "assets/characters/README.md"],
       gets: "설계서", gives: "MoveMotion → 기능팀이 lord_view에 잇는다", note: "끝(26분): 동작 20 + 반격 한 가지의 움직임(동작 고르기, 멈춤, 돌기·뛰어오르기·기울기·웅크리기 곡선), 받으면 좋은 Mixamo 동작 표. 커밋 763475d" },
-    { key: "fx", name: "이펙트팀", model: "Claude Opus 5.5 에이전트", status: "done",
+    { key: "fx", name: "이펙트팀", model: "Claude Opus 5.5 에이전트", status: "wait",
       does: ["동작 20개의 맞는 자리 보이기", "날아가는 것, 착지 먼지, 순간 이동 연기", "속성 4가지 효과", "가짜 신호로 하나씩 틀어 보는 도구"],
       files: ["scripts/world/move_fx.gd", "scripts/debug/move_gallery.gd"],
       gets: "설계서의 신호, 아트팀의 모양", gives: "MoveFx → 기능팀이 main에 잇는다", note: "끝: 동작 20가지의 맞는 자리(부채꼴·띠·원·고리), 늦게 터지는 것의 미리 보임, 날아가는 검기·던진 칼, 속성 4가지, 메아리. 사용량 한도로 한 번 멈췄다가 이어서 마침. 커밋 0d471f9" },
-    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
+    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "wait",
       does: ["규칙: 동작 실행(각인·고유 능력과 함께), 날아가는 것", "조합 150개 만들기, 검 300자루 배정", "카드에 방식 이름·아이콘, 화면 연결", "테스트"],
       files: ["scripts/core/", "data/attacks/", "data/swords/*.tres", "scripts/debug/build_attacks.gd", "tests/", "main.gd · lord_view.gd · hud.gd"],
       gets: "앞 세 팀이 만든 것 전부", gives: "게임에서 도는 좌클릭 150가지", note: "끝: 동작 실행기(20가지, 날아가는 것, 반격, 속성, 메아리), 방식 150가지와 검 300자루 배정, 갈고리 검 12방식·24자루, 카드에 이름·아이콘, 테스트 186 → 270. 한도와 서버 재시작으로 두 번 멈췄다가 이어서 마침. 커밋 f67fda7 · 17b1833 · c1a83ff" }
@@ -183,6 +183,9 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-18 07:45", "11단계(적 행동) 시작: 아트팀이 새 적 5종의 몸을 만든다."],
+    ["11-17 23:10", "10단계 공격 토큰 끝(테스트 312, 푸시). 사용자: 컨텐츠가 반복적 → 11~14단계 설계서 docs/content.md."],
+    ["11-17 22:30", "관리: 원하는 검 받기 창(` 또는 F6)."],
     ["11-17 22:10", "사용자: 공격 토큰(둠·갓 오브 워·하프라이프 2 방식). 설계서 docs/attack_tokens.md. 기능팀 시작(10단계)."],
     ["11-17 22:00", "기능팀 끝. 총괄 확인: 테스트 270 통과, 화면 확인, 푸시. 9단계 끝."],
     ["11-17 20:45", "기능팀이 시작하자마자 사용량 한도로 멈춤(파일 변경 없음) → 한도가 풀려 이어서 다시 돌림."],
