@@ -40,3 +40,16 @@ extends Resource
 @export var dash_speed: float = 13.0
 @export var dash_time: float = 0.16
 @export var dash_cooldown: float = 1.1
+
+@export_group("갈고리")
+## 겨눈 쪽으로 이 거리(칸)와 각도(라디안, 전체 폭) 안의 적에게 건다.
+@export var hook_range: float = 9.0
+@export var hook_cone: float = 0.9
+## 날아가는 빠르기(칸/초). 이 시간(초)이 지나도 못 닿으면 멈춘다.
+@export var hook_speed: float = 18.0
+@export var hook_max_time: float = 0.7
+@export var hook_cooldown: float = 2.5
+## 닿으면 큰 베기를 한다. 그 피해에 더 곱하는 값.
+@export var hook_damage_mult: float = 1.5
+## 적의 몸에서 이만큼(칸) 앞에서 멈춘다.
+@export var hook_gap: float = 0.3

@@ -26,7 +26,7 @@
 - 각인 36종과 고유 능력은 `Powers`(scripts/core/powers.gd)가 맡는다. Rules는 휘두르기·베기·쓰러뜨림·맞기·돌진·뽑기·부러짐 자리에서 부르고, 정해진 수치는 `data/powers.tres`(PowerTable)에 있다. 고유 능력은 검 이름으로 찾고, 넣은 것은 `Powers.READY`와 검 표의 `unique_ready`를 같이 켠다(테스트가 둘이 같은지 본다). 화면에 그릴 일은 `Rules.effect` 신호로 보내고 `PowerFx`가 그린다.
 - 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
 - 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
-- 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다.
+- 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
 - 영주와 적의 움직임과 부딪힘은 물리 엔진이 아니라 규칙이 계산한다. 화면 노드는 Node3D이고, 규칙의 위치(prev_pos → pos)를 틱 사이로 이어 그린다. 싸움터에는 장애물이 없어서 적은 영주에게 곧장 온다(길찾기가 필요해지면 그때 넣는다).
 - 위치가 있는 소리(타격, 휘두름, 뽑기, 부러짐)는 AudioStreamPlayer3D(`Sfx`)로 낸다. 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리는 쓰지 않는다(사용자가 싫어한다).
 - 규칙 단위 테스트를 `tests/`에 둔다. 애드온 없이 `extends SceneTree` 스크립트로 쓰고 `godot --headless --path . -s tests/run_all.gd`로 돌린다. 규칙을 바꾸면 테스트도 같이 고친다.

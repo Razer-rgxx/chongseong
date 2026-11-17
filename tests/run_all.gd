@@ -36,6 +36,7 @@ func _init() -> void:
 	_test_run_shards()
 	_test_inscriptions()
 	_test_uniques()
+	_test_hook()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -121,7 +122,7 @@ func _test_data() -> void:
 func _test_input_map() -> void:
 	var cfg := ConfigFile.new()
 	check(cfg.load("res://project.godot") == OK, "project.godot을 읽는다")
-	for a in ["move_left", "move_right", "move_up", "move_down", "attack", "dash", "pull", "start_night", "swap", "slot_1", "slot_2", "discard", "restart"]:
+	for a in ["move_left", "move_right", "move_up", "move_down", "attack", "dash", "hook", "pull", "start_night", "swap", "slot_1", "slot_2", "discard", "restart"]:
 		check(cfg.has_section_key("input", a), "입력 동작 " + a)
 
 
@@ -952,3 +953,44 @@ func _test_uniques() -> void:
 	r.step(_inp())
 	r.step(_inp())
 	check(r.powers.zones.size() == 1 and e.slow_k > 0.0, "늪지기: 찌른 자리에 늪이 생겨 느려진다")
+
+
+func _hook_in() -> LordInput:
+	var i := LordInput.new()
+	i.hook = true
+	return i
+
+
+func _test_hook() -> void:
+	var r := _ins_rules()
+	var e := r.spawn_at(&"wraith", r.lord.pos + Vector2(6.0, 0.5))
+	var side := r.spawn_at(&"wraith", r.lord.pos + Vector2(0.0, 4.0))
+	e.hp = 9999.0
+	side.hp = 9999.0
+	var h0: float = e.hp
+	var start: Vector2 = r.lord.pos
+	r.step(_hook_in())
+	check(r.lord.hook > 0.0 and r.lord.hook_target == e, "갈고리: 겨눈 쪽(부채꼴 안)의 적에게 건다")
+	for t in 40:
+		if r.lord.hook <= 0.0:
+			break
+		r.freeze = 0
+		r.step()
+	# 닿은 뒤 벤 넉백으로 적은 조금 밀려난다. 영주가 적이 있던 곳 앞까지 왔는지 본다
+	check(r.lord.pos.x - start.x > 6.0 - e.radius - d.lord.hook_gap - 1.0 and r.lord.hook_target == null, "갈고리: 그 적 앞까지 날아간다(%.2f칸)" % (r.lord.pos.x - start.x))
+	var want: float = d.lord.damage * d.lord.big_damage_mult * d.lord.hook_damage_mult
+	check(is_equal_approx(h0 - e.hp, want), "갈고리: 닿으면 큰 베기 × %.1f (%.1f, 바란 값 %.1f)" % [d.lord.hook_damage_mult, h0 - e.hp, want])
+	check(is_equal_approx(side.hp, 9999.0), "갈고리: 옆의 적은 그대로")
+	r.freeze = 0
+	r.step(_hook_in())
+	check(r.lord.hook <= 0.0, "갈고리: 다시 쓰려면 기다려야 한다")
+	var r2 := _ins_rules()
+	r2.spawn_at(&"wraith", r2.lord.pos + Vector2(0.0, 4.0))
+	r2.spawn_at(&"wraith", r2.lord.pos + Vector2(d.lord.hook_range + 2.0, 0.0))
+	r2.step(_hook_in())
+	check(r2.lord.hook <= 0.0 and r2.lord.hook_cooldown <= 0.0, "갈고리: 겨눈 쪽 사거리 안에 적이 없으면 안 걸고 기다림도 없다")
+	var r3 := Rules.new(d, 1)
+	r3.lord.face = 0.0
+	r3.spawn_at(&"wraith", r3.lord.pos + Vector2(3.0, 0.0))
+	r3.step(_hook_in())
+	check(r3.lord.hook <= 0.0, "갈고리: 낮에는 안 걸린다")

@@ -307,6 +307,10 @@ func recolor(mul: Color, glow: Color = Color.BLACK, glow_energy: float = 0.0) ->
 				continue
 			var m := src.duplicate() as StandardMaterial3D
 			m.albedo_color = src.albedo_color * mul
+			# 어두운 밤에도 윤곽이 보이게 가장자리를 밝힌다
+			m.rim_enabled = true
+			m.rim = 0.7
+			m.rim_tint = 0.2
 			if glow_energy > 0.0:
 				m.emission_enabled = true
 				m.emission = glow

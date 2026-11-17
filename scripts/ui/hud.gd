@@ -120,7 +120,7 @@ func _ready() -> void:
 		_cards.append(r)
 		_card_boxes.append(box)
 
-	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/Space 베기 · Shift 돌진\nQ 바꿔 쥐기 · 1/2 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정", 13)
+	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/Space 베기 · Shift 돌진 · 우클릭/F 갈고리\nQ 바꿔 쥐기 · 1/2 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정", 13)
 	_help.modulate = UiKit.MUTED
 	_help.position = Vector2(20, 96)
 	_help.visible = false

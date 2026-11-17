@@ -19,6 +19,8 @@ signal slots_changed()
 signal sword_broke(slot: int, sword: Sword)
 signal lord_swung(big: bool)
 signal lord_dashed()
+## 갈고리를 걸었다(날아가기 시작).
+signal lord_hooked(target: Enemy)
 signal lord_hurt(damage: float)
 signal enemy_spawned(enemy: Enemy)
 signal enemy_hit(enemy: Enemy, damage: float, big: bool)
@@ -76,6 +78,8 @@ var altar_open: bool = false
 var _pull_free: bool = false
 ## 남은 히트스톱 틱. 0보다 크면 그 틱은 시간이 멈춘다.
 var freeze: int = 0
+## 갈고리로 닿아서 하는 베기인지(_swing 안에서만 참).
+var _hook_strike: bool = false
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
 var debug_grade: int = -1
@@ -221,6 +225,7 @@ func _hilt_spot_ok(p: Vector2) -> bool:
 
 func _end_night() -> void:
 	enemies.clear()
+	_end_hook()
 	if last_zone():
 		phase = Phase.OVER
 		won = true
@@ -358,6 +363,7 @@ func _step_lord(input: LordInput) -> void:
 	L.swing -= dt
 	L.invuln -= dt
 	L.dash_cooldown -= dt
+	L.hook_cooldown -= dt
 	L.combo_timer -= dt
 	if input and input.swap_to >= 0:
 		swap(input.swap_to)
@@ -382,6 +388,11 @@ func _step_lord(input: LordInput) -> void:
 		L.dash_dir = L.move_dir if L.moving else Vector2.from_angle(L.face)
 		powers.on_dash()
 		lord_dashed.emit()
+	if input and input.hook and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
+		_try_hook(input)
+	if L.hook > 0.0:
+		_step_hook()
+		return
 	var v: Vector2
 	if L.dash > 0.0:
 		L.dash -= dt
@@ -399,6 +410,74 @@ func _step_lord(input: LordInput) -> void:
 		_swing()
 
 
+## 겨눈 쪽 부채꼴(hook_cone) 안, hook_range 안의 적 중 겨눈 선에 가장 가까운 적에게 건다. 없으면 아무 일도 없다.
+func _try_hook(input: LordInput) -> void:
+	var L := lord
+	var D := data.lord
+	var face: float = L.face
+	if input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
+		face = (input.aim - L.pos).angle()
+	var best: Enemy = null
+	var best_a: float = INF
+	for e in enemies:
+		if e.dead:
+			continue
+		var to: Vector2 = e.pos - L.pos
+		var d: float = to.length()
+		if d > D.hook_range + e.radius or d < 0.001:
+			continue
+		var a: float = absf(angle_difference(face, to.angle()))
+		if a > D.hook_cone / 2.0:
+			continue
+		if a < best_a - 0.0001 or (absf(a - best_a) <= 0.0001 and best and d < L.pos.distance_to(best.pos)):
+			best = e
+			best_a = a
+	if best == null:
+		return
+	L.hook = D.hook_max_time
+	L.hook_target = best
+	L.hook_from = L.pos
+	L.hook_cooldown = D.hook_cooldown
+	L.invuln = maxf(L.invuln, D.hook_max_time + 0.1)
+	L.face = (best.pos - L.pos).angle()
+	lord_hooked.emit(best)
+
+
+## 날아가는 중: 적에게 곧장 간다. 닿으면 큰 베기(hook_damage_mult배), 적이 죽거나 시간이 다 되면 멈춘다.
+func _step_hook() -> void:
+	var L := lord
+	var D := data.lord
+	var e: Enemy = L.hook_target
+	L.hook -= dt
+	if e == null or e.dead:
+		_end_hook()
+		return
+	var to: Vector2 = e.pos - L.pos
+	var stop: float = e.radius + D.hook_gap
+	var step: float = D.hook_speed * dt
+	L.face = to.angle()
+	L.moving = true
+	L.move_dir = to.normalized()
+	if to.length() - stop <= step:
+		var lim := Vector2(Grid.size) - Vector2(0.5, 0.5)
+		L.pos = (e.pos - to.normalized() * stop).clamp(Vector2(0.5, 0.5), lim)
+		_end_hook()
+		L.cooldown = 0.0
+		_hook_strike = true
+		_swing()
+		_hook_strike = false
+		return
+	var lim2 := Vector2(Grid.size) - Vector2(0.5, 0.5)
+	L.pos = (L.pos + to.normalized() * step).clamp(Vector2(0.5, 0.5), lim2)
+	if L.hook <= 0.0:
+		_end_hook()
+
+
+func _end_hook() -> void:
+	lord.hook = 0.0
+	lord.hook_target = null
+
+
 ## 형태마다 연타 수가 다르다(대검 2, 나머지 3). 연타의 마지막이 큰 베기다.
 ## 부채꼴 안이거나 아주 가까운 적을 가까운 순서로 벤다(세검은 앞의 2명 + 꿰뚫기).
 ## 피해·속도·사거리·각도는 Powers.stats()가 각인과 고유 능력을 넣어 계산한다.
@@ -412,7 +491,7 @@ func _swing() -> void:
 		L.combo = 0
 	L.combo = L.combo % F.combo + 1
 	L.combo_timer = D.combo_window
-	var big: bool = L.combo == F.combo or powers.force_big()
+	var big: bool = L.combo == F.combo or powers.force_big() or _hook_strike
 	L.big = big
 	L.cooldown = D.cooldown / maxf(0.05, st.spd) * (D.big_cooldown_mult if big else 1.0)
 	var reach: float = st.reach
@@ -424,6 +503,8 @@ func _swing() -> void:
 		lord_swung.emit(true)
 		return
 	var dmg: float = powers.swing_damage(st.dmg * (D.big_damage_mult if big else 1.0), big)
+	if _hook_strike:
+		dmg *= D.hook_damage_mult
 	var knock: float = D.knockback * F.knockback * (D.big_knockback_mult if big else 1.0) * powers.knock_mult()
 	var hit: Array[Enemy] = []
 	for e in enemies:

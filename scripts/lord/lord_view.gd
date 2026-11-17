@@ -34,6 +34,14 @@ extends Node3D
 @export var slash_hold: float = 0.8
 @export var roll_hold: float = 0.9
 
+@export_group("갈고리")
+## 날아가는 포물선의 가장 높은 곳(m). 먼 적일수록 높게, 이 값까지.
+@export var hook_arc_max: float = 2.6
+## 줄이 적에게 닿을 때까지의 시간(초).
+@export var hook_rope_shoot: float = 0.07
+@export var rope_color: Color = Color(0.5, 0.48, 0.45)
+@export_group("")
+
 var rules: Rules
 
 @onready var _model: Node3D = $Model
@@ -54,6 +62,14 @@ var _busy: float = 0.0
 var _last_swing: float = 0.0
 var _last_invuln: float = 0.0
 var _last_dash: float = 0.0
+var _last_hook: float = 0.0
+var _rope := MeshInstance3D.new()
+var _rope_head := MeshInstance3D.new()
+var _air: float = 0.0
+var _hook_t: float = -1.0
+var _hook_total: float = 1.0
+var _rope_out: float = 0.0
+var _rope_to := Vector3.ZERO
 var _state: String = ""
 var _yaw_now: float = 0.0
 var _yaw_ready: bool = false
@@ -97,6 +113,7 @@ func _ready() -> void:
 		_hand.add_child(_guard)
 	if _blade:
 		_blade.mesh = (_blade.mesh as BoxMesh).duplicate()
+	_build_rope()
 	torch.position = Vector3(0.4, 2.2, 0.3)
 	torch.light_color = Color(1.0, 0.72, 0.45)
 	torch.omni_range = 9.0
@@ -130,6 +147,7 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 func draw(alpha: float, delta: float) -> void:
 	var L := rules.lord
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
+	_draw_hook(L, delta)
 	if character == null:
 		_model.rotation.y = _yaw(L.face)
 	# 휘두르기: 콤보마다 쓸어 가는 방향이 바뀐다
@@ -179,6 +197,14 @@ func _animate(L: LordState, delta: float) -> void:
 		if _state != "death":
 			_one_shot("death", 1.0)
 			_busy = 999.0
+	elif L.hook > _last_hook and L.hook_target != null:
+		# 갈고리: 날아가는 동안 공중제비(구르기 동작의 구르는 부분만)
+		var flight: float = clampf(L.pos.distance_to(L.hook_target.pos) / rules.data.lord.hook_speed, 0.15, rules.data.lord.hook_max_time)
+		var w2: Vector2 = character.roll_window
+		if w2.x >= 0.0:
+			_one_shot("roll", (w2.y - w2.x) / flight, flight, w2.x)
+		else:
+			_one_shot("roll", roll_speed, flight)
 	elif L.dash > _last_dash:
 		var w: Vector2 = character.roll_window
 		if w.x >= 0.0:
@@ -203,6 +229,7 @@ func _animate(L: LordState, delta: float) -> void:
 	_last_swing = L.swing
 	_last_invuln = L.invuln
 	_last_dash = L.dash
+	_last_hook = L.hook
 
 
 ## 모델이 보는 쪽: 구를 때는 구르는 쪽, 휘두를 때는 겨눈 쪽(규칙의 face), 걸을 때는 걷는 쪽.
@@ -213,7 +240,10 @@ func _turn(L: LordState, delta: float) -> void:
 		_yaw_ready = true
 	var target: float = _yaw_now
 	var fast: bool = false
-	if (_state == "roll" and _busy > 0.0) or L.dash > 0.0:
+	if L.hook > 0.0:
+		target = _yaw(L.face)
+		fast = true
+	elif (_state == "roll" and _busy > 0.0) or L.dash > 0.0:
 		target = _yaw(L.dash_dir.angle())
 		fast = true
 	elif L.swing > 0.0 or ((_state == "slash" or _state == "big") and _swing_t < slash_hold * 0.5):
@@ -224,6 +254,78 @@ func _turn(L: LordState, delta: float) -> void:
 	var k: float = 1.0 - exp(-(turn_fast if fast else turn_speed) * delta)
 	_yaw_now = lerp_angle(_yaw_now, target, k)
 	_model.rotation.y = _yaw_now
+
+
+# ---------------------------------------------------------------- 갈고리
+
+func _build_rope() -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = rope_color
+	m.metallic = 0.7
+	m.roughness = 0.35
+	# 밤에도 줄이 보이게 아주 조금 빛난다
+	m.emission_enabled = true
+	m.emission = rope_color
+	m.emission_energy_multiplier = 0.25
+	var c := CylinderMesh.new()
+	c.top_radius = 0.022
+	c.bottom_radius = 0.022
+	c.height = 1.0
+	c.radial_segments = 6
+	c.rings = 1
+	_rope.mesh = c
+	_rope.material_override = m
+	_rope.top_level = true
+	_rope.visible = false
+	_rope.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_rope)
+	var h := CylinderMesh.new()
+	h.top_radius = 0.0
+	h.bottom_radius = 0.07
+	h.height = 0.22
+	h.radial_segments = 6
+	_rope_head.mesh = h
+	var hm := StandardMaterial3D.new()
+	hm.albedo_color = Color(0.3, 0.29, 0.28)
+	hm.metallic = 0.9
+	hm.roughness = 0.35
+	_rope_head.material_override = hm
+	_rope_head.top_level = true
+	_rope_head.visible = false
+	add_child(_rope_head)
+
+
+## 날아가는 동안: 줄을 쏘아 적에 걸고, 몸은 포물선으로 뜬다. 끝나면 줄을 거두고 내려온다.
+func _draw_hook(L: LordState, delta: float) -> void:
+	if L.hook > 0.0 and L.hook_target != null:
+		var e: Enemy = L.hook_target
+		if _hook_t < 0.0:
+			_hook_t = 0.0
+			_hook_total = maxf(0.5, L.hook_from.distance_to(e.pos) - e.radius)
+		_hook_t += delta
+		var g: Vector3 = Grid.cells_to_world(e.pos)
+		_rope_to = g + Vector3(0, Grid.cells_to_meters(e.radius) * 1.5 + HillBuilder.height(g.x, g.z), 0)
+		var p: float = clampf(L.pos.distance_to(L.hook_from) / _hook_total, 0.0, 1.0)
+		var h: float = minf(hook_arc_max, Grid.cells_to_meters(_hook_total) * 0.16)
+		_air = sin(p * PI) * h
+		_rope_out = minf(1.0, _hook_t / hook_rope_shoot)
+	else:
+		_hook_t = -1.0
+		_air = lerpf(_air, 0.0, 1.0 - exp(-14.0 * delta))
+		_rope_out = maxf(0.0, _rope_out - delta / 0.12)
+	_model.position.y = _air
+	var a: Vector3 = position + Vector3(0, 1.25 + _air, 0)
+	var b: Vector3 = a.lerp(_rope_to, _rope_out)
+	var len: float = a.distance_to(b)
+	var show: bool = _rope_out > 0.01 and len > 0.1
+	_rope.visible = show
+	_rope_head.visible = show
+	if not show:
+		return
+	var up: Vector3 = (b - a) / len
+	var basis := Basis(Quaternion(Vector3.UP, up))
+	_rope.global_transform = Transform3D(basis * Basis.from_scale(Vector3(1.0, len, 1.0)), (a + b) * 0.5)
+	_rope_head.global_transform = Transform3D(basis, b)
 
 
 ## 휘두르기 시작부터 trail_time 동안 칼날의 두 끝을 SlashFx에 넘긴다.

@@ -522,7 +522,7 @@ func _build_knight(grow: float, c: Color, boss: bool) -> void:
 	# 투구 안의 눈. 뼈의 방향이 모델마다 달라서 첫 프레임에 머리 앞에 맞춘다(_place_eyes)
 	_eyes = Node3D.new()
 	_knight.attach("mixamorig_Head", _eyes)
-	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.012, Color(1.0, 0.35, 0.15) if boss else Color(0.7, 0.85, 1.0))
+	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.022, Color(1.0, 0.35, 0.15) if boss else Color(0.7, 0.85, 1.0))
 	_knight.play("idle")
 
 

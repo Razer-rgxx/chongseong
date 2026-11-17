@@ -14,6 +14,9 @@ const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
 @export var big_number_size: int = 58
 
 @export_group("낮과 밤의 빛")
+## 돌진·갈고리 때 화면 가장자리가 가운데로 빨려 드는 세기.
+@export var dash_blur: float = 0.025
+@export var hook_blur: float = 0.06
 @export var day_sun: float = 0.75
 @export var night_sun: float = 1.1
 @export var day_ambient: float = 1.0
@@ -33,6 +36,7 @@ var meta: Meta
 var _acc: float = 0.0
 var _want_attack: bool = false
 var _want_dash: bool = false
+var _want_hook: bool = false
 var _want_pull: bool = false
 var _swap_to: int = -1
 var _lord: Node3D
@@ -83,7 +87,14 @@ func _ready() -> void:
 	rules.slots_changed.connect(_refresh_cards)
 	rules.sword_broke.connect(_on_broke)
 	rules.lord_swung.connect(_on_swung)
-	rules.lord_dashed.connect(func() -> void: _sfx.play(&"dash", _lord.position, -6.0))
+	rules.lord_dashed.connect(func() -> void:
+		_sfx.play(&"dash", _lord.position, -6.0)
+		_camera.kick(4.0))
+	rules.lord_hooked.connect(func(e: Enemy) -> void:
+		_sfx.play(&"draw", _lord.position, -2.0, 1.25)
+		_sfx.play(&"dash", _lord.position, -3.0, 0.85)
+		_camera.kick(10.0)
+		_camera.add_shake(0.1))
 	rules.lord_hurt.connect(_on_lord_hurt)
 	rules.enemy_hit.connect(_on_enemy_hit)
 	rules.enemy_died.connect(_on_enemy_died)
@@ -150,6 +161,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_want_attack = true
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("hook"):
+		_want_hook = true
 	if event.is_action_pressed("pull"):
 		_want_pull = true
 	if event.is_action_pressed("swap"):
@@ -188,6 +201,7 @@ func _physics_process(delta: float) -> void:
 		rules.step(_read_input())
 		_want_attack = false
 		_want_dash = false
+		_want_hook = false
 		_want_pull = false
 		_swap_to = -1
 		_acc -= rules.dt
@@ -201,6 +215,7 @@ func _read_input() -> LordInput:
 	inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 	inp.attack = Input.is_action_pressed("attack") or _want_attack
 	inp.dash = _want_dash
+	inp.hook = _want_hook
 	inp.pull = _want_pull
 	inp.swap_to = _swap_to
 	if _camera.third():
@@ -220,6 +235,9 @@ func _process(delta: float) -> void:
 	_lord.draw(alpha, delta)
 	_sync_enemies(alpha, delta)
 	_camera.target = _lord.position
+	# 빠르게 움직일 때 화면 가장자리가 빨려 든다
+	_camera.speed_blur = hook_blur if rules.lord.hook > 0.0 else (dash_blur if rules.lord.dash > 0.0 else 0.0)
+	_camera.follow_boost = 24.0 if rules.lord.hook > 0.0 else 0.0
 	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
 	var altar_near: bool = rules.near_altar() and rules.pull_hilt == null and rules.pending == null and not rules.altar_open
 	if altar_near:

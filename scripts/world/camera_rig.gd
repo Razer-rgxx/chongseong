@@ -28,6 +28,19 @@ enum Mode { THIRD, QUARTER }
 @export var shake_meters: float = 0.9
 @export var shake_decay: float = 2.5
 
+@export_group("모션 블러")
+## 0이면 끈다. 1이면 한 프레임 동안 움직인 만큼 그대로 번진다.
+@export var motion_blur: float = 0.5
+## 이 거리(m) 안은 번지지 않는다(영주와 바로 앞의 적은 또렷하게).
+@export var blur_mask_near: float = 9.0
+## 빠르게 움직일 때 화면 가장자리가 가운데로 빨려 드는 세기(main이 돌진·갈고리 때 올린다).
+var speed_blur: float = 0.0
+## 이 값이 follow_speed보다 크면 그만큼 빨리 따라간다(갈고리로 멀리 날아갈 때 main이 올린다).
+var follow_boost: float = 0.0
+## 시야각을 잠깐 넓히는 값(도). 줄어들며 원래대로 돌아온다.
+var fov_kick: float = 0.0
+@export var fov_kick_decay: float = 18.0
+
 var target: Vector3 = Vector3.ZERO
 var zoom: float = 1.0
 var shake: float = 0.0
@@ -37,6 +50,28 @@ var pitch: float = deg_to_rad(22.0)
 var _focus: Vector3 = Vector3.ZERO
 ## 화면 흔들림 전용. 게임 규칙의 랜덤(Rules.rng)과 따로 둔다.
 var _rng := RandomNumberGenerator.new()
+var _blur: MeshInstance3D = null
+var _blur_mat: ShaderMaterial = null
+var _prev_xf: Transform3D = Transform3D.IDENTITY
+var _base_fov: float = 75.0
+var _radial: float = 0.0
+
+
+func _ready() -> void:
+	_base_fov = fov
+	_blur = MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(2.0, 2.0)
+	_blur.mesh = q
+	_blur_mat = ShaderMaterial.new()
+	_blur_mat.shader = preload("res://scripts/world/motion_blur.gdshader")
+	# 다른 반투명(베기 빛, 불꽃)보다 먼저 그려서 그것들은 번지지 않게
+	_blur_mat.render_priority = -128
+	_blur.material_override = _blur_mat
+	_blur.extra_cull_margin = 16384.0
+	_blur.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_blur)
+	_prev_xf = global_transform
 
 
 func snap() -> void:
@@ -75,7 +110,7 @@ func look(delta: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	_focus = _focus.lerp(target, minf(1.0, delta * follow_speed))
+	_focus = _focus.lerp(target, minf(1.0, delta * maxf(follow_speed, follow_boost)))
 	shake = maxf(0.0, shake - delta * shake_decay)
 	var sh: Vector3 = Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.5, 0.5), _rng.randf_range(-1, 1)) * shake * shake_meters
 	if mode == Mode.THIRD:
@@ -89,6 +124,20 @@ func _process(delta: float) -> void:
 		var off: Vector3 = Vector3(0.0, sin(p), cos(p)) * (distance / zoom)
 		global_position = _focus + off + sh
 		look_at(_focus + sh, Vector3.UP)
+	fov_kick = maxf(0.0, fov_kick - delta * fov_kick_decay)
+	fov = _base_fov + fov_kick
+	_radial = lerpf(_radial, speed_blur, 1.0 - exp(-12.0 * delta))
+	if _blur:
+		_blur.visible = motion_blur > 0.0 or _radial > 0.001
+		_blur_mat.set_shader_parameter("prev_view", Projection(_prev_xf.affine_inverse()))
+		_blur_mat.set_shader_parameter("strength", motion_blur)
+		_blur_mat.set_shader_parameter("mask_near", blur_mask_near)
+		_blur_mat.set_shader_parameter("radial", _radial)
+	_prev_xf = global_transform
+
+
+func kick(deg: float) -> void:
+	fov_kick = maxf(fov_kick, deg)
 
 
 func _unhandled_input(event: InputEvent) -> void:
