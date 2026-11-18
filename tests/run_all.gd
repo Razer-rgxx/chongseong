@@ -82,6 +82,11 @@ func _init() -> void:
 	_test_event_pilgrim()
 	_test_event_seer()
 	_test_path_replay()
+	_test_omens()
+	_test_omen_luck()
+	_test_pull_timing()
+	_test_pull_timing_miss()
+	_test_pull_timing_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -3141,7 +3146,7 @@ func _test_event_cursed() -> void:
 		if not x.cursed:
 			normal = x
 			break
-	check(is_equal_approx(r.pull_luck(h), r.pull_luck(normal) * R.cursed_luck), "저주받은 손잡이: 운 ×2")
+	check(is_equal_approx(r.pull_luck(h), r.luck() * r.omen_luck(h.omen) * R.cursed_luck) and is_equal_approx(r.pull_luck(normal), r.luck() * r.omen_luck(normal.omen)), "저주받은 손잡이: 운 ×2(조짐 배수도 그대로 곱한다)")
 	r.lord.hp = 3.0
 	r.free_pulls = 1
 	var used: Array = []
@@ -3235,16 +3240,22 @@ func _test_event_seer() -> void:
 	r.lord.hp = 40.0
 	var used: Array = []
 	r.event_used.connect(func(e: DayEvent, _x: Dictionary) -> void: used.append(e.kind))
-	check(not r.seer_used_today, "점쟁이: 쓰기 전에는 조짐을 모른다")
+	var shown: Array = [0]
+	r.omens_revealed.connect(func() -> void: shown[0] += 1)
+	var wrong: int = 0
+	for h in r.hilts:
+		wrong += 1 if h.seen_omen() != h.omen else 0
+	check(not r.seer_used_today and r.hilts.all(func(h: Hilt) -> bool: return not h.revealed and h.seen_omen() == h.shown_omen), "점쟁이: 쓰기 전에는 조짐을 모른다(겉 조짐, 틀린 것 %d개)" % wrong)
 	r.lord.pos = r.event.pos
 	_press_e(r)
 	check(is_equal_approx(r.lord.hp, 40.0 - R.seer_cost) and r.seer_used_today and used == [&"seer"], "점쟁이: 체력 10을 내면 오늘 참된 조짐(seer_used_today, event_used)")
+	check(shown[0] == 1 and r.hilts.all(func(h: Hilt) -> bool: return h.revealed and h.seen_omen() == h.omen), "점쟁이: 오늘 손잡이가 모두 참된 조짐을 보인다(omens_revealed)")
 	_press_e(r)
-	check(is_equal_approx(r.lord.hp, 40.0 - R.seer_cost), "점쟁이: 한 번만")
+	check(is_equal_approx(r.lord.hp, 40.0 - R.seer_cost) and shown[0] == 1, "점쟁이: 한 번만")
 	r.start_night()
 	r.skip_night()
 	r.choose_path(0)
-	check(not r.seer_used_today, "점쟁이: 그 낮만")
+	check(not r.seer_used_today and r.hilts.all(func(h: Hilt) -> bool: return not h.revealed), "점쟁이: 그 낮만(다음 낮 손잡이는 다시 모른다)")
 	var low := _ev_day("seer")
 	low.lord.hp = R.seer_cost
 	low.lord.pos = low.event.pos
@@ -3284,3 +3295,248 @@ func _test_path_replay() -> void:
 		hashes.append(r.state_hash())
 		logs.append(text[0])
 	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].contains("p") and logs[0].contains("e"), "갈림길·사건: 같은 시드·같은 입력이면 결과가 같다(state_hash)")
+
+
+# ---------------------------------------------------------------- 14단계: 뽑기 손맛
+
+## 손잡이 조짐: 숨은 조짐의 비율, 겉 조짐이 맞는 비율.
+func _test_omens() -> void:
+	var R := d.run
+	var n: Array[int] = [0, 0, 0, 0]
+	var same: Array[int] = [0, 0, 0, 0]
+	var near := true
+	var total: int = 0
+	for sd in 500:
+		var r := Rules.new(d, 1000 + sd)
+		for h in r.hilts:
+			n[h.omen] += 1
+			same[h.omen] += 1 if h.shown_omen == h.omen else 0
+			near = near and absi(h.shown_omen - h.omen) <= 1 and h.shown_omen >= 0 and h.shown_omen <= 3 and not h.revealed
+			total += 1
+	var wsum: float = 0.0
+	for w in R.omen_weights:
+		wsum += w
+	var ok := true
+	var text: Array[String] = []
+	for o in 4:
+		var p: float = float(n[o]) / total
+		ok = ok and absf(p - R.omen_weights[o] / wsum) < 0.02
+		text.append("%.3f" % p)
+	check(ok, "조짐: 숨은 조짐 0~3이 30/45/20/5%% 비율로 나온다(%s, %d자루)" % [", ".join(text), total])
+	# 1·2는 위아래로 다 갈 수 있어 75%, 0·3은 끝에 붙어 87.5%
+	var a1: float = float(same[1] + same[2]) / float(n[1] + n[2])
+	var a0: float = float(same[0] + same[3]) / float(n[0] + n[3])
+	var all: float = float(same[0] + same[1] + same[2] + same[3]) / total
+	check(near and absf(a1 - R.omen_shown_true) < 0.03 and absf(a0 - (R.omen_shown_true + (1.0 - R.omen_shown_true) * 0.5)) < 0.04, "조짐: 겉 조짐은 75%% 맞고 아니면 한 단계 위나 아래(1·2: %.3f, 0·3: %.3f, 모두 %.3f)" % [a1, a0, all])
+	# 같은 시드면 같은 조짐
+	var x := Rules.new(d, 77)
+	var y := Rules.new(d, 77)
+	var eq := true
+	for i in x.hilts.size():
+		eq = eq and x.hilts[i].omen == y.hilts[i].omen and x.hilts[i].shown_omen == y.hilts[i].shown_omen
+	check(eq, "조짐: 같은 시드면 같은 조짐")
+
+
+## 조짐은 그 손잡이를 뽑을 때 운에 곱한다.
+func _test_omen_luck() -> void:
+	var R := d.run
+	var r := Rules.new(d, 21)
+	var ok := true
+	for h in r.hilts:
+		ok = ok and is_equal_approx(r.pull_luck(h), r.luck() * R.omen_luck[h.omen])
+	check(ok and is_equal_approx(r.omen_luck(0), 0.7) and is_equal_approx(r.omen_luck(3), 2.0), "조짐: 뽑을 때 운 × 0.7/1.0/1.4/2.0")
+	var mean: float = 0.0
+	var wsum: float = 0.0
+	for o in 4:
+		mean += R.omen_weights[o] * R.omen_luck[o]
+		wsum += R.omen_weights[o]
+	check(absf(mean / wsum - 1.0) < 0.05, "조짐: 운 배수의 평균이 약 1(%.3f)" % (mean / wsum))
+	# 뽑기가 그 배수를 쓴다: 배수 0이면 늘 흔함, 아주 크면 늘 가장 높은 등급
+	for big in [false, true]:
+		var g := _run_data({"omen_luck": PackedFloat32Array([1e7, 1e7, 1e7, 1e7] if big else [0, 0, 0, 0])})
+		var q := Rules.new(g, 22)
+		q.debug_god = true
+		var grades: Array[int] = []
+		q.pull_started.connect(func(_h: Hilt, gr: int) -> void: grades.append(gr))
+		for k in 6:
+			q.lord.hp = 100.0
+			q.slots = [null, null]
+			_pull_once(q)
+		var top: int = d.grades.odds.size() - 1
+		check(grades.size() == 6 and grades.all(func(x: int) -> bool: return x == (top if big else 0)), "조짐: 뽑기 등급이 조짐 배수를 쓴다(%s)" % str(grades))
+
+
+## 버팀마다 누르는 방식: good = 창 가운데, late = 가운데 + 0.06초, early = 창이 열리기 전, spam = 틱마다, none = 안 누름.
+## 돌려주는 것: 뽑는 데 걸린 틱 수.
+func _pull_timed(r: Rules, mode: String, only: Array = []) -> int:
+	var h := r.nearest_hilt(100.0)
+	_stand_at(r, h)
+	var i := LordInput.new()
+	i.pull = true
+	r.step(i)
+	var ticks: int = 0
+	while r.pull_hilt != null and ticks < 300:
+		var p := LordInput.new()
+		var at: float = r.pull_t + r.dt * 0.5
+		var open: bool = r.pull_win_step > r.pull_judged
+		var c: float = (r.pull_win_open + r.pull_win_close) * 0.5
+		var want: bool = only.is_empty() or only.has(r.pull_win_step)
+		match mode:
+			"good":
+				p.pull_press = open and want and absf(at - c) <= r.dt * 0.5 + 0.0001
+			"late":
+				p.pull_press = open and want and at >= c + 0.06 - r.dt * 0.5 and at < c + 0.06 + r.dt * 0.5
+			"early":
+				p.pull_press = open and want and at < r.pull_win_open - 0.05
+			"spam":
+				p.pull_press = true
+		r.step(p)
+		ticks += 1
+	return ticks
+
+
+func _test_pull_timing() -> void:
+	var R := d.run
+	var r := Rules.new(d, 5)
+	r.debug_grade = 2
+	r.lord.hp = 50.0
+	var win: Array = []
+	var good: Array = []
+	var perf: Array = [0]
+	var steps: Array = []
+	var got: Array[Sword] = []
+	r.pull_window.connect(func(_h: Hilt, o: float, c: float) -> void: win.append([r.pull_t, o, c]))
+	r.pull_good.connect(func(_h: Hilt, k: int) -> void: good.append([k, r.pull_t]))
+	r.pull_perfect.connect(func(_h: Hilt) -> void: perf[0] += 1)
+	r.pull_step.connect(func(_h: Hilt, k: int) -> void: steps.append(k))
+	r.sword_pulled.connect(func(s: Sword) -> void: got.append(s))
+	var ticks: int = _pull_timed(r, "good")
+	check(win.size() == 2 and is_equal_approx(win[0][0], 0.0), "타이밍: 버팀마다 창 하나, 첫 창은 뽑기 시작에(%s)" % str(win))
+	var ok := win.size() == 2
+	for k in win.size():
+		ok = ok and is_equal_approx(win[k][1], R.pull_step * (k + 1) - R.pull_window) and is_equal_approx(win[k][2], R.pull_step * (k + 1) + R.pull_window)
+	check(ok, "타이밍: 창은 그 버팀이 저절로 끝나는 때 ± 0.08초")
+	check(good.size() == 2 and good[0][0] == 1 and good[1][0] == 2 and steps == [1, 2], "타이밍: 가운데에 누르면 제대로 당김(pull_good 1, 2)")
+	check(good.size() == 2 and good[0][1] >= R.pull_step - 0.0001 and good[1][1] >= R.pull_step * 2 - 0.0001, "타이밍: 제대로 당기면 그 버팀이 끝난다(그 때까지 당긴다)")
+	check(perf[0] == 1 and r.pull_all_good, "타이밍: 버팀을 모두 제대로 당기면 pull_perfect")
+	check(is_equal_approx(r.lord.hp, 50.0 - R.pull_cost + 2.0 * R.pull_good_refund), "타이밍: 제대로 당길 때마다 체력 1을 돌려받는다(%.1f)" % r.lord.hp)
+	var slow := Rules.new(d, 5)
+	slow.debug_grade = 2
+	var none_ticks: int = _pull_timed(slow, "none")
+	check(ticks <= none_ticks, "타이밍: 제대로 당겨도 늦어지지 않는다(%d틱, 안 누르면 %d틱)" % [ticks, none_ticks])
+	if got.size() == 1:
+		var s: Sword = got[0]
+		var base: float = Sword.new(s.data, d).max_durability
+		check(not s.breakable() or (is_equal_approx(s.max_durability, maxf(base + 1.0, roundf(base * (1.0 + R.pull_perfect_durability)))) and s.durability == s.max_durability), "타이밍: 모두 제대로면 그 검의 최대 내구 +10%%(%s → %s)" % [base, s.max_durability])
+	else:
+		check(false, "타이밍: 검이 하나 나온다")
+	# 늦게(가운데 + 0.06초) 눌러도 창 안이면 친다
+	var l := Rules.new(d, 5)
+	l.debug_grade = 3
+	l.lord.hp = 50.0
+	var lg: Array = [0]
+	var lp: Array = [0]
+	l.pull_good.connect(func(_h: Hilt, _k: int) -> void: lg[0] += 1)
+	l.pull_perfect.connect(func(_h: Hilt) -> void: lp[0] += 1)
+	_pull_timed(l, "late")
+	check(lg[0] == 3 and lp[0] == 1 and is_equal_approx(l.lord.hp, 50.0 - R.pull_cost + 3.0), "타이밍: 창 안이면 늦게 눌러도 제대로 당김(3번, 모두 제대로)")
+	# 한 번만 제대로: 돌려받기는 1, 모두 제대로는 아니다
+	var o := Rules.new(d, 5)
+	o.debug_grade = 2
+	o.lord.hp = 50.0
+	var op: Array = [0]
+	o.pull_perfect.connect(func(_h: Hilt) -> void: op[0] += 1)
+	var og: Array = []
+	o.sword_pulled.connect(func(s: Sword) -> void: og.append(s))
+	_pull_timed(o, "good", [2])
+	check(op[0] == 0 and o.pull_goods == 1 and is_equal_approx(o.lord.hp, 50.0 - R.pull_cost + 1.0), "타이밍: 하나만 맞히면 체력 1만, 모두 제대로는 아니다")
+	if og.size() == 1:
+		check(is_equal_approx(og[0].max_durability, Sword.new(og[0].data, d).max_durability), "타이밍: 모두 제대로가 아니면 내구 보너스 없음")
+	# 버팀이 하나뿐이면 모두 제대로가 없다(최소 2번)
+	var one := Rules.new(d, 5)
+	one.debug_grade = 1
+	one.lord.hp = 50.0
+	var p1: Array = [0]
+	one.pull_perfect.connect(func(_h: Hilt) -> void: p1[0] += 1)
+	_pull_timed(one, "good")
+	check(one.pull_goods == 1 and p1[0] == 0 and not one.pull_all_good, "타이밍: 버팀이 한 번이면 모두 제대로는 없다(최소 2번)")
+	# 흔함은 버티지 않으니 창도 없다
+	var zero := Rules.new(d, 5)
+	zero.debug_grade = 0
+	var w0: Array = [0]
+	zero.pull_window.connect(func(_h: Hilt, _o: float, _c: float) -> void: w0[0] += 1)
+	_pull_timed(zero, "spam")
+	check(w0[0] == 0 and zero.pull_goods == 0, "타이밍: 흔함은 창이 없다")
+	# 가득 찬 체력: 뽑기 값과 함께 셈해서 버리지 않는다
+	var full := Rules.new(d, 5)
+	full.debug_grade = 2
+	_pull_timed(full, "good")
+	check(is_equal_approx(full.lord.hp, full.max_hp() - R.pull_cost + 2.0), "타이밍: 체력이 가득 차 있어도 돌려받기를 버리지 않는다(%.1f)" % full.lord.hp)
+	# 공짜 뽑기: 체력은 쓰지 않고 돌려받기만(최대치까지)
+	var fr := Rules.new(d, 5)
+	fr.debug_grade = 2
+	fr.free_pulls = 1
+	fr.lord.hp = 40.0
+	_pull_timed(fr, "good")
+	check(fr.free_pulls == 0 and is_equal_approx(fr.lord.hp, 42.0), "타이밍: 공짜 뽑기도 체력 1씩 돌려받는다")
+
+
+## 못 맞혀도 손해는 없고, 버팀마다 한 번만 판정한다.
+func _test_pull_timing_miss() -> void:
+	var R := d.run
+	var base := Rules.new(d, 5)
+	base.debug_grade = 3
+	base.lord.hp = 50.0
+	var bt: int = _pull_timed(base, "none")
+	var bs: Sword = base.slots[0]
+	for mode in ["none", "early", "spam"]:
+		var r := Rules.new(d, 5)
+		r.debug_grade = 3
+		r.lord.hp = 50.0
+		var miss: Array = []
+		var good: Array = [0]
+		var win: Array = [0]
+		r.pull_miss.connect(func(_h: Hilt, k: int) -> void: miss.append(k))
+		r.pull_good.connect(func(_h: Hilt, _k: int) -> void: good[0] += 1)
+		r.pull_window.connect(func(_h: Hilt, _o: float, _c: float) -> void: win[0] += 1)
+		var t: int = _pull_timed(r, mode)
+		var s: Sword = r.slots[0]
+		check(good[0] == 0 and miss == [1, 2, 3] and win[0] == 3, "타이밍(%s): 놓치면 pull_miss, 버팀마다 한 번만(%s)" % [mode, str(miss)])
+		check(t == bt and is_equal_approx(r.lord.hp, 50.0 - R.pull_cost) and s != null and bs != null and s.data == bs.data and s.max_durability == bs.max_durability and r.state_hash() == base.state_hash(), "타이밍(%s): 못 맞혀도 손해 없음(시간·체력·검·확률 같다)" % mode)
+	# 일찍 누르면 그 창은 끝까지 닫히지 않은 채로 놓친 것이고, 다음 창은 그 창이 닫힌 뒤에 열린다
+	var e := Rules.new(d, 5)
+	e.debug_grade = 2
+	var at: Array = []
+	e.pull_window.connect(func(_h: Hilt, _o: float, _c: float) -> void: at.append(e.pull_t))
+	_pull_timed(e, "early")
+	check(at.size() == 2 and at[1] > R.pull_step + R.pull_window - 0.0001, "타이밍: 일찍 눌러 놓치면 다음 창은 앞 창이 닫힌 뒤(%s)" % str(at))
+
+
+## 같은 시드·같은 누름이면 같다(조짐, 판정, 돌려받기).
+func _test_pull_timing_replay() -> void:
+	var hashes: Array[int] = []
+	var logs: Array[String] = []
+	for run_i in 2:
+		var r := Rules.new(d, 88)
+		r.debug_god = true
+		var text: Array[String] = [""]
+		r.pull_window.connect(func(_h: Hilt, o: float, _c: float) -> void: text[0] += "w%d:%.3f " % [r.tick, o])
+		r.pull_good.connect(func(_h: Hilt, k: int) -> void: text[0] += "g%d:%d " % [r.tick, k])
+		r.pull_miss.connect(func(_h: Hilt, k: int) -> void: text[0] += "m%d:%d " % [r.tick, k])
+		r.pull_perfect.connect(func(_h: Hilt) -> void: text[0] += "p%d " % r.tick)
+		r.sword_pulled.connect(func(s: Sword) -> void: text[0] += "s%d:%d:%s " % [r.tick, s.data.id, s.max_durability])
+		var rec := RandomNumberGenerator.new()
+		rec.seed = 9
+		for k in 900:
+			# 가까운 손잡이 쪽으로 걸어가며(조금 흔들리게) 뽑고, 뽑는 동안 아무 때나 누른다
+			var h := r.nearest_hilt(100.0)
+			var to: Vector2 = (h.pos - r.lord.pos).normalized() if h else Vector2.ZERO
+			var i := _inp(to + Vector2(rec.randf_range(-0.4, 0.4), rec.randf_range(-0.4, 0.4)))
+			i.pull = rec.randf() < 0.3
+			i.pull_press = rec.randf() < 0.12
+			r.step(i)
+			if r.pending:
+				r.choose(rec.randi_range(-1, 1))
+		hashes.append(r.state_hash())
+		logs.append(text[0])
+	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].contains("w") and logs[0].contains("s"), "타이밍: 같은 시드·같은 누름이면 결과가 같다(state_hash)")

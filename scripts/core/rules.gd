@@ -10,6 +10,7 @@ extends RefCounted
 ## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)의 행동은 Foes(foes.gd)가 맡는다.
 ## 12단계 밤마다 목표 하나(버티기·지키기·사냥·포위)와 구역 규칙 하나(없음·짙은 안개·불씨 땅·무덤). docs/content.md "12단계".
 ## 13단계 갈림길(새벽에 다음 구역의 길 두 개 중 고른다, choose_path)과 낮 사건(대장장이·저주받은 손잡이·순례자·점쟁이).
+## 14단계 뽑기 손맛: 버팀 타이밍(pull_window·pull_good·pull_perfect·pull_miss, LordInput.pull_press)과 손잡이 조짐(Hilt.omen, 운 배수).
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -18,6 +19,15 @@ signal pull_started(hilt: Hilt, grade: int)
 signal pull_step(hilt: Hilt, step: int)
 signal pull_refused(reason: String)
 signal sword_pulled(sword: Sword)
+## 버팀 타이밍(14단계). step번째 버팀의 창이 열린다(open_at ~ close_at, 시각은 pull_t의 시계).
+## 창의 가운데가 그 버팀이 저절로 끝나는 때다. 창은 앞 버팀이 판정된 뒤(뽑기 시작이면 바로) 하나씩 보낸다.
+signal pull_window(hilt: Hilt, open_at: float, close_at: float)
+## 창 안에서 눌렀다(제대로 당김) / 버팀을 모두 제대로 당겼다(pull_perfect_min번 이상) / 그 버팀을 놓쳤다(일찍 눌렀거나 창이 닫혔다).
+signal pull_good(hilt: Hilt, step: int)
+signal pull_perfect(hilt: Hilt)
+signal pull_miss(hilt: Hilt, step: int)
+## 점쟁이(14단계): 오늘 손잡이의 참된 조짐이 드러났다(Hilt.revealed, seen_omen()).
+signal omens_revealed()
 signal choice_needed(sword: Sword)
 signal slots_changed()
 signal sword_broke(slot: int, sword: Sword)
@@ -100,6 +110,16 @@ var pull_hilt: Hilt = null
 var pull_grade: int = 0
 var pull_t: float = 0.0
 var pull_steps: int = 0
+## 버팀 타이밍(14단계): 판정이 끝난 버팀 수, 그중 제대로 당긴 수, 창을 보낸 버팀 번호(0이면 아직 없음)와 그 창,
+## 모두 제대로 당겼는지(pull_perfect를 보냈다).
+var pull_judged: int = 0
+var pull_goods: int = 0
+var pull_win_step: int = 0
+var pull_win_open: float = 0.0
+var pull_win_close: float = 0.0
+var pull_all_good: bool = false
+## 다음 창을 보내도 되는 때(pull_t). 제대로 당기면 바로, 일찍 눌러 놓치면 그 창이 닫힌 뒤.
+var _next_win_at: float = 0.0
 ## 두 칸이 다 차서 어디에 들지 기다리는 검. 고르기 전에는 시간이 멈춘다.
 var pending: Sword = null
 var won: bool = false
@@ -185,7 +205,7 @@ var day_luck: float = 1.0
 var path_shards: int = 0
 ## 이 낮의 사건(없으면 null). 쓰면 used가 켜지고 밤이 오면 null.
 var event: DayEvent = null
-## 점쟁이를 썼다: 오늘 손잡이의 참된 조짐이 보인다(14단계가 쓴다).
+## 점쟁이를 썼다: 오늘 손잡이의 참된 조짐이 보인다(손잡이마다 Hilt.revealed, omens_revealed).
 var seer_used_today: bool = false
 ## 저주받은 손잡이를 뽑았다: 이번 밤 새로 나오는 적의 체력과 피해 ×cursed_enemies.
 var cursed_night: bool = false
@@ -268,7 +288,7 @@ func step(input: LordInput = null) -> void:
 	if pending != null or altar_open or path_open:
 		return
 	if pull_hilt != null:
-		_step_pull()
+		_step_pull(input)
 		return
 	moves.advance(dt)
 	powers.tick(dt)
@@ -350,6 +370,7 @@ func _new_day(reward: StringName = &"") -> void:
 		h.id = _new_id()
 		h.pos = p
 		h.tilt = rng.randf_range(-0.25, 0.25)
+		_roll_omen(h)
 		hilts.append(h)
 	altar = null
 	if zone >= R.altar_from_zone:
@@ -430,9 +451,37 @@ func nearest_hilt(reach: float) -> Hilt:
 	return best
 
 
-## 그 손잡이를 뽑을 때의 운(저주받은 손잡이는 ×cursed_luck).
+## 그 손잡이를 뽑을 때의 운: 운 × 숨은 조짐의 배수(14단계) × (저주받은 손잡이면 cursed_luck).
 func pull_luck(h: Hilt) -> float:
-	return luck() * (data.run.cursed_luck if h and h.cursed else 1.0)
+	if h == null:
+		return luck()
+	return luck() * omen_luck(h.omen) * (data.run.cursed_luck if h.cursed else 1.0)
+
+
+## 조짐(0~3)의 운 배수.
+func omen_luck(o: int) -> float:
+	var t := data.run.omen_luck
+	return t[clampi(o, 0, t.size() - 1)] if not t.is_empty() else 1.0
+
+
+## 손잡이가 꽂힐 때 숨은 조짐(omen_weights)과 겉 조짐(omen_shown_true만큼 맞고, 아니면 한 단계 위나 아래)을 정한다.
+func _roll_omen(h: Hilt) -> void:
+	var R := data.run
+	var total: float = 0.0
+	for w in R.omen_weights:
+		total += w
+	var x: float = rng.randf() * total
+	h.omen = R.omen_weights.size() - 1
+	for i in R.omen_weights.size():
+		x -= R.omen_weights[i]
+		if x < 0.0:
+			h.omen = i
+			break
+	h.shown_omen = h.omen
+	if rng.randf() >= R.omen_shown_true:
+		var top: int = maxi(0, R.omen_weights.size() - 1)
+		h.shown_omen = clampi(h.omen + (1 if rng.randf() < 0.5 else -1), 0, top)
+	h.revealed = false
 
 
 func pull_duration() -> float:
@@ -463,16 +512,41 @@ func _try_pull() -> void:
 	pull_grade = debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))
 	pull_t = 0.0
 	pull_steps = 0
+	pull_judged = 0
+	pull_goods = 0
+	pull_win_step = 0
+	pull_win_open = 0.0
+	pull_win_close = 0.0
+	pull_all_good = false
+	_next_win_at = 0.0
 	pull_started.emit(h, pull_grade)
+	_open_window()
+
+
+## k번째 버팀이 저절로 끝나는 때(pull_t의 시계).
+func pull_step_at(k: int) -> float:
+	return float(k) * data.run.pull_step
 
 
 ## 등급이 높을수록 오래 버틴다. 한 단계 버틸 때마다 pull_step 신호가 온다.
-func _step_pull() -> void:
+## 버팀 타이밍(14단계): 버팀마다 창(그 버팀이 끝나는 때 ± pull_window)이 하나 열린다. 눌린 때는 이 틱 사이의 가운데로 친다.
+## 창 안에서 누르면 제대로 당김: 일찍이면 그 버팀이 바로 끝나고(pull_t를 끝나는 때로 당긴다), 늦어도(이미 끝났어도) 친다.
+## 버팀마다 한 번만 판정한다: 창이 열리기 전에 누르면 그 버팀은 놓친 것(손해는 없다).
+func _step_pull(input: LordInput = null) -> void:
+	var R := data.run
+	var press_at: float = pull_t + dt * 0.5
 	pull_t += dt
-	var st: int = mini(pull_grade, int(pull_t / data.run.pull_step))
-	if st > pull_steps:
-		pull_steps = st
-		pull_step.emit(pull_hilt, st)
+	if input and input.pull_press:
+		_judge_press(press_at)
+	while pull_steps < pull_grade and pull_t >= pull_step_at(pull_steps + 1) - 0.0001:
+		pull_steps += 1
+		pull_step.emit(pull_hilt, pull_steps)
+	# 누르지 않고 창이 닫혔다
+	if pull_win_step > pull_judged and pull_t > pull_win_close:
+		pull_judged = pull_win_step
+		_next_win_at = pull_win_close
+		pull_miss.emit(pull_hilt, pull_judged)
+	_open_window()
 	if pull_t < pull_duration():
 		return
 	var h := pull_hilt
@@ -484,16 +558,56 @@ func _step_pull() -> void:
 		free_pulls -= 1
 	else:
 		lord.hp -= pull_cost()
+	# 제대로 당긴 만큼 돌려받는다(뽑기 값과 함께 셈해서 가득 찬 체력에서도 버리지 않는다)
+	if pull_goods > 0:
+		lord.hp = minf(max_hp(), lord.hp + R.pull_good_refund * pull_goods)
 	pulls += 1
 	best_grade = maxi(best_grade, pull_grade)
 	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
 	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
 	powers.on_pulled(s)
+	# 모두 제대로 당겼다: 최대 내구 +10%(반올림, 적어도 1). 언덕의 첫 검 뒤, 저주의 절반 앞
+	if pull_all_good and s.breakable():
+		s.max_durability = maxf(s.max_durability + 1.0, roundf(s.max_durability * (1.0 + R.pull_perfect_durability)))
+		s.durability = s.max_durability
 	if _pull_cursed:
 		_pull_cursed = false
 		_cursed_pulled(h, s)
 	sword_pulled.emit(s)
 	_receive(s)
+
+
+## 뽑는 동안 누른 것을 판정한다(at: 눌린 때, pull_t의 시계). 지금 창의 버팀을 한 번만 판정한다.
+func _judge_press(at: float) -> void:
+	var k: int = pull_win_step
+	if k == 0 or k <= pull_judged:
+		return
+	pull_judged = k
+	if at < pull_win_open or at > pull_win_close:
+		# 창 밖: 그 버팀은 놓쳤다. 다음 창은 이 창이 닫힌 뒤
+		_next_win_at = pull_win_close
+		pull_miss.emit(pull_hilt, k)
+		return
+	pull_goods += 1
+	# 일찍 눌렀으면 그 버팀이 바로 끝난다
+	pull_t = maxf(pull_t, pull_step_at(k))
+	_next_win_at = pull_t
+	pull_good.emit(pull_hilt, k)
+	if pull_goods == pull_grade and pull_grade >= data.run.pull_perfect_min:
+		pull_all_good = true
+		pull_perfect.emit(pull_hilt)
+
+
+## 앞 버팀이 판정됐고 다음 버팀이 남았으면 그 창을 연다(pull_window).
+func _open_window() -> void:
+	if pull_hilt == null or pull_win_step > pull_judged or pull_judged >= pull_grade or pull_t < _next_win_at:
+		return
+	pull_win_step = pull_judged + 1
+	var c: float = pull_step_at(pull_win_step)
+	pull_win_open = c - data.run.pull_window
+	pull_win_close = c + data.run.pull_window
+	_next_win_at = INF
+	pull_window.emit(pull_hilt, pull_win_open, pull_win_close)
 
 
 func _receive(s: Sword) -> void:
@@ -1392,10 +1506,15 @@ func _use_event(ev: DayEvent) -> void:
 		&"seer":
 			lord.hp -= R.seer_cost
 			seer_used_today = true
+			# 오늘 손잡이의 겉 조짐이 참된 조짐이 된다(14단계)
+			for h in hilts:
+				h.revealed = true
 			result = {"cost": R.seer_cost}
 	ev.used = true
 	event_used.emit(ev, result)
 	event_gone.emit(ev)
+	if ev.kind == &"seer":
+		omens_revealed.emit()
 	if ev.kind == &"pilgrim" or ev.kind == &"smith":
 		slots_changed.emit()
 
@@ -1517,4 +1636,6 @@ func state_hash() -> int:
 	for h in hilts:
 		if h.cursed:
 			parts.append_array([h.id, h.gone])
+		parts.append_array([h.omen, h.shown_omen, h.revealed])
+	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
 	return hash(str(parts))

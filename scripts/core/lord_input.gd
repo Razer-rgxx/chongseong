@@ -13,5 +13,7 @@ var dash: bool = false
 var hook: bool = false
 ## 가까운 꽂힌 검을 뽑는다(낮).
 var pull: bool = false
+## 뽑는 동안 이 틱에 E나 좌클릭을 눌렀다(누른 순간만, 버팀 타이밍 판정에 쓴다. 14단계).
+var pull_press: bool = false
 ## 다른 칸의 검으로 바꿔 쥔다. -1은 그대로, 0이나 1은 그 칸으로.
 var swap_to: int = -1

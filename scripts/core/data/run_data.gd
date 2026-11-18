@@ -27,6 +27,20 @@ extends Resource
 @export var hilt_spacing: float = 2.2
 @export var hilt_clear: float = 2.5
 
+@export_group("낮: 뽑기 손맛(14단계)")
+## 버팀 타이밍: k번째 버팀은 뽑기 시작부터 k × pull_step초에 저절로 끝난다. 그 때 ± pull_window초 안에
+## E나 좌클릭을 누르면 제대로 당김(버팀이 바로 끝나고 체력 pull_good_refund를 돌려받는다). 버팀마다 한 번만 판정한다.
+@export var pull_window: float = 0.08
+@export var pull_good_refund: float = 1.0
+## 버팀을 모두 제대로 당기면(버팀이 pull_perfect_min번 이상일 때) 뽑은 검의 최대 내구 × (1 + pull_perfect_durability).
+@export var pull_perfect_durability: float = 0.1
+@export var pull_perfect_min: int = 2
+## 손잡이 조짐 0~3: 숨은 조짐이 나올 비율(가중치)과 그 손잡이를 뽑을 때 운에 곱하는 값.
+@export var omen_weights: PackedFloat32Array = PackedFloat32Array([30, 45, 20, 5])
+@export var omen_luck: PackedFloat32Array = PackedFloat32Array([0.7, 1.0, 1.4, 2.0])
+## 겉으로 보이는 조짐이 숨은 조짐과 같을 확률. 아니면 한 단계 위나 아래(반반, 0~3을 넘으면 끝에 붙는다).
+@export var omen_shown_true: float = 0.75
+
 @export_group("낮: 제단")
 ## 이 구역부터(0부터 센다) 낮마다 숫돌 제단이 하나 선다.
 @export var altar_from_zone: int = 1
