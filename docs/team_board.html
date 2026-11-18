@@ -140,7 +140,7 @@ code.id { color: var(--line); font-size: 12.5px; }
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
   stage: "11~14단계: 적 행동 · 밤 목표 · 낮 사건과 갈림길 · 뽑기 손맛 (설계서 docs/content.md)",
-  updated: "2026-11-18 14:05",
+  updated: "2026-11-18 18:00",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
@@ -153,12 +153,12 @@ const STATE = {
       does: ["모양: 몸, 소품, 재질, 아이콘(코드로 그린 SVG)", "움직임: 코드 곡선과 Mixamo 동작 위에 얹기", "효과: 불똥, 먼지, 땅의 표시, 소리", "확인용 갤러리 장면"],
       files: ["scripts/enemies/enemy_art.gd · enemy_motion.gd", "scripts/world/enemy_fx.gd", "scripts/world/night_art.gd · night_fx.gd", "scripts/world/event_art.gd · event_fx.gd · assets/ui/map/*.svg", "scripts/world/omen_art.gd · pull_timing_fx.gd · scripts/lord/pull_motion.gd", "scripts/debug/*_gallery.gd"],
       gets: "설계서 docs/content.md", gives: "파일 머리의 API → 기능팀이 잇는다",
-      note: "11단계 끝(아트 8c8aef2 · 모션 3bd211a · 이펙트 마무리 중). 12·13단계와 14단계를 두 에이전트가 동시에 만드는 중." },
+      note: "11단계 끝(아트 8c8aef2 · 모션 3bd211a · 이펙트 426ea2e). 12·13단계와 14단계를 두 에이전트가 동시에 만드는 중(사용량 한도로 한 번 멈췄다가 이어서)." },
     { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
       does: ["규칙과 수치(.tres)", "신호, 화면 연결(EnemyView·main·hud)", "테스트, GDD·CLAUDE.md"],
       files: ["scripts/core/", "data/", "scripts/enemies/enemy_view.gd", "scenes/world/main.gd", "tests/", "docs/"],
       gets: "모양팀이 만든 것 전부", gives: "게임에서 도는 단계",
-      note: "11단계: 새 적 5종의 규칙(활·방패·돌진·자폭·부르기), 화살, 화면 연결, 테스트. 끝나면 12 → 13 → 14 차례로." }
+      note: "11단계 끝(f635916, 테스트 312 → 367). 지금 12단계: 밤 목표 4가지와 구역 규칙 3가지. 다음 13 → 14." }
   ],
   // 동작별 팀 진행: [아트, 모션, 이펙트, 기능]
   moves: [
@@ -177,6 +177,9 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-18 18:00", "11단계 끝: 새 적 5종(활잡이·방패병·돌격병·자폭병·부르는 자)이 2~6구역 밤에 섞여 나온다. 테스트 367 통과, 푸시. 기능팀 12단계 시작."],
+    ["11-18 17:41", "사용량 한도가 풀려 세 팀을 이어서 돌림."],
+    ["11-18 14:30", "세 팀 모두 사용량 한도(5시간)로 멈춤. 만든 파일은 남음."],
     ["11-18 14:05", "사용자: 팀을 합치고 빠르게. → 모양팀(아트·모션·이펙트)과 기능팀 둘로. 동시에: 11단계 기능팀, 12·13단계 모양팀, 14단계 모양팀, 11단계 이펙트 마무리."],
     ["11-18 13:40", "서버가 다시 켜지면서 이펙트팀이 멈춤(파일은 남음) → 이어서 마무리."],
     ["11-18 09:05", "11단계 모션 끝: 활 당겨 쏘기, 방패 들고 막기·튕겨 열리기, 돌격병 웅크림·질주·비틀거림, 자폭병 부풀며 떨기, 부르는 자 지팡이 내리치기. 이펙트팀 시작."],
