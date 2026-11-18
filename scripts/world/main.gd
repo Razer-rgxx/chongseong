@@ -57,7 +57,9 @@ var _fx := HitFx.new()
 var _pfx := PowerFx.new()
 var _pull_fx := PullFx.new()
 ## 버팀 타이밍 고리(14단계). Rules의 pull_window·pull_good·pull_perfect·pull_miss를 받는다.
-var _timing_fx := PullTimingFx.new()
+## 제대로 당기면 다음 창이 바로 열리는데, 하나는 새 창에 앞 고리를 지우므로 둘을 번갈아 쓴다(k번째 버팀은 k % 2).
+## 그래서 닫히는 고리의 번쩍임과 다음 고리가 함께 보인다.
+var _timing_fx: Array[PullTimingFx] = [PullTimingFx.new(), PullTimingFx.new()]
 ## 좌클릭 동작 20가지와 속성의 효과(판정 모양, 날아가는 것, 착지 먼지 …). Rules의 move_* 신호를 받는다.
 var _move_fx := MoveFx.new()
 ## 새 적 5종의 효과(겨눈 선, 화살, 방패 불똥, 돌진 길, 심지와 폭발, 부르는 원). Rules의 enemy_act·enemy_projectile_* 신호를 받는다.
@@ -114,7 +116,8 @@ func _ready() -> void:
 	add_child(_pfx)
 	_pull_fx.env = _env.environment
 	add_child(_pull_fx)
-	add_child(_timing_fx)
+	for fx in _timing_fx:
+		add_child(fx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	add_child(_enemy_fx)
@@ -145,10 +148,10 @@ func _ready() -> void:
 		_sfx.play(&"thump", _lord.position, -10.0)
 		_pull_fx.begin(Grid.cells_to_world(h.pos), h.id))
 	rules.pull_step.connect(_on_pull_step)
-	rules.pull_window.connect(func(h: Hilt, o: float, c: float) -> void: _timing_fx.on_window(Grid.cells_to_world(h.pos), o, c, rules.pull_t))
+	rules.pull_window.connect(func(h: Hilt, o: float, c: float) -> void: _timing_fx[rules.pull_win_step % 2].on_window(Grid.cells_to_world(h.pos), o, c, rules.pull_t))
 	rules.pull_good.connect(_on_pull_good)
 	rules.pull_perfect.connect(_on_pull_perfect)
-	rules.pull_miss.connect(func(_h: Hilt, _k: int) -> void: _timing_fx.on_miss())
+	rules.pull_miss.connect(func(_h: Hilt, k: int) -> void: _timing_fx[k % 2].on_miss())
 	rules.omens_revealed.connect(func() -> void:
 		for v: HiltView in _hilts.values():
 			if is_instance_valid(v):
@@ -340,7 +343,8 @@ func _process(delta: float) -> void:
 	_lord.draw(alpha, delta)
 	# 타이밍 고리의 시계를 규칙에 맞춘다(눌린 때는 그 틱 사이의 가운데로 판정된다)
 	if rules.pull_hilt != null:
-		_timing_fx.sync(rules.pull_t + alpha * rules.dt)
+		for fx in _timing_fx:
+			fx.sync(rules.pull_t + alpha * rules.dt)
 	_move_fx.draw(alpha)
 	_enemy_fx.draw(alpha)
 	_sync_enemies(alpha, delta)
@@ -625,7 +629,7 @@ func _on_pull_step(_h: Hilt, st: int) -> void:
 ## 제대로 당김(14단계): 고리가 닫히며 불똥, 영주가 한 번 크게 젖힌다(LordView), 짧은 쿵.
 func _on_pull_good(h: Hilt, st: int) -> void:
 	var at: Vector3 = Grid.cells_to_world(h.pos)
-	_timing_fx.on_good(at, st)
+	_timing_fx[st % 2].on_good(at, st)
 	_sfx.play(&"thump", at, -1.0, 0.8)
 	_camera.kick(3.0 + st)
 	_camera.add_shake(0.08)
@@ -634,7 +638,7 @@ func _on_pull_good(h: Hilt, st: int) -> void:
 ## 버팀을 모두 제대로 당겼다: 더 센 불똥·빛·충격파. 뽑은 뒤 이름 알림에 내구가 늘었다고 붙인다.
 func _on_pull_perfect(h: Hilt) -> void:
 	var at: Vector3 = Grid.cells_to_world(h.pos)
-	_timing_fx.on_perfect(at)
+	_timing_fx[rules.pull_judged % 2].on_perfect(at)
 	_sfx.play(&"hit_big", at, -5.0, 0.7)
 	_camera.kick(8.0)
 	_camera.add_shake(0.25)
@@ -648,7 +652,8 @@ func _reveal_video(grade: int) -> String:
 
 
 func _on_pulled(s: Sword) -> void:
-	_timing_fx.clear()
+	for fx in _timing_fx:
+		fx.clear()
 	meta.note_found(s.data.id)
 	meta.save()
 	var c: Color = data.grades.colors[s.grade]
