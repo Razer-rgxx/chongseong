@@ -454,7 +454,7 @@ func _on_day(_zone: int) -> void:
 	# 지난 밤의 결과와 새벽 회복은 갈림길 창이 보였다. 여기서는 고른 길의 보상과 이 낮의 것
 	var parts: Array[String] = []
 	if rules.path_reward != &"":
-		parts.append("길의 보상: " + _path_reward_name(rules.path_reward))
+		parts.append("길의 보상: " + _path_reward_name(rules.path_reward, true))
 	parts.append("뽑기 운 ×%s" % str(snappedf(rules.luck(), 0.01)))
 	if rules.altar:
 		parts.append("숫돌 제단이 섰다")
@@ -840,7 +840,8 @@ func _path_card(c: Dictionary) -> Dictionary:
 	}
 
 
-func _path_reward_name(r: StringName) -> String:
+## now면 그 낮에 받은 것(운은 "오늘").
+func _path_reward_name(r: StringName, now: bool = false) -> String:
 	var R := data.run
 	match r:
 		&"pulls":
@@ -850,7 +851,7 @@ func _path_reward_name(r: StringName) -> String:
 		&"whet":
 			return "두 칸 검의 내구를 모두 채운다"
 		&"luck":
-			return "다음 낮 뽑기 운 ×%s" % str(R.reward_luck)
+			return "%s 뽑기 운 ×%s" % ["오늘" if now else "다음 낮", str(R.reward_luck)]
 		&"shards":
 			return "판이 끝날 때 조각 +%d" % R.reward_shards
 	return ""
