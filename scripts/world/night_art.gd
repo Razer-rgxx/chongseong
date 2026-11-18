@@ -29,11 +29,11 @@ const FLAME_SHADER := """shader_type spatial;
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
 uniform float power = 1.0;
 uniform float seed = 0.0;
-uniform float energy = 1.5;
+uniform float energy = 1.1;
 uniform float speed = 1.0;
-uniform vec4 core : source_color = vec4(1.0, 0.8, 0.5, 1.0);
-uniform vec4 mid : source_color = vec4(1.0, 0.42, 0.1, 1.0);
-uniform vec4 edge : source_color = vec4(0.5, 0.08, 0.02, 1.0);
+uniform vec4 core : source_color = vec4(1.0, 0.64, 0.28, 1.0);
+uniform vec4 mid : source_color = vec4(0.95, 0.3, 0.06, 1.0);
+uniform vec4 edge : source_color = vec4(0.42, 0.05, 0.015, 1.0);
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
 	vec2 i = floor(p);
@@ -55,19 +55,19 @@ void fragment() {
 	float v = 1.0 - UV.y;
 	float t = TIME * speed;
 	float x = UV.x - 0.5;
-	x += (fbm(vec2(UV.x * 2.0 + seed, v * 1.6 - t * 1.3)) - 0.5) * 0.34 * v;
-	float n = fbm(vec2(x * 5.0 + seed * 3.1, v * 3.2 - t * 2.4));
-	float n2 = vn(vec2(x * 11.0 - seed, v * 7.0 - t * 4.0));
-	float w = 0.46 * pow(clamp(1.0 - v, 0.0, 1.0), 0.55);
-	float shape = 1.0 - smoothstep(w * 0.25, w, abs(x));
+	x += (vn(vec2(seed, v * 1.5 - t * 1.1)) - 0.5) * 0.22 * v;
+	float n = fbm(vec2(x * 4.0 + seed * 3.1, v * 2.4 - t * 2.6));
+	float n2 = fbm(vec2(x * 9.0 - seed, v * 5.0 - t * 4.2));
+	float w = 0.5 * pow(clamp(1.0 - v, 0.0, 1.0), 0.65);
+	float shape = 1.0 - smoothstep(0.0, w, abs(x));
 	float p = max(power, 0.001);
-	float f = shape * (0.55 + n * 0.85 + n2 * 0.2) - v * (1.05 / p) * (0.55 + 0.45 * n);
-	f *= smoothstep(0.0, 0.06, v);
+	float f = shape * 1.3 - v * (1.2 / p) + (n - 0.5) * 1.35 + (n2 - 0.5) * 0.5;
+	f *= smoothstep(0.0, 0.08, v);
 	f = clamp(f, 0.0, 1.0);
-	vec3 c = mix(edge.rgb, mid.rgb, smoothstep(0.03, 0.32, f));
-	c = mix(c, core.rgb, smoothstep(0.42, 0.85, f));
-	ALBEDO = c * energy;
-	ALPHA = clamp(smoothstep(0.015, 0.22, f) * clamp(power * 2.5, 0.0, 1.0), 0.0, 1.0);
+	vec3 c = mix(edge.rgb, mid.rgb, smoothstep(0.05, 0.4, f));
+	c = mix(c, core.rgb, smoothstep(0.55, 0.95, f));
+	ALBEDO = c * energy * (0.55 + 0.45 * f);
+	ALPHA = clamp(smoothstep(0.0, 0.3, f) * clamp(power * 2.5, 0.0, 1.0), 0.0, 1.0);
 }
 """
 
@@ -78,7 +78,7 @@ render_mode blend_mix, cull_disabled, depth_draw_never, specular_disabled, shado
 uniform vec4 color : source_color = vec4(0.36, 0.035, 0.022, 1.0);
 uniform vec4 hot : source_color = vec4(0.62, 0.08, 0.035, 1.0);
 uniform float fade = 1.0;
-uniform float energy = 1.3;
+uniform float energy = 0.65;
 uniform float spin = 0.12;
 uniform float seed = 0.0;
 varying vec2 lp;
@@ -99,7 +99,7 @@ void fragment() {
 	float n2 = vn(vec2(a * 9.0, r * 22.0) + seed * 1.3);
 	float rr = r + (n - 0.5) * 0.05;
 	float ring = smoothstep(0.76, 0.84, rr) * (1.0 - smoothstep(0.9, 0.97, rr));
-	float broken = smoothstep(0.22, 0.42, n2 * 0.6 + n * 0.6);
+	float broken = smoothstep(0.32, 0.5, n2 * 0.6 + n * 0.6) * (0.55 + 0.45 * n);
 	float inner = (1.0 - smoothstep(0.55, 0.84, r)) * 0.32 * (0.6 + 0.4 * n);
 	float glow = ring * broken;
 	float breathe = 0.78 + 0.22 * sin(TIME * 1.7 + seed);
@@ -191,8 +191,8 @@ static func beacon(parent: Node3D) -> Dictionary:
 	# 불꽃: 크기가 다른 판 셋(세로축 빌보드), 저마다 다른 잡음
 	var flames: Array[MeshInstance3D] = []
 	var fmats: Array[ShaderMaterial] = []
-	var sizes: Array[Vector2] = [Vector2(0.95, 1.25), Vector2(0.7, 0.95), Vector2(0.55, 0.7)]
-	var offs: Array[Vector3] = [Vector3(0.0, 0.0, 0.0), Vector3(0.1, 0.0, 0.06), Vector3(-0.11, 0.0, -0.05)]
+	var sizes: Array[Vector2] = [Vector2(1.0, 1.15), Vector2(0.8, 0.95), Vector2(0.7, 0.8)]
+	var offs: Array[Vector3] = [Vector3(0.0, 0.0, 0.0), Vector3(0.16, 0.0, 0.08), Vector3(-0.16, 0.0, -0.07)]
 	for i in sizes.size():
 		var q := QuadMesh.new()
 		q.size = sizes[i]
@@ -201,7 +201,7 @@ static func beacon(parent: Node3D) -> Dictionary:
 		m.shader = _shader("flame", FLAME_SHADER)
 		m.set_shader_parameter("seed", 3.7 * float(i) + 1.3)
 		m.set_shader_parameter("speed", 1.0 + 0.15 * float(i))
-		m.set_shader_parameter("energy", 1.5 - 0.15 * float(i))
+		m.set_shader_parameter("energy", 1.15 - 0.1 * float(i))
 		var f := MeshInstance3D.new()
 		f.name = "Flame%d" % i
 		f.mesh = q
@@ -423,13 +423,15 @@ static func grave_mound(parent: Node3D, seed: int = 0) -> Dictionary:
 		mat.albedo_texture = load(base + "_diff.jpg")
 		mat.normal_enabled = true
 		mat.normal_texture = load(base + "_nor_gl.jpg")
-		mat.albedo_color = Color(0.3, 0.26, 0.23)
+		mat.albedo_color = Color(0.62, 0.55, 0.48)
 		mat.uv1_triplanar = true
 		mat.uv1_scale = Vector3.ONE / 1.2
 	else:
 		mat.albedo_color = Color(0.09, 0.075, 0.06)
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.95
+	mat.rim_enabled = true
+	mat.rim = 0.35
 	var mound := MeshInstance3D.new()
 	mound.name = "Mound"
 	mound.mesh = mound_mesh(seed)

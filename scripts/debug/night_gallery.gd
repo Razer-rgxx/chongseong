@@ -18,7 +18,7 @@ const BOSS := Vector2(27.0, 12.5)
 const EVENT_KINDS: Array[StringName] = [&"smith", &"pilgrim", &"seer"]
 const EVENT_AT: Array[Vector2] = [Vector2(13.5, 16.0), Vector2(17.0, 16.4), Vector2(20.5, 16.0)]
 const HILT := Vector2(24.5, 16.2)
-const NAMES: Array[String] = ["전체", "봉화", "불씨 땅", "무덤", "포위", "우두머리", "사건", "손잡이"]
+const NAMES: Array[String] = ["전체", "봉화", "불씨 땅", "무덤", "포위", "우두머리", "사건", "손잡이", "대장장이", "순례자", "점쟁이"]
 
 ## 끄면 언덕의 땅·하늘·바위만 짓는다(풀과 숲 없이).
 @export var full_hill: bool = true
@@ -287,9 +287,12 @@ func cam_to(i: int) -> void:
 		5:
 			view(0.3, 0.42, 10.0, _ground(BOSS) + Vector3(0, 0.8, 0))
 		6:
-			view(0.0, 0.18, 11.5, _ground(Vector2(17.0, 16.2)) + Vector3(0, 1.0, 0))
-		_:
+			view(0.0, 0.16, 9.0, _ground(Vector2(17.0, 16.2)) + Vector3(0, 1.0, 0))
+		7:
 			view(0.5, 0.32, 3.6, _ground(HILT) + Vector3(0, 0.7, 0))
+		_:
+			var k: int = i - 8
+			view(0.35 - 0.2 * float(k), 0.14, 3.6, _ground(EVENT_AT[k]) + Vector3(0, 1.0, 0))
 
 
 ## yaw(라디안, 0 = 남쪽에서 북쪽을 본다), pitch(내려다보는 각), dist(m), at(보는 점).

@@ -134,7 +134,7 @@ void fragment() {
 		float ends = smoothstep(0.0, 0.05, along) * (1.0 - smoothstep(0.95, 1.0, along));
 		float scuff = 0.6 + 0.4 * n2;
 		a = body * ends * scuff * 0.8 * fill;
-		h = (1.0 - smoothstep(0.0, 0.1, across + (n2 - 0.5) * 0.05)) * ends * fill * (0.55 + 0.45 * n);
+		h = (1.0 - smoothstep(0.0, 0.16, across + (n2 - 0.5) * 0.06)) * ends * fill * (0.5 + 0.5 * n) + body * ends * fill * 0.12;
 	} else if (mode == 2) {
 		vec2 q = lp - 0.5;
 		float r = length(q) * 2.0;
@@ -535,7 +535,7 @@ func on_ember_burn(at: Vector2, radius: float, time: float) -> void:
 		m.shader = NightArt._shader("flame", NightArt.FLAME_SHADER)
 		m.set_shader_parameter("seed", _rng.randf() * 40.0)
 		m.set_shader_parameter("speed", _rng.randf_range(1.1, 1.5))
-		m.set_shader_parameter("energy", 1.3)
+		m.set_shader_parameter("energy", 0.95)
 		m.set_shader_parameter("power", 0.0)
 		var f := MeshInstance3D.new()
 		f.mesh = q
@@ -804,7 +804,7 @@ func on_siege_side(side: Variant) -> void:
 	var center: Vector3 = _ground(edge_c + inward * SIEGE_DEPTH * 0.5, 0.03)
 	var d := _decal(1)
 	if not d.is_empty():
-		_put(d, {"fill": 0.0, "color": Color(0.03, 0.025, 0.022), "hot": Color(0.3, 0.04, 0.025), "emit": 0.9})
+		_put(d, {"fill": 0.0, "color": Color(0.03, 0.025, 0.022), "hot": Color(0.5, 0.07, 0.035), "emit": 1.6})
 		(d["mi"] as MeshInstance3D).transform = Transform3D(b * Basis.from_scale(Vector3(length, 1.0, depth)), center)
 	var dust := _emitter(true)
 	if dust != null:
