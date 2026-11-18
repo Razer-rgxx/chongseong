@@ -26,7 +26,9 @@ var _title: AreaTitle
 var _help_hint: Label
 var _flash: ColorRect
 var _boss_box: VBoxContainer
+var _boss_label: Label
 var _boss_bar: ProgressBar
+var _boss_fill: StyleBoxFlat
 var _choice: Control
 var _ch_new: RichTextLabel
 var _ch_a: RichTextLabel
@@ -81,19 +83,27 @@ func _ready() -> void:
 	_night_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	top.add_child(_night_button)
 
+	# 위 가운데 목표 진행 줄(언덕지기·우두머리·봉화 체력, 포위 쪽). 이름 한 줄 + 가는 막대
 	_boss_box = VBoxContainer.new()
 	_boss_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_boss_box.position = Vector2(-260, 112)
-	_boss_box.custom_minimum_size = Vector2(520, 0)
-	var bl := _label("언덕지기", 16)
-	bl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_boss_box.add_child(bl)
+	_boss_box.position = Vector2(-220, 108)
+	_boss_box.custom_minimum_size = Vector2(440, 0)
+	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.add_theme_constant_override("separation", 3)
+	_boss_label = _label("언덕지기", 15)
+	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	_boss_label.add_theme_constant_override("shadow_offset_x", 1)
+	_boss_label.add_theme_constant_override("shadow_offset_y", 1)
+	_boss_box.add_child(_boss_label)
+	_boss_box.add_child(UiKit.rule(440.0, UiKit.LINE, 0.45))
 	_boss_bar = _bar(Color(1.0, 0.3, 0.42))
+	_boss_fill = _boss_bar.get_theme_stylebox("fill") as StyleBoxFlat
 	_boss_box.add_child(_boss_bar)
 	_boss_box.visible = false
 	add_child(_boss_box)
 
-	_toast = Band.make(self, 150.0, 1000.0, 48.0, 17)
+	_toast = Band.make(self, 166.0, 1000.0, 48.0, 17)
 	_prompt = Band.make(self, -200.0, 600.0, 46.0, 18)
 	_title = AreaTitle.make(self)
 
@@ -160,11 +170,16 @@ func set_status(hp: float, max_hp: float, zone_text: String, sub: String, night_
 	_night_button.visible = not night
 
 
-func set_boss(e: Enemy) -> void:
-	_boss_box.visible = e != null
-	if e:
-		_boss_bar.max_value = e.max_hp
-		_boss_bar.value = maxf(0.0, e.hp)
+## 위 가운데 목표 진행 줄. title이 비면 숨긴다. k는 막대(0~1, 음수면 막대 없이 글자만), col은 막대 색.
+func set_goal(title: String, k: float = -1.0, col: Color = Color(1.0, 0.3, 0.42)) -> void:
+	_boss_box.visible = title != ""
+	if title == "":
+		return
+	_boss_label.text = title
+	_boss_bar.visible = k >= 0.0
+	_boss_bar.max_value = 1.0
+	_boss_bar.value = clampf(k, 0.0, 1.0)
+	_boss_fill.bg_color = col.darkened(0.15)
 
 
 func set_cards(texts: Array[String], colors: Array[Color], active: int) -> void:

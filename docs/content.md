@@ -108,6 +108,14 @@ Enemy에 더하는 것:
 
 신호: `night_goal_changed(goal, rule)`, `beacon_hit(hp, max)`, `beacon_out()`, `boss_spawned(e)`(우두머리), `ember_warn(at, radius, time)`, `ember_burn(at, radius, time)`, `grave_rise(at)`, `siege_side(side)`.
 
+### 기능팀이 정한 것(2026-11-18, 만들면서)
+
+- 다음 밤의 목표·규칙은 낮이 될 때 `Rules.next_goal/next_rule`로 정해 두고(2~9구역은 `Rules.rng`, 고르게), 밤이 시작될 때 쓴다. 13단계 갈림길은 `set_next_night(goal, rule)`로 바꾼다. 1구역과 마지막 구역은 무엇을 넣어도 버티기다.
+- 봉화는 가운데에서 북쪽 3칸(`beacon_offset`), 반지름 0.5칸 안으로는 영주도 적도 못 들어온다. 봉화를 노리는 적은 새로 나온 망령·늑대·거인·방패병(`beacon_kinds`)만이다(활잡이·돌격병·자폭병·부르는 자는 자기 행동이 있어서 뺐다). 정예·우두머리·불려 나온 망령은 노리지 않는다.
+- 사냥의 우두머리는 그 밤의 정예를 대신한다(사냥하는 밤에는 정예가 따로 오지 않는다). 체력은 구역 체력 × `hunt_hp`(4, 정예 배수에 곱하지 않는다), 크기·피해는 정예와 같다. 정예라서 쓰러뜨리면 정예 몫 공짜 뽑기 +1이 따로 있다. 자폭병과 부르는 자는 우두머리가 되지 않는다.
+- 포위를 버티면(쓰러지지 않고 새벽) 공짜 뽑기 +1. 새벽의 결과는 `Rules.last_night`(goal, ok, free, shards, heal, fled)에 남고 main이 새벽 알림에 쓴다. 사냥의 조각은 판이 끝날 때 `Meta.run_shards`의 `goal`로 센다.
+- 불씨 땅의 영주 피해는 무적·돌진과 상관없이 닳고, 맞음 신호(`lord_hurt`)는 1초 몫(4)이 쌓일 때마다 한 번. 무덤에서 일어난 망령은 정예가 아니다(정예 망령이면 체력은 정예 체력의 절반).
+
 ---
 
 ## 13단계: 낮 사건과 갈림길
