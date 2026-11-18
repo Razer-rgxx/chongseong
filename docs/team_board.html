@@ -139,32 +139,26 @@ code.id { color: var(--line); font-size: 12.5px; }
 <script>
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
-  stage: "11단계: 적 행동(새 적 5종) · 설계서 docs/content.md · 다음: 12 밤 목표, 13 낮 사건·갈림길, 14 뽑기 손맛",
-  updated: "2026-11-18 07:45",
+  stage: "11~14단계: 적 행동 · 밤 목표 · 낮 사건과 갈림길 · 뽑기 손맛 (설계서 docs/content.md)",
+  updated: "2026-11-18 14:05",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
     does: "설계서로 팀 사이의 약속(동작 id, 신호, 자료 모양)을 정하고, 팀을 차례로 부르고, 끝나면 테스트·화면 확인·커밋·푸시를 한다.",
     status: "doing",
-    note: "10단계(공격 토큰) 끝. 11~14단계 설계서(docs/content.md)를 썼다. 11단계 아트팀이 일하는 중."
+    note: "빠르게: 팀을 둘(모양 → 기능)로 합치고, 모양팀은 12·13·14단계를 동시에 만든다. 기능팀은 11 → 12 → 13 → 14 차례로(규칙 파일이 겹쳐서)."
   },
   teams: [
-    { key: "art", name: "아트팀", model: "Claude Opus 5.5 에이전트", status: "doing",
-      does: ["검기 초승달, 땅의 고리·띠·금 모양", "반격 번쩍임, 속성 4가지 색", "동작 20개 + 속성 4개 아이콘(코드로 그린 SVG)"],
-      files: ["scripts/world/move_art.gd", "scripts/ui/move_icons.gd", "assets/ui/moves/*.svg"],
-      gets: "설계서", gives: "모양과 아이콘 → 이펙트팀·기능팀", note: "끝(17분): MoveArt(검기·고리·띠·금·별빛·잔상과 재질), MoveIcons, 놋쇠빛 아이콘 24개. 커밋 3a16204" },
-    { key: "motion", name: "모션팀", model: "Claude Opus 5.5 에이전트", status: "wait",
-      does: ["동작마다 영주의 움직임(있는 Mixamo 동작 + 코드로 돌기·뛰기·기울기)", "받으면 좋은 Mixamo 동작 목록"],
-      files: ["scripts/lord/move_motion.gd", "assets/characters/README.md"],
-      gets: "설계서", gives: "MoveMotion → 기능팀이 lord_view에 잇는다", note: "끝(26분): 동작 20 + 반격 한 가지의 움직임(동작 고르기, 멈춤, 돌기·뛰어오르기·기울기·웅크리기 곡선), 받으면 좋은 Mixamo 동작 표. 커밋 763475d" },
-    { key: "fx", name: "이펙트팀", model: "Claude Opus 5.5 에이전트", status: "wait",
-      does: ["동작 20개의 맞는 자리 보이기", "날아가는 것, 착지 먼지, 순간 이동 연기", "속성 4가지 효과", "가짜 신호로 하나씩 틀어 보는 도구"],
-      files: ["scripts/world/move_fx.gd", "scripts/debug/move_gallery.gd"],
-      gets: "설계서의 신호, 아트팀의 모양", gives: "MoveFx → 기능팀이 main에 잇는다", note: "끝: 동작 20가지의 맞는 자리(부채꼴·띠·원·고리), 늦게 터지는 것의 미리 보임, 날아가는 검기·던진 칼, 속성 4가지, 메아리. 사용량 한도로 한 번 멈췄다가 이어서 마침. 커밋 0d471f9" },
-    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "wait",
-      does: ["규칙: 동작 실행(각인·고유 능력과 함께), 날아가는 것", "조합 150개 만들기, 검 300자루 배정", "카드에 방식 이름·아이콘, 화면 연결", "테스트"],
-      files: ["scripts/core/", "data/attacks/", "data/swords/*.tres", "scripts/debug/build_attacks.gd", "tests/", "main.gd · lord_view.gd · hud.gd"],
-      gets: "앞 세 팀이 만든 것 전부", gives: "게임에서 도는 좌클릭 150가지", note: "끝: 동작 실행기(20가지, 날아가는 것, 반격, 속성, 메아리), 방식 150가지와 검 300자루 배정, 갈고리 검 12방식·24자루, 카드에 이름·아이콘, 테스트 186 → 270. 한도와 서버 재시작으로 두 번 멈췄다가 이어서 마침. 커밋 f67fda7 · 17b1833 · c1a83ff" }
+    { key: "look", name: "모양팀", model: "Claude Opus 5.5 에이전트 (아트·모션·이펙트를 합침)", status: "doing",
+      does: ["모양: 몸, 소품, 재질, 아이콘(코드로 그린 SVG)", "움직임: 코드 곡선과 Mixamo 동작 위에 얹기", "효과: 불똥, 먼지, 땅의 표시, 소리", "확인용 갤러리 장면"],
+      files: ["scripts/enemies/enemy_art.gd · enemy_motion.gd", "scripts/world/enemy_fx.gd", "scripts/world/night_art.gd · night_fx.gd", "scripts/world/event_art.gd · event_fx.gd · assets/ui/map/*.svg", "scripts/world/omen_art.gd · pull_timing_fx.gd · scripts/lord/pull_motion.gd", "scripts/debug/*_gallery.gd"],
+      gets: "설계서 docs/content.md", gives: "파일 머리의 API → 기능팀이 잇는다",
+      note: "11단계 끝(아트 8c8aef2 · 모션 3bd211a · 이펙트 마무리 중). 12·13단계와 14단계를 두 에이전트가 동시에 만드는 중." },
+    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
+      does: ["규칙과 수치(.tres)", "신호, 화면 연결(EnemyView·main·hud)", "테스트, GDD·CLAUDE.md"],
+      files: ["scripts/core/", "data/", "scripts/enemies/enemy_view.gd", "scenes/world/main.gd", "tests/", "docs/"],
+      gets: "모양팀이 만든 것 전부", gives: "게임에서 도는 단계",
+      note: "11단계: 새 적 5종의 규칙(활·방패·돌진·자폭·부르기), 화살, 화면 연결, 테스트. 끝나면 12 → 13 → 14 차례로." }
   ],
   // 동작별 팀 진행: [아트, 모션, 이펙트, 기능]
   moves: [
@@ -183,6 +177,10 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-18 14:05", "사용자: 팀을 합치고 빠르게. → 모양팀(아트·모션·이펙트)과 기능팀 둘로. 동시에: 11단계 기능팀, 12·13단계 모양팀, 14단계 모양팀, 11단계 이펙트 마무리."],
+    ["11-18 13:40", "서버가 다시 켜지면서 이펙트팀이 멈춤(파일은 남음) → 이어서 마무리."],
+    ["11-18 09:05", "11단계 모션 끝: 활 당겨 쏘기, 방패 들고 막기·튕겨 열리기, 돌격병 웅크림·질주·비틀거림, 자폭병 부풀며 떨기, 부르는 자 지팡이 내리치기. 이펙트팀 시작."],
+    ["11-18 08:30", "11단계 아트 끝: 활잡이(활·화살통), 방패병(기사+방패), 돌격병(뿔 달린 큰 짐승), 자폭병(빛나는 갈라진 배), 부르는 자(지팡이 등불). 모션팀 시작."],
     ["11-18 07:45", "11단계(적 행동) 시작: 아트팀이 새 적 5종의 몸을 만든다."],
     ["11-17 23:10", "10단계 공격 토큰 끝(테스트 312, 푸시). 사용자: 컨텐츠가 반복적 → 11~14단계 설계서 docs/content.md."],
     ["11-17 22:30", "관리: 원하는 검 받기 창(` 또는 F6)."],
@@ -222,6 +220,7 @@ const BODY = [
   "..........."
 ];
 const EXTRA = {
+  look: [[10,5,"g"],[10,4,"g"],[10,3,"g"],[10,2,"y"],[10,1,"y"],[0,1,"y"],[1,4,"y"],[0,9,"y"]],
   lead: [[0,0,"g"],[0,1,"g"],[0,2,"g"],[0,3,"g"],[0,4,"g"],[0,5,"g"],[1,0,"y"],[2,0,"y"],[1,1,"y"],[2,1,"y"],[1,2,"y"]],
   art: [[10,5,"g"],[10,4,"g"],[10,3,"g"],[10,2,"y"],[10,1,"y"]],
   motion: [[2,9,"."],[3,9,"o"],[1,10,"o"],[2,10,"o"],[3,10,"."],[0,11,"d"],[1,11,"d"],[2,11,"."],[3,11,"."],[7,9,"o"],[8,9,"."],[8,10,"."],[9,10,"o"],[8,11,"."],[9,11,"d"],[10,11,"d"]],
@@ -246,7 +245,7 @@ function render() {
   const made = S.bands.reduce((a, b) => a + b[2], 0);
   const total = S.bands.reduce((a, b) => a + b[1], 0);
   $("summary").innerHTML =
-    `<span><b>${doneTeams}/4</b>팀 끝</span>` +
+    `<span><b>${doneTeams}/${S.teams.length}</b>팀 끝</span>` +
     `<span><b>${S.moves.length}</b>기본 동작</span>` +
     `<span><b>${made}/${total}</b>공격 방식</span>` +
     `<span><b>${S.swords_assigned}/300</b>검 배정</span>`;
@@ -268,7 +267,7 @@ function render() {
 
   const head = `<tr><th>#</th><th>동작</th><th>역할</th>${S.teams.map((t) => `<th class="mark">${esc(t.name.replace("팀", ""))}</th>`).join("")}</tr>`;
   const rows = S.moves.map((m, i) => {
-    const p = S.progress[m[0]] || S.teams.map((t) => t.status);
+    const p = S.progress[m[0]] || S.teams.map(() => "done"); // 9단계(좌클릭)는 끝났다
     return `<tr><td class="num muted">${i + 1}</td><td>${esc(m[1])} <code class="id">${m[0]}</code></td><td class="role">${esc(m[2])}</td>` +
       p.map((s, k) => `<td class="mark"><i class="dot ${s === "wait" ? "" : "d-" + s}" title="${esc(S.teams[k].name)}: ${LABEL[s]}"></i></td>`).join("") + `</tr>`;
   }).join("");
