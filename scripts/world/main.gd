@@ -9,6 +9,12 @@ const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
 const GOAL_NAMES: Dictionary = {&"survive": "버티기", &"defend": "지키기", &"hunt": "사냥", &"siege": "포위"}
 const RULE_NAMES: Dictionary = {&"fog": "짙은 안개", &"embers": "불씨 땅", &"graves": "무덤"}
 const SIDE_NAMES: Array[String] = ["북쪽", "남쪽", "서쪽", "동쪽"]
+## 갈림길 지도 창의 한 줄 설명과 길의 이름(어려움 0~2, 13단계).
+const PATH_NAMES: Array[String] = ["완만한 길", "험한 길", "가파른 길"]
+const RULE_TEXT: Dictionary = {&"fog": "적이 잘 보이지 않는다", &"embers": "달아오른 땅이 탄다", &"graves": "쓰러진 망령이 다시 일어난다"}
+## 낮 사건의 이름과, 낮이 밝을 때의 알림(13단계).
+const EVENT_NAMES: Dictionary = {&"smith": "떠돌이 대장장이", &"cursed": "저주받은 손잡이", &"pilgrim": "순례자", &"seer": "점쟁이"}
+const EVENT_NEWS: Dictionary = {&"smith": "떠돌이 대장장이가 머문다", &"cursed": "검은 기운이 도는 손잡이가 꽂혔다", &"pilgrim": "순례자가 쉬어 간다", &"seer": "점쟁이가 등불을 들고 있다"}
 
 ## 0이면 시작할 때 아무 시드나 고른다. 같은 판을 다시 보고 싶으면 값을 넣는다.
 @export var seed_value: int = 0
@@ -68,6 +74,16 @@ var _held_set: bool = false
 var _reveal_until: int = 0
 var _hud_t: float = 0.0
 var _altar_view: Node3D = null
+## 낮 사건의 효과(쓰일 때, 사라질 때, 저주받은 손잡이의 기운). EventArt로 지은 형체를 움직인다.
+var _efx := EventFx.new()
+## 이 낮의 사건과 그 형체(EventArt.build가 돌려준 것), 형체를 세운 자리 노드, 저주받은 손잡이의 HiltView.
+var _event: DayEvent = null
+var _event_P: Dictionary = {}
+var _event_holder: Node3D = null
+var _cursed_view: Node3D = null
+var _event_t: float = 0.0
+## 저주받은 손잡이를 뽑았을 때 이름 알림 뒤에 붙일 말.
+var _pull_note: String = ""
 
 @onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
@@ -103,6 +119,15 @@ func _ready() -> void:
 		_camera.kick(6.0 * k))
 	add_child(_night_fx)
 	_night_fx.setup(rules)
+	add_child(_efx)
+	_efx.setup(rules)
+	rules.path_offered.connect(_on_path_offered)
+	rules.event_placed.connect(_on_event_placed)
+	rules.event_used.connect(_on_event_used)
+	rules.event_gone.connect(_on_event_gone)
+	_hud.path_picked.connect(func(i: int) -> void:
+		rules.choose_path(i)
+		_capture(true))
 	rules.beacon_out.connect(func() -> void:
 		_hud.toast("봉화가 꺼졌다. 이 밤의 보상은 없고, 새벽 회복이 절반이다.")
 		_camera.add_shake(0.3))
@@ -146,6 +171,8 @@ func _ready() -> void:
 	_camera.target = _lord_world()
 	_camera.snap()
 	_sync_altar()
+	if rules.event:
+		_on_event_placed(rules.event)
 	var start: String = "검집에서 %s을(를) 꺼냈다. " % rules.slots[0].label() if rules.slots[0] else ""
 	_hud.area_title(_zone_name())
 	_hud.toast("%s꽂힌 검 앞에서 E를 눌러 뽑는다. 한 번에 체력 %d. 준비되면 N으로 밤을 맞는다." % [start, rules.pull_cost()])
@@ -170,7 +197,7 @@ func _on_console_pick(d: SwordData, slot: int) -> void:
 
 
 func _capture(on: bool) -> void:
-	var want: bool = on and _camera.third() and rules.phase != Rules.Phase.OVER and not _hud.choice_open() and not _hud.altar_is_open() and not _console.visible
+	var want: bool = on and _camera.third() and rules.phase != Rules.Phase.OVER and not _hud.choice_open() and not _hud.altar_is_open() and not _hud.map_open() and not _console.visible
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if want else Input.MOUSE_MODE_VISIBLE
 
 
@@ -193,6 +220,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_hud.pick_altar(kk.physical_keycode - KEY_1)
 			elif kk.physical_keycode == KEY_ESCAPE:
 				_hud.pick_altar(-1)
+		return
+	# 갈림길: 1 또는 2(카드 클릭은 창이 받는다)
+	if _hud.map_open():
+		if event.is_action_pressed("slot_1"):
+			_hud.pick_path(0)
+		elif event.is_action_pressed("slot_2"):
+			_hud.pick_path(1)
 		return
 	if _hud.choice_open():
 		if event.is_action_pressed("slot_1"):
@@ -301,10 +335,16 @@ func _process(delta: float) -> void:
 	# 빠르게 움직일 때 화면 가장자리가 빨려 든다
 	_camera.speed_blur = hook_blur if rules.lord.hook > 0.0 else (dash_blur if rules.lord.dash > 0.0 else 0.0)
 	_camera.follow_boost = 24.0 if rules.lord.hook > 0.0 else 0.0
+	_draw_event(delta)
 	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
 	var altar_near: bool = rules.near_altar() and rules.pull_hilt == null and rules.pending == null and not rules.altar_open
+	var ev_near: DayEvent = rules.near_event() if rules.pull_hilt == null and rules.pending == null and not rules.altar_open else null
 	if altar_near:
 		_hud.set_prompt("E", "숫돌 제단에 선다")
+	elif ev_near:
+		_hud.set_prompt("E", _event_prompt(ev_near))
+	elif near and near.cursed:
+		_hud.set_prompt("E", "저주받은 손잡이 — 체력 없이 뽑는다 · 운 ×%s · 이번 밤 적이 몰려오고 최대 내구 절반" % str(data.run.cursed_luck))
 	elif near:
 		_hud.set_prompt("E", "검을 뽑는다 · " + ("공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost()))
 	else:
@@ -409,10 +449,18 @@ func _on_day(_zone: int) -> void:
 	_sync_hilts()
 	_sync_altar()
 	_set_light(false)
+	_clear_event_view()
 	_hud.area_title(_zone_name())
-	var ln: Dictionary = rules.last_night
-	var heal: float = float(ln.get("heal", rules.heal_at_dawn()))
-	_hud.toast("%s날이 밝았다. 체력 +%d · 뽑기 운 ×%s%s" % [_reward_text(ln), roundi(heal), str(snappedf(rules.luck(), 0.01)), " · 숫돌 제단이 섰다" if rules.altar else ""])
+	# 지난 밤의 결과와 새벽 회복은 갈림길 창이 보였다. 여기서는 고른 길의 보상과 이 낮의 것
+	var parts: Array[String] = []
+	if rules.path_reward != &"":
+		parts.append("길의 보상: " + _path_reward_name(rules.path_reward))
+	parts.append("뽑기 운 ×%s" % str(snappedf(rules.luck(), 0.01)))
+	if rules.altar:
+		parts.append("숫돌 제단이 섰다")
+	if rules.event:
+		parts.append(EVENT_NEWS.get(rules.event.kind, ""))
+	_hud.toast(" · ".join(parts))
 
 
 ## 지난 밤 목표의 결과 한 마디(없으면 "").
@@ -462,6 +510,8 @@ func _goal_line() -> String:
 			t += " 달아오르는 땅을 피해."
 		&"graves":
 			t += " 쓰러진 망령이 다시 일어난다."
+	if rules.cursed_night:
+		t += " 저주가 적을 더 불러온다."
 	return t
 
 
@@ -512,8 +562,9 @@ func _on_end(won: bool) -> void:
 	_move_fx.clear()
 	_enemy_fx.clear()
 	_clear_night_view()
+	_clear_event_view()
 	_hud.set_goal("")
-	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, " · 사냥 %d" % r.goal if r.goal > 0 else ""])
+	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")])
 	_capture(false)
 
 
@@ -574,6 +625,9 @@ func _on_pulled(s: Sword) -> void:
 	_reveal_until = Time.get_ticks_msec() + int(hold * 1000.0)
 	# 연출 중에는 글자를 띄우지 않는다. 끝나면 이름을 알린다
 	var text: String = "%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name]
+	if _pull_note != "":
+		text += " " + _pull_note
+		_pull_note = ""
 	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void: _hud.toast(text))
 
 
@@ -730,6 +784,187 @@ func _float(at: Vector3, text: String, c: Color, size: int) -> void:
 	t.modulate = c
 	add_child(t)
 	t.global_position = at
+
+
+# ---------------------------------------------------------------- 갈림길과 낮 사건(13단계)
+
+## 새벽: 밤의 것을 거두고 지도 창을 연다. 길을 고르기 전에는 규칙이 멈춰 있다(Rules.path_open).
+func _on_path_offered(cards: Array) -> void:
+	_move_fx.clear()
+	_enemy_fx.clear()
+	_clear_night_view()
+	_hud.set_goal("")
+	_set_light(false)
+	var trail: Array = []
+	var n: int = rules.path_log.size()
+	for i in n:
+		var e: Dictionary = rules.path_log[i]
+		var z: int = int(e.zone)
+		trail.append({"text": "%d구역 %s · %s" % [z + 1, data.run.zone_names[z], GOAL_NAMES.get(e.goal, "버티기")], "current": i == n - 1})
+	var made: Array = []
+	for c in cards:
+		made.append(_path_card(c))
+	var ln: Dictionary = rules.last_night
+	var left: int = rules.zone_count() - rules.zone
+	var heal: int = roundi(float(ln.get("heal", 0.0)))
+	var head: String = "%s날이 밝았다.%s 정상까지 %d구역 — 오를 길을 고른다." % [_reward_text(ln), " 체력 +%d." % heal if heal > 0 else "", left]
+	_hud.open_map("갈림길 · %d구역 %s" % [rules.zone + 1, data.run.zone_names[rules.zone]], head, trail, made)
+	_capture(false)
+
+
+## 지도 창 카드 하나의 글과 아이콘 id(PathMap.open).
+func _path_card(c: Dictionary) -> Dictionary:
+	var R := data.run
+	var top: bool = rules.last_zone()
+	var g: StringName = c.goal
+	var goal_text: String
+	match g:
+		&"defend":
+			goal_text = "봉화를 지킨다"
+		&"hunt":
+			goal_text = "우두머리를 쓰러뜨린다"
+		&"siege":
+			goal_text = "한쪽에서 몰려온다 · %d초" % roundi(R.siege_night)
+		_:
+			goal_text = "%d초를 버틴다" % roundi(R.night_length)
+	return {
+		"label": PATH_NAMES[clampi(R.path_hardness(g, c.rule), 0, PATH_NAMES.size() - 1)],
+		"goal_icon": "goal_hunt" if top else "goal_" + String(g),
+		"goal": "언덕지기" if top else GOAL_NAMES.get(g, "버티기"),
+		"goal_text": "정상을 지키는 자를 쓰러뜨린다" if top else goal_text,
+		"rule_icon": "" if c.rule == &"" else "rule_" + String(c.rule),
+		"rule": RULE_NAMES.get(c.rule, "구역 규칙 없음"),
+		"rule_text": RULE_TEXT.get(c.rule, ""),
+		"reward_icon": "reward_" + String(c.reward),
+		"reward": _path_reward_name(c.reward),
+	}
+
+
+func _path_reward_name(r: StringName) -> String:
+	var R := data.run
+	match r:
+		&"pulls":
+			return "공짜 뽑기 +%d" % R.reward_pulls
+		&"heal":
+			return "체력 +%d" % roundi(R.reward_heal)
+		&"whet":
+			return "두 칸 검의 내구를 모두 채운다"
+		&"luck":
+			return "다음 낮 뽑기 운 ×%s" % str(R.reward_luck)
+		&"shards":
+			return "판이 끝날 때 조각 +%d" % R.reward_shards
+	return ""
+
+
+## 숫자 뒤의 을/를(일·삼·육·칠·팔·십·백 … 은 받침이 있다).
+func _obj(n: int) -> String:
+	return "%d를" % n if [2, 4, 5, 9].has(absi(n) % 10) else "%d을" % n
+
+
+## 사건 앞에 섰을 때의 안내(Band).
+func _event_prompt(ev: DayEvent) -> String:
+	var R := data.run
+	match ev.kind:
+		&"smith":
+			if rules.current() == null:
+				return "떠돌이 대장장이 — 벼릴 검을 쥐고 있지 않다"
+			return "떠돌이 대장장이 — 체력 %s 내고 쥔 검을 벼린다 · 이번 밤 피해 +%d%%" % [_obj(roundi(R.smith_cost)), roundi(R.smith_damage * 100.0)]
+		&"pilgrim":
+			var k: int = rules.pilgrim_slot()
+			if k < 0:
+				return "순례자 — 바칠 검이 없다"
+			return "순례자 — %s을(를) 바치고 체력 +%d · 공짜 뽑기 +%d" % [rules.slots[k].label(), roundi(rules.max_hp() * R.pilgrim_heal), R.pilgrim_free]
+		&"seer":
+			return "점쟁이 — 체력 %s 내고 오늘 손잡이의 참된 조짐을 본다" % _obj(roundi(R.seer_cost))
+	return EVENT_NAMES.get(ev.kind, "")
+
+
+## 사건이 섰다: 형체를 그 자리에 짓는다. 저주받은 손잡이는 그 손잡이를 검게 칠하고 기운을 두른다.
+func _on_event_placed(ev: DayEvent) -> void:
+	_clear_event_view()
+	_event = ev
+	if ev.kind == &"cursed":
+		var v: Node3D = _hilts.get(ev.hilt.id) if ev.hilt else null
+		if v:
+			EventArt.curse_hilt(v)
+			_efx.aura(v)
+			_cursed_view = v
+		return
+	var holder := Node3D.new()
+	holder.name = "Event_" + String(ev.kind)
+	add_child(holder)
+	var w: Vector3 = Grid.cells_to_world(ev.pos)
+	w.y = HillBuilder.height(w.x, w.z)
+	holder.position = w
+	holder.rotation.y = _yaw_to(w, _lord.position)
+	_event_holder = holder
+	_event_P = EventArt.build(ev.kind, holder)
+	_event_t = 0.0
+
+
+## -Z를 보는 몸이 from에서 to를 보게 하는 rotation.y.
+func _yaw_to(from: Vector3, to: Vector3) -> float:
+	var d: Vector3 = to - from
+	return atan2(-d.x, -d.z) if Vector2(d.x, d.z).length() > 0.01 else 0.0
+
+
+## 매 화면: 사건의 형체가 숨 쉬며 영주 쪽으로 천천히 돈다(쓰인 뒤에는 EventFx가 움직인다).
+func _draw_event(delta: float) -> void:
+	if _event_P.is_empty() or not is_instance_valid(_event_holder) or not is_instance_valid(_event_P.get("root")):
+		return
+	if _event == null or _event.used:
+		return
+	_event_t += delta
+	EventArt.breathe(_event_P, _event_t)
+	var want: float = _yaw_to(_event_holder.position, _lord.position)
+	_event_holder.rotation.y = lerp_angle(_event_holder.rotation.y, want, 1.0 - exp(-2.5 * delta))
+
+
+func _on_event_used(ev: DayEvent, result: Dictionary) -> void:
+	var R := data.run
+	match ev.kind:
+		&"cursed":
+			if is_instance_valid(_cursed_view):
+				_efx.aura_off(_cursed_view, true)
+			_camera.add_shake(0.2)
+			_pull_note = "저주가 서렸다. 최대 내구가 절반이 되었고, 이번 밤 적이 더 몰려온다."
+			return
+		&"smith":
+			var s: Sword = result.get("sword")
+			_hud.toast("대장장이가 %s을(를) 벼렸다. 내구가 다 찼고, 이번 밤 피해 +%d%%." % [s.label() if s else "검", roundi(R.smith_damage * 100.0)])
+		&"pilgrim":
+			var s: Sword = result.get("sword")
+			_hud.toast("순례자가 %s을(를) 받아 갔다. 체력 +%d · 공짜 뽑기 +%d." % [s.label() if s else "검", roundi(float(result.get("heal", 0.0))), int(result.get("free", 0))])
+			_hud.flash(Color(1.0, 0.9, 0.7), 0.2)
+		&"seer":
+			_hud.toast("점쟁이가 등불을 들었다. 오늘 손잡이의 참된 조짐이 보인다.")
+	if not _event_P.is_empty():
+		_efx.used(_event_P)
+		_efx.vanish(_event_P)
+
+
+## 사건이 사라졌다. 쓰지 않고 밤이 왔으면 형체가 흩어지고 손잡이의 기운이 걷힌다.
+func _on_event_gone(ev: DayEvent) -> void:
+	if ev.used:
+		return
+	if ev.kind == &"cursed":
+		if is_instance_valid(_cursed_view):
+			_efx.aura_off(_cursed_view, false)
+		_cursed_view = null
+	elif not _event_P.is_empty():
+		_efx.vanish(_event_P)
+	_event = null
+
+
+## 낮이 바뀌거나 판이 끝날 때: 사건의 형체와 효과를 거둔다.
+func _clear_event_view() -> void:
+	_efx.clear()
+	if is_instance_valid(_event_holder):
+		_event_holder.queue_free()
+	_event_holder = null
+	_event_P = {}
+	_cursed_view = null
+	_event = null
 
 
 # ---------------------------------------------------------------- 그리기

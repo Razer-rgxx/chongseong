@@ -7,6 +7,8 @@ extends CanvasLayer
 signal chose(slot: int)
 signal restart_requested()
 signal altar_chosen(index: int)
+## 갈림길 지도 창에서 길을 골랐다(0, 1).
+signal path_picked(index: int)
 
 ## 두 칸이 다 찼을 때 뜨는 창이, 연출을 넘기던 클릭을 받지 않도록 기다리는 시간.
 @export var choice_guard: float = 0.8
@@ -43,6 +45,7 @@ var _night_button: Button
 var _altar: Control
 var _altar_list: VBoxContainer
 var _altar_t: float = 0.0
+var _map: PathMap
 
 
 func _ready() -> void:
@@ -104,7 +107,7 @@ func _ready() -> void:
 	add_child(_boss_box)
 
 	_toast = Band.make(self, 166.0, 1000.0, 48.0, 17)
-	_prompt = Band.make(self, -200.0, 600.0, 46.0, 18)
+	_prompt = Band.make(self, -236.0, 820.0, 46.0, 18)
 	_title = AreaTitle.make(self)
 
 	var bottom := HBoxContainer.new()
@@ -148,6 +151,8 @@ func _ready() -> void:
 
 	_build_choice()
 	_build_altar()
+	_map = PathMap.make(self)
+	_map.picked.connect(func(i: int) -> void: path_picked.emit(i))
 	_build_over()
 
 
@@ -260,6 +265,19 @@ func pick(k: int) -> void:
 		return
 	_choice.visible = false
 	chose.emit(k)
+
+
+## 갈림길 지도 창(13단계). 글과 아이콘 id는 main이 만든다(PathMap.open).
+func open_map(title: String, head: String, trail: Array, cards: Array) -> void:
+	_map.open(title, head, trail, cards)
+
+
+func map_open() -> bool:
+	return _map.is_open()
+
+
+func pick_path(i: int) -> void:
+	_map.pick(i)
 
 
 func show_over(title: String, text: String) -> void:
