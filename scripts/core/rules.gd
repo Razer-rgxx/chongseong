@@ -187,7 +187,7 @@ var path_shards: int = 0
 var event: DayEvent = null
 ## 점쟁이를 썼다: 오늘 손잡이의 참된 조짐이 보인다(14단계가 쓴다).
 var seer_used_today: bool = false
-## 저주받은 손잡이를 뽑았다: 이번 밤 적이 더 빨리 나온다.
+## 저주받은 손잡이를 뽑았다: 이번 밤 새로 나오는 적의 체력과 피해 ×cursed_enemies.
 var cursed_night: bool = false
 var _pull_cursed: bool = false
 
@@ -801,9 +801,6 @@ func _step_night() -> void:
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
 		if goal == &"siege":
 			_spawn_t /= maxf(0.01, R.siege_spawn)
-		# 저주받은 손잡이를 뽑은 밤에는 적이 더 빨리 나온다
-		if cursed_night:
-			_spawn_t /= maxf(0.01, R.cursed_enemies)
 		var r: float = rng.randf()
 		# 새 적(구역마다 RunData의 확률). 나머지 몫 안에서 망령·늑대·거인을 예전 비율로 나눈다
 		var extra: float = _extra_total()
@@ -884,6 +881,11 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 	e.max_hp = D.hp * (1.0 if D.boss else data.run.zone_hp[zi])
 	e.hp = e.max_hp
 	e.damage = D.damage * (1.0 if D.boss else data.run.zone_damage[zi])
+	# 저주받은 손잡이를 뽑은 밤에는 새로 나오는 적(정예·우두머리·불려 온 적·다시 일어난 망령도)이 강하다
+	if cursed_night:
+		e.max_hp *= data.run.cursed_enemies
+		e.hp = e.max_hp
+		e.damage *= data.run.cursed_enemies
 	e.radius = D.radius
 	e.cooldown = rng.randf() * 0.5
 	foes.on_spawn(e)
@@ -1398,7 +1400,7 @@ func _use_event(ev: DayEvent) -> void:
 		slots_changed.emit()
 
 
-## 저주받은 손잡이를 다 뽑았다: 뽑은 검의 최대 내구가 절반, 이번 밤 적이 더 빨리 나온다.
+## 저주받은 손잡이를 다 뽑았다: 뽑은 검의 최대 내구가 절반, 이번 밤 적이 강해진다(spawn_at).
 func _cursed_pulled(h: Hilt, s: Sword) -> void:
 	var R := data.run
 	if s.breakable():

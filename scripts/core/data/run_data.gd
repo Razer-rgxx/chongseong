@@ -151,7 +151,7 @@ extends Resource
 ## 대장장이: 체력을 내면 쥔 검의 내구를 다 채우고, 이번 밤 그 검의 피해 + smith_damage(0.15 = 15%).
 @export var smith_cost: float = 15.0
 @export var smith_damage: float = 0.15
-## 저주받은 손잡이: 체력 없이 뽑고 운 ×cursed_luck. 대신 이번 밤 적이 나오는 빠르기 ×cursed_enemies, 뽑은 검의 최대 내구 ×cursed_durability.
+## 저주받은 손잡이: 체력 없이 뽑고 운 ×cursed_luck. 대신 이번 밤 새로 나오는 적의 체력과 피해 ×cursed_enemies, 뽑은 검의 최대 내구 ×cursed_durability.
 @export var cursed_luck: float = 2.0
 @export var cursed_enemies: float = 1.25
 @export var cursed_durability: float = 0.5

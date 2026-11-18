@@ -344,7 +344,7 @@ func _process(delta: float) -> void:
 	elif ev_near:
 		_hud.set_prompt("E", _event_prompt(ev_near))
 	elif near and near.cursed:
-		_hud.set_prompt("E", "저주받은 손잡이 — 체력 없이 뽑는다 · 운 ×%s · 이번 밤 적이 몰려오고 최대 내구 절반" % str(data.run.cursed_luck))
+		_hud.set_prompt("E", "저주받은 손잡이 — 체력 없이 뽑는다 · 운 ×%s · 이번 밤 적이 강해지고 최대 내구 절반" % str(data.run.cursed_luck))
 	elif near:
 		_hud.set_prompt("E", "검을 뽑는다 · " + ("공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost()))
 	else:
@@ -511,7 +511,7 @@ func _goal_line() -> String:
 		&"graves":
 			t += " 쓰러진 망령이 다시 일어난다."
 	if rules.cursed_night:
-		t += " 저주가 적을 더 불러온다."
+		t += " 저주가 적을 사납게 한다."
 	return t
 
 
@@ -928,7 +928,7 @@ func _on_event_used(ev: DayEvent, result: Dictionary) -> void:
 			if is_instance_valid(_cursed_view):
 				_efx.aura_off(_cursed_view, true)
 			_camera.add_shake(0.2)
-			_pull_note = "저주가 서렸다. 최대 내구가 절반이 되었고, 이번 밤 적이 더 몰려온다."
+			_pull_note = "저주가 서렸다. 최대 내구가 절반이 되었고, 이번 밤 적이 더 강하다."
 			return
 		&"smith":
 			var s: Sword = result.get("sword")

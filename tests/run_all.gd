@@ -3161,7 +3161,7 @@ func _test_event_cursed() -> void:
 		var full: float = Sword.new(s.data, d).max_durability
 		check(not s.breakable() or (is_equal_approx(s.max_durability, maxf(1.0, roundf(full * R.cursed_durability))) and s.durability == s.max_durability), "저주받은 손잡이: 이 검의 최대 내구 절반(%s → %s)" % [full, s.max_durability])
 	check(used.size() == 1 and used[0].sword == s and gone == [ev] and ev.used and r.cursed_night and h.gone, "저주받은 손잡이: 뽑으면 쓴 것(event_used, event_gone), 이번 밤 저주")
-	# 이번 밤 적 +25%: 나오는 빠르기
+	# 이번 밤 적 +25%: 새로 나오는 적의 체력과 피해(나오는 빠르기는 그대로)
 	var a := _ev_day("cursed", 66)
 	var b := _ev_day("cursed", 66)
 	a.cursed_night = true
@@ -3172,7 +3172,14 @@ func _test_event_cursed() -> void:
 			q.step()
 			if not q.enemies.is_empty():
 				break
-	check(a.enemies.size() == 1 and b.enemies.size() == 1 and is_equal_approx(a._spawn_t * R.cursed_enemies, b._spawn_t), "저주받은 손잡이: 이번 밤 적이 1.25배 빠르게 나온다(%.3f, %.3f)" % [a._spawn_t, b._spawn_t])
+	var ea: Enemy = a.enemies[0] if a.enemies.size() == 1 else null
+	var eb: Enemy = b.enemies[0] if b.enemies.size() == 1 else null
+	check(ea != null and eb != null and ea.data == eb.data and is_equal_approx(a._spawn_t, b._spawn_t), "저주받은 손잡이: 적이 나오는 때와 종류는 그대로")
+	if ea and eb:
+		check(is_equal_approx(ea.max_hp, eb.max_hp * R.cursed_enemies) and is_equal_approx(ea.hp, ea.max_hp) and is_equal_approx(ea.damage, eb.damage * R.cursed_enemies), "저주받은 손잡이: 이번 밤 적의 체력·피해 ×1.25(%.1f/%.1f, %.1f/%.1f)" % [ea.max_hp, eb.max_hp, ea.damage, eb.damage])
+	var el_a := a._spawn_elite()
+	var el_b := b._spawn_elite()
+	check(el_a.data == el_b.data and is_equal_approx(el_a.max_hp, el_b.max_hp * R.cursed_enemies) and is_equal_approx(el_a.damage, el_b.damage * R.cursed_enemies), "저주받은 손잡이: 정예도 ×1.25(정예 배수 위에 곱한다)")
 	a.skip_night()
 	a.choose_path(0)
 	check(not a.cursed_night, "저주받은 손잡이: 저주는 그 밤만")
