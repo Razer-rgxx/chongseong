@@ -8,6 +8,7 @@ extends RefCounted
 ## 판 사이 성장(Meta): 축복(체력, 운, 뽑기 값, 새벽 회복)과 검집의 검을 들고 시작한다. 정예와 숫돌 제단.
 ## 각인 36종과 고유 능력은 Powers(powers.gd)가 맡고, 이 파일은 정해진 자리에서 부른다.
 ## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)의 행동은 Foes(foes.gd)가 맡는다.
+## 12단계 밤마다 목표 하나(버티기·지키기·사냥·포위)와 구역 규칙 하나(없음·짙은 안개·불씨 땅·무덤). docs/content.md "12단계".
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -45,8 +46,24 @@ signal enemy_act(e: Enemy, act: StringName, info: Dictionary)
 ## 적의 화살이 났다 / 끝났다(hit = 영주에게 맞았다. 부러졌으면 p.cut). 위치는 enemy_projectiles에서 틱마다 읽는다.
 signal enemy_projectile_spawned(p: Projectile)
 signal enemy_projectile_ended(p: Projectile, hit: bool)
+## 이 밤의 목표(survive, defend, hunt, siege)와 구역 규칙(&"", fog, embers, graves). 밤이 시작될 때(night_started 앞).
+signal night_goal_changed(goal: StringName, rule: StringName)
+## 봉화가 맞았다 / 꺼졌다(지키기). 봉화 자리는 beacon_pos.
+signal beacon_hit(hp: float, max_hp: float)
+signal beacon_out()
+## 불씨 땅: 그 자리(칸)가 time초 뒤 불붙는다 / 지금부터 time초 동안 탄다.
+signal ember_warn(at: Vector2, radius: float, time: float)
+signal ember_burn(at: Vector2, radius: float, time: float)
+## 무덤: 쓰러졌던 망령이 그 자리에서 다시 일어났다(enemy_spawned 뒤).
+signal grave_rise(at: Vector2)
+## 포위: 적이 나오는 변(0 북 y = 0, 1 남, 2 서 x = 0, 3 동). -1이면 포위가 끝났다.
+signal siege_side(side: int)
 
 enum Phase { DAY, NIGHT, OVER }
+
+## 밤의 목표와 구역 규칙(RunData.night_goals, zone_rules의 값).
+const GOALS: Array[StringName] = [&"survive", &"defend", &"hunt", &"siege"]
+const ZONE_RULES: Array[StringName] = [&"", &"fog", &"embers", &"graves"]
 
 var data: GameData
 ## 판 사이에 남는 것. null이면 축복도 검집도 없다(테스트).
@@ -61,6 +78,8 @@ var phase: Phase = Phase.DAY
 var zone: int = 0
 ## 새벽까지 남은 시간(초). 0 아래로 내려가도 마지막 구역에서는 언덕지기를 쓰러뜨릴 때까지 밤이다.
 var night_left: float = 0.0
+## 이 밤의 길이(초). 포위는 짧다.
+var night_total: float = 0.0
 var lord := LordState.new()
 ## 두 칸. 빈 칸은 null.
 var slots: Array[Sword] = [null, null]
@@ -112,6 +131,36 @@ var tokens: Tokens
 ## 새 적 5종의 행동.
 var foes: Foes
 
+# ---- 밤의 목표와 구역 규칙(12단계). 화면은 읽기만 한다.
+## 이 밤(또는 지난 밤)의 목표와 구역 규칙.
+var goal: StringName = &"survive"
+var rule: StringName = &""
+## 다음 밤의 목표와 구역 규칙. 낮이 될 때 정하고(_roll_next_night), 13단계 갈림길이 set_next_night로 바꾼다.
+var next_goal: StringName = &"survive"
+var next_rule: StringName = &""
+## 지키기: 봉화 자리(칸)와 체력. beacon_max가 0이면 봉화가 없는 밤이다.
+var beacon_pos: Vector2 = Vector2.ZERO
+var beacon_hp: float = 0.0
+var beacon_max: float = 0.0
+var beacon_lost: bool = false
+## 사냥: 우두머리가 나왔는지, 그 적, 쓰러뜨렸는지(그러면 다음 틱에 새벽).
+var hunt_out: bool = false
+var hunt_boss: Enemy = null
+var hunt_killed: bool = false
+## 포위: 적이 나오는 변(-1이면 네 변 아무 데나)과 다른 변으로 바뀔 때까지 남은 시간(초).
+var siege: int = -1
+var siege_left: float = 0.0
+## 불씨 땅: 자리마다 {at, warn(미리 보임 남은 초), burn(타는 남은 초)}.
+var embers: Array[Dictionary] = []
+var _ember_t: float = 0.0
+var _burn_acc: float = 0.0
+## 무덤: 다시 일어날 망령 {at, t(남은 초), kind, hp}.
+var graves: Array[Dictionary] = []
+## 목표를 이뤄 판이 끝날 때 더하는 조각(사냥).
+var goal_shards: int = 0
+## 지난 밤의 결과: goal, rule, ok(이뤘는지), free(받은 공짜 뽑기), shards, heal(되찾은 체력), fled(우두머리가 달아났는지).
+var last_night: Dictionary = {}
+
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	data = game_data
@@ -124,6 +173,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	moves = Moves.new(self)
 	tokens = Tokens.new(self)
 	foes = Foes.new(self)
+	night_total = data.run.night_length
 	lord.hp = max_hp()
 	_new_day()
 	if meta:
@@ -209,11 +259,19 @@ func step(input: LordInput = null) -> void:
 func start_night() -> void:
 	if phase != Phase.DAY or pull_hilt != null or pending != null or altar_open:
 		return
+	var R := data.run
 	phase = Phase.NIGHT
-	night_left = data.run.night_length
-	_spawn_t = data.run.spawn_first
+	goal = next_goal
+	rule = next_rule
+	if zone == 0 or last_zone():
+		goal = &"survive"
+		rule = &""
+	night_total = R.siege_night if goal == &"siege" else R.night_length
+	night_left = night_total
+	_spawn_t = R.spawn_first
 	boss_out = false
-	elite_out = false
+	# 사냥하는 밤에는 우두머리가 정예를 대신한다
+	elite_out = goal == &"hunt"
 	callers_out = 0
 	enemy_projectiles.clear()
 	hilts.clear()
@@ -221,7 +279,11 @@ func start_night() -> void:
 	moves.clear()
 	tokens.reset()
 	powers.on_night_start()
+	_start_goal()
+	night_goal_changed.emit(goal, rule)
 	night_started.emit(zone)
+	if siege >= 0:
+		siege_side.emit(siege)
 
 
 ## 관리용: 지금 밤을 바로 끝낸다(마지막 구역이면 이긴 것으로 친다).
@@ -255,6 +317,7 @@ func _new_day() -> void:
 			if a.pos.distance_to(lord.pos) >= 3.0 and hilts.all(func(h: Hilt) -> bool: return h.pos.distance_to(a.pos) >= 1.8):
 				break
 		altar = a
+	_roll_next_night()
 	day_started.emit(zone)
 
 
@@ -268,17 +331,30 @@ func _hilt_spot_ok(p: Vector2) -> bool:
 
 
 func _end_night() -> void:
+	var reward := _goal_reward()
 	enemies.clear()
 	enemy_projectiles.clear()
 	_end_hook()
 	moves.clear()
+	embers.clear()
+	graves.clear()
+	hunt_boss = null
+	if siege >= 0:
+		siege = -1
+		siege_side.emit(-1)
 	if last_zone():
 		phase = Phase.OVER
 		won = true
 		run_ended.emit(true)
 		return
+	free_pulls = mini(data.run.max_free_pulls, free_pulls + int(reward.free))
+	goal_shards += int(reward.shards)
 	zone += 1
-	lord.hp = minf(max_hp(), lord.hp + heal_at_dawn())
+	var before: float = lord.hp
+	lord.hp = minf(max_hp(), lord.hp + heal_at_dawn() * float(reward.heal_k))
+	reward["heal"] = lord.hp - before
+	reward.erase("heal_k")
+	last_night = reward
 	_new_day()
 
 
@@ -598,6 +674,9 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		if e.elite:
 			elites_killed += 1
 			free_pulls = mini(data.run.max_free_pulls, free_pulls + 1)
+		if e.hunt:
+			hunt_killed = true
+		_note_grave(e)
 		powers.on_kill(e)
 		enemy_died.emit(e)
 		# 심지가 타는 동안 쓰러진 자폭병은 바로 터진다
@@ -633,17 +712,31 @@ func lord_died() -> void:
 
 func _step_night() -> void:
 	var R := data.run
+	# 사냥: 우두머리를 쓰러뜨리면 그 자리에서 새벽이 온다
+	if hunt_killed:
+		_end_night()
+		return
 	night_left -= dt
-	var prog: float = 1.0 - maxf(0.0, night_left) / R.night_length
-	if last_zone() and not boss_out and night_left <= R.night_length * R.boss_at:
+	var prog: float = 1.0 - maxf(0.0, night_left) / night_total
+	if last_zone() and not boss_out and night_left <= night_total * R.boss_at:
 		boss_out = true
 		boss_spawned.emit(_spawn(&"boss"))
+	if goal == &"hunt" and not hunt_out and prog >= R.hunt_at:
+		hunt_out = true
+		boss_spawned.emit(_spawn_hunt())
 	if not elite_out and prog > R.elite_at:
 		elite_out = true
 		elite_spawned.emit(_spawn_elite())
+	_step_siege()
+	_step_graves()
+	_step_embers()
+	if phase != Phase.NIGHT:
+		return
 	_spawn_t -= dt
 	if _spawn_t <= 0.0 and enemies.size() < R.max_enemies and (night_left > 0.0 or last_zone()):
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
+		if goal == &"siege":
+			_spawn_t /= maxf(0.01, R.siege_spawn)
 		var r: float = rng.randf()
 		# 새 적(구역마다 RunData의 확률). 나머지 몫 안에서 망령·늑대·거인을 예전 비율로 나눈다
 		var extra: float = _extra_total()
@@ -662,7 +755,7 @@ func _step_night() -> void:
 				kind = &"wraith"
 			else:
 				callers_out += 1
-		_spawn(kind)
+		_mark_beacon(_spawn(kind))
 	if night_left <= 0.0 and (not last_zone() or (boss_out and not boss_alive())):
 		_end_night()
 
@@ -698,7 +791,8 @@ func boss_alive() -> bool:
 ## 싸움터 네 변 바깥 한 칸에서 나온다.
 func _spawn(kind: StringName) -> Enemy:
 	var size := Vector2(Grid.size)
-	var side: int = rng.randi_range(0, 3)
+	# 포위하는 밤에는 정해진 변에서만
+	var side: int = siege if siege >= 0 else rng.randi_range(0, 3)
 	var p := Vector2.ZERO
 	match side:
 		0:
@@ -760,14 +854,16 @@ func _step_enemies() -> void:
 				if o != e and not o.dead and o.pos.distance_squared_to(e.pos) < best:
 					best = o.pos.distance_squared_to(e.pos)
 					foe = o
-		var target: Vector2 = foe.pos if foe else lord.pos
+		# 봉화를 노리는 적은 봉화가 타는 동안 표 없이 봉화를 친다
+		var burn_it: bool = foe == null and at_beacon(e)
+		var target: Vector2 = foe.pos if foe else (beacon_pos if burn_it else lord.pos)
 		var to: Vector2 = target - e.pos
 		var d: float = to.length()
 		if d > 0.001:
 			foes.turn(e, to / d, dt)
 		e.cooldown -= dt
 		# 망각으로 다른 적을 치거나 표가 들지 않는 적(언덕지기)은 표 없이 덤빈다
-		var free_hand: bool = foe != null or tokens.cost(e) <= 0
+		var free_hand: bool = foe != null or burn_it or tokens.cost(e) <= 0
 		if not free_hand:
 			tokens.hold(e, d, dt)
 		# 새 적의 걸음과 행동(활잡이, 돌격병, 자폭병의 심지, 부르는 자). 맡았으면 아래를 건너뛴다
@@ -775,12 +871,14 @@ func _step_enemies() -> void:
 			continue
 		if not free_hand and e.token <= 0:
 			tokens.wait_move(e, to, d, e.data.speed * k, dt)
-		elif d > e.radius + reach + (foe.radius if foe else 0.0):
+		elif d > e.radius + reach + (foe.radius if foe else (data.run.beacon_radius if burn_it else 0.0)):
 			e.pos += e.face * e.data.speed * k * dt
 		elif e.cooldown <= 0.0 and e.windup <= 0.0:
 			e.cooldown = e.data.cooldown
 			if foe:
 				hurt(foe, e.damage, Vector2.ZERO, false)
+			elif burn_it:
+				hit_beacon(e.damage)
 			else:
 				_hurt_lord(e.damage, e)
 				# 한 번 때리면(피해를 줬든 막혔든) 표를 돌려놓는다
@@ -797,6 +895,7 @@ func _step_enemies() -> void:
 				var p: Vector2 = dv * ((m - d) / 2.0 / d)
 				a.pos -= p
 				b.pos += p
+	_keep_off_beacon()
 	var alive: Array[Enemy] = []
 	for e in enemies:
 		if not e.dead:
@@ -824,6 +923,247 @@ func _spawn_elite() -> Enemy:
 	e.damage *= R.elite_damage
 	e.radius *= R.elite_size
 	return e
+
+
+# ---------------------------------------------------------------- 밤의 목표와 구역 규칙(12단계)
+
+## 다음 밤의 목표와 구역 규칙을 정한다(낮이 될 때). 2~9구역은 13단계의 갈림길이 고르기 전까지 rng로 정한다.
+## 1구역과 마지막 구역은 start_night가 버티기(언덕지기)로 둔다.
+func _roll_next_night() -> void:
+	var R := data.run
+	if zone == 0 or last_zone() or R.night_goals.is_empty():
+		next_goal = &"survive"
+		next_rule = &""
+		return
+	var g := StringName(R.night_goals[rng.randi_range(0, R.night_goals.size() - 1)])
+	var z: StringName = &""
+	if not R.zone_rules.is_empty():
+		z = StringName(R.zone_rules[rng.randi_range(0, R.zone_rules.size() - 1)])
+	set_next_night(g, z)
+
+
+## 다음 밤의 목표와 구역 규칙을 바꾼다(13단계 갈림길, 관리, 테스트). 모르는 값이면 그대로 둔다.
+## 1구역과 마지막 구역의 밤은 이것과 상관없이 버티기다.
+func set_next_night(g: StringName, z: StringName) -> void:
+	if not GOALS.has(g) or not ZONE_RULES.has(z):
+		return
+	next_goal = g
+	next_rule = z
+
+
+## 밤이 시작될 때 목표와 구역 규칙의 상태를 새로 둔다.
+func _start_goal() -> void:
+	var R := data.run
+	beacon_max = 0.0
+	beacon_hp = 0.0
+	beacon_lost = false
+	if goal == &"defend":
+		beacon_pos = (Grid.middle() + R.beacon_offset).clamp(Vector2(1.0, 1.0), Vector2(Grid.size) - Vector2(1.0, 1.0))
+		beacon_max = R.beacon_hp * R.zone_hp[mini(zone, R.zone_hp.size() - 1)]
+		beacon_hp = beacon_max
+	hunt_out = false
+	hunt_boss = null
+	hunt_killed = false
+	siege = -1
+	siege_left = 0.0
+	if goal == &"siege":
+		siege = rng.randi_range(0, 3)
+		siege_left = R.siege_switch
+	embers.clear()
+	graves.clear()
+	_ember_t = R.ember_every
+	_burn_acc = 0.0
+
+
+## 새벽의 보상. heal_k는 새벽 회복에 곱한다(봉화가 꺼지면 절반).
+func _goal_reward() -> Dictionary:
+	var R := data.run
+	var out := {"goal": goal, "rule": rule, "ok": false, "free": 0, "shards": 0, "heal_k": 1.0, "fled": false}
+	match goal:
+		&"defend":
+			out.ok = not beacon_lost
+			out.free = R.defend_free if out.ok else 0
+			out.heal_k = 1.0 if out.ok else R.beacon_out_heal
+		&"hunt":
+			out.ok = hunt_killed
+			out.fled = hunt_out and not hunt_killed
+			if out.ok:
+				out.free = R.hunt_free
+				out.shards = R.hunt_shards
+		&"siege":
+			out.ok = true
+			out.free = R.siege_free
+	return out
+
+
+## 그 적이 지금 봉화를 노리는지(봉화가 타는 동안만).
+func at_beacon(e: Enemy) -> bool:
+	return e.beacon and beacon_hp > 0.0
+
+
+## 봉화를 친다. 0이 되면 꺼진다(밤은 이어진다).
+func hit_beacon(damage: float) -> void:
+	if beacon_hp <= 0.0:
+		return
+	beacon_hp = maxf(0.0, beacon_hp - damage)
+	beacon_hit.emit(beacon_hp, beacon_max)
+	if beacon_hp <= 0.0:
+		beacon_lost = true
+		beacon_out.emit()
+
+
+## 지키는 밤에 새로 나온 적의 몫(beacon_share)은 봉화를 노린다(beacon_kinds만).
+func _mark_beacon(e: Enemy) -> void:
+	var R := data.run
+	if beacon_hp > 0.0 and R.beacon_kinds.has(String(e.data.id)) and rng.randf() < R.beacon_share:
+		e.beacon = true
+
+
+## 봉화(돌 받침) 안으로는 영주도 적도 들어오지 못한다.
+func _keep_off_beacon() -> void:
+	if beacon_max <= 0.0:
+		return
+	var br: float = data.run.beacon_radius
+	for e in enemies:
+		e.pos = _push_out(e.pos, br + e.radius)
+	lord.pos = _push_out(lord.pos, br)
+
+
+func _push_out(p: Vector2, r: float) -> Vector2:
+	var v: Vector2 = p - beacon_pos
+	var d: float = v.length()
+	if d >= r:
+		return p
+	return beacon_pos + (v / d if d > 0.0001 else Vector2.DOWN) * r
+
+
+## 사냥의 우두머리: 이 구역에서 나올 수 있는 적(hunt_kinds) 하나를 정예로, 체력은 hunt_hp배.
+func _spawn_hunt() -> Enemy:
+	var R := data.run
+	var kinds: Array[StringName] = []
+	for k in R.hunt_kinds:
+		var id := StringName(k)
+		if data.enemies.has(id) and _can_appear(id):
+			kinds.append(id)
+	var kind: StringName = kinds[rng.randi_range(0, kinds.size() - 1)] if not kinds.is_empty() else &"wraith"
+	var e := _spawn(kind)
+	e.elite = true
+	e.hunt = true
+	e.max_hp *= R.hunt_hp
+	e.hp = e.max_hp
+	e.damage *= R.elite_damage
+	e.radius *= R.elite_size
+	hunt_boss = e
+	return e
+
+
+## 그 종류가 지금 구역의 밤에 나올 수 있는지.
+func _can_appear(kind: StringName) -> bool:
+	match kind:
+		&"wraith", &"wolf":
+			return true
+		&"giant":
+			return zone >= 1
+	return RunData.EXTRA_KINDS.has(kind) and data.run.extra_chance(kind, zone) > 0.0
+
+
+## 포위: siege_switch초마다 다른 변으로.
+func _step_siege() -> void:
+	if siege < 0:
+		return
+	siege_left -= dt
+	if siege_left > 0.0:
+		return
+	siege_left += data.run.siege_switch
+	var n: int = rng.randi_range(0, 2)
+	siege = n if n < siege else n + 1
+	siege_side.emit(siege)
+
+
+## 무덤: 쓰러진 망령(우두머리·언덕지기·이미 일어난 것은 빼고)이 grave_chance로 grave_delay초 뒤 다시 일어난다.
+func _note_grave(e: Enemy) -> void:
+	var R := data.run
+	if rule != &"graves" or phase != Phase.NIGHT or not e.data.wraith or e.risen or e.hunt or e.data.boss:
+		return
+	if rng.randf() < R.grave_chance:
+		graves.append({"at": e.pos, "t": R.grave_delay, "kind": e.data.id, "hp": e.max_hp * R.grave_hp})
+
+
+func _step_graves() -> void:
+	if graves.is_empty():
+		return
+	var keep: Array[Dictionary] = []
+	var rise: Array[Dictionary] = []
+	for g in graves:
+		g.t -= dt
+		if g.t > 0.0:
+			keep.append(g)
+		else:
+			rise.append(g)
+	graves = keep
+	for g in rise:
+		var e := spawn_at(g.kind, g.at)
+		e.risen = true
+		e.max_hp = g.hp
+		e.hp = g.hp
+		grave_rise.emit(g.at)
+
+
+## 불씨 땅: ember_every초마다 ember_count곳이 ember_warn초 미리 보이고 ember_burn초 동안 탄다.
+## 안에 있으면 영주는 초당 ember_lord(겹쳐도 한 번), 적은 초당 ember_enemy.
+func _step_embers() -> void:
+	if rule != &"embers":
+		return
+	var R := data.run
+	_ember_t -= dt
+	if _ember_t <= 0.0:
+		_ember_t += R.ember_every
+		if night_left > 0.0:
+			var size := Vector2(Grid.size)
+			for i in R.ember_count:
+				var at := Vector2(rng.randf_range(2.0, size.x - 2.0), rng.randf_range(2.0, size.y - 2.0))
+				embers.append({"at": at, "warn": R.ember_warn, "burn": R.ember_burn})
+				ember_warn.emit(at, R.ember_radius, R.ember_warn)
+	var lit: Array[Vector2] = []
+	var keep: Array[Dictionary] = []
+	for f in embers:
+		if f.warn > 0.0:
+			f.warn -= dt
+			if f.warn <= 0.0:
+				ember_burn.emit(f.at, R.ember_radius, R.ember_burn)
+			keep.append(f)
+			continue
+		f.burn -= dt
+		if f.burn > 0.0:
+			keep.append(f)
+			lit.append(f.at)
+	embers = keep
+	if lit.is_empty():
+		return
+	for e in enemies.duplicate():
+		if e.dead:
+			continue
+		for at in lit:
+			if e.pos.distance_to(at) <= R.ember_radius:
+				hurt(e, R.ember_enemy * dt, Vector2.ZERO, false, true)
+				break
+	for at in lit:
+		if lord.pos.distance_to(at) <= R.ember_radius:
+			_burn_lord(R.ember_lord * dt)
+			break
+
+
+## 불에 타는 영주: 무적·돌진과 상관없이 조금씩 닳는다. 맞음 신호는 1초 몫이 쌓일 때마다 한 번.
+func _burn_lord(d: float) -> void:
+	if debug_god or phase != Phase.NIGHT:
+		return
+	lord.hp -= d
+	_burn_acc += d
+	if _burn_acc >= maxf(1.0, data.run.ember_lord):
+		lord_hurt.emit(_burn_acc)
+		_burn_acc = 0.0
+	if lord.hp <= 0.0 and not powers.save_from_death():
+		lord_died()
 
 
 # ---------------------------------------------------------------- 제단
@@ -901,6 +1241,11 @@ func state_hash() -> int:
 	parts.append(tokens.cooling)
 	parts.append(lord.push)
 	parts.append(callers_out)
+	parts.append_array([goal, rule, next_goal, next_rule, night_total, beacon_hp, beacon_lost, hunt_out, hunt_killed, siege, siege_left, _ember_t, goal_shards])
+	for f in embers:
+		parts.append_array([f.at, f.warn, f.burn])
+	for g in graves:
+		parts.append_array([g.at, g.t, g.kind, g.hp])
 	for e in enemies:
 		parts.append(e.pos)
 		parts.append(e.hp)
@@ -909,6 +1254,7 @@ func state_hash() -> int:
 		parts.append(e.act_t)
 		parts.append(e.guard_down)
 		parts.append(e.summoned)
+		parts.append_array([e.beacon, e.hunt, e.risen])
 	for s in slots:
 		parts.append(s.data.id if s else -1)
 		parts.append(s.durability if s else -1.0)

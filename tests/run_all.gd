@@ -64,6 +64,15 @@ func _init() -> void:
 	_test_caller()
 	_test_foes_tokens()
 	_test_foes_replay()
+	_test_night_choice()
+	_test_defend()
+	_test_hunt()
+	_test_siege()
+	_test_fog()
+	_test_embers()
+	_test_graves()
+	_test_goal_rewards()
+	_test_goals_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -2491,3 +2500,369 @@ func _test_foes_replay() -> void:
 		counts.append(acts[0])
 	check(hashes[0] == hashes[1] and logs[0] == logs[1], "새 적: 같은 시드·같은 입력이면 행동과 결과가 같다(state_hash)")
 	check(counts[0] > 20 and logs[0].contains("aim") and logs[0].contains("fuse") and logs[0].contains("call"), "새 적: 다시 돌린 밤에서 다섯 종이 실제로 움직였다(행동 %d)" % counts[0])
+
+
+# ---------------------------------------------------------------- 12단계: 밤의 목표와 구역 규칙
+
+## 그 목표와 구역 규칙의 밤(3구역, 0부터 2). 영주는 다치지 않는다.
+func _goal_rules(goal: StringName, rule: StringName = &"", g: GameData = null, seed: int = 21) -> Rules:
+	var r := Rules.new(g if g else d, seed)
+	r.zone = 2
+	r.debug_god = true
+	r.set_next_night(goal, rule)
+	r.start_night()
+	return r
+
+
+## 그 값만 바꾼 표.
+func _run_data(values: Dictionary) -> GameData:
+	var g := GameData.load_default()
+	g.run = d.run.duplicate() as RunData
+	for k in values:
+		g.run.set(k, values[k])
+	return g
+
+
+func _test_night_choice() -> void:
+	var r := Rules.new(d, 31)
+	var got: Array = []
+	r.night_goal_changed.connect(func(gl: StringName, rl: StringName) -> void: got.append([gl, rl]))
+	r.set_next_night(&"siege", &"embers")
+	r.start_night()
+	check(r.goal == &"survive" and r.rule == &"" and got == [[&"survive", &""]], "목표: 1구역은 늘 버티기(구역 규칙 없음), night_goal_changed")
+	check(is_equal_approx(r.night_total, d.run.night_length) and r.beacon_max == 0.0 and r.siege < 0, "버티기: 지금과 같다(75초, 봉화·포위 없음)")
+	var seen := {}
+	var rules_seen := {}
+	var valid: Array[bool] = [true]
+	for sd in 60:
+		var q := Rules.new(d, 400 + sd)
+		q.debug_god = true
+		q.start_night()
+		q.skip_night()
+		seen[q.next_goal] = true
+		rules_seen[q.next_rule] = true
+		valid[0] = valid[0] and Rules.GOALS.has(q.next_goal) and Rules.ZONE_RULES.has(q.next_rule)
+	check(valid[0], "목표: 2구역의 목표와 구역 규칙은 표에 있는 값")
+	check(seen.size() == 4 and rules_seen.size() == 4, "목표: 2~9구역은 rng로 네 목표와 네 규칙(없음 포함)이 다 나온다(%d, %d)" % [seen.size(), rules_seen.size()])
+	var a := Rules.new(d, 77)
+	var b := Rules.new(d, 77)
+	for q in [a, b]:
+		q.debug_god = true
+		q.start_night()
+		q.skip_night()
+	check(a.next_goal == b.next_goal and a.next_rule == b.next_rule, "목표: 같은 시드면 같은 목표")
+	a.set_next_night(&"hunt", &"graves")
+	a.start_night()
+	check(a.goal == &"hunt" and a.rule == &"graves", "목표: set_next_night로 고른 목표가 그 밤에 쓰인다(13단계 갈림길)")
+	a.set_next_night(&"nope", &"")
+	check(a.next_goal == &"hunt", "목표: 모르는 값은 무시한다")
+	var last := Rules.new(d, 32)
+	last.zone = last.zone_count() - 1
+	last.set_next_night(&"defend", &"fog")
+	last.start_night()
+	check(last.goal == &"survive" and last.rule == &"" and last.beacon_max == 0.0, "목표: 마지막 구역은 지금과 같다(언덕지기)")
+
+
+func _test_defend() -> void:
+	var r := _goal_rules(&"defend")
+	var zi: int = 2
+	check(r.goal == &"defend" and is_equal_approx(r.beacon_max, d.run.beacon_hp * d.run.zone_hp[zi]) and r.beacon_hp == r.beacon_max, "지키기: 봉화 체력 300 × 구역 체력 배수")
+	check(r.beacon_pos.distance_to(Grid.middle()) < 4.0, "지키기: 봉화는 싸움터 가운데 근처")
+	# 나오는 적의 40%쯤이 봉화를 노린다
+	var born: Array[Enemy] = []
+	r.enemy_spawned.connect(func(e: Enemy) -> void: born.append(e))
+	for t in 30 * 40:
+		r.step()
+	var marked: Array[int] = [0, 0]
+	for e in born:
+		if d.run.beacon_kinds.has(String(e.data.id)) and not e.elite:
+			marked[0] += 1
+			marked[1] += 1 if e.beacon else 0
+		elif e.beacon:
+			marked[1] += 1000
+	var share: float = float(marked[1]) / maxf(1.0, marked[0])
+	check(marked[0] > 30 and share > 0.25 and share < 0.55, "지키기: 적의 40%%쯤이 봉화를 노린다(%d / %d)" % [marked[1], marked[0]])
+	# 봉화를 노리는 적은 표 없이 봉화를 때린다
+	var q := _goal_rules(&"defend")
+	q._spawn_t = 1e9
+	q.elite_out = true
+	q.enemies.clear()
+	q.lord.pos = q.beacon_pos + Vector2(10.0, 0.0)
+	var hits: Array = []
+	var outs: Array[int] = [0]
+	q.beacon_hit.connect(func(hp: float, mx: float) -> void: hits.append([hp, mx]))
+	q.beacon_out.connect(func() -> void: outs[0] += 1)
+	var e := q.spawn_at(&"wraith", q.beacon_pos + Vector2(-3.0, 0.0))
+	e.beacon = true
+	var tokened: Array[bool] = [false]
+	for t in 30 * 6:
+		q.step()
+		if e.token > 0:
+			tokened[0] = true
+	check(hits.size() >= 2 and not tokened[0] and q.beacon_hp < q.beacon_max, "지키기: 봉화를 노리는 적은 표 없이 봉화를 때린다(beacon_hit %d번)" % hits.size())
+	check(e.pos.distance_to(q.beacon_pos) >= d.run.beacon_radius + e.radius - 0.01, "지키기: 봉화 안으로는 들어오지 못한다")
+	check(hits.size() > 0 and is_equal_approx(float(hits[0][1]), q.beacon_max), "지키기: beacon_hit(hp, max)")
+	q.hit_beacon(99999.0)
+	check(q.beacon_hp == 0.0 and q.beacon_lost and outs[0] == 1 and q.phase == Rules.Phase.NIGHT, "지키기: 봉화가 꺼지면 beacon_out, 밤은 이어진다")
+	q.hit_beacon(10.0)
+	check(outs[0] == 1, "지키기: 꺼진 봉화는 다시 꺼지지 않는다")
+	# 꺼진 뒤에는 영주를 노린다(표를 청한다)
+	q.lord.pos = e.pos + Vector2(3.0, 0.0)
+	for t in 30 * 3:
+		q.step()
+	check(not q.at_beacon(e) and e.pos.distance_to(q.lord.pos) < 3.0, "지키기: 봉화가 꺼지면 그 적도 영주에게 온다")
+
+
+func _test_hunt() -> void:
+	var r := _goal_rules(&"hunt")
+	var bosses: Array[Enemy] = []
+	var elites: Array[Enemy] = []
+	var at: Array[float] = [-1.0]
+	r.boss_spawned.connect(func(e: Enemy) -> void:
+		bosses.append(e)
+		at[0] = 1.0 - r.night_left / r.night_total)
+	r.elite_spawned.connect(func(e: Enemy) -> void: elites.append(e))
+	for t in 30 * 30:
+		r.step()
+	check(bosses.size() == 1 and absf(at[0] - d.run.hunt_at) < 0.02, "사냥: 밤이 20%% 지나면 우두머리가 나온다(%.2f)" % at[0])
+	var b: Enemy = bosses[0] if bosses.size() > 0 else null
+	check(b != null and b.hunt and b.elite and r.hunt_boss == b and not b.data.boss, "사냥: 우두머리는 이 구역의 적 하나를 정예로 한 것")
+	if b:
+		var zi: int = 2
+		check(is_equal_approx(b.max_hp, b.data.hp * d.run.zone_hp[zi] * d.run.hunt_hp) and is_equal_approx(b.radius, b.data.radius * d.run.elite_size), "사냥: 체력 ×4, 몸이 크다")
+		check(d.run.hunt_kinds.has(String(b.data.id)) and r._can_appear(b.data.id), "사냥: 이 구역에서 나올 수 있는 적")
+	check(elites.is_empty(), "사냥: 우두머리가 그 밤의 정예를 대신한다")
+	var days: Array[int] = []
+	r.day_started.connect(func(z: int) -> void: days.append(z))
+	var left: float = r.night_left
+	r.hurt(b, 999999.0, Vector2.ZERO, false)
+	r.step()
+	check(r.phase == Rules.Phase.DAY and days == [3] and left > 10.0, "사냥: 쓰러뜨리면 그 자리에서 새벽이 온다")
+	check(r.last_night.goal == &"hunt" and r.last_night.ok and not r.last_night.fled, "사냥: 결과에 남는다")
+	# 못 쓰러뜨리면 달아난다
+	var q := _goal_rules(&"hunt")
+	for t in roundi(q.night_total * 30) + 5:
+		q.step()
+		if q.phase != Rules.Phase.NIGHT:
+			break
+	check(q.phase == Rules.Phase.DAY and q.zone == 3 and q.last_night.fled and not q.last_night.ok and q.enemies.is_empty(), "사냥: 밤이 끝날 때까지 못 쓰러뜨리면 달아난다")
+	check(q.goal_shards == 0, "사냥: 달아나면 보상이 없다")
+	# 1구역 적만 나오는 곳에서는 망령·늑대만
+	var only := _goal_rules(&"hunt")
+	only.zone = 0
+	var kinds := {}
+	for t in 20:
+		kinds[only._spawn_hunt().data.id] = true
+	check(kinds.keys().all(func(k: StringName) -> bool: return k == &"wraith" or k == &"wolf"), "사냥: 1구역의 적에서 고른다(%s)" % str(kinds.keys()))
+
+
+func _test_siege() -> void:
+	var r := _goal_rules(&"siege")
+	var sides: Array[int] = []
+	r.siege_side.connect(func(sd: int) -> void: sides.append(sd))
+	check(is_equal_approx(r.night_total, d.run.siege_night) and is_equal_approx(r.night_left, 60.0), "포위: 밤 길이 60초")
+	check(r.siege >= 0 and r.siege <= 3, "포위: 시작할 때 변 하나")
+	var first: int = r.siege
+	var spawned: Array[Enemy] = []
+	r.enemy_spawned.connect(func(e: Enemy) -> void: spawned.append(e))
+	var size := Vector2(Grid.size)
+	var bad: Array[int] = [0]
+	var cur: Array[int] = [first]
+	r.siege_side.connect(func(sd: int) -> void: cur[0] = sd)
+	r.enemy_spawned.connect(func(e: Enemy) -> void:
+		if e.summoned > 0:
+			return
+		var p := e.pos
+		var ok: bool = [p.y < 0.0, p.y > size.y, p.x < 0.0, p.x > size.x][cur[0]] if cur[0] >= 0 else true
+		if not ok:
+			bad[0] += 1)
+	for t in 30 * 21:
+		r.step()
+	check(sides.size() == 1 and sides[0] != first and sides[0] >= 0, "포위: 20초마다 다른 변으로(siege_side)")
+	check(spawned.size() > 10 and bad[0] == 0, "포위: 적이 한 변에서만 나온다(%d마리, 어긋남 %d)" % [spawned.size(), bad[0]])
+	# 나오는 빠르기 ×1.4
+	var plain := _goal_rules(&"survive")
+	var n: Array[int] = [0, 0]
+	plain.enemy_spawned.connect(func(_e: Enemy) -> void: n[0] += 1)
+	var s2 := _goal_rules(&"siege")
+	s2.enemy_spawned.connect(func(_e: Enemy) -> void: n[1] += 1)
+	for t in 30 * 18:
+		plain.step()
+		s2.step()
+	check(float(n[1]) > float(n[0]) * 1.2, "포위: 적이 더 빨리 나온다(%d → %d)" % [n[0], n[1]])
+	var ends: Array[int] = []
+	s2.siege_side.connect(func(sd: int) -> void: ends.append(sd))
+	for t in 30 * 50:
+		s2.step()
+		if s2.phase != Rules.Phase.NIGHT:
+			break
+	check(s2.phase == Rules.Phase.DAY and ends.size() > 0 and ends[-1] == -1 and s2.siege == -1, "포위: 60초면 새벽, 끝나면 siege_side(-1)")
+
+
+func _test_fog() -> void:
+	var a := _goal_rules(&"survive", &"fog", null, 55)
+	var b := _goal_rules(&"survive", &"", null, 55)
+	check(a.rule == &"fog", "짙은 안개: 구역 규칙이 붙는다")
+	for t in 30 * 20:
+		a.step(_inp(Vector2(0.3, 0.1), true))
+		b.step(_inp(Vector2(0.3, 0.1), true))
+	var same: bool = a.enemies.size() == b.enemies.size() and a.kills == b.kills and a.lord.pos == b.lord.pos
+	for i in mini(a.enemies.size(), b.enemies.size()):
+		same = same and a.enemies[i].pos == b.enemies[i].pos and a.enemies[i].hp == b.enemies[i].hp
+	check(same and a.rng.state == b.rng.state, "짙은 안개: 화면만 바뀌고 규칙은 같다")
+
+
+func _test_embers() -> void:
+	var r := _goal_rules(&"survive", &"embers")
+	r._spawn_t = 1e9
+	r.elite_out = true
+	r.enemies.clear()
+	r.debug_god = false
+	var warns: Array = []
+	var burns: Array = []
+	r.ember_warn.connect(func(at: Vector2, rad: float, tm: float) -> void: warns.append([r.tick, at, rad, tm]))
+	r.ember_burn.connect(func(at: Vector2, rad: float, tm: float) -> void: burns.append([r.tick, at, rad, tm]))
+	var t0: int = r.tick
+	for t in roundi(d.run.ember_every * 30) + 2:
+		r.step()
+	check(warns.size() == 3 and burns.is_empty(), "불씨 땅: 8초마다 3곳이 미리 보인다(%d)" % warns.size())
+	check(warns.size() > 0 and is_equal_approx(warns[0][2], 1.5) and is_equal_approx(warns[0][3], 1.0) and absf((warns[0][0] - t0) / 30.0 - 8.0) < 0.1, "불씨 땅: 반지름 1.5칸, 1초 미리")
+	# 불이 붙을 자리에 영주와 적을 세운다
+	var at: Vector2 = r.embers[0].at
+	r.lord.pos = at
+	var e := r.spawn_at(&"giant", at + Vector2(0.5, 0.0))
+	e.stun = 99.0
+	e.max_hp = 9999.0
+	e.hp = 9999.0
+	var hp0: float = r.lord.hp
+	var hurt_n: Array[int] = [0]
+	r.lord_hurt.connect(func(_d: float) -> void: hurt_n[0] += 1)
+	for t in 32:
+		r.step()
+		r.lord.pos = at
+		e.pos = at + Vector2(0.5, 0.0)
+	check(burns.size() == 3 and is_equal_approx(burns[0][3], 4.0), "불씨 땅: 1초 뒤 4초 동안 탄다(ember_burn)")
+	var lord_lost: float = hp0 - r.lord.hp
+	for t in 30:
+		r.step()
+		r.lord.pos = at
+		e.pos = at + Vector2(0.5, 0.0)
+	var per_s: float = hp0 - r.lord.hp - lord_lost
+	check(absf(per_s - 4.0) < 0.3, "불씨 땅: 안에 있으면 영주 초당 4(%.2f)" % per_s)
+	check(hurt_n[0] >= 1, "불씨 땅: 영주가 타면 맞음 신호(1초 몫마다)")
+	var e_hp0: float = e.hp
+	for t in 30:
+		r.step()
+		r.lord.pos = at
+		e.pos = at + Vector2(0.5, 0.0)
+	check(absf(e_hp0 - e.hp - 8.0) < 0.5, "불씨 땅: 적 초당 8(%.2f)" % (e_hp0 - e.hp))
+	for t in 30 * 3:
+		r.step()
+	check(r.embers.size() <= 3, "불씨 땅: 다 탄 자리는 사라진다")
+	var none := _goal_rules(&"survive", &"")
+	var w2: Array[int] = [0]
+	none.ember_warn.connect(func(_a: Vector2, _b: float, _c: float) -> void: w2[0] += 1)
+	for t in 30 * 10:
+		none.step()
+	check(w2[0] == 0, "불씨 땅: 규칙이 없으면 불이 없다")
+
+
+func _test_graves() -> void:
+	var g := _run_data({"grave_chance": 1.0})
+	var r := _goal_rules(&"survive", &"graves", g)
+	r._spawn_t = 1e9
+	r.elite_out = true
+	r.enemies.clear()
+	var rises: Array = []
+	r.grave_rise.connect(func(at: Vector2) -> void: rises.append([r.tick, at]))
+	var w := r.spawn_at(&"wraith", r.lord.pos + Vector2(5.0, 0.0))
+	w.stun = 99.0
+	var at: Vector2 = w.pos
+	var mhp: float = w.max_hp
+	var t0: int = r.tick
+	r.hurt(w, 99999.0, Vector2.ZERO, false)
+	var wolf := r.spawn_at(&"wolf", r.lord.pos + Vector2(-5.0, 0.0))
+	r.hurt(wolf, 99999.0, Vector2.ZERO, false)
+	for t in 30 * 4:
+		r.step()
+	check(rises.size() == 1 and absf((rises[0][0] - t0) / 30.0 - 3.0) < 0.1 and rises[0][1] == at, "무덤: 쓰러진 망령이 3초 뒤 그 자리에서 일어난다(grave_rise)")
+	var back: Enemy = null
+	for e in r.enemies:
+		if e.risen:
+			back = e
+	check(back != null and back.data.id == &"wraith" and is_equal_approx(back.max_hp, mhp * 0.5) and is_equal_approx(back.hp, mhp * 0.5), "무덤: 체력 절반으로")
+	check(rises.size() == 1, "무덤: 망령만 일어난다(늑대는 아니다)")
+	if back:
+		r.hurt(back, 99999.0, Vector2.ZERO, false)
+	for t in 30 * 4:
+		r.step()
+	check(rises.size() == 1, "무덤: 한 번만 일어난다")
+	# 25%
+	var q := _goal_rules(&"survive", &"graves")
+	q._spawn_t = 1e9
+	q.elite_out = true
+	q.enemies.clear()
+	for i in 400:
+		var e := q.spawn_at(&"wraith", Vector2(3.0, 3.0))
+		q.hurt(e, 99999.0, Vector2.ZERO, false)
+	var p: float = q.graves.size() / 400.0
+	check(p > 0.18 and p < 0.32, "무덤: 25%% 확률(%.2f)" % p)
+	var none := _goal_rules(&"survive", &"")
+	none.hurt(none.spawn_at(&"wraith", Vector2(3.0, 3.0)), 99999.0, Vector2.ZERO, false)
+	check(none.graves.is_empty(), "무덤: 규칙이 없으면 일어나지 않는다")
+
+
+## 새벽의 보상: 공짜 뽑기, 조각, 봉화가 꺼지면 회복 절반.
+func _test_goal_rewards() -> void:
+	var heal: float = d.run.heal_per_dawn
+	var lit := _goal_rules(&"defend")
+	lit.lord.hp = 20.0
+	lit.skip_night()
+	check(lit.free_pulls == d.run.defend_free and is_equal_approx(lit.lord.hp, 20.0 + heal) and lit.last_night.ok, "보상: 봉화를 지키면 다음 낮 공짜 뽑기 +1")
+	var out := _goal_rules(&"defend")
+	out.lord.hp = 20.0
+	out.hit_beacon(999999.0)
+	out.skip_night()
+	check(out.free_pulls == 0 and is_equal_approx(out.lord.hp, 20.0 + heal * 0.5) and not out.last_night.ok and is_equal_approx(out.last_night.heal, heal * 0.5), "보상: 봉화가 꺼지면 보상이 없고 새벽 회복이 절반")
+	var h := _goal_rules(&"hunt")
+	for t in 30 * 16:
+		h.step()
+	var free0: int = h.free_pulls
+	h.hurt(h.hunt_boss, 999999.0, Vector2.ZERO, false)
+	h.step()
+	check(h.phase == Rules.Phase.DAY and h.free_pulls == free0 + 1 + d.run.hunt_free and h.goal_shards == 3, "보상: 사냥은 공짜 뽑기 +1(정예 몫과 따로), 조각 +3")
+	var sh := Meta.run_shards(h, d.meta)
+	check(int(sh.goal) == 3 and int(sh.total) >= 3, "보상: 사냥의 조각은 판이 끝날 때 센다")
+	var sg := _goal_rules(&"siege")
+	sg.skip_night()
+	check(sg.free_pulls == d.run.siege_free and sg.last_night.goal == &"siege", "보상: 포위를 버티면 공짜 뽑기 +1")
+	var sv := _goal_rules(&"survive")
+	sv.skip_night()
+	check(sv.free_pulls == 0 and sv.goal_shards == 0, "보상: 버티기는 없다")
+	var cap := _goal_rules(&"siege")
+	cap.free_pulls = d.run.max_free_pulls
+	cap.skip_night()
+	check(cap.free_pulls == d.run.max_free_pulls, "보상: 공짜 뽑기는 모아 둘 수 있는 수까지")
+
+
+## 같은 시드·같은 입력이면 목표마다 결과가 같다.
+func _test_goals_replay() -> void:
+	var cases: Array = [[&"defend", &"embers"], [&"hunt", &"graves"], [&"siege", &"fog"]]
+	for c in cases:
+		var hashes: Array[int] = []
+		var logs: Array[String] = []
+		for run_i in 2:
+			var r := _goal_rules(c[0], c[1], null, 88)
+			var text: Array[String] = [""]
+			r.beacon_hit.connect(func(hp: float, _m: float) -> void: text[0] += "b%d:%.1f " % [r.tick, hp])
+			r.ember_warn.connect(func(at: Vector2, _r: float, _t: float) -> void: text[0] += "e%d:%s " % [r.tick, at])
+			r.grave_rise.connect(func(at: Vector2) -> void: text[0] += "g%d:%s " % [r.tick, at])
+			r.siege_side.connect(func(sd: int) -> void: text[0] += "s%d:%d " % [r.tick, sd])
+			r.boss_spawned.connect(func(e: Enemy) -> void: text[0] += "h%d:%s " % [r.tick, e.data.id])
+			var rec := RandomNumberGenerator.new()
+			rec.seed = 9
+			for k in 1500:
+				r.step(_inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)), rec.randf() < 0.4, rec.randf() < 0.03))
+			hashes.append(r.state_hash())
+			logs.append(text[0])
+		check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0] != "", "목표 %s·%s: 같은 시드·같은 입력이면 결과가 같다(state_hash)" % [c[0], c[1]])

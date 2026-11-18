@@ -133,7 +133,7 @@ func stats() -> Dictionary:
 	if using("백 명의 이름"):
 		dmg *= 1.0 + minf(T.u("백 명의 이름", "max"), floorf(night_kills / T.u("백 명의 이름", "per")) * T.u("백 명의 이름", "step"))
 	if using("백 년 전쟁") and r.phase == Rules.Phase.NIGHT:
-		var passed: float = r.data.run.night_length - r.night_left
+		var passed: float = r.night_total - r.night_left
 		dmg *= 1.0 + T.u("백 년 전쟁", "step") * floorf(passed / T.u("백 년 전쟁", "every"))
 	if using("부러지지 않는 맹세"):
 		dmg *= 1.0 + minf(T.u("부러지지 않는 맹세", "dmg_max"), oath * T.u("부러지지 않는 맹세", "dmg_step"))

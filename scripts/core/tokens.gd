@@ -140,7 +140,8 @@ func deal(dt: float) -> void:
 	var want: Array[int] = []
 	for i in r.enemies.size():
 		var e := r.enemies[i]
-		if e.dead or cost(e) <= 0:
+		# 봉화를 노리는 적(지키기)은 표 없이 봉화를 친다
+		if e.dead or cost(e) <= 0 or r.at_beacon(e):
 			e.waiting = false
 			continue
 		var d: float = e.pos.distance_to(r.lord.pos)

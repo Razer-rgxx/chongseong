@@ -80,6 +80,52 @@ extends Resource
 ## 기다리는 적이 둘레에서 벗어난 거리를 이 시간(초)에 걸쳐 되돌린다. 작으면 딱딱하고 크면 무르다.
 @export var token_settle: float = 0.3
 
+@export_group("밤: 목표와 구역 규칙(12단계)")
+## 2~9구역(1번부터 8번)의 밤 목표와 구역 규칙을 이 목록에서 고른다(13단계 갈림길 전까지는 Rules.rng로). 1구역은 버티기, 마지막 구역은 언덕지기.
+## 목표: survive 버티기, defend 지키기, hunt 사냥, siege 포위. 구역 규칙: "" 없음, fog 짙은 안개, embers 불씨 땅, graves 무덤.
+@export var night_goals: PackedStringArray = PackedStringArray(["survive", "defend", "hunt", "siege"])
+@export var zone_rules: PackedStringArray = PackedStringArray(["", "fog", "embers", "graves"])
+@export_subgroup("지키기")
+## 봉화 체력(× 구역 체력 배수), 자리(싸움터 가운데에서 떨어진 칸), 크기(칸, 이 안으로는 아무도 못 들어온다).
+@export var beacon_hp: float = 300.0
+@export var beacon_offset: Vector2 = Vector2(0.0, -3.0)
+@export var beacon_radius: float = 0.5
+## 새로 나온 적 중 봉화를 노리는 몫(표 없이 봉화를 때린다). 이 종류만 노린다.
+@export var beacon_share: float = 0.4
+@export var beacon_kinds: PackedStringArray = PackedStringArray(["wraith", "wolf", "giant", "shield"])
+## 봉화가 꺼지면 새벽 회복에 곱한다.
+@export var beacon_out_heal: float = 0.5
+@export_subgroup("사냥")
+## 밤이 이만큼 지나면(0~1) 우두머리가 나온다. 이 구역에서 나올 수 있는 이 종류 중 하나를 정예로 하고 체력은 이 배수(정예 배수 대신).
+@export var hunt_at: float = 0.2
+@export var hunt_hp: float = 4.0
+@export var hunt_kinds: PackedStringArray = PackedStringArray(["wraith", "wolf", "giant", "archer", "shield", "charger"])
+@export_subgroup("포위")
+## 적이 한 변에서만 나오고 이만큼(초)마다 다른 변으로 바뀐다. 나오는 빠르기 배수, 밤 길이.
+@export var siege_switch: float = 20.0
+@export var siege_spawn: float = 1.4
+@export var siege_night: float = 60.0
+@export_subgroup("보상(새벽)")
+## 목표를 이루면 다음 낮의 공짜 뽑기(max_free_pulls까지)와 판이 끝날 때 더하는 조각.
+@export var defend_free: int = 1
+@export var hunt_free: int = 1
+@export var hunt_shards: int = 3
+@export var siege_free: int = 1
+@export_subgroup("불씨 땅")
+## ember_every초마다 ember_count곳이 ember_warn초 미리 보이고(반지름 ember_radius칸) ember_burn초 동안 탄다. 안에 있으면 초당 피해.
+@export var ember_every: float = 8.0
+@export var ember_count: int = 3
+@export var ember_warn: float = 1.0
+@export var ember_radius: float = 1.5
+@export var ember_burn: float = 4.0
+@export var ember_lord: float = 4.0
+@export var ember_enemy: float = 8.0
+@export_subgroup("무덤")
+## 쓰러진 망령이 이 확률로 grave_delay초 뒤 한 번 다시 일어난다(체력 × grave_hp).
+@export var grave_chance: float = 0.25
+@export var grave_delay: float = 3.0
+@export var grave_hp: float = 0.5
+
 @export_group("정예")
 ## 밤이 이만큼 지나면(0~1) 정예가 하나 온다.
 @export var elite_at: float = 0.4

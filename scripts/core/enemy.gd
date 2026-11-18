@@ -35,6 +35,14 @@ var act_to: Vector2 = Vector2.ZERO
 var act_spots: PackedVector2Array = PackedVector2Array()
 var summoned: int = 0
 
+# ---- 밤 목표와 구역 규칙(12단계). 화면은 읽기만 한다.
+## 봉화를 노린다(지키기). 봉화가 타는 동안은 표 없이 봉화를 때리고, 꺼지면 다른 적과 같다.
+var beacon: bool = false
+## 사냥의 우두머리. 쓰러뜨리면 그 자리에서 새벽이 온다.
+var hunt: bool = false
+## 무덤에서 다시 일어난 망령(한 번만 일어난다).
+var risen: bool = false
+
 # ---- 공격 표(Tokens, docs/attack_tokens.md). 화면은 읽기만 한다.
 ## 들고 있는 표 수(없으면 0). 표가 있어야 영주를 때린다.
 var token: int = 0
