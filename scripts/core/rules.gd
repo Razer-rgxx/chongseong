@@ -7,6 +7,7 @@ extends RefCounted
 ## 좌클릭은 검마다 다른 공격 방식(PatternData, 동작 2~4개)이고 Moves(moves.gd)가 돌린다(docs/attacks.md).
 ## 판 사이 성장(Meta): 축복(체력, 운, 뽑기 값, 새벽 회복)과 검집의 검을 들고 시작한다. 정예와 숫돌 제단.
 ## 각인 36종과 고유 능력은 Powers(powers.gd)가 맡고, 이 파일은 정해진 자리에서 부른다.
+## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)의 행동은 Foes(foes.gd)가 맡는다.
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -39,6 +40,11 @@ signal move_area(move: StringName, info: Dictionary)
 ## 날아가는 것(검기, 던진 칼)이 생겼다 / 사라졌다. 위치는 projectiles에서 틱마다 읽는다.
 signal projectile_spawned(p: Projectile)
 signal projectile_ended(p: Projectile)
+## 적이 무엇을 시작했다(docs/content.md 11단계의 act와 info). 이펙트(EnemyFx)와 적 화면이 이것으로 그린다.
+signal enemy_act(e: Enemy, act: StringName, info: Dictionary)
+## 적의 화살이 났다 / 끝났다(hit = 영주에게 맞았다. 부러졌으면 p.cut). 위치는 enemy_projectiles에서 틱마다 읽는다.
+signal enemy_projectile_spawned(p: Projectile)
+signal enemy_projectile_ended(p: Projectile, hit: bool)
 
 enum Phase { DAY, NIGHT, OVER }
 
@@ -88,6 +94,10 @@ var _pull_free: bool = false
 var freeze: int = 0
 ## 날아가는 것(검기, 던진 칼).
 var projectiles: Array[Projectile] = []
+## 적의 화살(활잡이). 영주 쪽 날아가는 것과 따로 둔다.
+var enemy_projectiles: Array[Projectile] = []
+## 이 밤에 나온 부르는 자의 수(RunData.caller_max까지).
+var callers_out: int = 0
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
 var debug_grade: int = -1
@@ -99,6 +109,8 @@ var powers: Powers
 var moves: Moves
 ## 공격 표: 표를 가진 적만 영주를 때린다(docs/attack_tokens.md).
 var tokens: Tokens
+## 새 적 5종의 행동.
+var foes: Foes
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -111,6 +123,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	powers = Powers.new(self)
 	moves = Moves.new(self)
 	tokens = Tokens.new(self)
+	foes = Foes.new(self)
 	lord.hp = max_hp()
 	_new_day()
 	if meta:
@@ -166,6 +179,8 @@ func step(input: LordInput = null) -> void:
 		e.prev_pos = e.pos
 	for p in projectiles:
 		p.prev_pos = p.pos
+	for p in enemy_projectiles:
+		p.prev_pos = p.pos
 	if freeze > 0:
 		freeze -= 1
 		return
@@ -184,6 +199,8 @@ func step(input: LordInput = null) -> void:
 		_step_night()
 		if phase == Phase.NIGHT:
 			_step_enemies()
+		if phase == Phase.NIGHT:
+			foes.step_arrows(dt)
 
 
 # ---------------------------------------------------------------- 낮과 밤
@@ -197,6 +214,8 @@ func start_night() -> void:
 	_spawn_t = data.run.spawn_first
 	boss_out = false
 	elite_out = false
+	callers_out = 0
+	enemy_projectiles.clear()
 	hilts.clear()
 	altar = null
 	moves.clear()
@@ -250,6 +269,7 @@ func _hilt_spot_ok(p: Vector2) -> bool:
 
 func _end_night() -> void:
 	enemies.clear()
+	enemy_projectiles.clear()
 	_end_hook()
 	moves.clear()
 	if last_zone():
@@ -392,6 +412,12 @@ func _step_lord(input: LordInput) -> void:
 	L.hook_cooldown -= dt
 	L.combo_timer -= dt
 	L.move_lock -= dt
+	# 돌격병에 받혀 밀려나는 중
+	if L.push.length_squared() > 0.0001:
+		L.pos = (L.pos + L.push * dt).clamp(Vector2(0.5, 0.5), Vector2(Grid.size) - Vector2(0.5, 0.5))
+		L.push *= pow(D.knock_keep, dt)
+	else:
+		L.push = Vector2.ZERO
 	if input and input.swap_to >= 0:
 		swap(input.swap_to)
 	if input and input.pull:
@@ -553,9 +579,13 @@ func _break(k: int) -> void:
 
 
 ## dot: 출혈·불처럼 틱마다 조금씩 들어가는 피해(화면에 맞음 신호를 보내지 않는다).
-func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false) -> void:
+## src: 때린 자리(방패병이 막는 쪽). 없으면(INF) 영주의 자리.
+func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false, src: Vector2 = Vector2.INF) -> void:
 	if e.dead:
 		return
+	var res: Array = foes.taken(e, damage, knock, big, dot, lord.pos if src == Vector2.INF else src)
+	damage = res[0]
+	knock = res[1]
 	powers.on_damage(e, damage)
 	e.hp -= damage
 	e.push += knock * e.data.knockback_mult * data.lord.knock_speed
@@ -570,6 +600,9 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false)
 			free_pulls = mini(data.run.max_free_pulls, free_pulls + 1)
 		powers.on_kill(e)
 		enemy_died.emit(e)
+		# 심지가 타는 동안 쓰러진 자폭병은 바로 터진다
+		if e.act == &"fuse":
+			foes.explode(e)
 
 
 func _hurt_lord(d: float, attacker: Enemy = null) -> void:
@@ -612,16 +645,47 @@ func _step_night() -> void:
 	if _spawn_t <= 0.0 and enemies.size() < R.max_enemies and (night_left > 0.0 or last_zone()):
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
 		var r: float = rng.randf()
-		var giant_p: float = minf(R.giant_chance.z, R.giant_chance.x + R.giant_chance.y * zone)
-		var wolf_p: float = minf(R.wolf_chance.z, R.wolf_chance.x + R.wolf_chance.y * zone)
-		var kind: StringName = &"wraith"
-		if zone >= 1 and prog > R.giant_after and r < giant_p:
-			kind = &"giant"
-		elif r < wolf_p:
-			kind = &"wolf"
+		# 새 적(구역마다 RunData의 확률). 나머지 몫 안에서 망령·늑대·거인을 예전 비율로 나눈다
+		var extra: float = _extra_total()
+		var kind: StringName = _pick_extra(r)
+		if kind == &"":
+			r = (r - extra) / maxf(0.0001, 1.0 - extra)
+			var giant_p: float = minf(R.giant_chance.z, R.giant_chance.x + R.giant_chance.y * zone)
+			var wolf_p: float = minf(R.wolf_chance.z, R.wolf_chance.x + R.wolf_chance.y * zone)
+			kind = &"wraith"
+			if zone >= 1 and prog > R.giant_after and r < giant_p:
+				kind = &"giant"
+			elif r < wolf_p:
+				kind = &"wolf"
+		elif kind == &"caller":
+			if callers_out >= R.caller_max:
+				kind = &"wraith"
+			else:
+				callers_out += 1
 		_spawn(kind)
 	if night_left <= 0.0 and (not last_zone() or (boss_out and not boss_alive())):
 		_end_night()
+
+
+## 이 구역에서 새 적이 나올 확률의 합.
+func _extra_total() -> float:
+	var t: float = 0.0
+	for k in RunData.EXTRA_KINDS:
+		if data.enemies.has(k):
+			t += data.run.extra_chance(k, zone)
+	return minf(t, 1.0)
+
+
+## 0~1의 값 r로 새 적을 하나 고른다. 새 적의 몫(_extra_total) 밖이면 &"".
+func _pick_extra(r: float) -> StringName:
+	var acc: float = 0.0
+	for k in RunData.EXTRA_KINDS:
+		if not data.enemies.has(k):
+			continue
+		acc += data.run.extra_chance(k, zone)
+		if r < acc:
+			return k
+	return &""
 
 
 func boss_alive() -> bool:
@@ -661,6 +725,7 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 	e.damage = D.damage * (1.0 if D.boss else data.run.zone_damage[zi])
 	e.radius = D.radius
 	e.cooldown = rng.randf() * 0.5
+	foes.on_spawn(e)
 	enemies.append(e)
 	enemy_spawned.emit(e)
 	return e
@@ -681,6 +746,10 @@ func _step_enemies() -> void:
 			continue
 		# 묶였거나(기절·얼음) 망각이면 표를 내려놓는다
 		tokens.check_state(e)
+		# 새 적의 행동 시간(겨눔, 돌진, 심지 …). 심지가 다 타면 여기서 터진다
+		foes.tick(e, k, dt)
+		if e.dead or phase != Phase.NIGHT:
+			continue
 		if k <= 0.0:
 			continue
 		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
@@ -695,12 +764,15 @@ func _step_enemies() -> void:
 		var to: Vector2 = target - e.pos
 		var d: float = to.length()
 		if d > 0.001:
-			e.face = to / d
+			foes.turn(e, to / d, dt)
 		e.cooldown -= dt
 		# 망각으로 다른 적을 치거나 표가 들지 않는 적(언덕지기)은 표 없이 덤빈다
 		var free_hand: bool = foe != null or tokens.cost(e) <= 0
 		if not free_hand:
 			tokens.hold(e, d, dt)
+		# 새 적의 걸음과 행동(활잡이, 돌격병, 자폭병의 심지, 부르는 자). 맡았으면 아래를 건너뛴다
+		if foes.step(e, foe, to, d, k, dt):
+			continue
 		if not free_hand and e.token <= 0:
 			tokens.wait_move(e, to, d, e.data.speed * k, dt)
 		elif d > e.radius + reach + (foe.radius if foe else 0.0):
@@ -737,7 +809,11 @@ func _step_enemies() -> void:
 func _spawn_elite() -> Enemy:
 	var R := data.run
 	var kind: StringName = &"wraith"
-	if zone >= R.elite_giant_from and rng.randf() < R.elite_giant_chance:
+	# 새 적이 나오는 구역이면 그 확률로 새 적이 정예가 된다(부르는 자는 빼고)
+	var extra: StringName = _pick_extra(rng.randf()) if _extra_total() > 0.0 else &""
+	if extra != &"" and extra != &"caller":
+		kind = extra
+	elif zone >= R.elite_giant_from and rng.randf() < R.elite_giant_chance:
 		kind = &"giant"
 	elif rng.randf() < 0.5:
 		kind = &"wolf"
@@ -820,11 +896,19 @@ func state_hash() -> int:
 	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
 	for p in projectiles:
 		parts.append(p.pos)
+	for p in enemy_projectiles:
+		parts.append(p.pos)
 	parts.append(tokens.cooling)
+	parts.append(lord.push)
+	parts.append(callers_out)
 	for e in enemies:
 		parts.append(e.pos)
 		parts.append(e.hp)
 		parts.append(e.token)
+		parts.append(e.act)
+		parts.append(e.act_t)
+		parts.append(e.guard_down)
+		parts.append(e.summoned)
 	for s in slots:
 		parts.append(s.data.id if s else -1)
 		parts.append(s.durability if s else -1.0)

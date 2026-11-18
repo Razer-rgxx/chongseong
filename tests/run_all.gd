@@ -54,6 +54,16 @@ func _init() -> void:
 	_test_tokens_release()
 	_test_tokens_ring()
 	_test_tokens_replay()
+	_test_foes_data()
+	_test_foes_spawn()
+	_test_archer()
+	_test_arrow_cut()
+	_test_shield()
+	_test_charger()
+	_test_bomber()
+	_test_caller()
+	_test_foes_tokens()
+	_test_foes_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -188,7 +198,7 @@ func _test_data() -> void:
 	check(unknown.is_empty(), "방식의 동작이 모두 표에 있다 %s" % [unknown])
 	check(d.patterns[0].moves == PackedStringArray(["sweep"]) and d.pattern_for(null) == d.patterns[0], "맨손은 횡베기 하나뿐인 0번 방식")
 	check(d.grades.odds.size() == 6 and d.grades.odds[2] == 40.0 and d.grades.odds[5] == 50000.0, "등급 확률 1/6, 1/40 … 1/50000")
-	check(d.enemies.size() == 4 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 4종")
+	check(d.enemies.size() == 9 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 9종(11단계 새 적 5종 포함)")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
 	var s := Sword.new(d.sword_by_name("붉은 이삭"), d)
 	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(150.0 * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 195, 무리 베기 34")
@@ -1984,3 +1994,500 @@ func _test_tokens_replay() -> void:
 		waits.append(waited)
 	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].length() > 0, "표: 같은 시드·같은 입력이면 누가 언제 표를 받는지도 같다")
 	check(waits[0] > 100, "표: 다시 돌린 밤에서 실제로 표를 기다린 적이 있다(%d)" % waits[0])
+
+
+# ---------------------------------------------------------------- 11단계 새 적 5종(docs/content.md, Foes)
+
+## 적의 행동을 적는다: [틱, 적, act, info, 그때 든 표].
+func _acts(r: Rules) -> Array:
+	var log: Array = []
+	r.enemy_act.connect(func(e: Enemy, act: StringName, info: Dictionary) -> void: log.append([r.tick, e, act, info, e.token]))
+	return log
+
+
+## 그 행동의 첫 기록(없으면 빈 배열).
+func _first(log: Array, act: StringName, e: Enemy = null) -> Array:
+	for x in log:
+		if x[2] == act and (e == null or x[1] == e):
+			return x
+	return []
+
+
+func _count(log: Array, act: StringName) -> int:
+	var n: int = 0
+	for x in log:
+		if x[2] == act:
+			n += 1
+	return n
+
+
+## 그 행동이 적힐 때까지(최대 n틱) 돌린다.
+func _until(r: Rules, log: Array, act: StringName, n: int, e: Enemy = null) -> Array:
+	for i in n:
+		var got := _first(log, act, e)
+		if not got.is_empty():
+			return got
+		r.freeze = 0
+		r.step(_inp())
+	return _first(log, act, e)
+
+
+## 손으로 놓은 활잡이 화살.
+func _arrow(r: Rules, at: Vector2, dir: Vector2) -> Projectile:
+	var A: EnemyData = d.enemies[&"archer"]
+	var p := Projectile.new()
+	p.kind = &"arrow"
+	p.pos = at
+	p.prev_pos = at
+	p.dir = dir
+	p.speed = A.shot_speed
+	p.distance = A.shot_range
+	p.width = A.shot_radius * 2.0
+	p.max_time = 3.0
+	p.damage = A.damage
+	r.enemy_projectiles.append(p)
+	return p
+
+
+func _test_foes_data() -> void:
+	var want := {&"archer": [18, 7, 1.4, 0.28, 1], &"shield": [60, 8, 1.2, 0.34, 1], &"charger": [70, 18, 1.5, 0.4, 2], &"bomber": [10, 22, 2.6, 0.24, 1], &"caller": [40, 0, 1.3, 0.3, 0]}
+	var ok: bool = true
+	for k in want:
+		var e: EnemyData = d.enemies.get(k)
+		var w: Array = want[k]
+		ok = ok and e != null and e.hp == w[0] and e.damage == w[1] and is_equal_approx(e.speed, w[2]) and is_equal_approx(e.radius, w[3]) and e.token_cost == w[4]
+	check(ok, "새 적 5종: 체력·피해·빠르기·크기·표 값이 표와 같다")
+	var A: EnemyData = d.enemies[&"archer"]
+	var S: EnemyData = d.enemies[&"shield"]
+	var C: EnemyData = d.enemies[&"charger"]
+	var B: EnemyData = d.enemies[&"bomber"]
+	var K: EnemyData = d.enemies[&"caller"]
+	check(A.keep_near == 5.0 and A.keep_far == 8.0 and A.aim_time == 0.6 and A.shot_speed == 11.0 and A.shot_range == 12.0, "활잡이: 5~8칸, 0.6초 겨눔, 11칸/초, 12칸")
+	check(S.guard_arc == 120.0 and S.guard_mult == 0.25 and S.guard_knock == 0.2 and S.guard_stun == 1.2 and S.guard_down == 2.0, "방패병: 앞 120°, ×0.25, 넉백 ×0.2, 기절 1.2초, 2초")
+	check(C.charge_min == 3.0 and C.charge_max == 8.0 and C.wind_time == 0.7 and C.charge_speed == 13.0 and C.charge_length == 9.0 and C.charge_knock == 6.0 and C.stagger_time == 1.0 and C.stagger_mult == 1.5, "돌격병: 3~8칸, 0.7초, 13칸/초, 9칸, 넉백 6, 1초 ×1.5")
+	check(B.fuse_range == 1.2 and B.fuse_time == 0.9 and B.blast_radius == 2.2, "자폭병: 1.2칸, 0.9초, 반지름 2.2칸")
+	check(K.keep_near == 10.0 and K.summon_interval == 7.0 and K.summon_time == 1.0 and K.summon_count == 3 and K.summon_kind == &"wraith", "부르는 자: 10칸, 7초마다 1초, 망령 3마리")
+	# 처음 나오는 구역(1부터 세면 2, 3, 4, 5, 6)에 5~8%, 그전에는 0, 구역이 오를수록 늘어난다
+	var first := {&"archer": 1, &"shield": 2, &"charger": 3, &"bomber": 4, &"caller": 5}
+	var mix_ok: bool = true
+	for k in first:
+		var z: int = first[k]
+		var c0: float = d.run.extra_chance(k, z - 1)
+		var c1: float = d.run.extra_chance(k, z)
+		var c9: float = d.run.extra_chance(k, 9)
+		mix_ok = mix_ok and c0 == 0.0 and c1 >= 0.05 - 0.0001 and c1 <= 0.08 + 0.0001 and c9 >= c1
+	check(mix_ok and d.run.caller_max == 2, "나오는 비율: 처음 나오는 구역에 5~8%, 오를수록 늘어난다. 부르는 자는 한 밤에 2마리까지")
+
+
+func _test_foes_spawn() -> void:
+	var r := Rules.new(d, 3)
+	check(r._extra_total() == 0.0 and r._pick_extra(0.0) == &"", "1구역에는 새 적이 없다")
+	r.zone = 5
+	check(r._pick_extra(0.0) == &"archer" and r._pick_extra(0.999) == &"" and is_equal_approx(r._extra_total(), 0.09 + 0.08 + 0.06 + 0.07 + 0.05), "6구역: 다섯 종 모두 나올 수 있다(합 %.2f)" % r._extra_total())
+	# 2구역의 한 밤: 활잡이만 새로 나온다
+	var kinds := {}
+	var z1 := Rules.new(d, 8)
+	z1.zone = 1
+	z1.debug_god = true
+	z1.enemy_spawned.connect(func(e: Enemy) -> void: kinds[e.data.id] = int(kinds.get(e.data.id, 0)) + 1)
+	z1.start_night()
+	for t in 1500:
+		z1.step()
+	check(int(kinds.get(&"archer", 0)) > 0 and not kinds.has(&"shield") and not kinds.has(&"caller") and int(kinds.get(&"wraith", 0)) > int(kinds.get(&"archer", 0)), "2구역의 밤: 활잡이가 조금 나오고 방패병·부르는 자는 없다 %s" % [kinds])
+	# 부르는 자만 나오게 해도 한 밤에 2마리까지(넘으면 망령)
+	var g := GameData.load_default()
+	g.run = d.run.duplicate() as RunData
+	g.run.caller_chance = PackedFloat32Array([1.0])
+	var ck := {}
+	var rc := Rules.new(g, 9)
+	rc.debug_god = true
+	rc.enemy_spawned.connect(func(e: Enemy) -> void: ck[e.data.id] = int(ck.get(e.data.id, 0)) + 1)
+	rc.start_night()
+	for t in 600:
+		rc.step()
+	check(int(ck.get(&"caller", 0)) == 2 and rc.callers_out == 2 and int(ck.get(&"wraith", 0)) > 5, "부르는 자는 한 밤에 2마리까지 %s" % [ck])
+	# 새 적도 정예가 된다(부르는 자는 빼고)
+	var eg := GameData.load_default()
+	eg.run = d.run.duplicate() as RunData
+	eg.run.bomber_chance = PackedFloat32Array([1.0])
+	var re := Rules.new(eg, 4)
+	re.start_night()
+	var el := re._spawn_elite()
+	check(el.elite and el.data.id == &"bomber" and is_equal_approx(el.max_hp, el.data.hp * d.run.elite_hp), "정예는 새 적에게도 붙는다(자폭병 정예)")
+
+
+func _test_archer() -> void:
+	var A: EnemyData = d.enemies[&"archer"]
+	# 거리 두기: 가까우면 물러나고 멀면 다가온다(쏘지 않게 간격을 길게)
+	var r := _tok_rules()
+	var near := _at(r, &"archer", 0.0, 3.0)
+	var far := _at(r, &"archer", PI, 14.0)
+	near.cooldown = 99.0
+	far.cooldown = 99.0
+	for t in 200:
+		r.freeze = 0
+		r.step(_inp())
+	var dn: float = near.pos.distance_to(r.lord.pos)
+	var df: float = far.pos.distance_to(r.lord.pos)
+	check(dn >= A.keep_near - 0.05 and df <= A.keep_far + 0.05 and df >= A.keep_near - 0.05, "활잡이: 가까우면 물러나고 멀면 다가와 5~8칸에 선다(%.2f, %.2f)" % [dn, df])
+	# 겨누고 쏜다: 0.6초 겨눔 → 화살 → 서 있는 영주가 맞는다
+	r = _tok_rules()
+	r.debug_god = false
+	var log := _acts(r)
+	var spawned: Array[Projectile] = []
+	var ended: Array = []
+	r.enemy_projectile_spawned.connect(func(p: Projectile) -> void: spawned.append(p))
+	r.enemy_projectile_ended.connect(func(p: Projectile, hit: bool) -> void: ended.append([p, hit, r.tick]))
+	var a := _at(r, &"archer", 0.0, 7.0)
+	a.cooldown = 0.0
+	var hp0: float = r.lord.hp
+	var aim := _until(r, log, &"aim", 60)
+	var shoot := _until(r, log, &"shoot", 40)
+	var info: Dictionary = aim[3] if not aim.is_empty() else {}
+	check(not aim.is_empty() and int(aim[4]) > 0 and info.has("from") and info.has("dir") and is_equal_approx(float(info.get("time", 0.0)), A.aim_time), "활잡이: 표를 받으면 겨눈다(aim: from, dir, time %.2f)" % float(info.get("time", 0.0)))
+	var gap: int = int(shoot[0]) - int(aim[0]) if not shoot.is_empty() else -1
+	check(absi(gap - roundi(A.aim_time * d.run.tick_rate)) <= 1 and int(shoot[4]) == 0 and spawned.size() == 1 and spawned[0].kind == &"arrow", "활잡이: 0.6초 뒤 쏘고 표를 돌려놓는다(%d틱)" % gap)
+	var moved: bool = a.prev_pos.distance_to(a.pos) < 0.001
+	for t in 40:
+		if not ended.is_empty():
+			break
+		r.freeze = 0
+		r.step(_inp())
+	check(moved and ended.size() == 1 and bool(ended[0][1]) and is_equal_approx(hp0 - r.lord.hp, a.damage) and r.enemy_projectiles.is_empty(), "활잡이: 화살이 날아가 서 있는 영주를 맞힌다(-%.1f)" % (hp0 - r.lord.hp))
+	var fly: int = int(ended[0][2]) - int(shoot[0]) if not ended.is_empty() else 0
+	var expect: float = (7.0 - a.radius - 0.1) / A.shot_speed * d.run.tick_rate
+	check(absf(fly - expect) <= 2.0, "활잡이: 화살은 11칸/초(%d틱, 어림 %.1f)" % [fly, expect])
+	# 돌진 중에는 지나간다
+	var q := _tok_rules()
+	q.debug_god = false
+	var p := _arrow(q, q.lord.pos + Vector2(2.0, 0.0), Vector2(-1.0, 0.0))
+	q.lord.dash = 1.0
+	var hq: float = q.lord.hp
+	for t in 12:
+		q.freeze = 0
+		q.step(_inp())
+	check(q.lord.hp == hq and p.pos.x < q.lord.pos.x - 1.0 and not p.cut, "화살: 돌진 중에는 맞지 않고 지나간다")
+	# 사거리 끝에서 사라진다
+	var gone: Array = []
+	q.enemy_projectile_ended.connect(func(pp: Projectile, hit: bool) -> void: gone.append(hit))
+	for t in 40:
+		q.freeze = 0
+		q.step(_inp())
+	check(gone.size() == 1 and not bool(gone[0]) and q.enemy_projectiles.is_empty() and absf(p.travelled - A.shot_range) < 0.5, "화살: 12칸을 가면 사라진다(%.1f칸)" % p.travelled)
+
+
+func _test_arrow_cut() -> void:
+	var r := _mv(["sweep"])
+	var ended: Array = []
+	r.enemy_projectile_ended.connect(func(p: Projectile, hit: bool) -> void: ended.append([p, hit]))
+	var front := _arrow(r, r.lord.pos + Vector2(1.0, 0.0), Vector2(-1.0, 0.0))
+	var back := _arrow(r, r.lord.pos + Vector2(-2.5, 0.0), Vector2(1.0, 0.0))
+	r.step(_inp(Vector2.ZERO, true))
+	check(ended.size() == 1 and ended[0][0] == front and not bool(ended[0][1]) and front.cut and not back.cut, "화살: 좌클릭 판정(횡베기)에 닿은 화살은 부러진다(p.cut). 뒤의 화살은 그대로")
+	var w := _mv(["wave"])
+	var cut: Array = []
+	w.enemy_projectile_ended.connect(func(p: Projectile, hit: bool) -> void: cut.append(p.cut))
+	_arrow(w, w.lord.pos + Vector2(7.0, 0.0), Vector2(-1.0, 0.0))
+	w.step(_inp(Vector2.ZERO, true))
+	_wait(w, 20)
+	check(cut.size() == 1 and bool(cut[0]), "화살: 검기에 닿아도 부러진다")
+
+
+func _test_shield() -> void:
+	var S: EnemyData = d.enemies[&"shield"]
+	var r := _tok_rules()
+	var log := _acts(r)
+	var s := _at(r, &"shield", 0.0, 1.5)
+	s.face = Vector2(-1.0, 0.0)
+	var h0: float = s.hp
+	r.hurt(s, 10.0, Vector2(1.0, 0.0), false)
+	check(is_equal_approx(h0 - s.hp, 10.0 * S.guard_mult) and is_equal_approx(s.push.x, S.guard_knock * d.lord.knock_speed) and _count(log, &"block") == 1, "방패병: 앞에서 맞으면 피해 ×0.25, 넉백 ×0.2(-%.2f)" % (h0 - s.hp))
+	var blk := _first(log, &"block")
+	check(not blk.is_empty() and (blk[3] as Dictionary).has("at") and ((blk[3] as Dictionary).get("dir", Vector2.ZERO) as Vector2).x < -0.9, "방패병: block 신호(at, 막은 쪽 dir)")
+	s.push = Vector2.ZERO
+	s.face = Vector2(1.0, 0.0)
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, false)
+	var back: float = h0 - s.hp
+	s.face = Vector2(0.0, 1.0)
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, false)
+	check(back == 10.0 and h0 - s.hp == 10.0, "방패병: 옆과 뒤에서 맞으면 그대로 들어간다")
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, false, true)
+	check(h0 - s.hp == 10.0, "방패병: 출혈·불(dot)은 막지 못한다")
+	# 마무리(큰 베기)에 앞을 맞으면 깨진다
+	s.face = Vector2(-1.0, 0.0)
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, true)
+	var gb := _first(log, &"guard_break")
+	check(h0 - s.hp == 10.0 and not gb.is_empty() and is_equal_approx(float((gb[3] as Dictionary).get("time", 0.0)), S.guard_stun) and is_equal_approx(s.stun, S.guard_stun) and is_equal_approx(s.guard_down, S.guard_down) and s.act == &"guard_break", "방패병: 마무리에 맞으면 깨진다(1.2초 기절, 2초 못 막음)")
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, false)
+	check(h0 - s.hp == 10.0, "방패병: 깨진 동안은 앞에서도 그대로 들어간다")
+	for t in roundi(S.guard_down * d.run.tick_rate) + 2:
+		r.freeze = 0
+		r.step(_inp())
+	s.face = (r.lord.pos - s.pos).normalized()
+	h0 = s.hp
+	r.hurt(s, 10.0, Vector2.ZERO, false)
+	check(s.guard_down == 0.0 and s.act != &"guard_break" and is_equal_approx(h0 - s.hp, 2.5), "방패병: 2초 뒤에는 다시 막는다")
+	# 몸을 천천히 돌린다(돌아서는 동안 등이 열린다)
+	var q := _tok_rules()
+	var t := _at(q, &"shield", PI, 3.0)
+	t.face = Vector2(-1.0, 0.0)
+	for i in 3:
+		q.freeze = 0
+		q.step(_inp())
+	var turned: float = absf(angle_difference(PI, t.face.angle()))
+	check(turned > 0.1 and turned <= S.turn_rate * 3.0 / d.run.tick_rate + 0.01, "방패병: 몸을 turn_rate로 천천히 돌린다(%.2f라디안)" % turned)
+	# 좌클릭으로: 앞의 방패병은 덜 다친다
+	var m := _mv(["sweep"])
+	var w := _foe(m, Vector2(1.0, 0.0), &"wraith")
+	var sh := _foe(m, Vector2(1.0, 0.3), &"shield")
+	sh.stun = 0.0
+	sh.face = Vector2(-1.0, 0.0)
+	m.step(_inp(Vector2.ZERO, true))
+	check(_hurt_by(sh) > 0.0 and is_equal_approx(_hurt_by(sh), _hurt_by(w) * S.guard_mult), "방패병: 횡베기도 앞에서 막는다(%.1f / %.1f)" % [_hurt_by(sh), _hurt_by(w)])
+
+
+func _test_charger() -> void:
+	var C: EnemyData = d.enemies[&"charger"]
+	var r := _tok_rules()
+	r.debug_god = false
+	var log := _acts(r)
+	var c := _at(r, &"charger", 0.0, 5.0)
+	c.cooldown = 0.0
+	var hp0: float = r.lord.hp
+	var lp0: Vector2 = r.lord.pos
+	var wind := _until(r, log, &"wind", 60)
+	var at_wind: Vector2 = c.pos
+	var info: Dictionary = wind[3] if not wind.is_empty() else {}
+	check(not wind.is_empty() and int(wind[4]) > 0 and is_equal_approx(float(info.get("time", 0.0)), C.wind_time) and float(info.get("length", 0.0)) > 8.9 and info.has("dir") and info.has("from"), "돌격병: 3~8칸에서 표를 받으면 머리를 낮춘다(wind: from, dir, length %.1f, time)" % float(info.get("length", 0.0)))
+	var charge := _until(r, log, &"charge", 40)
+	var gap: int = int(charge[0]) - int(wind[0]) if not charge.is_empty() else -1
+	check(absi(gap - roundi(C.wind_time * d.run.tick_rate)) <= 1 and c.prev_pos.distance_to(at_wind) < 0.01, "돌격병: 0.7초 멈춘 뒤 달린다(%d틱)" % gap)
+	var end := _until(r, log, &"charge_end", 40)
+	check(not end.is_empty() and bool((end[3] as Dictionary).get("hit", false)) and is_equal_approx(hp0 - r.lord.hp, c.damage) and c.token == 0, "돌격병: 영주에게 닿으면 피해(-%.0f)를 주고 멈춘다" % (hp0 - r.lord.hp))
+	for t in 30:
+		r.freeze = 0
+		r.step(_inp())
+	var pushed: float = r.lord.pos.distance_to(lp0)
+	check(pushed > C.charge_knock * 0.8 and pushed < C.charge_knock * 1.05, "돌격병: 큰 넉백(영주가 %.1f칸 밀려난다)" % pushed)
+	# 비틀거리는 동안 받는 피해 ×1.5
+	var q := _tok_rules()
+	var e := _at(q, &"charger", 0.0, 6.0)
+	q.foes._end_charge(e, false)
+	var h0: float = e.hp
+	q.hurt(e, 10.0, Vector2.ZERO, false)
+	var stagger: float = h0 - e.hp
+	for t in roundi(C.stagger_time * d.run.tick_rate) + 1:
+		q.freeze = 0
+		q.step(_inp())
+	h0 = e.hp
+	q.hurt(e, 10.0, Vector2.ZERO, false)
+	check(is_equal_approx(stagger, 15.0) and e.act != &"charge_end" and h0 - e.hp == 10.0, "돌격병: 끝나고 1초 비틀거리며 그동안 피해 ×1.5(%.1f)" % stagger)
+	# 돌진으로 피하면 맞지 않는다
+	var v := _tok_rules()
+	v.debug_god = false
+	var vl := _acts(v)
+	var c2 := _at(v, &"charger", 0.0, 5.0)
+	c2.cooldown = 0.0
+	var hv: float = v.lord.hp
+	_until(v, vl, &"charge", 60)
+	v.lord.dash = 1.0
+	var end2 := _until(v, vl, &"charge_end", 40)
+	check(not end2.is_empty() and not bool((end2[3] as Dictionary).get("hit", true)) and v.lord.hp == hv and c2.pos.distance_to(v.lord.pos) > 3.0, "돌격병: 돌진 중인 영주는 지나쳐 9칸 끝까지 달린다")
+	# 기절하면 돌진이 멈춘다
+	var w := _tok_rules()
+	var wl := _acts(w)
+	var c3 := _at(w, &"charger", 0.0, 5.0)
+	c3.cooldown = 0.0
+	_until(w, wl, &"wind", 60)
+	c3.stun = 0.5
+	w.freeze = 0
+	w.step(_inp())
+	check(c3.act == &"" and _first(wl, &"charge").is_empty(), "돌격병: 머리를 낮추는 동안 기절하면 돌진하지 않는다")
+
+
+func _test_bomber() -> void:
+	var B: EnemyData = d.enemies[&"bomber"]
+	var r := _tok_rules()
+	r.debug_god = false
+	var log := _acts(r)
+	var b := _at(r, &"bomber", 0.0, 1.0)
+	var near := _at(r, &"wraith", 0.0, 2.5)
+	var far := _at(r, &"wraith", PI, 5.0)
+	near.stun = 99.0
+	far.stun = 99.0
+	var hp0: float = r.lord.hp
+	var fuse := _until(r, log, &"fuse", 30)
+	var info: Dictionary = fuse[3] if not fuse.is_empty() else {}
+	check(not fuse.is_empty() and int(fuse[4]) > 0 and is_equal_approx(float(info.get("radius", 0.0)), B.blast_radius) and is_equal_approx(float(info.get("time", 0.0)), B.fuse_time), "자폭병: 1.2칸 안에서 표를 받으면 심지(fuse: at, radius 2.2, time 0.9)")
+	var boom := _until(r, log, &"explode", 40)
+	var gap: int = int(boom[0]) - int(fuse[0]) if not boom.is_empty() else -1
+	check(absi(gap - roundi(B.fuse_time * d.run.tick_rate)) <= 1 and b.dead and r.kills == 0, "자폭병: 0.9초 뒤 터지고 사라진다(스스로 터진 것은 처치가 아니다, %d틱)" % gap)
+	check(is_equal_approx(hp0 - r.lord.hp, b.damage) and is_equal_approx(_hurt_by(near), b.damage * B.blast_enemy_mult) and near.push.length() > 0.1 and _hurt_by(far) == 0.0, "자폭병: 영주와 반지름 안의 다른 적을 다친다(멀리 있는 적은 그대로)")
+	# 심지가 타는 동안 쓰러지면 바로 터진다(이어서 다른 자폭병의 심지도)
+	var q := _tok_rules()
+	var ql := _acts(q)
+	var b1 := _at(q, &"bomber", 0.0, 1.0)
+	var b2 := _at(q, &"bomber", 0.0, 2.6)
+	b2.stun = 99.0
+	_until(q, ql, &"fuse", 30, b1)
+	q.foes._begin(b2, &"fuse", 5.0)
+	var t0: int = q.tick
+	q.hurt(b1, 999.0, Vector2.ZERO, false)
+	var e1 := _first(ql, &"explode", b1)
+	var e2 := _first(ql, &"explode", b2)
+	check(not e1.is_empty() and int(e1[0]) == t0 and q.kills == 2 and not e2.is_empty() and b2.dead, "자폭병: 심지가 타는 동안 쓰러지면 바로 터지고, 심지 붙은 다른 자폭병도 터진다")
+	var z := _tok_rules()
+	var zl := _acts(z)
+	var b3 := _at(z, &"bomber", 0.0, 6.0)
+	z.hurt(b3, 999.0, Vector2.ZERO, false)
+	check(b3.dead and _count(zl, &"explode") == 0, "자폭병: 심지 전에 쓰러지면 터지지 않는다")
+
+
+func _test_caller() -> void:
+	var K: EnemyData = d.enemies[&"caller"]
+	var r := _tok_rules()
+	var log := _acts(r)
+	var spawned: Array[Enemy] = []
+	r.enemy_spawned.connect(func(e: Enemy) -> void: spawned.append(e))
+	var c := _at(r, &"caller", 0.0, 12.0)
+	spawned.clear()
+	check(is_equal_approx(c.cooldown, K.summon_interval) and r.tokens.cost(c) == 0, "부르는 자: 표를 쓰지 않고, 7초 뒤 처음 부른다")
+	var max_tok: Array[int] = [0]
+	var wind := []
+	for t in roundi((K.summon_interval + K.summon_time) * d.run.tick_rate) + 4:
+		r.freeze = 0
+		r.step(_inp())
+		max_tok[0] = maxi(max_tok[0], c.token)
+	wind = _first(log, &"call_wind")
+	var call := _first(log, &"call")
+	var spots: Array = (call[3] as Dictionary).get("spots", []) if not call.is_empty() else []
+	var near_spots: bool = spawned.size() == 3
+	for i in mini(spawned.size(), spots.size()):
+		near_spots = near_spots and spawned[i].data.id == &"wraith" and (spawned[i].pos as Vector2).distance_to(spots[i]) < 0.5
+	check(not wind.is_empty() and is_equal_approx(float((wind[3] as Dictionary).get("time", 0.0)), K.summon_time) and is_equal_approx(float((wind[3] as Dictionary).get("radius", 0.0)), K.summon_radius), "부르는 자: 1초 동안 불러낸다(call_wind: at, radius, time)")
+	check(not call.is_empty() and int((call[3] as Dictionary).get("count", 0)) == 3 and spots.size() == 3 and near_spots and int(call[0]) - int(wind[0]) == roundi(K.summon_time * d.run.tick_rate), "부르는 자: 둘레에 망령 3마리(call: count, spots)")
+	check(max_tok[0] == 0 and c.summoned == 3, "부르는 자: 표를 들지 않는다")
+	# 도망친다
+	var f := _tok_rules()
+	var fc := _at(f, &"caller", 0.0, 4.0)
+	for t in 60:
+		f.freeze = 0
+		f.step(_inp())
+	check(fc.pos.distance_to(f.lord.pos) > 6.0, "부르는 자: 가까우면 도망친다(%.1f칸)" % fc.pos.distance_to(f.lord.pos))
+	# 한 마리가 한 밤에 부르는 수(summon_max)와 전체 적 수 한도
+	var g := GameData.load_default()
+	var kd := (d.enemies[&"caller"] as EnemyData).duplicate() as EnemyData
+	kd.summon_interval = 0.5
+	kd.summon_max = 5
+	g.enemies[&"caller"] = kd
+	var m := _tok_rules(g)
+	var mc := _at(m, &"caller", 0.0, 12.0)
+	for t in 300:
+		m.freeze = 0
+		m.step(_inp())
+	check(mc.summoned == 5 and m.enemies.size() == 6, "부르는 자: 한 밤에 summon_max(%d)마리까지만 부른다" % mc.summoned)
+	var g2 := GameData.load_default()
+	g2.enemies[&"caller"] = kd
+	g2.run = d.run.duplicate() as RunData
+	g2.run.max_enemies = 3
+	var n := _tok_rules(g2)
+	var nc := _at(n, &"caller", 0.0, 12.0)
+	var most: Array[int] = [0]
+	for t in 300:
+		n.freeze = 0
+		n.step(_inp())
+		most[0] = maxi(most[0], n.enemies.size())
+	check(most[0] == 3 and nc.summoned == 2, "부르는 자: 전체 적 수 한도 안에서만 부른다(%d)" % most[0])
+	# 불러내는 동안 기절하면 끊긴다
+	var s := _tok_rules()
+	var sl := _acts(s)
+	var sc := _at(s, &"caller", 0.0, 12.0)
+	sc.cooldown = 0.0
+	_until(s, sl, &"call_wind", 10)
+	sc.stun = 0.3
+	for t in 40:
+		s.freeze = 0
+		s.step(_inp())
+	check(_first(sl, &"call").is_empty() and sc.summoned == 0, "부르는 자: 불러내는 동안 기절하면 끊긴다")
+
+
+func _test_foes_tokens() -> void:
+	# 표 1장: 활잡이 셋이 돌아가며 쏜다(동시에 겨누는 것은 하나)
+	var r := _tok_rules(_tok_data(1))
+	var log := _acts(r)
+	for i in 3:
+		_at(r, &"archer", i * 2.0, 7.0).cooldown = 0.0
+	var worst: Array[int] = [0]
+	for t in 300:
+		r.freeze = 0
+		r.step(_inp())
+		var n: int = 0
+		for e in r.enemies:
+			if e.act == &"aim":
+				n += 1
+		worst[0] = maxi(worst[0], n)
+	check(worst[0] == 1 and _count(log, &"shoot") >= 3, "표: 표 1장이면 활잡이도 한 번에 하나만 겨눈다(쏨 %d)" % _count(log, &"shoot"))
+	var aims_ok: bool = true
+	for x in log:
+		if x[2] == &"aim" or x[2] == &"wind" or x[2] == &"fuse":
+			aims_ok = aims_ok and int(x[4]) > 0
+	# 자폭병의 심지도 표가 있어야 붙는다
+	var b := _tok_rules(_tok_data(1))
+	var bl := _acts(b)
+	for i in 3:
+		var bb := _at(b, &"bomber", i * 2.0, 1.0)
+		bb.max_hp = 9999.0
+		bb.hp = bb.max_hp
+	var fusing: Array[int] = [0]
+	for t in 240:
+		b.freeze = 0
+		b.step(_inp())
+		var n: int = 0
+		for e in b.enemies:
+			if e.act == &"fuse":
+				n += 1
+		fusing[0] = maxi(fusing[0], n)
+	for x in bl:
+		if x[2] == &"fuse":
+			aims_ok = aims_ok and int(x[4]) > 0
+	check(fusing[0] == 1 and _count(bl, &"explode") >= 2 and aims_ok, "표: 겨눔·심지는 표를 든 적만 한다(심지는 한 번에 %d)" % fusing[0])
+	var c := _tok_rules()
+	var ch := _ringed(c, &"charger", 0.0)
+	for t in 15:
+		c.freeze = 0
+		c.step(_inp())
+	check(c.tokens.wait_dist(ch) == d.enemies[&"charger"].wait_range and (ch.token == 2 or ch.act != &""), "표: 돌격병은 5.5칸 둘레에서 표 2장을 받는다")
+
+
+func _test_foes_replay() -> void:
+	var g := GameData.load_default()
+	g.run = d.run.duplicate() as RunData
+	for k in RunData.EXTRA_KINDS:
+		g.run.set(String(k) + "_chance", PackedFloat32Array([0.14]))
+	var hashes: Array[int] = []
+	var logs: Array[String] = []
+	var counts: Array[int] = []
+	for run_i in 2:
+		var r := Rules.new(g, 77)
+		r.zone = 5
+		r.debug_god = true
+		var text: Array[String] = [""]
+		var acts: Array[int] = [0]
+		r.enemy_act.connect(func(e: Enemy, act: StringName, _i: Dictionary) -> void:
+			text[0] += "%d:%d:%s " % [r.tick, e.id, act]
+			acts[0] += 1)
+		r.start_night()
+		var rec := RandomNumberGenerator.new()
+		rec.seed = 5
+		for k in 1500:
+			r.step(_inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)), rec.randf() < 0.3, rec.randf() < 0.03))
+		hashes.append(r.state_hash())
+		logs.append(text[0])
+		counts.append(acts[0])
+	check(hashes[0] == hashes[1] and logs[0] == logs[1], "새 적: 같은 시드·같은 입력이면 행동과 결과가 같다(state_hash)")
+	check(counts[0] > 20 and logs[0].contains("aim") and logs[0].contains("fuse") and logs[0].contains("call"), "새 적: 다시 돌린 밤에서 다섯 종이 실제로 움직였다(행동 %d)" % counts[0])

@@ -20,6 +20,21 @@ var elite: bool = false
 var cooldown: float = 0.0
 var dead: bool = false
 
+# ---- 행동(11단계, Foes, docs/content.md). 화면은 읽기만 한다.
+## 지금 하는 일(aim, shoot, block, guard_break, wind, charge, charge_end, fuse, explode, call_wind, call). &""이면 걷기다.
+var act: StringName = &""
+## 그 일을 시작하고 지난 시간과 그 일의 길이(초).
+var act_t: float = 0.0
+var act_time: float = 0.0
+## 방패가 깨진 채 남은 시간(초). 0보다 크면 막지 못한다.
+var guard_down: float = 0.0
+## 규칙만 쓰는 것: 겨눈 쪽·돌진할 쪽, 돌진의 처음과 끝, 부를 자리, 이 밤에 부른 수.
+var act_dir: Vector2 = Vector2.ZERO
+var act_from: Vector2 = Vector2.ZERO
+var act_to: Vector2 = Vector2.ZERO
+var act_spots: PackedVector2Array = PackedVector2Array()
+var summoned: int = 0
+
 # ---- 공격 표(Tokens, docs/attack_tokens.md). 화면은 읽기만 한다.
 ## 들고 있는 표 수(없으면 0). 표가 있어야 영주를 때린다.
 var token: int = 0

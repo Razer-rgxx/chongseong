@@ -5,6 +5,8 @@ extends Node3D
 ## 나타날 때는 비탈 아래에서 기어 올라오고(망령은 연기처럼 맺힌다), 눈은 스스로 빛나 어두운 밤에도 보인다.
 ## 공격 표를 든 적은 눈이 더 밝고, 때리기 직전에는 번쩍인다. 몸은 늘 face(기다릴 때는 영주 쪽)를 본다.
 ## 모델 에셋이 들어오면 _build_* 만 바꾼다. 기사 모델(assets/characters/lord/paladin.fbx)이 없으면 거인은 기본 도형이다.
+## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)은 EnemyArt가 몸을 짓고(parts) EnemyMotion이 매 프레임 움직인다.
+## 이펙트(EnemyFx)는 parts로 방패·배·지팡이 끝의 실제 자리를 읽는다.
 
 const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshader")
 
@@ -66,6 +68,11 @@ var _eye_nodes: Array[Node3D] = []
 var _eye_scale: Array[Vector3] = []
 var _token_glow: float = 0.0
 var _soon_glow: float = 0.0
+# 새 적 5종: EnemyArt의 부품(EnemyFx가 읽는다)과 EnemyMotion의 움직임 상태
+var parts: Dictionary = {}
+var _motion: Dictionary = {}
+var _shield_knight: LordCharacter = null
+var _vel := Vector3.ZERO
 
 
 func setup(e: Enemy) -> void:
@@ -85,6 +92,8 @@ func _ready() -> void:
 				_build_knight(grow, D.color, D.boss)
 			else:
 				_build_giant(r, D.color, D.boss)
+		&"archer", &"shield", &"charger", &"bomber", &"caller":
+			_build_new(D.id, grow, D.color)
 		_:
 			_build_wraith(grow, D.color)
 	if enemy.elite:
@@ -116,7 +125,7 @@ func _ready() -> void:
 func hit(big: bool = false) -> void:
 	_flash = flash_time
 	_recoil = 1.6 if big else 1.0
-	if _knight and big and _attack < 0.0:
+	if (_knight or _shield_knight) and big and _attack < 0.0:
 		_hit_anim = 0.0
 
 
@@ -124,6 +133,8 @@ func die() -> void:
 	_dying = 0.0
 	if _knight:
 		_knight.play("death", 1.0)
+	if _shield_knight:
+		_shield_knight.play("death", 1.0)
 	if _wisps:
 		_wisps.amount = 24
 		_wisps.explosiveness = 0.8
@@ -143,6 +154,7 @@ func draw(alpha: float, delta: float) -> bool:
 	var p := _ground(Grid.cells_to_world(enemy.prev_pos.lerp(enemy.pos, alpha)))
 	var step: float = Vector2(p.x - _last_pos.x, p.z - _last_pos.z).length()
 	_speed_m = lerpf(_speed_m, step / maxf(delta, 0.001), 1.0 - exp(-10.0 * delta))
+	_vel = _vel.lerp(Vector3(p.x - _last_pos.x, 0.0, p.z - _last_pos.z) / maxf(delta, 0.001), 1.0 - exp(-10.0 * delta))
 	_last_pos = p
 	# 비탈 아래에서 올라오는 중이면 바깥쪽 아래에서 시작한다
 	if _rise < 1.0:
@@ -163,7 +175,9 @@ func draw(alpha: float, delta: float) -> bool:
 		_attack += delta
 	_recoil = maxf(0.0, _recoil - delta * recoil_return * maxf(0.3, _recoil))
 	_flash -= delta
-	if _knight:
+	if not parts.is_empty():
+		_animate_new(delta)
+	elif _knight:
 		_animate_knight(delta)
 	elif _hips.size() > 0:
 		_animate_wolf(delta)
@@ -182,6 +196,18 @@ func draw(alpha: float, delta: float) -> bool:
 func _draw_death(delta: float) -> bool:
 	_dying += delta
 	var k: float = _dying / die_time
+	# 터진 자폭병은 바로 사라진다(폭발은 EnemyFx가 그린다)
+	if enemy.act == &"explode":
+		visible = false
+		return true
+	if not parts.is_empty() and not _cloaks.is_empty():
+		# 두건 쓴 새 적(활잡이, 부르는 자): 망령처럼 흩어지며 위로, 활·지팡이·등불도 같이 오그라든다
+		var root := parts.get("root") as Node3D
+		if root:
+			root.scale = Vector3.ONE * float(parts.get("scale", 1.0)) * clampf(1.4 - k, 0.0, 1.0)
+		var light := parts.get("light") as OmniLight3D
+		if light:
+			light.light_energy *= clampf(1.0 - k, 0.0, 1.0)
 	if not _cloaks.is_empty():
 		# 망령: 흩어지며 위로
 		for c in _cloaks:
@@ -190,13 +216,17 @@ func _draw_death(delta: float) -> bool:
 			e.visible = k < 0.4
 		_body.position.y += delta * 1.2
 		return k >= 1.3
-	if _knight:
+	var kn: LordCharacter = _knight if _knight else _shield_knight
+	if kn:
 		# 기사: 쓰러지는 동작을 보고 나서 땅으로 가라앉는다
-		var fall: float = minf(2.2, _knight.length("death"))
+		var fall: float = minf(2.2, kn.length("death"))
 		if _dying > fall:
 			_body.position.y -= delta * 1.5
 		if _eyes:
 			_eyes.visible = _dying < fall * 0.6
+		elif _shield_knight:
+			for e in _eyes_list():
+				e.visible = _dying < fall * 0.6
 		return _dying > fall + 1.2
 	# 늑대와 도형 거인: 옆으로 넘어간 뒤 가라앉는다
 	_body.rotation.z = lerpf(_body.rotation.z, PI / 2.0, 1.0 - pow(1.0 - minf(1.0, k * 1.8), 3.0))
@@ -640,3 +670,63 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 		_add(_body, horn, hm, Vector3(-r * 0.3, r * 4.5, 0), Vector3(0, 0, 0.5))
 		_add(_body, horn, hm, Vector3(r * 0.3, r * 4.5, 0), Vector3(0, 0, -0.5))
 	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Color(1.0, 0.8, 0.35) if boss else Color(0.75, 0.9, 1.0))
+
+
+# ---------------------------------------------------------------- 11단계 새 적 5종(EnemyArt + EnemyMotion)
+
+func _build_new(kind: StringName, grow: float, c: Color) -> void:
+	parts = EnemyArt.build(kind, _body, grow, c)
+	_motion = EnemyMotion.rest(parts)
+	_height = float(parts.get("height", 2.0))
+	_shield_knight = parts.get("knight") as LordCharacter
+	for m in parts.get("mats", []):
+		var sm := m as StandardMaterial3D
+		if sm:
+			_mats.append(sm)
+			_base.append(sm.albedo_color)
+	for c2 in parts.get("cloaks", []):
+		_cloaks.append(c2 as ShaderMaterial)
+	# 눈: 짝마다 재질 하나. 정예는 금빛
+	for mi in parts.get("eyes", []):
+		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		if m == null or _eye_mats.has(m):
+			continue
+		if enemy.elite:
+			m.albedo_color = Color(1.0, 0.8, 0.35)
+			m.emission = m.albedo_color
+		_eye_mats.append(m)
+		_eye_base.append(m.albedo_color)
+
+
+func _animate_new(delta: float) -> void:
+	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
+	var right := Vector3(cos(_yaw), 0.0, -sin(_yaw))
+	var act: StringName = enemy.act
+	if act == &"" and enemy.waiting and enemy.token <= 0:
+		act = &"wait"
+	if _attack > 1.5:
+		_attack = -1.0
+	if _hit_anim >= 0.0:
+		_hit_anim += delta
+		if _hit_anim > 0.6:
+			_hit_anim = -1.0
+	var state := {
+		"act": act,
+		"act_t": enemy.act_t,
+		"act_time": enemy.act_time,
+		"speed": _speed_m,
+		"side": _vel.dot(right),
+		"backing": _vel.dot(fwd) < -0.2,
+		"t": _t,
+		"guard": enemy.guard_down <= 0.0 and enemy.act != &"guard_break",
+		"stunned": enemy.stun > 0.0,
+		"id": enemy.id,
+		"recoil": _recoil,
+		"attack": _attack,
+		"hit": _hit_anim,
+	}
+	EnemyMotion.animate(parts, _motion, enemy.data.id, state, delta)
+	# 나타날 때: 두건 쓴 적은 연기처럼 맺힌다
+	if not _cloaks.is_empty():
+		for c in _cloaks:
+			c.set_shader_parameter("fade", _rise)

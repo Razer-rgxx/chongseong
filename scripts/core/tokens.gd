@@ -43,7 +43,11 @@ func cost(e: Enemy) -> int:
 
 
 ## 기다림 거리(칸, 영주와 적의 가운데 사이) = 사거리 + token_wait_gap.
+## 멀리서 덤비는 새 적(활잡이, 돌격병)은 EnemyData.wait_range.
 func wait_dist(e: Enemy) -> float:
+	var w: float = r.foes.wait_range(e) if r.foes else 0.0
+	if w > 0.0:
+		return w
 	return e.radius + r.data.run.enemy_reach + r.data.run.token_wait_gap
 
 
@@ -147,6 +151,8 @@ func deal(dt: float) -> void:
 			e.waiting = false
 		if e.token > 0 or not e.waiting or e.stun > 0.0 or e.frozen or e.confused > 0.0:
 			continue
+		if r.foes and not r.foes.can_take_token(e):
+			continue
 		e.wait_t += dt
 		want.append(i)
 	var list: Array[Enemy] = r.enemies
@@ -170,8 +176,12 @@ func deal(dt: float) -> void:
 
 
 ## 표를 든 적이 영주를 때리기까지 남은 시간(어림): 간격·첫 기다림·걸어갈 시간 중 가장 긴 것.
+## 새 적은 겨눔·머리 낮춤·심지 시간을 더한다(하고 있으면 남은 시간만).
 func time_to_hit(e: Enemy) -> float:
-	var gap: float = e.pos.distance_to(r.lord.pos) - e.radius - r.data.run.enemy_reach
+	if r.foes and r.foes.busy(e):
+		return r.foes.prep_left(e)
+	var reach: float = r.foes.strike_reach(e) if r.foes else e.radius + r.data.run.enemy_reach
+	var gap: float = e.pos.distance_to(r.lord.pos) - reach
 	var sp: float = e.data.speed * (1.0 - e.slow_k)
 	var walk: float = maxf(0.0, gap) / maxf(sp, 0.01)
-	return maxf(maxf(e.cooldown, e.windup), walk)
+	return maxf(maxf(e.cooldown, e.windup), walk) + (r.foes.prep_left(e) if r.foes else 0.0)

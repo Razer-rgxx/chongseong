@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"caller"
+display_name = "부르는 자"
+hp = 40
+damage = 0
+speed = 1.3
+radius = 0.3
+cooldown = 1.0
+color = Color(0.5, 0.75, 0.6, 1)
+knockback_mult = 1.0
+big = false
+wraith = false
+boss = false
+token_cost = 0
+keep_near = 10.0
+keep_far = 13.0
+act_after = 0.6
+summon_kind = &"wraith"
+summon_count = 3
+summon_interval = 7.0
+summon_time = 1.0
+summon_radius = 1.6
+summon_max = 15

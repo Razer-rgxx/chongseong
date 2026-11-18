@@ -48,6 +48,8 @@ var _pfx := PowerFx.new()
 var _pull_fx := PullFx.new()
 ## 좌클릭 동작 20가지와 속성의 효과(판정 모양, 날아가는 것, 착지 먼지 …). Rules의 move_* 신호를 받는다.
 var _move_fx := MoveFx.new()
+## 새 적 5종의 효과(겨눈 선, 화살, 방패 불똥, 돌진 길, 심지와 폭발, 부르는 원). Rules의 enemy_act·enemy_projectile_* 신호를 받는다.
+var _enemy_fx := EnemyFx.new()
 ## 지금 쥔 검(바뀔 때만 손의 칼과 효과 색을 바꾼다).
 var _held: Sword = null
 var _held_set: bool = false
@@ -83,6 +85,11 @@ func _ready() -> void:
 	add_child(_pull_fx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
+	add_child(_enemy_fx)
+	_enemy_fx.setup(rules, _enemy_parts)
+	_enemy_fx.exploded.connect(func(_at: Vector3, k: float) -> void:
+		_camera.add_shake(0.35 * k)
+		_camera.kick(6.0 * k))
 	rules.move_area.connect(_on_move_area)
 	rules.effect.connect(_on_effect)
 	rules.day_started.connect(_on_day)
@@ -267,6 +274,7 @@ func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
 	_lord.draw(alpha, delta)
 	_move_fx.draw(alpha)
+	_enemy_fx.draw(alpha)
 	_sync_enemies(alpha, delta)
 	_camera.target = _lord.position
 	# 빠르게 움직일 때 화면 가장자리가 빨려 든다
@@ -343,6 +351,7 @@ func _refresh_cards() -> void:
 
 func _on_day(_zone: int) -> void:
 	_move_fx.clear()
+	_enemy_fx.clear()
 	for v in _hilts.values():
 		v.queue_free()
 	_hilts.clear()
@@ -369,6 +378,7 @@ func _on_end(won: bool) -> void:
 	var r := meta.record_run(rules, data.meta)
 	meta.save()
 	_move_fx.clear()
+	_enemy_fx.clear()
 	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt])
 	_capture(false)
 
@@ -556,8 +566,17 @@ func _on_effect(kind: StringName, at: Vector2, info: Dictionary) -> void:
 			_hud.toast("언덕의 모든 검이 함께 뽑혀 나왔다. 도감이 다 채워졌다.")
 
 
+## EnemyFx가 방패·배·지팡이 끝의 실제 자리를 읽는 그 적의 몸 부품(EnemyArt). 새 적이 아니면 빈 것.
+func _enemy_parts(e: Enemy) -> Dictionary:
+	var v: EnemyView = _enemies.get(e.id)
+	return v.parts if v else {}
+
+
 func _on_enemy_died(e: Enemy) -> void:
 	var at: Vector3 = Grid.cells_to_world(e.pos)
+	# 터진 자폭병은 EnemyFx가 폭발을 그린다
+	if e.act == &"explode":
+		return
 	if e.data.wraith:
 		_fx.wisp(at + Vector3(0, 1.0, 0), Vector3.UP, true)
 	else:

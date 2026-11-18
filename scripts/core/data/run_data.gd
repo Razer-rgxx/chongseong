@@ -54,6 +54,16 @@ extends Resource
 ## 적이 영주를 때리는 거리(서로의 크기에 더한다).
 @export var enemy_reach: float = 0.42
 
+@export_group("밤: 새 적(11단계)")
+## 구역마다 새 적이 나올 확률(길이는 구역 수, 0부터 센다). 망령·늑대·거인의 확률은 남은 몫(1 - 새 적의 합) 안에서 나눈다.
+@export var archer_chance: PackedFloat32Array = PackedFloat32Array([0, 0.06, 0.07, 0.08, 0.08, 0.09, 0.09, 0.1, 0.1, 0.1])
+@export var shield_chance: PackedFloat32Array = PackedFloat32Array([0, 0, 0.06, 0.07, 0.07, 0.08, 0.08, 0.09, 0.09, 0.1])
+@export var charger_chance: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0.05, 0.06, 0.06, 0.07, 0.07, 0.08, 0.08])
+@export var bomber_chance: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0.06, 0.07, 0.07, 0.08, 0.08, 0.08])
+@export var caller_chance: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0.05, 0.05, 0.05, 0.06, 0.06])
+## 한 밤에 나오는 부르는 자의 수 상한(넘으면 망령이 나온다).
+@export var caller_max: int = 2
+
 @export_group("밤: 공격 표")
 ## 구역마다 밤의 공격 표 수(docs/attack_tokens.md). 표를 가진 적만 영주를 때린다. 0이면 표 없이 모두 덤빈다.
 @export var attack_tokens: PackedInt32Array = PackedInt32Array([4, 4, 5, 5, 6, 6, 7, 8, 9, 10])
@@ -79,3 +89,26 @@ extends Resource
 ## 이 구역부터 정예가 거인일 수 있다. 확률.
 @export var elite_giant_from: int = 2
 @export var elite_giant_chance: float = 0.4
+
+
+## 새 적(나오는 순서대로).
+const EXTRA_KINDS: Array[StringName] = [&"archer", &"shield", &"charger", &"bomber", &"caller"]
+
+
+## 그 구역에서 새 적 kind가 나올 확률.
+func extra_chance(kind: StringName, zone: int) -> float:
+	var a: PackedFloat32Array
+	match kind:
+		&"archer":
+			a = archer_chance
+		&"shield":
+			a = shield_chance
+		&"charger":
+			a = charger_chance
+		&"bomber":
+			a = bomber_chance
+		&"caller":
+			a = caller_chance
+	if a.is_empty():
+		return 0.0
+	return a[clampi(zone, 0, a.size() - 1)]

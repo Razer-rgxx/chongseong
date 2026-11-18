@@ -566,6 +566,10 @@ func _step_shots(dt: float) -> void:
 
 
 func _shot_hits(p: Projectile) -> void:
+	# 검기·던진 칼이 지나간 길의 적의 화살은 부러진다
+	for q in r.enemy_projectiles.duplicate():
+		if _seg_dist(q.pos, p.prev_pos, p.pos) <= (p.width + q.width) / 2.0:
+			r.foes.cut_arrow(q)
 	var hits: Array[Enemy] = []
 	for e in r.enemies:
 		if e.dead or p.hit_ids.has(e.id):
@@ -612,6 +616,7 @@ func _radius(run: MoveRun, m: MoveData) -> float:
 ## 판정 하나: 모양 안의 적을 찾아 화면에 알리고(필요하면) 벤다.
 func _fire(run: MoveRun, a: Dictionary) -> Array[Enemy]:
 	var hits := _find(run, a)
+	_cut_arrows(run, a)
 	if run.echo or bool(a.get("emit", false)):
 		var info := _info(run, a)
 		info["hits"] = hits.size()
@@ -635,32 +640,12 @@ func _find(run: MoveRun, a: Dictionary) -> Array[Enemy]:
 	var out: Array[Enemy] = []
 	var at: Vector2 = a.at
 	var face: float = float(a.get("face", run.face))
-	var close: float = r.data.lord.close_hit
 	var shape: StringName = a.shape
 	var once: bool = bool(a.get("once", false))
 	for e in r.enemies:
 		if e.dead or (once and run.seen.has(e.id)):
 			continue
-		var d: float = e.pos.distance_to(at)
-		var ok: bool = false
-		match shape:
-			&"arc":
-				ok = d <= float(a.reach) + e.radius and (absf(angle_difference(face, (e.pos - at).angle())) <= float(a.arc) / 2.0 or d <= e.radius + close)
-			&"line":
-				ok = _in_line(e, at, face, float(a.reach), float(a.width)) or d <= e.radius + close
-			&"plus":
-				var dir := Vector2.from_angle(face)
-				var side := dir.orthogonal()
-				var half: float = float(a.cross) / 2.0
-				var mid: Vector2 = at + dir * float(a.reach) / 2.0
-				ok = _in_line(e, at, face, float(a.reach), float(a.width)) or _in_line(e, mid - side * half, side.angle(), float(a.cross), float(a.width)) or d <= e.radius + close
-			&"circle":
-				ok = d <= float(a.radius) + e.radius
-			&"ring":
-				ok = absf(d - float(a.radius)) <= float(a.thick) / 2.0 + e.radius
-			&"path":
-				ok = _seg_dist(e.pos, a.from, a.to) <= float(a.width) + e.radius
-		if ok:
+		if covers(a, face, e.pos, e.radius):
 			out.append(e)
 	out.sort_custom(func(x: Enemy, y: Enemy) -> bool: return x.pos.distance_squared_to(at) < y.pos.distance_squared_to(at))
 	var pierce: int = int(run.st.get("pierce", 0))
@@ -672,11 +657,50 @@ func _find(run: MoveRun, a: Dictionary) -> Array[Enemy]:
 	return out
 
 
+## 판정 모양 a(face 쪽)가 p에 선 크기 rad의 것에 닿는지. 적과 적의 화살(11단계)이 같이 쓴다.
+func covers(a: Dictionary, face: float, p: Vector2, rad: float) -> bool:
+	var at: Vector2 = a.at
+	var close: float = r.data.lord.close_hit
+	var d: float = p.distance_to(at)
+	match a.shape:
+		&"arc":
+			return d <= float(a.reach) + rad and (absf(angle_difference(face, (p - at).angle())) <= float(a.arc) / 2.0 or d <= rad + close)
+		&"line":
+			return _in_line_p(p, rad, at, face, float(a.reach), float(a.width)) or d <= rad + close
+		&"plus":
+			var dir := Vector2.from_angle(face)
+			var side := dir.orthogonal()
+			var half: float = float(a.cross) / 2.0
+			var mid: Vector2 = at + dir * float(a.reach) / 2.0
+			return _in_line_p(p, rad, at, face, float(a.reach), float(a.width)) or _in_line_p(p, rad, mid - side * half, side.angle(), float(a.cross), float(a.width)) or d <= rad + close
+		&"circle":
+			return d <= float(a.radius) + rad
+		&"ring":
+			return absf(d - float(a.radius)) <= float(a.thick) / 2.0 + rad
+		&"path":
+			return _seg_dist(p, a.from, a.to) <= float(a.width) + rad
+	return false
+
+
+## 판정에 닿은 적의 화살(Rules.enemy_projectiles)을 부러뜨린다.
+func _cut_arrows(run: MoveRun, a: Dictionary) -> void:
+	if r.enemy_projectiles.is_empty():
+		return
+	var face: float = float(a.get("face", run.face))
+	for p in r.enemy_projectiles.duplicate():
+		if covers(a, face, p.pos, p.width / 2.0) or covers(a, face, p.prev_pos, p.width / 2.0):
+			r.foes.cut_arrow(p)
+
+
 func _in_line(e: Enemy, at: Vector2, face: float, length: float, width: float) -> bool:
+	return _in_line_p(e.pos, e.radius, at, face, length, width)
+
+
+static func _in_line_p(p: Vector2, rad: float, at: Vector2, face: float, length: float, width: float) -> bool:
 	var dir := Vector2.from_angle(face)
-	var to: Vector2 = e.pos - at
+	var to: Vector2 = p - at
 	var along: float = to.dot(dir)
-	return along >= -e.radius and along <= length + e.radius and absf(to.cross(dir)) <= width / 2.0 + e.radius
+	return along >= -rad and along <= length + rad and absf(to.cross(dir)) <= width / 2.0 + rad
 
 
 static func _seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:

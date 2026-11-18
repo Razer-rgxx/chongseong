@@ -1,8 +1,8 @@
 class_name Projectile extends RefCounted
-## 날아가는 것(검기, 던진 칼). Rules.projectiles에 있고 규칙이 틱마다 옮겨 맞힌다(물리로 맞히지 않는다).
+## 날아가는 것(검기, 던진 칼). 적의 화살(kind arrow)은 Rules.enemy_projectiles에 따로 있다. Rules.projectiles에 있고 규칙이 틱마다 옮겨 맞힌다(물리로 맞히지 않는다).
 ## 화면(MoveFx)은 pos·prev_pos·dir·returning을 읽어 그린다.
 
-var kind: StringName       # &"wave", &"boomerang"
+var kind: StringName       # &"wave", &"boomerang", 적의 &"arrow"
 var pos: Vector2           # 칸
 var prev_pos: Vector2
 var dir: Vector2           # 단위 벡터
@@ -18,3 +18,7 @@ var age: float = 0.0
 var max_time: float = 3.0
 var hit_ids: Dictionary = {}
 var run: MoveRun
+## 적의 화살: 쏜 적, 피해, 영주의 좌클릭에 부러졌는지(화면이 두 동강으로 그린다).
+var owner: Enemy = null
+var damage: float = 0.0
+var cut: bool = false
