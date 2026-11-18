@@ -9,6 +9,7 @@ extends RefCounted
 ## 각인 36종과 고유 능력은 Powers(powers.gd)가 맡고, 이 파일은 정해진 자리에서 부른다.
 ## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)의 행동은 Foes(foes.gd)가 맡는다.
 ## 12단계 밤마다 목표 하나(버티기·지키기·사냥·포위)와 구역 규칙 하나(없음·짙은 안개·불씨 땅·무덤). docs/content.md "12단계".
+## 13단계 갈림길(새벽에 다음 구역의 길 두 개 중 고른다, choose_path)과 낮 사건(대장장이·저주받은 손잡이·순례자·점쟁이).
 
 signal day_started(zone: int)
 signal night_started(zone: int)
@@ -58,6 +59,14 @@ signal ember_burn(at: Vector2, radius: float, time: float)
 signal grave_rise(at: Vector2)
 ## 포위: 적이 나오는 변(0 북 y = 0, 1 남, 2 서 x = 0, 3 동). -1이면 포위가 끝났다.
 signal siege_side(side: int)
+## 갈림길(13단계): 새벽에 다음 구역의 길 두 개를 보인다. 카드는 {goal, rule, reward}. choose_path(i)를 부르기 전에는 낮이 시작되지 않는다.
+signal path_offered(cards: Array)
+signal path_chosen(i: int, card: Dictionary)
+## 낮 사건(13단계): 섰다(day_started 뒤) / 썼다(result는 종류마다 다르다) / 사라졌다(쓴 뒤, 또는 쓰지 않고 밤이 왔을 때).
+## 못 쓰면(체력이 모자람, 검이 없음) pull_refused로 까닭을 보낸다.
+signal event_placed(ev: DayEvent)
+signal event_used(ev: DayEvent, result: Dictionary)
+signal event_gone(ev: DayEvent)
 
 enum Phase { DAY, NIGHT, OVER }
 
@@ -135,7 +144,7 @@ var foes: Foes
 ## 이 밤(또는 지난 밤)의 목표와 구역 규칙.
 var goal: StringName = &"survive"
 var rule: StringName = &""
-## 다음 밤의 목표와 구역 규칙. 낮이 될 때 정하고(_roll_next_night), 13단계 갈림길이 set_next_night로 바꾼다.
+## 다음 밤의 목표와 구역 규칙. 1구역은 버티기, 그 뒤는 새벽의 갈림길(choose_path)이 set_next_night로 정한다.
 var next_goal: StringName = &"survive"
 var next_rule: StringName = &""
 ## 지키기: 봉화 자리(칸)와 체력. beacon_max가 0이면 봉화가 없는 밤이다.
@@ -161,6 +170,27 @@ var goal_shards: int = 0
 ## 지난 밤의 결과: goal, rule, ok(이뤘는지), free(받은 공짜 뽑기), shards, heal(되찾은 체력), fled(우두머리가 달아났는지).
 var last_night: Dictionary = {}
 
+# ---- 갈림길과 낮 사건(13단계). 화면은 읽기만 한다.
+## 새벽에 길을 고르는 중이면 시간이 멈추고 낮이 시작되지 않는다(손잡이도 없다).
+var path_open: bool = false
+## 고를 길 두 개: {goal, rule, reward}.
+var path_cards: Array[Dictionary] = []
+## 지나온 구역: {zone, goal, rule, reward}. 1구역은 고르지 않았으니 reward가 &"". 지도 창이 그린다.
+var path_log: Array[Dictionary] = []
+## 이 낮에 받은 갈림길 보상(&""이면 없음).
+var path_reward: StringName = &""
+## 이 낮의 뽑기 운 배수(갈림길의 운 보상).
+var day_luck: float = 1.0
+## 갈림길의 조각 보상. 판이 끝날 때 Meta.run_shards가 센다.
+var path_shards: int = 0
+## 이 낮의 사건(없으면 null). 쓰면 used가 켜지고 밤이 오면 null.
+var event: DayEvent = null
+## 점쟁이를 썼다: 오늘 손잡이의 참된 조짐이 보인다(14단계가 쓴다).
+var seer_used_today: bool = false
+## 저주받은 손잡이를 뽑았다: 이번 밤 적이 더 빨리 나온다.
+var cursed_night: bool = false
+var _pull_cursed: bool = false
+
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	data = game_data
@@ -175,6 +205,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	foes = Foes.new(self)
 	night_total = data.run.night_length
 	lord.hp = max_hp()
+	path_log.append({"zone": 0, "goal": &"survive", "rule": &"", "reward": &""})
 	_new_day()
 	if meta:
 		var s := meta.sheath_sword(data)
@@ -217,7 +248,7 @@ func pattern() -> PatternData:
 
 
 func luck() -> float:
-	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult()
+	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult() * day_luck
 
 
 func step(input: LordInput = null) -> void:
@@ -234,7 +265,7 @@ func step(input: LordInput = null) -> void:
 	if freeze > 0:
 		freeze -= 1
 		return
-	if pending != null or altar_open:
+	if pending != null or altar_open or path_open:
 		return
 	if pull_hilt != null:
 		_step_pull()
@@ -257,7 +288,7 @@ func step(input: LordInput = null) -> void:
 
 ## 낮에만. 뽑는 중이거나 고르는 중이면 못 한다.
 func start_night() -> void:
-	if phase != Phase.DAY or pull_hilt != null or pending != null or altar_open:
+	if phase != Phase.DAY or pull_hilt != null or pending != null or altar_open or path_open:
 		return
 	var R := data.run
 	phase = Phase.NIGHT
@@ -276,6 +307,12 @@ func start_night() -> void:
 	enemy_projectiles.clear()
 	hilts.clear()
 	altar = null
+	# 쓰지 않은 낮 사건은 밤이 오면 떠난다
+	if event:
+		var ev := event
+		event = null
+		if not ev.used:
+			event_gone.emit(ev)
 	moves.clear()
 	tokens.reset()
 	powers.on_night_start()
@@ -292,9 +329,14 @@ func skip_night() -> void:
 		_end_night()
 
 
-func _new_day() -> void:
+## 낮을 연다. reward는 고른 길의 보상(13단계 갈림길, 1구역은 &"").
+func _new_day(reward: StringName = &"") -> void:
 	var R := data.run
 	phase = Phase.DAY
+	path_open = false
+	day_luck = 1.0
+	seer_used_today = false
+	cursed_night = false
 	hilts.clear()
 	lord.pos = Grid.middle()
 	lord.prev_pos = lord.pos
@@ -317,8 +359,11 @@ func _new_day() -> void:
 			if a.pos.distance_to(lord.pos) >= 3.0 and hilts.all(func(h: Hilt) -> bool: return h.pos.distance_to(a.pos) >= 1.8):
 				break
 		altar = a
-	_roll_next_night()
+	_place_event()
+	_apply_path_reward(reward)
 	day_started.emit(zone)
+	if event:
+		event_placed.emit(event)
 
 
 func _hilt_spot_ok(p: Vector2) -> bool:
@@ -347,6 +392,9 @@ func _end_night() -> void:
 		won = true
 		run_ended.emit(true)
 		return
+	for s in slots:
+		if s:
+			s.night_bonus = 1.0
 	free_pulls = mini(data.run.max_free_pulls, free_pulls + int(reward.free))
 	goal_shards += int(reward.shards)
 	zone += 1
@@ -355,7 +403,7 @@ func _end_night() -> void:
 	reward["heal"] = lord.hp - before
 	reward.erase("heal_k")
 	last_night = reward
-	_new_day()
+	_offer_path()
 
 
 # ---------------------------------------------------------------- 뽑기
@@ -382,6 +430,11 @@ func nearest_hilt(reach: float) -> Hilt:
 	return best
 
 
+## 그 손잡이를 뽑을 때의 운(저주받은 손잡이는 ×cursed_luck).
+func pull_luck(h: Hilt) -> float:
+	return luck() * (data.run.cursed_luck if h and h.cursed else 1.0)
+
+
 func pull_duration() -> float:
 	return data.run.pull_time + data.run.pull_step * pull_grade
 
@@ -393,15 +446,21 @@ func _try_pull() -> void:
 		altar_open = true
 		altar_opened.emit()
 		return
+	var ev := near_event()
+	if ev:
+		_use_event(ev)
+		return
 	var h := nearest_hilt(data.run.pull_reach)
 	if h == null:
 		return
-	_pull_free = free_pulls > 0
-	if not _pull_free and lord.hp <= pull_cost():
+	# 저주받은 손잡이는 체력도 공짜 뽑기도 쓰지 않는다
+	_pull_cursed = h.cursed
+	_pull_free = not _pull_cursed and free_pulls > 0
+	if not _pull_free and not _pull_cursed and lord.hp <= pull_cost():
 		pull_refused.emit("체력이 모자라. 더 뽑으면 쓰러진다.")
 		return
 	pull_hilt = h
-	pull_grade = debug_grade if debug_grade >= 0 else roll_grade(luck())
+	pull_grade = debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))
 	pull_t = 0.0
 	pull_steps = 0
 	pull_started.emit(h, pull_grade)
@@ -419,7 +478,9 @@ func _step_pull() -> void:
 	var h := pull_hilt
 	pull_hilt = null
 	h.gone = true
-	if _pull_free:
+	if _pull_cursed:
+		pass
+	elif _pull_free:
 		free_pulls -= 1
 	else:
 		lord.hp -= pull_cost()
@@ -428,6 +489,9 @@ func _step_pull() -> void:
 	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
 	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
 	powers.on_pulled(s)
+	if _pull_cursed:
+		_pull_cursed = false
+		_cursed_pulled(h, s)
 	sword_pulled.emit(s)
 	_receive(s)
 
@@ -737,6 +801,9 @@ func _step_night() -> void:
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
 		if goal == &"siege":
 			_spawn_t /= maxf(0.01, R.siege_spawn)
+		# 저주받은 손잡이를 뽑은 밤에는 적이 더 빨리 나온다
+		if cursed_night:
+			_spawn_t /= maxf(0.01, R.cursed_enemies)
 		var r: float = rng.randf()
 		# 새 적(구역마다 RunData의 확률). 나머지 몫 안에서 망령·늑대·거인을 예전 비율로 나눈다
 		var extra: float = _extra_total()
@@ -927,22 +994,7 @@ func _spawn_elite() -> Enemy:
 
 # ---------------------------------------------------------------- 밤의 목표와 구역 규칙(12단계)
 
-## 다음 밤의 목표와 구역 규칙을 정한다(낮이 될 때). 2~9구역은 13단계의 갈림길이 고르기 전까지 rng로 정한다.
-## 1구역과 마지막 구역은 start_night가 버티기(언덕지기)로 둔다.
-func _roll_next_night() -> void:
-	var R := data.run
-	if zone == 0 or last_zone() or R.night_goals.is_empty():
-		next_goal = &"survive"
-		next_rule = &""
-		return
-	var g := StringName(R.night_goals[rng.randi_range(0, R.night_goals.size() - 1)])
-	var z: StringName = &""
-	if not R.zone_rules.is_empty():
-		z = StringName(R.zone_rules[rng.randi_range(0, R.zone_rules.size() - 1)])
-	set_next_night(g, z)
-
-
-## 다음 밤의 목표와 구역 규칙을 바꾼다(13단계 갈림길, 관리, 테스트). 모르는 값이면 그대로 둔다.
+## 다음 밤의 목표와 구역 규칙을 바꾼다(13단계 갈림길이 부른다. 관리, 테스트). 모르는 값이면 그대로 둔다.
 ## 1구역과 마지막 구역의 밤은 이것과 상관없이 버티기다.
 func set_next_night(g: StringName, z: StringName) -> void:
 	if not GOALS.has(g) or not ZONE_RULES.has(z):
@@ -1166,6 +1218,201 @@ func _burn_lord(d: float) -> void:
 		lord_died()
 
 
+# ---------------------------------------------------------------- 갈림길(13단계)
+
+## 새벽: 다음 구역의 길 두 개를 보이고 고를 때까지 기다린다(시간이 멈추고 손잡이도 없다).
+func _offer_path() -> void:
+	phase = Phase.DAY
+	hilts.clear()
+	altar = null
+	event = null
+	path_cards = make_path_cards()
+	path_open = true
+	path_offered.emit(path_cards)
+
+
+## 길 두 개: {goal, rule, reward}. 2~9구역은 목표와 구역 규칙을 RunData 목록에서 고르고(두 길이 같지 않게),
+## 마지막 구역은 둘 다 언덕지기(버티기, 규칙 없음)이고 보상만 다르다. 어려운 길일수록 좋은 보상이 잘 붙는다.
+func make_path_cards() -> Array[Dictionary]:
+	var R := data.run
+	var out: Array[Dictionary] = []
+	for k in 2:
+		var g: StringName = &"survive"
+		var z: StringName = &""
+		if zone > 0 and not last_zone() and not R.night_goals.is_empty():
+			for tries in 12:
+				g = StringName(R.night_goals[rng.randi_range(0, R.night_goals.size() - 1)])
+				z = StringName(R.zone_rules[rng.randi_range(0, R.zone_rules.size() - 1)]) if not R.zone_rules.is_empty() else &""
+				if k == 0 or g != out[0].goal or z != out[0].rule:
+					break
+		var avoid: StringName = out[0].reward if k == 1 else &""
+		out.append({"goal": g, "rule": z, "reward": roll_path_reward(R.path_hardness(g, z), avoid)})
+	return out
+
+
+## 그 어려움(0~2)의 길에 붙을 보상 하나. avoid는 뺀다(두 길의 보상이 겹치지 않게).
+func roll_path_reward(hard: int, avoid: StringName = &"") -> StringName:
+	var R := data.run
+	var w := R.path_weights(hard)
+	var total: float = 0.0
+	for i in w.size():
+		if StringName(R.path_rewards[i]) == avoid:
+			w[i] = 0.0
+		total += w[i]
+	if total <= 0.0:
+		return &""
+	var x: float = rng.randf() * total
+	for i in w.size():
+		x -= w[i]
+		if x < 0.0:
+			return StringName(R.path_rewards[i])
+	return StringName(R.path_rewards[w.size() - 1])
+
+
+## 길을 고른다(0, 1). 틱 사이에 부른다. 다음 밤의 목표·규칙을 정하고 보상을 받아 낮을 연다.
+func choose_path(i: int) -> void:
+	if not path_open or i < 0 or i >= path_cards.size():
+		return
+	var c: Dictionary = path_cards[i]
+	path_open = false
+	set_next_night(c.goal, c.rule)
+	path_log.append({"zone": zone, "goal": c.goal, "rule": c.rule, "reward": c.reward})
+	path_cards = []
+	path_chosen.emit(i, c)
+	_new_day(c.reward)
+
+
+## 고른 길의 보상(낮이 열릴 때): 공짜 뽑기, 체력, 두 칸 검 내구, 이 낮의 운, 판이 끝날 때의 조각.
+func _apply_path_reward(reward: StringName) -> void:
+	var R := data.run
+	path_reward = reward
+	match reward:
+		&"pulls":
+			free_pulls = mini(R.max_free_pulls, free_pulls + R.reward_pulls)
+		&"heal":
+			lord.hp = minf(max_hp(), lord.hp + R.reward_heal)
+		&"whet":
+			for s in slots:
+				if s and s.breakable():
+					s.durability = s.max_durability
+			slots_changed.emit()
+		&"luck":
+			day_luck = R.reward_luck
+		&"shards":
+			path_shards += R.reward_shards
+
+
+# ---------------------------------------------------------------- 낮 사건(13단계)
+
+## 이 구역부터 낮마다 사건 하나. 저주받은 손잡이는 낮의 손잡이 하나에 붙고, 나머지는 손잡이·제단·영주와 떨어진 자리에 선다.
+func _place_event() -> void:
+	var R := data.run
+	event = null
+	if zone < R.event_from_zone or R.event_kinds.is_empty():
+		return
+	var ev := DayEvent.new()
+	ev.id = _new_id()
+	ev.kind = StringName(R.event_kinds[rng.randi_range(0, R.event_kinds.size() - 1)])
+	if ev.kind == &"cursed":
+		if hilts.is_empty():
+			return
+		var h := hilts[rng.randi_range(0, hilts.size() - 1)]
+		h.cursed = true
+		ev.hilt = h
+		ev.pos = h.pos
+	else:
+		var clear: float = R.event_reach + R.pull_reach
+		for tries in 60:
+			ev.pos = Vector2(rng.randf_range(3.0, R.arena_size.x - 3.0), rng.randf_range(3.0, R.arena_size.y - 3.0))
+			if ev.pos.distance_to(lord.pos) >= 3.0 and hilts.all(func(h: Hilt) -> bool: return h.pos.distance_to(ev.pos) >= clear) and (altar == null or altar.pos.distance_to(ev.pos) >= R.altar_reach + R.event_reach):
+				break
+	event = ev
+
+
+## E로 쓸 수 있는 가까운 사건(저주받은 손잡이는 뽑기로 쓴다). 없으면 null.
+func near_event() -> DayEvent:
+	if event == null or event.used or event.kind == &"cursed" or phase != Phase.DAY:
+		return null
+	return event if event.pos.distance_to(lord.pos) < data.run.event_reach else null
+
+
+## 지금 그 사건을 쓸 수 있는지. 못 쓰면 까닭(화면의 알림), 쓸 수 있으면 "".
+func event_block(ev: DayEvent) -> String:
+	var R := data.run
+	match ev.kind:
+		&"smith":
+			if current() == null:
+				return "벼릴 검을 쥐고 있지 않다."
+			if lord.hp <= R.smith_cost:
+				return "체력이 모자라. 대장장이에게 낼 체력이 없다."
+		&"pilgrim":
+			if pilgrim_slot() < 0:
+				return "바칠 검이 없다."
+		&"seer":
+			if lord.hp <= R.seer_cost:
+				return "체력이 모자라. 점쟁이에게 낼 체력이 없다."
+	return ""
+
+
+## 순례자에게 바칠 칸: 쥐지 않은 칸, 그 칸이 비면 쥔 칸. 둘 다 비면 -1.
+func pilgrim_slot() -> int:
+	if slots[1 - active] != null:
+		return 1 - active
+	return active if slots[active] != null else -1
+
+
+func _use_event(ev: DayEvent) -> void:
+	var R := data.run
+	var why := event_block(ev)
+	if why != "":
+		pull_refused.emit(why)
+		return
+	var result := {}
+	match ev.kind:
+		&"smith":
+			var s := current()
+			lord.hp -= R.smith_cost
+			if s.breakable():
+				s.durability = s.max_durability
+			s.night_bonus = 1.0 + R.smith_damage
+			result = {"sword": s, "cost": R.smith_cost, "damage": R.smith_damage}
+		&"pilgrim":
+			var k := pilgrim_slot()
+			var s := slots[k]
+			slots[k] = null
+			if k == active and slots[1 - k] != null:
+				active = 1 - k
+			lord.combo = 0
+			var before: float = lord.hp
+			lord.hp = minf(max_hp(), lord.hp + max_hp() * R.pilgrim_heal)
+			free_pulls = mini(R.max_free_pulls, free_pulls + R.pilgrim_free)
+			result = {"sword": s, "slot": k, "heal": lord.hp - before, "free": R.pilgrim_free}
+		&"seer":
+			lord.hp -= R.seer_cost
+			seer_used_today = true
+			result = {"cost": R.seer_cost}
+	ev.used = true
+	event_used.emit(ev, result)
+	event_gone.emit(ev)
+	if ev.kind == &"pilgrim" or ev.kind == &"smith":
+		slots_changed.emit()
+
+
+## 저주받은 손잡이를 다 뽑았다: 뽑은 검의 최대 내구가 절반, 이번 밤 적이 더 빨리 나온다.
+func _cursed_pulled(h: Hilt, s: Sword) -> void:
+	var R := data.run
+	if s.breakable():
+		s.max_durability = maxf(1.0, roundf(s.max_durability * R.cursed_durability))
+		s.durability = s.max_durability
+	cursed_night = true
+	var ev := event if event and event.hilt == h else null
+	if ev == null:
+		return
+	ev.used = true
+	event_used.emit(ev, {"sword": s, "max_durability": s.max_durability})
+	event_gone.emit(ev)
+
+
 # ---------------------------------------------------------------- 제단
 
 func near_altar() -> bool:
@@ -1258,4 +1505,14 @@ func state_hash() -> int:
 	for s in slots:
 		parts.append(s.data.id if s else -1)
 		parts.append(s.durability if s else -1.0)
+		parts.append(s.max_durability if s else -1.0)
+		parts.append(s.night_bonus if s else -1.0)
+	parts.append_array([path_open, path_shards, day_luck, path_reward, path_log.size(), seer_used_today, cursed_night])
+	for c in path_cards:
+		parts.append_array([c.goal, c.rule, c.reward])
+	if event:
+		parts.append_array([event.kind, event.pos, event.used])
+	for h in hilts:
+		if h.cursed:
+			parts.append_array([h.id, h.gone])
 	return hash(str(parts))

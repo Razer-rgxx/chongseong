@@ -73,6 +73,15 @@ func _init() -> void:
 	_test_graves()
 	_test_goal_rewards()
 	_test_goals_replay()
+	_test_path_cards()
+	_test_path_bias()
+	_test_path_rewards()
+	_test_events_place()
+	_test_event_smith()
+	_test_event_cursed()
+	_test_event_pilgrim()
+	_test_event_seer()
+	_test_path_replay()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -505,8 +514,11 @@ func _test_night_flow() -> void:
 		if r.phase != Rules.Phase.NIGHT:
 			break
 	check(spawned[0] > 30, "밤 동안 적이 계속 올라온다(%d)" % spawned[0])
-	check(r.zone == 1 and r.phase == Rules.Phase.DAY and days == [1], "새벽이 오면 다음 구역의 낮")
-	check(is_equal_approx(r.lord.hp, 50.0 + d.run.heal_per_dawn) and r.enemies.is_empty(), "날이 밝으면 체력 +%d, 적은 사라진다" % d.run.heal_per_dawn)
+	check(r.zone == 1 and r.path_open and days.is_empty() and r.hilts.is_empty(), "새벽이 오면 갈림길: 길을 고르기 전에는 낮이 시작되지 않는다")
+	r.choose_path(0)
+	check(r.zone == 1 and r.phase == Rules.Phase.DAY and days == [1], "길을 고르면 다음 구역의 낮")
+	var path_heal: float = d.run.reward_heal if r.path_reward == &"heal" else 0.0
+	check(is_equal_approx(r.lord.hp, minf(r.max_hp(), 50.0 + d.run.heal_per_dawn + path_heal)) and r.enemies.is_empty(), "날이 밝으면 체력 +%d, 적은 사라진다" % d.run.heal_per_dawn)
 	check(r.hilts.size() == d.run.hilts_per_day, "새 낮에 검이 다시 꽂힌다")
 	check(r.lord.pos == Grid.middle(), "새 낮에는 한가운데에서 시작")
 
@@ -1914,6 +1926,7 @@ func _test_tokens_release() -> void:
 	r.hurt(k, 99999.0, Vector2.ZERO, false)
 	check(k.dead and k.token == 0 and r.tokens.cooling_count() == 1, "표: 죽으면 내려놓는다")
 	r.skip_night()
+	r.choose_path(0)
 	check(r.phase == Rules.Phase.DAY and not r.tokens.cooling.is_empty(), "표: (낮이 되어도 식는 표가 남아 있다가)")
 	r.start_night()
 	check(r.tokens.cooling.is_empty(), "표: 밤이 시작되면 식는 표가 없다")
@@ -2539,18 +2552,21 @@ func _test_night_choice() -> void:
 		q.debug_god = true
 		q.start_night()
 		q.skip_night()
-		seen[q.next_goal] = true
-		rules_seen[q.next_rule] = true
-		valid[0] = valid[0] and Rules.GOALS.has(q.next_goal) and Rules.ZONE_RULES.has(q.next_rule)
-	check(valid[0], "목표: 2구역의 목표와 구역 규칙은 표에 있는 값")
-	check(seen.size() == 4 and rules_seen.size() == 4, "목표: 2~9구역은 rng로 네 목표와 네 규칙(없음 포함)이 다 나온다(%d, %d)" % [seen.size(), rules_seen.size()])
+		for c in q.path_cards:
+			seen[c.goal] = true
+			rules_seen[c.rule] = true
+			valid[0] = valid[0] and Rules.GOALS.has(c.goal) and Rules.ZONE_RULES.has(c.rule)
+	check(valid[0], "목표: 2구역 갈림길의 목표와 구역 규칙은 표에 있는 값")
+	check(seen.size() == 4 and rules_seen.size() == 4, "목표: 2~9구역의 갈림길에 네 목표와 네 규칙(없음 포함)이 다 나온다(%d, %d)" % [seen.size(), rules_seen.size()])
 	var a := Rules.new(d, 77)
 	var b := Rules.new(d, 77)
 	for q in [a, b]:
 		q.debug_god = true
 		q.start_night()
 		q.skip_night()
-	check(a.next_goal == b.next_goal and a.next_rule == b.next_rule, "목표: 같은 시드면 같은 목표")
+	check(str(a.path_cards) == str(b.path_cards), "목표: 같은 시드면 같은 갈림길")
+	a.choose_path(1)
+	check(a.next_goal == b.path_cards[1].goal and a.next_rule == b.path_cards[1].rule, "목표: 고른 길의 목표와 규칙이 다음 밤의 것")
 	a.set_next_night(&"hunt", &"graves")
 	a.start_night()
 	check(a.goal == &"hunt" and a.rule == &"graves", "목표: set_next_night로 고른 목표가 그 밤에 쓰인다(13단계 갈림길)")
@@ -2637,7 +2653,9 @@ func _test_hunt() -> void:
 	var left: float = r.night_left
 	r.hurt(b, 999999.0, Vector2.ZERO, false)
 	r.step()
-	check(r.phase == Rules.Phase.DAY and days == [3] and left > 10.0, "사냥: 쓰러뜨리면 그 자리에서 새벽이 온다")
+	check(r.phase == Rules.Phase.DAY and r.path_open and r.zone == 3 and left > 10.0, "사냥: 쓰러뜨리면 그 자리에서 새벽이 온다")
+	r.choose_path(0)
+	check(days == [3], "사냥: (길을 고르면 낮)")
 	check(r.last_night.goal == &"hunt" and r.last_night.ok and not r.last_night.fled, "사냥: 결과에 남는다")
 	# 못 쓰러뜨리면 달아난다
 	var q := _goal_rules(&"hunt")
@@ -2866,3 +2884,396 @@ func _test_goals_replay() -> void:
 			hashes.append(r.state_hash())
 			logs.append(text[0])
 		check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0] != "", "목표 %s·%s: 같은 시드·같은 입력이면 결과가 같다(state_hash)" % [c[0], c[1]])
+
+
+# ---------------------------------------------------------------- 13단계: 갈림길과 낮 사건
+
+## 그 구역(0부터)의 밤을 넘겨 새벽의 갈림길에 선 판. 영주는 다치지 않는다.
+func _dawn(zone: int, g: GameData = null, seed: int = 61) -> Rules:
+	var r := Rules.new(g if g else d, seed)
+	r.debug_god = true
+	r.zone = zone
+	r.start_night()
+	r.skip_night()
+	return r
+
+
+## 그 사건 하나만 서는 표.
+func _ev_data(kind: String) -> GameData:
+	return _run_data({"event_kinds": PackedStringArray([kind])})
+
+
+## 사건 kind가 선 2구역의 낮(길은 0번).
+func _ev_day(kind: String, seed: int = 62) -> Rules:
+	var r := _dawn(0, _ev_data(kind), seed)
+	r.choose_path(0)
+	return r
+
+
+func _press_e(r: Rules) -> void:
+	var i := LordInput.new()
+	i.pull = true
+	r.step(i)
+
+
+func _test_path_cards() -> void:
+	var r := Rules.new(d, 63)
+	r.debug_god = true
+	var offered: Array = []
+	var days: Array[int] = []
+	r.path_offered.connect(func(c: Array) -> void: offered.append(c))
+	r.day_started.connect(func(z: int) -> void: days.append(z))
+	check(not r.path_open and r.path_cards.is_empty() and r.path_log.size() == 1, "갈림길: 1구역은 고르지 않는다")
+	r.start_night()
+	r.skip_night()
+	check(r.path_open and offered.size() == 1 and r.path_cards.size() == 2 and days.is_empty() and r.hilts.is_empty() and r.altar == null and r.event == null, "갈림길: 새벽에 길 두 개, 고르기 전에는 낮이 아니다(손잡이·제단·사건 없음)")
+	var a: Dictionary = r.path_cards[0]
+	var b: Dictionary = r.path_cards[1]
+	check(a.goal != b.goal or a.rule != b.rule, "갈림길: 두 길의 목표·규칙이 같지 않다")
+	check(a.reward != b.reward and d.run.path_rewards.has(String(a.reward)) and d.run.path_rewards.has(String(b.reward)), "갈림길: 두 길의 보상은 서로 다른 보상 표의 값")
+	var p0: Vector2 = r.lord.pos
+	var t0: int = r.tick
+	r.step(_inp(Vector2.RIGHT))
+	r.start_night()
+	check(r.lord.pos == p0 and r.phase == Rules.Phase.DAY and r.tick == t0 + 1, "갈림길: 고르는 동안 시간이 멈추고 밤도 오지 않는다")
+	r.choose_path(5)
+	check(r.path_open, "갈림길: 없는 길은 무시한다")
+	var chosen: Array = []
+	r.path_chosen.connect(func(i: int, c: Dictionary) -> void: chosen.append([i, c]))
+	r.choose_path(1)
+	check(not r.path_open and days == [1] and chosen.size() == 1 and chosen[0][0] == 1 and r.hilts.size() == d.run.hilts_per_day, "갈림길: 고르면 path_chosen, 그다음 낮(손잡이)")
+	check(r.next_goal == b.goal and r.next_rule == b.rule and r.path_reward == b.reward, "갈림길: 고른 길의 목표·규칙·보상")
+	check(r.path_log.size() == 2 and r.path_log[1].zone == 1 and r.path_log[1].goal == b.goal, "갈림길: 지나온 길에 남는다(지도 창)")
+	r.choose_path(0)
+	check(r.path_log.size() == 2, "갈림길: 한 번만 고른다")
+	r.start_night()
+	check(r.goal == b.goal and r.rule == b.rule, "갈림길: 그 밤의 목표·규칙이 된다")
+	# 구역 제한: 2~9구역은 표의 값, 마지막 구역은 둘 다 언덕지기(버티기, 규칙 없음)
+	var ok: Array[bool] = [true]
+	var hard_seen: Array[int] = [0]
+	for z in range(0, 8):
+		var q := _dawn(z, null, 70 + z)
+		for c in q.path_cards:
+			ok[0] = ok[0] and Rules.GOALS.has(c.goal) and Rules.ZONE_RULES.has(c.rule)
+			hard_seen[0] += d.run.path_hardness(c.goal, c.rule)
+	check(ok[0] and hard_seen[0] > 0, "갈림길: 2~9구역의 길은 표의 목표와 규칙")
+	var last := _dawn(8)
+	check(last.last_zone() and last.path_cards.size() == 2 and last.path_cards.all(func(c: Dictionary) -> bool: return c.goal == &"survive" and c.rule == &""), "갈림길: 10구역 앞은 둘 다 언덕지기(보상만 다르다)")
+	check(last.path_cards[0].reward != last.path_cards[1].reward, "갈림길: 10구역 앞 두 길의 보상은 다르다")
+	var top := _dawn(9)
+	check(top.phase == Rules.Phase.OVER and not top.path_open, "갈림길: 정상의 밤이 끝나면 길이 없다")
+
+
+## 어려운 길(사냥·포위, 구역 규칙)일수록 좋은 보상(공짜 뽑기, 운)이 잘 붙는다.
+func _test_path_bias() -> void:
+	var R := d.run
+	check(R.path_hardness(&"survive", &"") == 0 and R.path_hardness(&"hunt", &"") == 1 and R.path_hardness(&"defend", &"fog") == 1 and R.path_hardness(&"siege", &"embers") == 2, "갈림길: 어려움 = 사냥·포위 +1, 구역 규칙 +1")
+	var good := func(w: PackedFloat32Array) -> float:
+		var t: float = 0.0
+		for x in w:
+			t += x
+		return (w[R.path_rewards.find("pulls")] + w[R.path_rewards.find("luck")]) / t
+	var g0: float = good.call(R.path_weights(0))
+	var g1: float = good.call(R.path_weights(1))
+	var g2: float = good.call(R.path_weights(2))
+	check(g0 < g1 and g1 < g2, "갈림길: 좋은 보상의 몫이 어려움을 따라 오른다(%.2f < %.2f < %.2f)" % [g0, g1, g2])
+	var r := Rules.new(d, 64)
+	var n: Array[int] = [0, 0]
+	for i in 3000:
+		if [&"pulls", &"luck"].has(r.roll_path_reward(0)):
+			n[0] += 1
+		if [&"pulls", &"luck"].has(r.roll_path_reward(2)):
+			n[1] += 1
+	check(absf(n[0] / 3000.0 - g0) < 0.04 and absf(n[1] / 3000.0 - g2) < 0.04, "갈림길: 굴린 보상이 가중치를 따른다(%.2f, %.2f)" % [n[0] / 3000.0, n[1] / 3000.0])
+	# 실제 길에서도: 어려운 길의 보상이 더 좋다
+	var easy: Array[int] = [0, 0]
+	var hard: Array[int] = [0, 0]
+	for sd in 300:
+		var q := Rules.new(d, 1000 + sd)
+		q.zone = 3
+		for c in q.make_path_cards():
+			var h: int = R.path_hardness(c.goal, c.rule)
+			var is_good: int = 1 if [&"pulls", &"luck"].has(c.reward) else 0
+			if h == 0:
+				easy[0] += 1
+				easy[1] += is_good
+			elif h == 2:
+				hard[0] += 1
+				hard[1] += is_good
+	var ke: float = easy[1] / maxf(1.0, easy[0])
+	var kh: float = hard[1] / maxf(1.0, hard[0])
+	check(easy[0] > 20 and hard[0] > 20 and kh > ke + 0.15, "갈림길: 가장 어려운 길이 좋은 보상을 더 자주 받는다(쉬움 %.2f, 어려움 %.2f)" % [ke, kh])
+
+
+func _test_path_rewards() -> void:
+	var R := d.run
+	var p := _dawn(1)
+	p.free_pulls = 0
+	p.path_cards[0].reward = &"pulls"
+	p.choose_path(0)
+	check(p.free_pulls == R.reward_pulls and p.path_reward == &"pulls", "보상: 공짜 뽑기 +2(낮이 열릴 때)")
+	var pc := _dawn(1)
+	pc.free_pulls = R.max_free_pulls - 1
+	pc.path_cards[0].reward = &"pulls"
+	pc.choose_path(0)
+	check(pc.free_pulls == R.max_free_pulls, "보상: 공짜 뽑기는 모아 둘 수 있는 수까지")
+	var h := _dawn(1)
+	h.lord.hp = 10.0
+	h.path_cards[1].reward = &"heal"
+	h.choose_path(1)
+	check(is_equal_approx(h.lord.hp, 10.0 + R.reward_heal), "보상: 체력 +60")
+	var hc := _dawn(1)
+	hc.lord.hp = hc.max_hp() - 5.0
+	hc.path_cards[0].reward = &"heal"
+	hc.choose_path(0)
+	check(is_equal_approx(hc.lord.hp, hc.max_hp()), "보상: 체력은 최대치까지")
+	var w := _dawn(1)
+	var s0 := w.give(d.sword_by_name("늙은 사자"), 0)
+	var s1 := w.give(d.sword_by_name("붉은 이삭"), 1)
+	s0.durability = 1.0
+	s1.durability = 2.0
+	w.path_cards[0].reward = &"whet"
+	w.choose_path(0)
+	check(s0.durability == s0.max_durability and s1.durability == s1.max_durability, "보상: 두 칸 검 내구 모두 채움")
+	var l := _dawn(1)
+	var base: float = l.luck()
+	l.path_cards[0].reward = &"luck"
+	l.choose_path(0)
+	check(is_equal_approx(l.luck(), base * R.reward_luck) and is_equal_approx(l.pull_luck(l.hilts[0]) / (R.cursed_luck if l.hilts[0].cursed else 1.0), base * R.reward_luck), "보상: 다음 낮 운 ×1.3(뽑기에 쓰인다)")
+	l.start_night()
+	l.skip_night()
+	l.path_cards[0].reward = &"heal"
+	l.choose_path(0)
+	check(is_equal_approx(l.day_luck, 1.0), "보상: 운은 그 낮 한 번만")
+	var sh := _dawn(1)
+	sh.path_cards[0].reward = &"shards"
+	sh.choose_path(0)
+	var got := Meta.run_shards(sh, d.meta)
+	check(sh.path_shards == R.reward_shards and int(got.path) == R.reward_shards and int(got.total) >= R.reward_shards, "보상: 판이 끝날 때 조각 +5(Meta.run_shards의 path)")
+	var m := _meta()
+	var rec := m.record_run(sh, d.meta)
+	check(m.shards == rec.total and int(rec.path) == R.reward_shards, "보상: 조각은 Meta.record_run이 센다")
+
+
+func _test_events_place() -> void:
+	var r := Rules.new(d, 65)
+	check(r.event == null, "사건: 1구역에는 없다")
+	var kinds := {}
+	var ok: Array[bool] = [true]
+	for sd in 40:
+		var q := _dawn(0, null, 300 + sd)
+		var order: Array[String] = []
+		q.day_started.connect(func(_z: int) -> void: order.append("day"))
+		q.event_placed.connect(func(ev: DayEvent) -> void: order.append(String(ev.kind)))
+		q.choose_path(0)
+		var ev: DayEvent = q.event
+		if ev == null:
+			ok[0] = false
+			continue
+		kinds[ev.kind] = true
+		ok[0] = ok[0] and order.size() == 2 and order[0] == "day" and order[1] == String(ev.kind)
+		ok[0] = ok[0] and ev.pos.x > 0.0 and ev.pos.y > 0.0 and ev.pos.x < Grid.size.x and ev.pos.y < Grid.size.y and not ev.used
+		var cursed: Array = q.hilts.filter(func(h: Hilt) -> bool: return h.cursed)
+		if ev.kind == &"cursed":
+			ok[0] = ok[0] and cursed.size() == 1 and ev.hilt == cursed[0] and ev.pos == ev.hilt.pos
+		else:
+			ok[0] = ok[0] and cursed.is_empty() and q.hilts.all(func(h: Hilt) -> bool: return h.pos.distance_to(ev.pos) >= d.run.event_reach + d.run.pull_reach - 0.01)
+	check(ok[0], "사건: 2구역부터 낮마다 하나(day_started 뒤 event_placed), 저주받은 손잡이는 손잡이 하나, 나머지는 손잡이와 떨어진 자리")
+	check(kinds.size() == 4, "사건: 네 사건이 다 나온다(%s)" % str(kinds.keys()))
+	# 쓰지 않으면 밤이 올 때 떠난다
+	var q := _ev_day("seer")
+	var gone: Array = []
+	q.event_gone.connect(func(ev: DayEvent) -> void: gone.append(ev))
+	var ev0: DayEvent = q.event
+	q.start_night()
+	check(q.event == null and gone == [ev0], "사건: 쓰지 않으면 밤이 오며 사라진다(event_gone)")
+
+
+func _test_event_smith() -> void:
+	var R := d.run
+	var r := _ev_day("smith")
+	var s := r.give(d.sword_by_name("늙은 사자"), 0)
+	s.durability = 3.0
+	var dmg0: float = r.powers.stats().dmg
+	r.lord.hp = 50.0
+	var used: Array = []
+	var gone: Array = []
+	r.event_used.connect(func(ev: DayEvent, res: Dictionary) -> void: used.append([ev.kind, res]))
+	r.event_gone.connect(func(ev: DayEvent) -> void: gone.append(ev.kind))
+	r.lord.pos = r.event.pos + Vector2(R.event_reach + 0.3, 0.0)
+	check(r.near_event() == null, "대장장이: 멀면 쓸 수 없다")
+	r.lord.pos = r.event.pos + Vector2(0.5, 0.0)
+	check(r.near_event() == r.event, "대장장이: 가까우면 E로 쓴다")
+	_press_e(r)
+	check(is_equal_approx(r.lord.hp, 50.0 - R.smith_cost) and s.durability == s.max_durability, "대장장이: 체력 15를 내고 쥔 검의 내구를 다 채운다")
+	check(is_equal_approx(s.night_bonus, 1.0 + R.smith_damage) and is_equal_approx(r.powers.stats().dmg, dmg0 * (1.0 + R.smith_damage)), "대장장이: 이번 밤 그 검의 피해 +15%")
+	check(used.size() == 1 and used[0][0] == &"smith" and gone == [&"smith"] and r.event.used and r.pull_hilt == null, "대장장이: event_used, event_gone")
+	_press_e(r)
+	check(is_equal_approx(r.lord.hp, 50.0 - R.smith_cost) and used.size() == 1 and r.near_event() == null, "대장장이: 한 번만 쓴다")
+	r.start_night()
+	check(is_equal_approx(s.night_bonus, 1.0 + R.smith_damage), "대장장이: (밤 동안 남는다)")
+	r.skip_night()
+	check(is_equal_approx(s.night_bonus, 1.0), "대장장이: 새벽에 피해 보너스가 사라진다")
+	# 못 쓰는 때: 체력이 모자람, 쥔 검이 없음
+	var low := _ev_day("smith")
+	low.give(d.sword_by_name("늙은 사자"), 0)
+	low.lord.hp = R.smith_cost
+	var why: Array[String] = []
+	low.pull_refused.connect(func(t: String) -> void: why.append(t))
+	low.lord.pos = low.event.pos
+	_press_e(low)
+	check(why.size() == 1 and not low.event.used and is_equal_approx(low.lord.hp, R.smith_cost), "대장장이: 체력이 모자라면 못 쓴다")
+	var bare := _ev_day("smith")
+	bare.slots = [null, null]
+	bare.lord.pos = bare.event.pos
+	_press_e(bare)
+	check(not bare.event.used, "대장장이: 쥔 검이 없으면 못 쓴다")
+
+
+func _test_event_cursed() -> void:
+	var R := d.run
+	var r := _ev_day("cursed")
+	var ev: DayEvent = r.event
+	var h: Hilt = ev.hilt
+	check(h != null and h.cursed and r.near_event() == null, "저주받은 손잡이: 낮의 손잡이 하나(E는 뽑기)")
+	var normal: Hilt = null
+	for x in r.hilts:
+		if not x.cursed:
+			normal = x
+			break
+	check(is_equal_approx(r.pull_luck(h), r.pull_luck(normal) * R.cursed_luck), "저주받은 손잡이: 운 ×2")
+	r.lord.hp = 3.0
+	r.free_pulls = 1
+	var used: Array = []
+	r.event_used.connect(func(e: DayEvent, res: Dictionary) -> void: used.append(res))
+	var gone: Array = []
+	r.event_gone.connect(func(e: DayEvent) -> void: gone.append(e))
+	r.lord.pos = h.pos + Vector2(0.3, 0.0)
+	_press_e(r)
+	check(r.pull_hilt == h, "저주받은 손잡이: 체력이 모자라도 뽑는다")
+	for t in 300:
+		if r.pull_hilt == null:
+			break
+		r.step()
+	var s: Sword = r.slots[0] if r.slots[0] else r.pending
+	check(s != null and is_equal_approx(r.lord.hp, 3.0) and r.free_pulls == 1, "저주받은 손잡이: 체력도 공짜 뽑기도 들지 않는다")
+	if s:
+		var full: float = Sword.new(s.data, d).max_durability
+		check(not s.breakable() or (is_equal_approx(s.max_durability, maxf(1.0, roundf(full * R.cursed_durability))) and s.durability == s.max_durability), "저주받은 손잡이: 이 검의 최대 내구 절반(%s → %s)" % [full, s.max_durability])
+	check(used.size() == 1 and used[0].sword == s and gone == [ev] and ev.used and r.cursed_night and h.gone, "저주받은 손잡이: 뽑으면 쓴 것(event_used, event_gone), 이번 밤 저주")
+	# 이번 밤 적 +25%: 나오는 빠르기
+	var a := _ev_day("cursed", 66)
+	var b := _ev_day("cursed", 66)
+	a.cursed_night = true
+	for q in [a, b]:
+		q.start_night()
+		q.enemies.clear()
+		for t in 60:
+			q.step()
+			if not q.enemies.is_empty():
+				break
+	check(a.enemies.size() == 1 and b.enemies.size() == 1 and is_equal_approx(a._spawn_t * R.cursed_enemies, b._spawn_t), "저주받은 손잡이: 이번 밤 적이 1.25배 빠르게 나온다(%.3f, %.3f)" % [a._spawn_t, b._spawn_t])
+	a.skip_night()
+	a.choose_path(0)
+	check(not a.cursed_night, "저주받은 손잡이: 저주는 그 밤만")
+	# 늘 부러지지 않는 검은 내구가 없다
+	var u := _ev_day("cursed")
+	var ud: SwordData = null
+	for sd in d.swords:
+		if sd.unbreakable:
+			ud = sd
+			break
+	if ud:
+		var us := Sword.new(ud, d)
+		u._cursed_pulled(u.event.hilt, us)
+		check(not us.breakable() and us.max_durability < 0.0 and u.cursed_night, "저주받은 손잡이: 부러지지 않는 검이면 내구는 그대로(%s)" % ud.display_name)
+
+
+func _test_event_pilgrim() -> void:
+	var R := d.run
+	var r := _ev_day("pilgrim")
+	var a := r.give(d.sword_by_name("늙은 사자"), 0)
+	var b := r.give(d.sword_by_name("붉은 이삭"), 1)
+	r.active = 0
+	r.lord.hp = 20.0
+	r.free_pulls = 0
+	var res: Array = []
+	r.event_used.connect(func(_e: DayEvent, x: Dictionary) -> void: res.append(x))
+	check(r.pilgrim_slot() == 1, "순례자: 쥐지 않은 칸의 검을 바친다")
+	r.lord.pos = r.event.pos
+	_press_e(r)
+	check(r.slots[0] == a and r.slots[1] == null and r.active == 0, "순례자: 그 칸의 검이 사라진다")
+	check(is_equal_approx(r.lord.hp, minf(r.max_hp(), 20.0 + r.max_hp() * R.pilgrim_heal)) and r.free_pulls == R.pilgrim_free, "순례자: 체력을 최대치의 50%만큼, 공짜 뽑기 +1")
+	check(res.size() == 1 and res[0].sword == b and r.event.used, "순례자: event_used(바친 검)")
+	_press_e(r)
+	check(r.slots[0] == a and res.size() == 1, "순례자: 한 번만")
+	var one := _ev_day("pilgrim")
+	var c := one.give(d.sword_by_name("늙은 사자"), 0)
+	one.slots[1] = null
+	one.active = 0
+	one.lord.pos = one.event.pos
+	check(one.pilgrim_slot() == 0, "순례자: 한 자루뿐이면 쥔 검")
+	_press_e(one)
+	check(one.slots[0] == null and one.slots[1] == null and one.current() == null and c != null, "순례자: 쥔 검을 바치면 맨손")
+	var none := _ev_day("pilgrim")
+	none.slots = [null, null]
+	none.lord.pos = none.event.pos
+	_press_e(none)
+	check(not none.event.used, "순례자: 바칠 검이 없으면 못 쓴다")
+
+
+func _test_event_seer() -> void:
+	var R := d.run
+	var r := _ev_day("seer")
+	r.lord.hp = 40.0
+	var used: Array = []
+	r.event_used.connect(func(e: DayEvent, _x: Dictionary) -> void: used.append(e.kind))
+	check(not r.seer_used_today, "점쟁이: 쓰기 전에는 조짐을 모른다")
+	r.lord.pos = r.event.pos
+	_press_e(r)
+	check(is_equal_approx(r.lord.hp, 40.0 - R.seer_cost) and r.seer_used_today and used == [&"seer"], "점쟁이: 체력 10을 내면 오늘 참된 조짐(seer_used_today, event_used)")
+	_press_e(r)
+	check(is_equal_approx(r.lord.hp, 40.0 - R.seer_cost), "점쟁이: 한 번만")
+	r.start_night()
+	r.skip_night()
+	r.choose_path(0)
+	check(not r.seer_used_today, "점쟁이: 그 낮만")
+	var low := _ev_day("seer")
+	low.lord.hp = R.seer_cost
+	low.lord.pos = low.event.pos
+	_press_e(low)
+	check(not low.event.used and not low.seer_used_today, "점쟁이: 체력이 모자라면 못 쓴다")
+
+
+## 같은 시드·같은 입력·같은 길이면 갈림길·사건·뽑기가 같다.
+func _test_path_replay() -> void:
+	var hashes: Array[int] = []
+	var logs: Array[String] = []
+	for run_i in 2:
+		var r := Rules.new(d, 67)
+		r.debug_god = true
+		var text: Array[String] = [""]
+		r.path_offered.connect(func(c: Array) -> void: text[0] += "p%d:%s " % [r.tick, str(c)])
+		r.event_placed.connect(func(ev: DayEvent) -> void: text[0] += "e%d:%s@%s " % [r.tick, ev.kind, ev.pos])
+		r.event_used.connect(func(ev: DayEvent, _x: Dictionary) -> void: text[0] += "u%d:%s " % [r.tick, ev.kind])
+		r.sword_pulled.connect(func(s: Sword) -> void: text[0] += "s%d:%d " % [r.tick, s.data.id])
+		var rec := RandomNumberGenerator.new()
+		rec.seed = 5
+		for day in 4:
+			if r.zone > 0 and r.event:
+				r.lord.pos = r.event.pos
+				_press_e(r)
+			for k in 240:
+				var i := _inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)))
+				i.pull = rec.randf() < 0.2
+				r.step(i)
+				if r.pending:
+					r.choose(rec.randi_range(-1, 1))
+			r.start_night()
+			for k in 300:
+				r.step(_inp(Vector2(rec.randf_range(-1, 1), rec.randf_range(-1, 1)), rec.randf() < 0.4))
+			r.skip_night()
+			r.choose_path(rec.randi_range(0, 1))
+		hashes.append(r.state_hash())
+		logs.append(text[0])
+	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].contains("p") and logs[0].contains("e"), "갈림길·사건: 같은 시드·같은 입력이면 결과가 같다(state_hash)")

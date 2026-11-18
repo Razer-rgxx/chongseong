@@ -196,8 +196,9 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 		"elite": rules.elites_killed * md.elite,
 		"melt": melted,
 		"goal": rules.goal_shards,
+		"path": rules.path_shards,
 	}
-	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal
+	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal + r.path
 	return r
 
 

@@ -12,6 +12,8 @@ var durability: float
 var max_durability: float
 ## 검집 강화로 오른 피해 배수.
 var bonus: float = 1.0
+## 떠돌이 대장장이(13단계)가 벼린 이번 밤의 피해 배수. 새벽에 1로 돌아온다.
+var night_bonus: float = 1.0
 ## 검집 단계(0이면 검집에서 온 검이 아니거나 강화 안 함).
 var sheath_lv: int = 0
 var from_sheath: bool = false
@@ -42,9 +44,9 @@ func breakable() -> bool:
 	return max_durability > 0.0
 
 
-## 기본 피해(형태 × 등급 × 검집). 각인은 아직 더하지 않는다.
+## 기본 피해(형태 × 등급 × 검집 × 대장장이). 각인은 아직 더하지 않는다.
 func damage(game: GameData) -> float:
-	return game.lord.damage * form.damage * game.grades.damage_mult[grade] * bonus
+	return game.lord.damage * form.damage * game.grades.damage_mult[grade] * bonus * night_bonus
 
 
 ## 화면에 쓸 이름(검집 단계가 붙는다).

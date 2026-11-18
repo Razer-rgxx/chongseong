@@ -126,6 +126,41 @@ extends Resource
 @export var grave_delay: float = 3.0
 @export var grave_hp: float = 0.5
 
+@export_group("갈림길과 낮 사건(13단계)")
+@export_subgroup("갈림길")
+## 새벽(1~9구역 뒤)에 다음 구역의 길 두 개를 보인다. 길마다 다음 밤의 목표·구역 규칙(위 목록에서)과 보상 하나.
+## 보상 id(아래 두 가중치와 순서가 같다): pulls 공짜 뽑기, heal 체력, whet 두 칸 검 내구 모두 채움, luck 다음 낮 운, shards 판이 끝날 때 조각.
+@export var path_rewards: PackedStringArray = PackedStringArray(["pulls", "heal", "whet", "luck", "shards"])
+## 쉬운 길(어려움 0)과 가장 어려운 길(어려움 2)의 보상 가중치. 사이는 어려움 / 2로 섞는다.
+## 어려움 = 목표가 path_hard_goals면 +1, 구역 규칙이 있으면 +1. 어려운 길일수록 좋은 보상(공짜 뽑기, 운)이 잘 붙는다.
+@export var path_reward_weight: PackedFloat32Array = PackedFloat32Array([1, 3, 3, 1, 2])
+@export var path_reward_weight_hard: PackedFloat32Array = PackedFloat32Array([4, 1, 1, 3, 2])
+@export var path_hard_goals: PackedStringArray = PackedStringArray(["hunt", "siege"])
+## 보상의 양: 공짜 뽑기 +2(max_free_pulls까지), 체력 +60, 다음 낮 운 ×1.3, 판이 끝날 때 조각 +5.
+@export var reward_pulls: int = 2
+@export var reward_heal: float = 60.0
+@export var reward_luck: float = 1.3
+@export var reward_shards: int = 5
+@export_subgroup("낮 사건")
+## 이 구역부터(0부터 센다) 낮마다 사건 하나가 선다. 이 목록에서 같은 확률로 고른다.
+## smith 떠돌이 대장장이, cursed 저주받은 손잡이, pilgrim 순례자, seer 점쟁이.
+@export var event_from_zone: int = 1
+@export var event_kinds: PackedStringArray = PackedStringArray(["smith", "cursed", "pilgrim", "seer"])
+## 이만큼(칸) 가까우면 E로 쓴다(저주받은 손잡이는 뽑기 거리 pull_reach).
+@export var event_reach: float = 1.4
+## 대장장이: 체력을 내면 쥔 검의 내구를 다 채우고, 이번 밤 그 검의 피해 + smith_damage(0.15 = 15%).
+@export var smith_cost: float = 15.0
+@export var smith_damage: float = 0.15
+## 저주받은 손잡이: 체력 없이 뽑고 운 ×cursed_luck. 대신 이번 밤 적이 나오는 빠르기 ×cursed_enemies, 뽑은 검의 최대 내구 ×cursed_durability.
+@export var cursed_luck: float = 2.0
+@export var cursed_enemies: float = 1.25
+@export var cursed_durability: float = 0.5
+## 순례자: 칸의 검 하나(쥐지 않은 칸, 없으면 쥔 검)를 바치면 체력을 최대치 × pilgrim_heal만큼 채우고 공짜 뽑기 + pilgrim_free.
+@export var pilgrim_heal: float = 0.5
+@export var pilgrim_free: int = 1
+## 점쟁이: 체력을 내면 오늘 손잡이의 참된 조짐을 모두 보인다(14단계).
+@export var seer_cost: float = 10.0
+
 @export_group("정예")
 ## 밤이 이만큼 지나면(0~1) 정예가 하나 온다.
 @export var elite_at: float = 0.4
@@ -139,6 +174,22 @@ extends Resource
 
 ## 새 적(나오는 순서대로).
 const EXTRA_KINDS: Array[StringName] = [&"archer", &"shield", &"charger", &"bomber", &"caller"]
+
+
+## 길의 어려움(0~2): 목표가 사냥·포위면 +1, 구역 규칙이 있으면 +1.
+func path_hardness(goal: StringName, rule: StringName) -> int:
+	return (1 if path_hard_goals.has(String(goal)) else 0) + (0 if rule == &"" else 1)
+
+
+## 그 어려움의 길에 붙는 보상 가중치(path_rewards와 같은 순서).
+func path_weights(hard: int) -> PackedFloat32Array:
+	var k: float = clampf(hard / 2.0, 0.0, 1.0)
+	var out := PackedFloat32Array()
+	for i in path_rewards.size():
+		var a: float = path_reward_weight[i] if i < path_reward_weight.size() else 1.0
+		var b: float = path_reward_weight_hard[i] if i < path_reward_weight_hard.size() else a
+		out.append(lerpf(a, b, k))
+	return out
 
 
 ## 그 구역에서 새 적 kind가 나올 확률.

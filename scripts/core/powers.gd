@@ -116,7 +116,7 @@ func stats() -> Dictionary:
 	var D := r.data.lord
 	var s := r.current()
 	var F: FormData = s.form if s else r.data.unarmed
-	var g_mult: float = r.data.grades.damage_mult[s.grade] * s.bonus if s else 1.0
+	var g_mult: float = r.data.grades.damage_mult[s.grade] * s.bonus * s.night_bonus if s else 1.0
 	var dmg: float = D.damage * F.damage * g_mult * (1.0 + ins("날") / 100.0)
 	if ins("투박함") > 0.0:
 		dmg *= T.i("투박함_피해")
