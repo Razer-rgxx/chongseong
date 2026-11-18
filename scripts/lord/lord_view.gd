@@ -38,6 +38,9 @@ extends Node3D
 ## 줄이 적에게 닿을 때까지의 시간(초).
 @export var hook_rope_shoot: float = 0.07
 @export var rope_color: Color = Color(0.5, 0.48, 0.45)
+@export_group("뽑기")
+## 뽑는 동안 영주의 몸(화면만)을 손잡이에서 이만큼(m)까지 당겨 세운다. 규칙의 뽑기 거리는 1.1칸(2.2m)까지라 팔이 닿게.
+@export var pull_stand: float = 1.6
 @export_group("")
 
 var rules: Rules
@@ -77,6 +80,11 @@ var _then_done: bool = true
 var _trail_window := Vector2(-1.0, -1.0)
 var _lock_yaw: float = 0.0
 var _hide_done: bool = false
+## 뽑는 동안의 몸(PullMotion, 14단계)과 손잡이 자리(세계 좌표), 쥔 칼을 숨겼는지.
+var _pull := PullMotion.rest()
+var _pull_at := Vector3.ZERO
+var _pull_has_at: bool = false
+var _pull_hid: bool = false
 
 
 func setup(r: Rules) -> void:
@@ -85,6 +93,8 @@ func setup(r: Rules) -> void:
 	r.move_area.connect(_on_move_area)
 	r.projectile_ended.connect(func(_p: Projectile) -> void: _show_sword(true))
 	r.lord_hurt.connect(func(_d: float) -> void: _hurt = true)
+	r.pull_good.connect(func(_h: Hilt, k: int) -> void: PullMotion.good(_pull, k))
+	r.pull_perfect.connect(func(_h: Hilt) -> void: PullMotion.perfect(_pull))
 
 
 func _ready() -> void:
@@ -144,6 +154,7 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 func draw(alpha: float, delta: float) -> void:
 	var L := rules.lord
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
+	_draw_pull_stand()
 	_draw_hook(L, delta)
 	if not _plan.is_empty():
 		_plan_t += delta
@@ -172,6 +183,13 @@ func draw(alpha: float, delta: float) -> void:
 	var pose: Dictionary = MoveMotion.pose(_plan, _plan_t, float(_plan.get("time", 0.0))) if not _plan.is_empty() else MoveMotion.pose({}, 0.0, 0.0)
 	if _plan.get("move", &"") == &"hook":
 		pose["y"] = 0.0
+	# 뽑는 동안: 손잡이를 보고, 뒤로 버티며 떨고, 제대로 당김에 젖힌다(끝난 뒤에도 마지막 젖힘이 끝날 때까지)
+	var pulling: bool = rules.pull_hilt != null
+	if pulling and _pull_has_at:
+		var want: float = PullMotion.face_yaw(position, _pull_at)
+		_yaw_now = lerp_angle(_yaw_now, want, 1.0 - exp(-turn_fast * delta)) if character else want
+	_pull_sword(pulling)
+	pose = PullMotion.add(pose, PullMotion.pose(_pull, {"pulling": pulling, "steps": rules.pull_steps}, delta, character))
 	MoveMotion.apply(_model, pose, _yaw_now, _air)
 	for i in range(_ghosts.size() - 1, -1, -1):
 		var g := _ghosts[i]
@@ -182,6 +200,34 @@ func draw(alpha: float, delta: float) -> void:
 			_ghosts.remove_at(i)
 	if L.dash > 0.0 and character == null:   # 기사 모델은 구르기 동작이 있어서 잔상을 남기지 않는다
 		_spawn_ghost()
+
+
+## 뽑는 동안 몸을 손잡이 쪽으로 pull_stand(m)까지 당겨 세운다(버티기 세기만큼 부드럽게). 규칙의 자리는 그대로.
+func _draw_pull_stand() -> void:
+	if rules.pull_hilt != null:
+		_pull_at = Grid.cells_to_world(rules.pull_hilt.pos)
+		_pull_has_at = true
+	var k: float = float(_pull.strain)
+	if not _pull_has_at or k <= 0.0:
+		if rules.pull_hilt == null:
+			_pull_has_at = k > 0.0 and _pull_has_at
+		return
+	var to: Vector3 = _pull_at - position
+	to.y = 0.0
+	var d: float = to.length()
+	if d > pull_stand:
+		position += to / d * (d - pull_stand) * k
+
+
+## 두 손으로 손잡이를 잡는 자세라 뽑는 동안 쥔 칼을 숨긴다. 끝나면(던진 칼이 날아가는 중이 아니면) 다시 보인다.
+func _pull_sword(pulling: bool) -> void:
+	if pulling and not _pull_hid:
+		_pull_hid = true
+		_show_sword(false)
+	elif not pulling and _pull_hid:
+		_pull_hid = false
+		if not rules.projectiles.any(func(p: Projectile) -> bool: return p.kind == &"boomerang"):
+			_show_sword(true)
 
 
 ## 메아리 계곡 같은 두 번째 베기: 그 자리에 베기 빛만 다시 그린다.

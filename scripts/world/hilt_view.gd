@@ -1,6 +1,7 @@
 class_name HiltView
 extends Node3D
 ## 땅에 꽂힌 검 하나. 뽑는 동안 흔들리며 조금씩 올라온다. 모델이 들어오면 _build()만 바꾸면 된다.
+## 조짐(14단계)은 OmenArt가 입힌다: 처음엔 겉 조짐, 점쟁이를 쓰면(Rules.omens_revealed) main이 show_omen()을 불러 참된 조짐으로.
 
 @export var rise: float = 0.55
 @export var jitter: float = 0.035
@@ -11,6 +12,7 @@ var _sword := Node3D.new()
 var _hole := MeshInstance3D.new()
 ## 화면 흔들림 전용. 게임 규칙의 랜덤(Rules.rng)과 따로 둔다.
 var _rng := RandomNumberGenerator.new()
+var _omen_cleared: bool = false
 
 
 func setup(r: Rules, h: Hilt) -> void:
@@ -36,11 +38,34 @@ func _ready() -> void:
 	_hole.scale = Vector3(1.0, 1.0, 0.85)
 	_hole.rotation.y = float(hilt.id) * 1.7
 	add_child(_hole)
+	OmenArt.apply(self, hilt.seen_omen())
+
+
+## 지금 보일 조짐(Hilt.seen_omen)을 다시 입힌다. 저주받은 손잡이의 검은 칠은 그대로 둔다.
+func show_omen() -> void:
+	if hilt.gone:
+		return
+	var cursed: bool = _cursed_paint()
+	if cursed:
+		EventArt.uncurse_hilt(self)
+	OmenArt.apply(self, hilt.seen_omen())
+	if cursed:
+		EventArt.curse_hilt(self)
+
+
+func _cursed_paint() -> bool:
+	for mi in find_children("*", "MeshInstance3D", true, false):
+		if mi.has_meta("pre_curse"):
+			return true
+	return false
 
 
 func _process(_delta: float) -> void:
 	if hilt.gone:
 		_sword.visible = false
+		if not _omen_cleared:
+			_omen_cleared = true
+			OmenArt.clear(self)
 		return
 	if rules.pull_hilt == hilt:
 		var k: float = clampf(rules.pull_t / rules.pull_duration(), 0.0, 1.0)

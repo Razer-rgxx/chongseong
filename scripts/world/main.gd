@@ -56,6 +56,8 @@ var _dying: Array[EnemyView] = []
 var _fx := HitFx.new()
 var _pfx := PowerFx.new()
 var _pull_fx := PullFx.new()
+## 버팀 타이밍 고리(14단계). Rules의 pull_window·pull_good·pull_perfect·pull_miss를 받는다.
+var _timing_fx := PullTimingFx.new()
 ## 좌클릭 동작 20가지와 속성의 효과(판정 모양, 날아가는 것, 착지 먼지 …). Rules의 move_* 신호를 받는다.
 var _move_fx := MoveFx.new()
 ## 새 적 5종의 효과(겨눈 선, 화살, 방패 불똥, 돌진 길, 심지와 폭발, 부르는 원). Rules의 enemy_act·enemy_projectile_* 신호를 받는다.
@@ -84,6 +86,8 @@ var _cursed_view: Node3D = null
 var _event_t: float = 0.0
 ## 저주받은 손잡이를 뽑았을 때 이름 알림 뒤에 붙일 말.
 var _pull_note: String = ""
+## 버팀을 모두 제대로 당겼다(이번 뽑기). 이름 알림에 최대 내구가 늘었다고 붙인다.
+var _perfect_note: bool = false
 
 @onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
@@ -110,6 +114,7 @@ func _ready() -> void:
 	add_child(_pfx)
 	_pull_fx.env = _env.environment
 	add_child(_pull_fx)
+	add_child(_timing_fx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	add_child(_enemy_fx)
@@ -140,6 +145,14 @@ func _ready() -> void:
 		_sfx.play(&"thump", _lord.position, -10.0)
 		_pull_fx.begin(Grid.cells_to_world(h.pos), h.id))
 	rules.pull_step.connect(_on_pull_step)
+	rules.pull_window.connect(func(h: Hilt, o: float, c: float) -> void: _timing_fx.on_window(Grid.cells_to_world(h.pos), o, c, rules.pull_t))
+	rules.pull_good.connect(_on_pull_good)
+	rules.pull_perfect.connect(_on_pull_perfect)
+	rules.pull_miss.connect(func(_h: Hilt, _k: int) -> void: _timing_fx.on_miss())
+	rules.omens_revealed.connect(func() -> void:
+		for v: HiltView in _hilts.values():
+			if is_instance_valid(v):
+				v.show_omen())
 	rules.pull_refused.connect(func(t: String) -> void: _hud.toast(t))
 	rules.sword_pulled.connect(_on_pulled)
 	rules.choice_needed.connect(_on_choice_needed)
@@ -307,6 +320,8 @@ func _read_input() -> LordInput:
 	inp.dash = _want_dash
 	inp.hook = _want_hook
 	inp.pull = _want_pull
+	# 뽑는 동안은 E나 좌클릭을 누른 순간이 버팀 타이밍이다(14단계)
+	inp.pull_press = _want_pull or _want_attack
 	inp.swap_to = _swap_to
 	if _camera.third():
 		# 3인칭: 카메라가 보는 쪽을 벤다
@@ -323,6 +338,9 @@ func _read_input() -> LordInput:
 func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
 	_lord.draw(alpha, delta)
+	# 타이밍 고리의 시계를 규칙에 맞춘다(눌린 때는 그 틱 사이의 가운데로 판정된다)
+	if rules.pull_hilt != null:
+		_timing_fx.sync(rules.pull_t + alpha * rules.dt)
 	_move_fx.draw(alpha)
 	_enemy_fx.draw(alpha)
 	_sync_enemies(alpha, delta)
@@ -604,6 +622,25 @@ func _on_pull_step(_h: Hilt, st: int) -> void:
 	_pull_fx.step(st)
 
 
+## 제대로 당김(14단계): 고리가 닫히며 불똥, 영주가 한 번 크게 젖힌다(LordView), 짧은 쿵.
+func _on_pull_good(h: Hilt, st: int) -> void:
+	var at: Vector3 = Grid.cells_to_world(h.pos)
+	_timing_fx.on_good(at, st)
+	_sfx.play(&"thump", at, -1.0, 0.8)
+	_camera.kick(3.0 + st)
+	_camera.add_shake(0.08)
+
+
+## 버팀을 모두 제대로 당겼다: 더 센 불똥·빛·충격파. 뽑은 뒤 이름 알림에 내구가 늘었다고 붙인다.
+func _on_pull_perfect(h: Hilt) -> void:
+	var at: Vector3 = Grid.cells_to_world(h.pos)
+	_timing_fx.on_perfect(at)
+	_sfx.play(&"hit_big", at, -5.0, 0.7)
+	_camera.kick(8.0)
+	_camera.add_shake(0.25)
+	_perfect_note = true
+
+
 ## 등급 연출 영상(assets/video/grade_<등급>.ogv). 없으면 "".
 func _reveal_video(grade: int) -> String:
 	var path: String = "res://assets/video/grade_%d.ogv" % grade
@@ -611,6 +648,7 @@ func _reveal_video(grade: int) -> String:
 
 
 func _on_pulled(s: Sword) -> void:
+	_timing_fx.clear()
 	meta.note_found(s.data.id)
 	meta.save()
 	var c: Color = data.grades.colors[s.grade]
@@ -625,6 +663,10 @@ func _on_pulled(s: Sword) -> void:
 	_reveal_until = Time.get_ticks_msec() + int(hold * 1000.0)
 	# 연출 중에는 글자를 띄우지 않는다. 끝나면 이름을 알린다
 	var text: String = "%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name]
+	if _perfect_note:
+		_perfect_note = false
+		if s.breakable():
+			text += " 모두 제대로 당겨 최대 내구가 늘었다."
 	if _pull_note != "":
 		text += " " + _pull_note
 		_pull_note = ""
