@@ -82,8 +82,8 @@ static func smith(parent: Node3D) -> Dictionary:
 	P.radius = 1.2
 	var cloth := _mat(P, Color(0.13, 0.115, 0.1), 0.95)
 	var shirt := _mat(P, Color(0.2, 0.18, 0.15), 0.95)
-	var leather := _mat(P, Color(0.14, 0.085, 0.05), 0.65)
-	var skin := _mat(P, Color(0.34, 0.24, 0.19), 0.7)
+	var leather := _mat(P, Color(0.085, 0.055, 0.035), 0.6)
+	var skin := _mat(P, Color(0.3, 0.2, 0.15), 0.7)
 	var hood := _mat(P, Color(0.1, 0.07, 0.05), 0.7)
 	_legs(P, 0.12, 0.92, cloth, leather, 0.1)
 	var torso := _pivot(root, Vector3(0, 0.92, 0), "Torso")
@@ -93,8 +93,8 @@ static func smith(parent: Node3D) -> Dictionary:
 	], 14, 0.0), shirt)
 	# 앞치마: 가슴에서 무릎까지 늘어진 두꺼운 가죽, 허리끈
 	_add(torso, CreatureMesh.loft([
-		[Vector3(0, 0.46, -0.165), 0.17, 0.012], [Vector3(0, 0.2, -0.165), 0.2, 0.014], [Vector3(0, -0.05, -0.155), 0.22, 0.014],
-		[Vector3(0, -0.3, -0.16), 0.22, 0.014], [Vector3(0, -0.55, -0.15), 0.21, 0.012],
+		[Vector3(0, 0.4, -0.158), 0.12, 0.01], [Vector3(0, 0.2, -0.162), 0.15, 0.012], [Vector3(0, -0.05, -0.152), 0.17, 0.012],
+		[Vector3(0, -0.3, -0.155), 0.17, 0.012], [Vector3(0, -0.5, -0.145), 0.16, 0.01],
 	], 10, 0.0), leather).name = "Apron"
 	_add(torso, CreatureMesh.lathe([[0.02, 0.2, 0.15, 0.0], [0.06, 0.2, 0.15, 0.0]], 14), leather)
 	# 머리: 짧은 가죽 두건(어깨까지 덮는 깃), 안의 어둠

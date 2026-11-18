@@ -57,8 +57,8 @@ func aura(node: Node3D, height: float = 1.1) -> void:
 	# 검은 연기: 손잡이를 따라 감기며 오른다(빛을 받지 않는 검은 조각이라 낮에 또렷하고 밤에는 붉은 점과 빛으로 읽힌다)
 	var wisp := _emitter(true)
 	if wisp != null:
-		wisp.amount = 16
-		wisp.lifetime = 2.2
+		wisp.amount = 18
+		wisp.lifetime = 2.4
 		wisp.explosiveness = 0.0
 		wisp.randomness = 0.5
 		wisp.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
@@ -78,9 +78,9 @@ func aura(node: Node3D, height: float = 1.1) -> void:
 		wisp.angle_max = 180.0
 		wisp.angular_velocity_min = -60.0
 		wisp.angular_velocity_max = 60.0
-		_curve3(wisp, 0.3, 0.8, 1.3)
-		_ramp(wisp, [Color(0.01, 0.008, 0.008, 0.0), Color(0.012, 0.009, 0.009, 0.7), Color(0.02, 0.012, 0.012, 0.45), Color(0.02, 0.015, 0.015, 0.0)], [0.0, 0.15, 0.6, 1.0])
-		wisp.mesh = _quad(0.55, Q_FIRE)
+		_curve3(wisp, 0.35, 0.8, 1.5)
+		_ramp(wisp, [Color(0.01, 0.008, 0.008, 0.0), Color(0.012, 0.009, 0.009, 0.42), Color(0.02, 0.012, 0.012, 0.22), Color(0.02, 0.015, 0.015, 0.0)], [0.0, 0.15, 0.55, 1.0])
+		wisp.mesh = _quad(0.34, Q_FIRE)
 		wisp.emitting = true
 		emits.append(wisp)
 	# 안으로 끌려드는 티끌(땅에서 손잡이 쪽으로)
@@ -130,7 +130,7 @@ func aura(node: Node3D, height: float = 1.1) -> void:
 		emits.append(motes)
 	var stain := _decal(2)
 	if not stain.is_empty():
-		_put(stain, {"fill": 0.0, "color": Color(0.012, 0.01, 0.01), "hot": Color(0.5, 0.04, 0.02), "energy": 0.8, "emit": 1.2})
+		_put(stain, {"fill": 0.0, "color": Color(0.012, 0.01, 0.01), "hot": Color(0.32, 0.03, 0.015), "energy": 0.45, "emit": 0.8})
 	var l := OmniLight3D.new()
 	l.light_color = Color(0.6, 0.06, 0.03)
 	l.light_energy = 0.0
