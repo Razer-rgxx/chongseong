@@ -1,5 +1,6 @@
 extends RefCounted
-## 19단계 지하 무덤 테스트(docs/outside.md). run_all.gd가 부른다: run(데이터, check).
+## 19단계 지하 무덤 테스트(docs/outside.md). 31단계(docs/field_life.md): 8~10구역·방마다 적 +2·정예 하나, 무덤 주인 2000·24·두 번 부르기·×1.3, 큰 관의 오픈월드 한정 검.
+## run_all.gd가 부른다: run(데이터, check).
 
 var d: GameData
 var check: Callable
@@ -19,12 +20,20 @@ func _all() -> void:
 	_clear_open()
 	_coffins()
 	_final_room()
+	_elites()
+	_two_summons()
+	_big_coffin_sword()
 	_persist()
 	_death()
 	_replay()
 	_save()
 	_entrance()
 	Grid.size = Vector2i(34, 22)
+
+
+## 31단계 기대값: 방마다 적 수(19단계 +2, r5는 +3)와 세기 구역.
+const WANT_FOES: Dictionary = {&"r1": 6, &"r2": 7, &"r3": 7, &"r5": 8, &"r4": 7}
+const WANT_ZONE: Dictionary = {&"r1": 8, &"r2": 8, &"r3": 9, &"r5": 10, &"r4": 9}
 
 
 func _crypt(seed_value: int = 1, meta: Meta = null) -> CryptRun:
@@ -58,7 +67,9 @@ func _data() -> void:
 	var L: EnemyData = d.enemies[&"crypt_lord"]
 	var K: EnemyData = d.enemies[FieldLayout.BOSS_ID]
 	check.call(L.boss and L.big and L.token_cost == 0 and L.display_name == "무덤 주인", "무덤 주인: 표 없이 덤비는 큰 적, 이름 무덤 주인")
-	check.call(L.hp < K.hp and L.damage < K.damage and L.radius < K.radius and L.model_scale < K.model_scale and L.summon_max <= K.summon_max, "무덤 주인: 무덤 기사보다 체력·피해·크기가 낮다")
+	check.call(L.hp == 2000.0 and L.damage == 24.0 and L.summon_count == 4 and L.summon_max == 8 and L.summon_below == 0.5 and L.summon_again == 0.25 and L.rage_mult == 1.3, "무덤 주인(31단계): 체력 2000, 피해 24, 망령 4마리를 체력 50%·25%에서 두 번, 빨라짐 ×1.3")
+	check.call(L.radius < K.radius and L.model_scale < K.model_scale, "무덤 주인: 몸은 무덤 기사보다 작다")
+	check.call(K.summon_again == 0.0 and K.summon_max == K.summon_count and K.hp == 1800.0 and K.rage_mult == 1.2, "무덤 기사: 그대로(부르기 한 번, 1800, ×1.2)")
 	check.call(L.swing_arc == K.swing_arc and L.charge_length == K.charge_length and L.rage_hp == K.rage_hp, "무덤 주인: 행동(휘두르기·돌진·빨라짐)은 무덤 기사를 빌린다")
 	check.call(CryptLayout.COFFIN_MIN == 10 and CryptLayout.COFFIN_MAX == 25 and CryptLayout.BIG_SHARDS == 60, "무덤: 관 조각 10~25, 큰 관 60")
 
@@ -86,13 +97,18 @@ func _layout() -> void:
 			for f in R.pack.foes:
 				n += int(f[1])
 				ok_pack = ok_pack and d.enemies.has(f[0])
-			ok_pack = ok_pack and n >= 3 and n <= 6
-			ok_zone = ok_zone and int(R.pack.zone) >= 5 and int(R.pack.zone) <= 7
+			ok_pack = ok_pack and n == int(WANT_FOES[id])
+			var has_elite: bool = false
+			for f in R.pack.foes:
+				has_elite = has_elite or StringName(f[0]) == StringName(R.pack.get("elite", &""))
+			ok_pack = ok_pack and has_elite and StringName(R.pack.elite) != &"caller"
+			ok_zone = ok_zone and int(R.pack.zone) == int(WANT_ZONE[id]) and int(R.pack.zone) <= d.run.zone_hp.size()
 			ok_dist = ok_dist and rect.grow(-R.pack.wander - 1.0).has_point(home)
 		else:
-			ok_zone = ok_zone and int(R.boss.zone) >= 5 and int(R.boss.zone) <= 7 and d.enemies.has(R.boss.kind)
+			ok_zone = ok_zone and int(R.boss.zone) == 10 and CryptLayout.LORD_ZONE == 10 and d.enemies.has(R.boss.kind)
 	check.call(ok_in, "배치: 방은 무덤 안에 있고 서로 겹치지 않는다")
-	check.call(ok_pack and ok_zone, "배치: 무리는 3~6마리, 세기는 5~7구역, 적 종류가 표에 있다")
+	check.call(ok_pack, "배치(31단계): 방마다 적 +2(서쪽 끝 r5는 +3), 적 종류가 표에 있고 정예 종류가 무리에 있다")
+	check.call(ok_zone, "배치(31단계): 세기 8~10구역(r1·r2 8, r3·r4 9, r5 10, 무덤 주인 10), 구역 표 끝을 넘지 않는다")
 	check.call(ok_coffin and ok_dist, "배치: 관은 방 안쪽, 무리·무덤 주인 자리에서 떨어져 있다. 무리는 서성여도 방 안")
 	check.call(CryptLayout.ROOMS[&"r6"].has("boss") and bool(CryptLayout.ROOMS[&"r6"].big) and not CryptLayout.ROOMS[&"r1"].has("big"), "배치: 마지막 방만 무덤 주인과 큰 관")
 	# 문은 두 방 사이에 닿고 걷는 곳이 두 방과 겹친다
@@ -122,7 +138,7 @@ func _layout() -> void:
 func _doors() -> void:
 	var c := _crypt()
 	c.step()
-	check.call(c.room == &"r1" and c.rules.packs.has(&"r1") and c.rules.pack_alive(&"r1") == 4, "문: 방에 들어서면 그 방 무리가 선다")
+	check.call(c.room == &"r1" and c.rules.packs.has(&"r1") and c.rules.pack_alive(&"r1") == int(WANT_FOES[&"r1"]), "문: 방에 들어서면 그 방 무리가 선다(31단계 6마리)")
 	check.call(c.door_closed(&"d12") and not c.door_closed(&"d23") and not c.door_closed(&"d46"), "문: 들어선 방의 문만 닫힌다")
 	# 닫힌 문 쪽으로 밀려도 못 나간다
 	var p: Vector2 = c.push(Vector2(35, 57))
@@ -237,7 +253,126 @@ func _final_room() -> void:
 	var next := Rules.new(d, 9, c.meta)
 	check.call(next.has_pack(&"charm"), "마지막 방: 얻은 운 부적을 다음 판이 쥐고 시작한다")
 	# 불려 온 망령의 세기는 방이 정한다
-	check.call(c.rules.field_boss_zone == 7, "마지막 방: 불려 오는 적의 세기 구역은 7")
+	check.call(c.rules.field_boss_zone == 10, "마지막 방: 불려 오는 적의 세기 구역은 10")
+
+
+## 31단계: 방마다 정예 하나(언덕 밤의 정예와 같은 배수: Rules.make_elite).
+func _elites() -> void:
+	var R := d.run
+	var ok: bool = true
+	var detail: String = ""
+	for id in [&"r1", &"r2", &"r3", &"r5", &"r4"]:
+		var c := _crypt(7)
+		var P: Dictionary = CryptLayout.ROOMS[id].pack
+		var made: Array[Enemy] = c.rules.spawn_pack(id, P)
+		var elites: Array[Enemy] = []
+		var plain: Enemy = null
+		for e in made:
+			if e.elite:
+				elites.append(e)
+			elif e.data.id == StringName(P.elite) and plain == null:
+				plain = e
+		var one: bool = elites.size() == 1 and made.size() == int(WANT_FOES[id]) and elites[0].data.id == StringName(P.elite)
+		if one:
+			var e: Enemy = elites[0]
+			var zk: float = d.run.zone_hp[int(P.zone) - 1]
+			one = absf(e.max_hp - e.data.hp * zk * R.elite_hp) < 0.01 and e.hp == e.max_hp and absf(e.radius - e.data.radius * R.elite_size) < 0.0001
+			if plain != null:
+				one = one and absf(e.damage - plain.damage * R.elite_damage) < 0.001
+		ok = ok and one
+		detail += "%s %d " % [id, elites.size()]
+	check.call(ok, "정예(31단계): 방마다 정해진 종류 하나가 정예(체력 %.0f배·피해 %.1f배·몸 %.1f배, 언덕과 같다) [%s]" % [R.elite_hp, R.elite_damage, R.elite_size, detail.strip_edges()])
+	# 언덕 밤의 정예도 같은 함수를 쓴다(배수 그대로)
+	var r := Rules.new(d, 4)
+	r.start_night()
+	var hill := r._spawn_elite()
+	check.call(hill.elite and absf(hill.radius - hill.data.radius * R.elite_size) < 0.0001 and hill.hp == hill.max_hp, "정예: 언덕 밤의 정예는 그대로(make_elite)")
+	# 들판 무리는 정예가 없다
+	var f := _crypt(7)
+	var any: bool = false
+	for e in f.rules.spawn_pack(&"road_south"):
+		any = any or e.elite
+	check.call(not any, "정예: 들판 무리(elite 칸 없음)는 그대로")
+
+
+## 무덤 주인을 깨워 n틱 돌린다(영주는 곁에 서 있고 무적).
+func _boss_ticks(c: CryptRun, n: int, until_summoned: int = -1) -> void:
+	for i in n:
+		c.rules.step()
+		if until_summoned >= 0 and c.rules.field_boss.summoned >= until_summoned and c.rules.field_boss.act == &"":
+			return
+
+
+## 31단계: 무덤 주인은 체력 50%와 25%에서 망령 4마리씩 두 번 부른다. 무덤 기사는 50%에서 한 번.
+func _two_summons() -> void:
+	var c := _crypt(11)
+	_go(c, Vector2(57, 34.0))
+	_boss_ticks(c, 5)
+	var b: Enemy = c.rules.field_boss
+	var calls: Array = []
+	c.rules.enemy_act.connect(func(e: Enemy, act: StringName, info: Dictionary) -> void:
+		if e == b and act == &"call":
+			calls.append(int(info.count)))
+	_boss_ticks(c, 150)
+	check.call(b.summoned == 0 and calls.is_empty(), "두 번 부르기: 체력이 50% 위면 안 부른다")
+	b.hp = b.max_hp * 0.49
+	_boss_ticks(c, 300, 4)
+	check.call(b.summoned == 4 and calls == [4], "두 번 부르기: 50% 밑에서 망령 4마리")
+	b.hp = b.max_hp * 0.3
+	_boss_ticks(c, 300)
+	check.call(b.summoned == 4 and calls.size() == 1, "두 번 부르기: 25% 위에서는 다시 안 부른다")
+	b.hp = b.max_hp * 0.24
+	_boss_ticks(c, 300, 8)
+	var minions: int = 0
+	for e in c.rules.enemies:
+		minions += 1 if e.caller == b.id and not e.dead else 0
+	check.call(b.summoned == 8 and calls == [4, 4] and minions == 8, "두 번 부르기: 25% 밑에서 4마리 더(모두 %d마리)" % minions)
+	_boss_ticks(c, 300)
+	check.call(calls.size() == 2, "두 번 부르기: 세 번째는 없다")
+	var lord_zone: int = c.rules.zone
+	check.call(lord_zone == CryptLayout.LORD_ZONE - 1, "두 번 부르기: 불려 오는 망령은 10구역 세기")
+	# 무덤 기사는 지금처럼 한 번
+	var r := Rules.new(d, 12)
+	Grid.size = FieldLayout.SIZE
+	r.start_field()
+	r.debug_god = true
+	var k: Enemy = r.spawn_field_boss()
+	r.lord.pos = FieldLayout.BOSS_AT + Vector2(0, 3)
+	r.lord.prev_pos = r.lord.pos
+	var kc: Array = []
+	r.enemy_act.connect(func(e: Enemy, act: StringName, _i: Dictionary) -> void:
+		if e == k and act == &"call":
+			kc.append(1))
+	for i in 5:
+		r.step()
+	k.hp = k.max_hp * 0.49
+	for i in 300:
+		r.step()
+	k.hp = k.max_hp * 0.2
+	for i in 400:
+		r.step()
+	check.call(kc.size() == 1 and k.summoned == 4, "무덤 기사: 부르기는 지금처럼 한 번(25% 밑에서도 더 안 부른다)")
+	Grid.size = CryptLayout.SIZE
+
+
+## 31단계: 큰 관을 처음 열면 오픈월드 한정 검(BIG_COFFIN_SWORD)을 도감에 넣는다. 검 파일(33단계)이 없으면 건너뛴다.
+func _big_coffin_sword() -> void:
+	check.call(CryptLayout.BIG_COFFIN_SWORD == 309, "큰 관의 검: 309번(오픈월드 한정 검 301~310 중)")
+	var has_file: bool = ResourceLoader.exists("res://data/swords/309.tres")
+	check.call(CryptLayout.big_coffin_sword_path() == ("res://data/swords/309.tres" if has_file else ""), "큰 관의 검: 파일이 있을 때만 경로를 준다")
+	var m := Meta.new()
+	m.crypt_cleared["r6"] = 1
+	var r: Dictionary = m.crypt_open("r6")
+	if has_file:
+		check.call(int(r.sword) == 309 and m.has_found(309) and int(m.found["309"]) == 1, "큰 관의 검: 처음 열면 309번이 도감에 든다")
+	else:
+		check.call(int(r.sword) == -1 and not m.has_found(309) and r.shards == 60, "큰 관의 검: 검 파일이 없으면 조용히 건너뛴다(조각·부적은 그대로)")
+	# 다음 판에 다시 열어도(record_run이 비운 뒤) 검은 다시 안 준다
+	m.crypt_opened.clear()
+	var r2: Dictionary = m.crypt_open("r6")
+	check.call(int(r2.sword) == -1 and r2.shards == 60, "큰 관의 검: 처음 한 번만(이미 도감에 있으면 다시 안 준다)")
+	var r3: Dictionary = m.crypt_open("r1")
+	check.call(int(r3.sword) == -1, "큰 관의 검: 일반 관은 검을 안 준다")
 
 
 func _persist() -> void:
@@ -282,7 +417,7 @@ func _death() -> void:
 	# 쓰러지고 다시 들어오면 쓰러뜨린 방은 열려 있다. 안 쓰러뜨린 방은 처음부터
 	var c2 := _crypt(9, m)
 	_go(c2, Vector2(35, 46))
-	check.call(c2.cleared(&"r1") and c2.rules.packs.has(&"r2") and c2.rules.pack_alive(&"r2") == 5, "쓰러짐: 다시 들어오면 쓰러뜨린 방은 그대로, 못 쓰러뜨린 방은 새 무리")
+	check.call(c2.cleared(&"r1") and c2.rules.packs.has(&"r2") and c2.rules.pack_alive(&"r2") == int(WANT_FOES[&"r2"]), "쓰러짐: 다시 들어오면 쓰러뜨린 방은 그대로, 못 쓰러뜨린 방은 새 무리")
 
 
 func _replay() -> void:
@@ -326,7 +461,7 @@ func _entrance() -> void:
 	var root := Node3D.new()
 	var blockers: Dictionary = FieldBuilder.build(root, Environment.new())
 	var rects: Array = blockers.rects
-	var circles: Array = blockers.circles
+	var circles: Array = blockers.circles + blockers.low_circles
 	var in_rect: bool = false
 	for r in rects:
 		if (r as Rect2).grow(0.3).has_point(FieldLayout.CRYPT_DOOR) or (r as Rect2).grow(0.3).has_point(FieldLayout.CRYPT_WAKE):

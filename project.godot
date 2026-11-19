@@ -49,11 +49,15 @@ move_down={
 }
 attack={
 "deadzone": 0.2,
-"events": [Object(InputEventMouseButton,"device":-1,"button_index":1), Object(InputEventKey,"device":-1,"physical_keycode":32), Object(InputEventKey,"device":-1,"physical_keycode":74)]
+"events": [Object(InputEventMouseButton,"device":-1,"button_index":1), Object(InputEventKey,"device":-1,"physical_keycode":74)]
 }
 dash={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":4194325), Object(InputEventKey,"device":-1,"physical_keycode":75)]
+}
+jump={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":32)]
 }
 hook={
 "deadzone": 0.2,

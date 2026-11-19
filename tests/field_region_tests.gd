@@ -110,11 +110,16 @@ func _finds() -> void:
 func _blockers() -> void:
 	var root := Node3D.new()
 	var b: Dictionary = FieldBuilder.build(root, Environment.new())
-	var rects: Array = b.rects
-	var has_all: bool = rects.has(FieldLayout.KEEP_TOWER)
+	var rects: Array = b.rects + b.low_rects
+	var circles: Array = b.circles + b.low_circles
+	var has_all: bool = b.rects.has(FieldLayout.KEEP_TOWER)
 	for w in FieldLayout.KEEP_WALLS:
-		has_all = has_all and rects.has(w)
-	check.call(has_all, "성채: 그린 성벽과 탑이 막힌 곳(rects)에 든다")
+		has_all = has_all and _covered(w, b.rects, b.low_rects)
+	check.call(has_all, "성채: 그린 성벽과 탑이 막힌 곳(rects, 무너진 낮은 조각은 low_rects)에 든다")
+	var keep_low: int = 0
+	for r: Rect2 in b.low_rects:
+		keep_low += 1 if (FieldLayout.AREAS[&"keep"] as Rect2).encloses(r) else 0
+	check.call(keep_low >= 1, "성채: 성벽에 점프로 넘는 무너진 낮은 조각이 있다(low_rects %d)" % keep_low)
 	var clear: bool = true
 	var spots: Array[Vector2] = [FieldLayout.CACHES["cache_9"][0], FieldLayout.CACHES["cache_10"][0], FieldLayout.STONES["stone_7"][0]]
 	for i in range(16, 20):
@@ -122,7 +127,7 @@ func _blockers() -> void:
 	for p in spots:
 		for rc: Rect2 in rects:
 			clear = clear and not rc.grow(0.6).has_point(p)
-		for c in b.circles:
+		for c in circles:
 			clear = clear and p.distance_to(c[0]) >= float(c[1]) + 0.6
 	check.call(clear, "새 지역: 상자·비석·조각 후보는 막힌 곳과 겹치지 않는다")
 	# 성문(남쪽 틈)으로 안으로 들어갈 수 있다: 틈 자리에 막힘이 없다
@@ -397,19 +402,23 @@ func _border_blocked(c: Vector2) -> bool:
 func _far_east_places() -> void:
 	var root := Node3D.new()
 	var b: Dictionary = FieldBuilder.build(root, Environment.new())
-	var rects: Array = b.rects
+	var rects: Array = b.rects + b.low_rects
 	var tables: Array[Rect2] = []
 	tables.append_array(FieldLayout.QUARRY_CLIFFS)
 	tables.append_array(FieldLayout.QUARRY_BLOCKS)
 	tables.append_array(FieldLayout.QUARRY_POSTS)
-	tables.append_array(FieldLayout.HAMLET_WALLS)
-	tables.append_array(FieldLayout.HAMLET_FENCES)
-	tables.append(FieldLayout.HAMLET_WELL)
 	tables.append_array(FieldLayout.PASS_CLIFFS)
+	tables.append(FieldLayout.HAMLET_WELL_POST)
 	var all_in: bool = true
 	for r in tables:
-		all_in = all_in and rects.has(r)
-	check.call(all_in and FieldLayout.HAMLET_WALLS.size() >= 25, "새 곳: 그린 벽·벼랑·돌덩이·우물·울타리가 막힌 곳(rects)에 든다(그린 것 = 막힘)")
+		all_in = all_in and b.rects.has(r)
+	for r in FieldLayout.HAMLET_WALLS:
+		all_in = all_in and _covered(r, b.rects, b.low_rects)
+	check.call(all_in and FieldLayout.HAMLET_WALLS.size() >= 25, "새 곳: 그린 벽·벼랑·돌덩이·두레박 기둥이 막힌 곳(rects, 벽의 낮은 조각은 low_rects)에 든다(그린 것 = 막힘)")
+	var low_in: bool = b.low_rects.has(FieldLayout.HAMLET_WELL)
+	for r in FieldLayout.HAMLET_FENCES:
+		low_in = low_in and b.low_rects.has(r) and not b.rects.has(r)
+	check.call(low_in and not b.rects.has(FieldLayout.HAMLET_WELL), "불탄 마을: 울타리와 우물 둘레는 낮은 막힘(low_rects, 점프로 넘는다)")
 	# 막힌 곳에 상자·비석·조각 후보·무리·영주 시작이 없다
 	var clear: bool = true
 	var spots: Array[Vector2] = []
@@ -427,7 +436,7 @@ func _far_east_places() -> void:
 	for p in spots:
 		for rc: Rect2 in rects:
 			clear = clear and not rc.grow(0.5).has_point(p)
-		for c in b.circles:
+		for c in b.circles + b.low_circles:
 			clear = clear and p.distance_to(c[0]) >= float(c[1]) + 0.5
 	check.call(clear, "새 곳: 상자·비석·조각 후보·무리 서성임은 막힌 곳(rects·circles)과 겹치지 않는다")
 	# 서로 가까이: 상자·비석은 무리 서성임 밖, 무리끼리 겹치지 않는다
@@ -457,7 +466,7 @@ func _far_east_places() -> void:
 			var q: Vector2 = a.lerp(z, float(s) / steps)
 			for rc: Rect2 in rects:
 				walk = walk and not rc.grow(0.3).has_point(q)
-			for c in b.circles:
+			for c in b.circles + b.low_circles:
 				walk = walk and q.distance_to(c[0]) >= float(c[1]) + 0.3
 	check.call(walk, "새 곳: 동쪽 둘레 틈 셋, 채석장 → 불탄 마을, 불탄 마을 → 까마귀 고개, 고개 길이 막히지 않고 이어진다")
 	# 집 문 자리는 비어 있다
@@ -485,3 +494,20 @@ func _far_east_places() -> void:
 	var mid: float = FieldBuilder.height(420.0, 190.0)
 	check.call(side - mid > 2.0, "까마귀 고개: 길 양쪽 땅이 솟아 벼랑 사이의 골짜기다")
 	root.free()
+
+
+## 벽 한 줄(표의 rect)이 높은 막힘과 낮은 막힘 조각으로 빈틈없이 덮였는가(가운데 줄을 0.1칸마다 본다, 30단계).
+func _covered(w: Rect2, hi: Array, lo: Array) -> bool:
+	var along_x: bool = w.size.x >= w.size.y
+	var n: int = int((w.size.x if along_x else w.size.y) / 0.1)
+	for i in n + 1:
+		var t: float = minf(float(i) / n, 0.999)
+		var q: Vector2 = Vector2(w.position.x + w.size.x * t, w.get_center().y) if along_x else Vector2(w.get_center().x, w.position.y + w.size.y * t)
+		var hit: bool = false
+		for r: Rect2 in hi + lo:
+			if r.grow(0.001).has_point(q):
+				hit = true
+				break
+		if not hit:
+			return false
+	return true

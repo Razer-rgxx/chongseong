@@ -19,32 +19,35 @@ const COFFIN_MIN: int = 10
 const COFFIN_MAX: int = 25
 const BIG_SHARDS: int = 60
 const BIG_CHARM: StringName = &"charm"
+## 큰 관을 처음 열 때 주는 오픈월드 한정 검(31단계, 33단계에서 data/swords/301~310을 만든다). 그 검 파일이 없으면 건너뛴다.
+const BIG_COFFIN_SWORD: int = 309
 ## 관 앞에서 E가 먹는 거리(칸), 관이 막는 반지름(칸).
 const COFFIN_REACH: float = 2.0
 const COFFIN_RADIUS: float = 1.0
-## 무덤 주인(마지막 방)의 불려 오는 적 세기 구역과 이름.
+## 무덤 주인(마지막 방)의 불려 오는 적 세기 구역과 이름(31단계: 7 → 10, 구역 표 끝).
 const LORD_ID: StringName = &"crypt_lord"
-const LORD_ZONE: int = 7
+const LORD_ZONE: int = 10
 
 ## 나가는 문(입구 방 남쪽 벽): E를 누르는 자리와 영주가 들어서는 자리.
 const EXIT_AT: Vector2 = Vector2(35, 71.3)
 const START: Vector2 = Vector2(35, 69.0)
 
-## 방 id → {rect, coffin(관 자리), pack(무리: at, wander, zone(1부터), foes) 또는 boss(at, kind, zone), big(마지막 방 큰 관)}.
-## 무리는 3~6마리, 세기는 5~7구역(RunData의 구역 배수). 자리는 방 안, 관에서 떨어진 곳.
+## 방 id → {rect, coffin(관 자리), pack(무리: at, wander, zone(1부터), foes, elite) 또는 boss(at, kind, zone), big(마지막 방 큰 관)}.
+## 31단계(무덤을 어렵게): 세기는 8~10구역(19단계 5~7에서 +3, 구역 표 끝 10), 방마다 적 +2(서쪽 끝 선택 방 r5는 10구역·+3).
+## elite: 그 종류의 첫 적 하나가 정예가 된다(Rules.make_elite, 언덕 밤의 정예와 같은 배수와 금빛). 자리는 방 안, 관에서 떨어진 곳.
 const ROOMS: Dictionary = {
 	&"r1": {"rect": Rect2(26, 58, 18, 14), "coffin": Vector2(28.5, 65.0),
-		"pack": {"at": Vector2(35, 64), "wander": 3.0, "zone": 5, "foes": [[&"wraith", 3], [&"wolf", 1]]}},
+		"pack": {"at": Vector2(35, 64), "wander": 3.0, "zone": 8, "elite": &"wolf", "foes": [[&"wraith", 4], [&"wolf", 2]]}},
 	&"r2": {"rect": Rect2(26, 40, 18, 14), "coffin": Vector2(35, 42.2),
-		"pack": {"at": Vector2(35, 48), "wander": 3.5, "zone": 5, "foes": [[&"archer", 2], [&"shield", 1], [&"wraith", 2]]}},
+		"pack": {"at": Vector2(35, 48), "wander": 3.5, "zone": 8, "elite": &"shield", "foes": [[&"archer", 2], [&"shield", 2], [&"wraith", 3]]}},
 	&"r3": {"rect": Rect2(4, 40, 18, 14), "coffin": Vector2(7.0, 51.0),
-		"pack": {"at": Vector2(13, 46), "wander": 3.5, "zone": 6, "foes": [[&"wolf", 3], [&"bomber", 1], [&"charger", 1]]}},
+		"pack": {"at": Vector2(13, 46), "wander": 3.5, "zone": 9, "elite": &"charger", "foes": [[&"wolf", 4], [&"bomber", 1], [&"charger", 2]]}},
 	&"r5": {"rect": Rect2(4, 22, 18, 14), "coffin": Vector2(13, 24.2),
-		"pack": {"at": Vector2(13, 29), "wander": 3.5, "zone": 6, "foes": [[&"shield", 2], [&"archer", 2], [&"wraith", 1]]}},
+		"pack": {"at": Vector2(13, 29), "wander": 3.5, "zone": 10, "elite": &"shield", "foes": [[&"shield", 3], [&"archer", 2], [&"wraith", 2], [&"charger", 1]]}},
 	&"r4": {"rect": Rect2(48, 40, 18, 14), "coffin": Vector2(63.5, 50.0),
-		"pack": {"at": Vector2(57, 46), "wander": 3.5, "zone": 6, "foes": [[&"charger", 2], [&"caller", 1], [&"wraith", 2]]}},
+		"pack": {"at": Vector2(57, 46), "wander": 3.5, "zone": 9, "elite": &"wraith", "foes": [[&"charger", 2], [&"caller", 1], [&"wraith", 3], [&"shield", 1]]}},
 	&"r6": {"rect": Rect2(48, 22, 18, 14), "coffin": Vector2(57, 23.6), "big": true,
-		"boss": {"at": Vector2(57, 28.0), "kind": &"crypt_lord", "zone": 7}},
+		"boss": {"at": Vector2(57, 28.0), "kind": &"crypt_lord", "zone": LORD_ZONE}},
 }
 
 ## 문 id → {gap(돌판이 서는 복도), walk(열렸을 때 걷는 곳: 복도에서 양쪽 방으로 1칸씩 겹친다), rooms(이어지는 두 방)}.
@@ -86,8 +89,9 @@ static func walkable(open_doors: Dictionary) -> Array[Rect2]:
 	return out
 
 
-## 걷는 판 밖에 있으면 가장 가까운 걸을 수 있는 곳으로 밀어 넣고, 관(둥근 막힘)에서 밀어낸다.
-static func push_in(p: Vector2, open_doors: Dictionary) -> Vector2:
+## 걷는 판 밖에 있으면 가장 가까운 걸을 수 있는 곳으로 밀어 넣고, 관(둥근 막힘, Blockers)에서 밀어낸다.
+## 벽(CryptBuilder.WALL_H 1.5m)과 관(땅 위 1.2m)은 모두 높은 막힘이라 공중이어도 막는다. 낮은 막힘은 없다(돌무더기는 막힘이 아닌 꾸밈).
+static func push_in(p: Vector2, open_doors: Dictionary, airborne: bool = false) -> Vector2:
 	var best: Vector2 = p
 	var best_d: float = INF
 	for r in walkable(open_doors):
@@ -100,13 +104,21 @@ static func push_in(p: Vector2, open_doors: Dictionary) -> Vector2:
 			if d == 0.0:
 				break
 	p = best
+	return Blockers.push_out(p, [], coffin_circles(), [], [], airborne, BODY)
+
+
+## 관의 둥근 막힘([가운데, 반지름], Blockers 모양).
+static func coffin_circles() -> Array:
+	var out: Array = []
 	for id in ROOM_ORDER:
-		var c: Vector2 = ROOMS[id].coffin
-		var off: Vector2 = p - c
-		var min_d: float = COFFIN_RADIUS + BODY
-		if off.length() < min_d:
-			p = c + (off.normalized() if off.length() > 0.001 else Vector2.DOWN) * min_d
-	return p
+		out.append([ROOMS[id].coffin, COFFIN_RADIUS])
+	return out
+
+
+## 큰 관의 오픈월드 한정 검 파일(없으면 "").
+static func big_coffin_sword_path() -> String:
+	var p: String = "res://data/swords/%03d.tres" % BIG_COFFIN_SWORD
+	return p if ResourceLoader.exists(p) else ""
 
 
 ## 방의 가운데(무리·무덤 주인 자리).

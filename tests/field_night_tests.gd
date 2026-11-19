@@ -69,9 +69,9 @@ func _layout() -> void:
 		for a in 16:
 			for k in [0.0, 0.5, 1.0]:
 				var q: Vector2 = (p.at as Vector2) + Vector2.from_angle(a * TAU / 16.0) * float(p.wander) * k
-				for rc: Rect2 in b.rects:
+				for rc: Rect2 in b.rects + b.low_rects:
 					clear = clear and not rc.grow(0.4).has_point(q)
-				for c in b.circles:
+				for c in b.circles + b.low_circles:
 					clear = clear and q.distance_to(c[0]) >= float(c[1]) + 0.4
 		for k in FieldLayout.PACKS:
 			apart = apart and (p.at as Vector2).distance_to(FieldLayout.PACKS[k].at) > float(p.wander) + float(FieldLayout.PACKS[k].wander) + 2.0

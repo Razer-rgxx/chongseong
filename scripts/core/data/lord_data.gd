@@ -41,6 +41,12 @@ extends Resource
 @export var dash_time: float = 0.16
 @export var dash_cooldown: float = 1.1
 
+@export_group("점프")
+## 걸어 다니는 점프(30단계): 뜬 동안의 시간(초)과 가장 높은 곳(m, 칸이 아니다). 높이는 포물선이다(LordState.air_height).
+## 막힘의 높이가 Blockers.JUMP_CLEAR(1.0m) 이하면 공중에서 넘는다. 싸움 판정과는 상관없다(공중이어도 맞는다).
+@export var jump_time: float = 0.55
+@export var jump_height: float = 1.1
+
 @export_group("갈고리")
 ## 겨눈 쪽으로 이 거리(칸)와 각도(라디안, 전체 폭) 안의 적에게 건다.
 @export var hook_range: float = 9.0

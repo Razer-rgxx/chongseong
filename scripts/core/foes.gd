@@ -10,7 +10,7 @@ extends RefCounted
 ##   자폭병   표를 받고 fuse_range칸 안이면 심지(fuse_time) 뒤 터져 영주와 다른 적을 다친다. 심지가 타는 동안 죽으면 바로 터진다.
 ##   부르는 자 표를 쓰지 않고 때리지 않는다. 멀리 도망치며 summon_interval초마다 summon_time 동안 불러내고 망령을 부른다.
 ##   무덤 기사 (18단계, 들판 보스) 표를 쓰지 않는다. 쿨다운이 끝나면 가까우면 크게 휘두르기(swing_wind: 앞 swing_arc° 부채꼴, swing_time초 예고),
-##            charge_min~charge_max칸이면 charge_chance 확률로 돌진 베기(돌격병과 같은 wind → charge), 아니면 다가간다. 체력이 summon_below 밑이면 망령을 한 번 부른다.
+##            charge_min~charge_max칸이면 charge_chance 확률로 돌진 베기(돌격병과 같은 wind → charge), 아니면 다가간다. 체력이 summon_below 밑이면 망령을 한 번 부른다(summon_again이 있으면 그 밑에서 한 번 더, 31단계 무덤 주인).
 ##            체력이 rage_hp 밑이면 빠르기·예고·돌진·쉬는 시간이 rage_mult배 빨라진다(_rate).
 ## 기절하면 겨눔·머리 낮춤·불러내기가 끊기고 돌진은 멈춘다(비틀거림). 심지와 방패 깨짐, 비틀거림은 기절해도 이어진다.
 ## 랜덤은 Rules.rng만 쓴다(부를 자리의 첫 각). 화면에는 Rules.enemy_act·enemy_projectile_spawned·enemy_projectile_ended로 알린다.
@@ -446,6 +446,18 @@ func _cd(e: Enemy) -> float:
 	return e.data.cooldown / _rate(e)
 
 
+## 기사형의 다음 부르기가 되는 체력 비율: 처음은 summon_below, 한 번 불렀으면 summon_again(없으면 -1이라 다시 안 부른다).
+## 부른 횟수는 summoned를 summon_count로 나눠 올림(한도 때문에 덜 불렀어도 한 번으로 친다).
+func _summon_below(e: Enemy) -> float:
+	var D := e.data
+	var waves: int = ceili(float(e.summoned) / float(maxi(1, D.summon_count)))
+	if waves <= 0:
+		return D.summon_below
+	if waves == 1 and D.summon_again > 0.0:
+		return D.summon_again
+	return -1.0
+
+
 ## 빨라졌는지(체력이 rage_hp 밑).
 func raged(e: Enemy) -> bool:
 	return _rate(e) > 1.0
@@ -456,8 +468,8 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 	var rate: float = _rate(e)
 	if d < 0.001:
 		return
-	# 부르기: 체력이 summon_below 밑으로 내려오면 한 번(summoned가 summon_max에 닿을 때까지 못 부른 만큼만)
-	if D.summon_count > 0 and e.summoned < D.summon_max and e.hp <= e.max_hp * D.summon_below and e.cooldown <= 0.0 \
+	# 부르기: 체력이 summon_below 밑으로 내려오면 한 번, summon_again(0보다 크면) 밑으로 내려오면 한 번 더(summoned가 summon_max에 닿을 때까지 못 부른 만큼만)
+	if D.summon_count > 0 and e.summoned < D.summon_max and e.hp <= e.max_hp * _summon_below(e) and e.cooldown <= 0.0 \
 			and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
 		var n: int = D.summon_count
 		var a0: float = r.rng.randf() * TAU

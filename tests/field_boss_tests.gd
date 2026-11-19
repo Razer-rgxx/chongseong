@@ -62,9 +62,9 @@ func _layout() -> void:
 	for a in 16:
 		for k in [0.0, 0.5, 1.0]:
 			var q: Vector2 = at + Vector2.from_angle(a * TAU / 16.0) * 3.0 * k
-			for rc: Rect2 in blockers.rects:
+			for rc: Rect2 in blockers.rects + blockers.low_rects:
 				clear = clear and not rc.grow(0.4).has_point(q)
-			for c in blockers.circles:
+			for c in blockers.circles + blockers.low_circles:
 				clear = clear and q.distance_to(c[0]) >= float(c[1]) + 0.4
 	check.call(clear, "무덤 기사 자리: 둘레 3칸은 막힌 곳(rects·circles)을 피한다")
 	root.free()

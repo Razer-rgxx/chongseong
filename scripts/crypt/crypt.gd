@@ -20,6 +20,7 @@ var rules: Rules
 var crypt: CryptRun
 var _acc: float = 0.0
 var _want_dash: bool = false
+var _want_jump: bool = false
 var _want_attack: bool = false
 var _want_hook: bool = false
 var _lord: Node3D
@@ -80,6 +81,7 @@ func _ready() -> void:
 	rules.lord_dashed.connect(func() -> void:
 		_sfx.play(&"dash", _lord.position, -6.0)
 		_camera.kick(4.0))
+	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
 	rules.lord_hooked.connect(func(_e: Enemy) -> void:
 		_sfx.play(&"draw", _lord.position, -2.0, 1.25)
 		_camera.kick(10.0))
@@ -116,6 +118,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_capture(true)
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("jump"):
+		_want_jump = true
 	if event.is_action_pressed("attack"):
 		_want_attack = true
 	if event.is_action_pressed("hook"):
@@ -137,6 +141,7 @@ func _physics_process(delta: float) -> void:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
+		inp.jump = _want_jump
 		inp.attack = Input.is_action_pressed("attack") or _want_attack
 		inp.hook = _want_hook
 		if _camera.third():
@@ -153,8 +158,9 @@ func _physics_process(delta: float) -> void:
 				inp.aim = Grid.world_to_cells(g)
 		rules.step(inp)
 		crypt.step()
-		rules.lord.pos = crypt.push(rules.lord.pos)
+		rules.lord.pos = crypt.push(rules.lord.pos, rules.lord.airborne())
 		_want_dash = false
+		_want_jump = false
 		_want_attack = false
 		_want_hook = false
 		_acc -= rules.dt
@@ -211,10 +217,18 @@ func _interact() -> void:
 		if int(r.shards) > 0:
 			CryptBuilder.open_coffin(_coffins[id])
 			_sfx.play(&"thump", _coffins[id].position, -3.0, 0.7)
-			_hud.toast("돌 관에서 조각 %d개%s" % [r.shards, ", 운 부적" if r.charm else ""])
-			if r.charm:
+			_hud.toast("돌 관에서 조각 %d개%s%s" % [r.shards, ", 운 부적" if r.charm else "", _sword_note(int(r.sword))])
+			if r.charm or int(r.sword) >= 0:
 				_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
 			_saved()
+
+
+## 큰 관에서 얻은 오픈월드 한정 검의 이름(알림 끝에 붙인다). 없으면 "".
+func _sword_note(id: int) -> String:
+	if id < 0:
+		return ""
+	var sd := load(CryptLayout.big_coffin_sword_path()) as SwordData
+	return ", 검 「%s」" % sd.display_name if sd != null else ""
 
 
 ## 고른 검을 칸 0에 쥔다(부러지지 않는다, 들판과 같다). 안 골랐으면 검집의 검, 0이면 맨손.

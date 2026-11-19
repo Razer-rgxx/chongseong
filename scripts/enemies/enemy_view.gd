@@ -8,6 +8,9 @@ extends Node3D
 ## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)은 EnemyArt가 몸을 짓고(parts) EnemyMotion이 매 프레임 움직인다.
 ## 이펙트(EnemyFx)는 parts로 방패·배·지팡이 끝의 실제 자리를 읽는다.
 
+## 정예 발밑 고리의 빛깔(31단계, NightArt.boss_ring 판에 칠한다).
+const ELITE_RING: Color = Color(0.62, 0.42, 0.12)
+const ELITE_RING_HOT: Color = Color(1.0, 0.8, 0.38)
 const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshader")
 
 @export var flash_time: float = 0.09
@@ -122,6 +125,13 @@ func _ready() -> void:
 		l.omni_range = 3.5 * grow
 		l.position.y = 1.2
 		add_child(l)
+		if not enemy.hunt:   # 발밑의 금빛 고리(우두머리의 검붉은 고리와 같은 판, 31단계). 사냥 우두머리는 NightFx의 검붉은 고리를 단다
+			var ring := NightArt.boss_ring(self, Grid.cells_to_meters(enemy.radius) * 1.7, float(enemy.id % 17))
+			var rm := ring.material_override as ShaderMaterial
+			rm.set_shader_parameter("color", ELITE_RING)
+			rm.set_shader_parameter("hot", ELITE_RING_HOT)
+			rm.set_shader_parameter("energy", 1.1)
+			ring.position.y = 0.035
 	position = _ground(Grid.cells_to_world(enemy.pos))
 	_yaw = atan2(-enemy.face.x, -enemy.face.y)
 	rotation.y = _yaw

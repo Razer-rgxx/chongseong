@@ -422,9 +422,11 @@ func crypt_clear(id: String) -> void:
 
 ## 돌 관을 연다. 그 방을 쓰러뜨렸고 아직 안 열었을 때만 받는다. 일반 관은 조각 CRYPT_COFFIN_MIN~MAX(Meta.rng),
 ## 마지막 방의 큰 관은 조각 CRYPT_BIG_SHARDS와 운 부적(Meta.pack, 이미 있으면 겹치지 않는다).
-## {shards, charm}을 돌려준다(못 열면 shards 0).
+## 31단계: 큰 관을 처음 열면(도감에 아직 없으면) 오픈월드 한정 검 CryptLayout.BIG_COFFIN_SWORD를 도감(found, note_found)에 넣는다.
+## 그 검 파일이 없으면 조용히 건너뛴다(33단계 전).
+## {shards, charm, sword(얻은 검 번호, 없으면 -1)}을 돌려준다(못 열면 shards 0).
 func crypt_open(id: String) -> Dictionary:
-	var r := {"shards": 0, "charm": false}
+	var r := {"shards": 0, "charm": false, "sword": -1}
 	if not crypt_cleared.has(id) or crypt_opened.has(id) or not CryptLayout.ROOMS.has(StringName(id)):
 		return r
 	crypt_opened[id] = 1
@@ -434,6 +436,9 @@ func crypt_open(id: String) -> Dictionary:
 		if not pack.has(CryptLayout.BIG_CHARM):
 			pack.append(CryptLayout.BIG_CHARM)
 			r.charm = true
+		if not has_found(CryptLayout.BIG_COFFIN_SWORD) and CryptLayout.big_coffin_sword_path() != "":
+			note_found(CryptLayout.BIG_COFFIN_SWORD)
+			r.sword = CryptLayout.BIG_COFFIN_SWORD
 	else:
 		n = rng.randi_range(CryptLayout.COFFIN_MIN, CryptLayout.COFFIN_MAX)
 	shards += n

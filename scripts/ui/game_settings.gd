@@ -8,7 +8,7 @@ const PATH: String = "user://settings.cfg"
 ## 설정 창에 보이는 키(행동 이름, 보이는 이름). 행동마다 첫 입력 하나만 바꾼다(나머지 예비 키는 그대로).
 const ACTIONS: Array = [
 	["move_up", "앞으로"], ["move_down", "뒤로"], ["move_left", "왼쪽"], ["move_right", "오른쪽"],
-	["attack", "베기"], ["hook", "갈고리"], ["dash", "구르기"], ["pull", "뽑기 · 들르기"],
+	["attack", "베기"], ["hook", "갈고리"], ["dash", "구르기"], ["jump", "점프"], ["pull", "뽑기 · 들르기"],
 	["swap", "검 바꾸기"], ["discard", "버리기"], ["start_night", "밤 부르기"],
 ]
 

@@ -39,3 +39,19 @@ var move_to: Vector2 = Vector2.ZERO
 var move_lock: float = 0.0
 ## 반격 자세가 남은 시간. 이 동안 맞으면 피해 없이 반격한다.
 var parry: float = 0.0
+## 걸어 다니는 점프(30단계): 공중에 남은 시간(초). 0이면 땅에 있다. 높이는 air_height로(포물선).
+var air: float = 0.0
+## 지난 틱의 air(화면이 틱 사이 높이를 이어 그린다. Rules.step이 prev_pos와 같이 적는다).
+var prev_air: float = 0.0
+
+
+func airborne() -> bool:
+	return air > 0.0
+
+
+## 공중에 left초 남았을 때의 높이(m, 칸이 아니다). 뜬 순간과 내려앉는 순간이 0이고 가운데가 jump_height인 포물선.
+static func air_height(left: float, D: LordData) -> float:
+	if left <= 0.0 or D.jump_time <= 0.0:
+		return 0.0
+	var u: float = clampf(1.0 - left / D.jump_time, 0.0, 1.0)
+	return 4.0 * D.jump_height * u * (1.0 - u)

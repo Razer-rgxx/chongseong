@@ -94,6 +94,8 @@ extends Resource
 @export var rage_mult: float = 1.2
 ## 체력이 이 비율 아래로 내려가면 summon_*으로 한 번 부른다(summon_count가 0이면 안 부른다). 0이면 체력과 상관없이 부른다(부르는 자).
 @export var summon_below: float = 0.0
+## 31단계: 0보다 크면 체력이 이 비율 아래로 내려갔을 때 summon_count마리를 한 번 더 부른다(무덤 주인 50% → 25%). summon_max는 두 번 몫.
+@export var summon_again: float = 0.0
 ## 그림 크기 배수(기사 모델 기준 1.0). 0이면 기본.
 @export var model_scale: float = 0.0
 

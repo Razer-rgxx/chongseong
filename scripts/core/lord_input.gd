@@ -17,9 +17,12 @@ var pull: bool = false
 var pull_press: bool = false
 ## 다른 칸의 검으로 바꿔 쥔다. -1은 그대로, 0이나 1은 그 칸으로.
 var swap_to: int = -1
+## 걸어 다니는 점프(30단계, Space): 누른 틱. 결투(21·22단계)는 점프를 쓰지 않아 바이트(to_bytes)에 넣지 않는다(결투에서는 늘 false).
+var jump: bool = false
 
 ## 22단계(온라인)용: 입력을 바이트로 바꾸고 되돌린다. 숫자는 32비트 실수 그대로라 되돌려도 같다(규칙이 같은 값을 본다).
 ## 배치: [0] 깃발(aim_valid 1, attack 2, dash 4, hook 8, pull 16, pull_press 32), [1] swap_to + 1, [2..9] move x·y, [10..17] aim x·y.
+## jump(30단계)는 넣지 않는다: 결투 바이트의 모양과 길이는 그대로다.
 const BYTES: int = 18
 
 
