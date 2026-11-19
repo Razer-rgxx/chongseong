@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOARD = os.path.join(ROOT, "docs", "team_board.html")
 GDD = os.path.join(ROOT, "docs", "GDD.md")
-STEPS = [11, 12, 13, 14]  # 지금 팀으로 돌리는 단계
-NAMES = {11: "적 행동", 12: "밤 목표·구역 규칙", 13: "낮 사건·갈림길", 14: "뽑기 손맛"}
+STEPS = [15, 16]  # 지금 팀으로 돌리는 단계(11~14는 끝)
+NAMES = {11: "적 행동", 12: "밤 목표·구역 규칙", 13: "낮 사건·갈림길", 14: "뽑기 손맛", 15: "마을 컨텐츠", 16: "마을 밖 들판"}
 
 
 def git_log(n: int = 60) -> list:
@@ -80,9 +80,9 @@ def main() -> None:
     func_status, func_note = team_note(func, checked, True)
     left = [n for n in STEPS if n not in checked]
     now = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
-    stage = (f"지금 {left[0]}단계: {NAMES[left[0]]}" if left else "11~14단계 끝") + \
+    stage = (f"지금 {left[0]}단계: {NAMES[left[0]]}" if left else f"{STEPS[0]}~{STEPS[-1]}단계 끝") + \
         " · " + " / ".join(f"{n} {'끝' if n in checked else NAMES[n]}" for n in STEPS) + \
-        " (설계서 docs/content.md)"
+        " (설계서 docs/village.md)"
     lead_note = "모양팀이 먼저(겹치지 않는 단계는 동시에), 기능팀이 차례로 잇는다. 단계가 끝나면 테스트·화면 확인·푸시."
     entries = [[d, s] for h, d, s in log if "현황판" not in s][:25]
 

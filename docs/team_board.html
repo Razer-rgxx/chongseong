@@ -139,26 +139,26 @@ code.id { color: var(--line); font-size: 12.5px; }
 <script>
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
-  stage: "11~14단계 끝 · 11 끝 / 12 끝 / 13 끝 / 14 끝 (설계서 docs/content.md)",
-  updated: "2026-11-19 08:43",
+  stage: "지금 15단계: 마을 컨텐츠 · 15 마을 컨텐츠 / 16 마을 밖 들판 (설계서 docs/village.md)",
+  updated: "2026-11-19 11:41",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
     does: "설계서로 팀 사이의 약속(동작 id, 신호, 자료 모양)을 정하고, 팀을 차례로 부르고, 끝나면 테스트·화면 확인·커밋·푸시를 한다.",
-    status: "done",
+    status: "doing",
     note: "모양팀이 먼저(겹치지 않는 단계는 동시에), 기능팀이 차례로 잇는다. 단계가 끝나면 테스트·화면 확인·푸시."
   },
   teams: [
-    { key: "look", name: "모양팀", model: "Claude Opus 5.5 에이전트 (아트·모션·이펙트를 합침)", status: "done",
+    { key: "look", name: "모양팀", model: "Claude Opus 5.5 에이전트 (아트·모션·이펙트를 합침)", status: "doing",
       does: ["모양: 몸, 소품, 재질, 아이콘(코드로 그린 SVG)", "움직임: 코드 곡선과 Mixamo 동작 위에 얹기", "효과: 불똥, 먼지, 땅의 표시, 소리", "확인용 갤러리 장면"],
       files: ["scripts/enemies/enemy_art.gd · enemy_motion.gd", "scripts/world/enemy_fx.gd", "scripts/world/night_art.gd · night_fx.gd", "scripts/world/event_art.gd · event_fx.gd · assets/ui/map/*.svg", "scripts/world/omen_art.gd · pull_timing_fx.gd · scripts/lord/pull_motion.gd", "scripts/debug/*_gallery.gd"],
       gets: "설계서 docs/content.md", gives: "파일 머리의 API → 기능팀이 잇는다",
-      note: "끝: 11단계, 12단계, 13단계, 14단계" },
-    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "done",
+      note: "하는 중: 15단계, 16단계" },
+    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
       does: ["규칙과 수치(.tres)", "신호, 화면 연결(EnemyView·main·hud)", "테스트, GDD·CLAUDE.md"],
       files: ["scripts/core/", "data/", "scripts/enemies/enemy_view.gd", "scenes/world/main.gd", "tests/", "docs/"],
       gets: "모양팀이 만든 것 전부", gives: "게임에서 도는 단계",
-      note: "끝: 11단계, 12단계, 13단계, 14단계" }
+      note: "하는 중: 15단계 마을 컨텐츠 · 남음: 16단계" }
   ],
   // 동작별 팀 진행: [아트, 모션, 이펙트, 기능]
   moves: [
@@ -177,6 +177,9 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-19 11:17", "웹판: 조각에 판 번호를 붙여 옛 조각이 캐시에서 섞이지 않게"],
+    ["11-19 11:16", "웹판만 가볍게(WebQuality): 3D 해상도 0.6, 해 그림자 한 겹, 작은 빛 그림자·번짐 판·빛 번짐 끔, 풀 30% — PC판은 그대로"],
+    ["11-19 10:45", "웹판 만들기: Web 내보내기 설정과 docs/web_build.py(pck를 조각내 GitHub Pages에 올림)"],
     ["11-19 08:42", "기능팀: 14단계 문서(GDD 체크와 한 일, 기능팀이 정한 것, CLAUDE.md)"],
     ["11-19 08:41", "기능팀: 14단계 타이밍 고리를 둘 번갈아 써서 제대로 당김의 번쩍임이 다음 고리에 지워지지 않게"],
     ["11-19 08:23", "기능팀: 14단계 화면 연결(OmenArt·PullMotion·PullTimingFx 잇기, 뽑는 동안 E·좌클릭이 타이밍)"],
@@ -198,10 +201,7 @@ const STATE = {
     ["11-18 08:19", "아트팀: 11단계 새 적 5종의 몸(EnemyArt)"],
     ["11-18 07:41", "11~14단계 설계: 적 행동, 밤 목표와 구역 규칙, 낮 사건과 갈림길, 뽑기 손맛"],
     ["11-17 23:13", "10단계 공격 토큰: 표를 가진 적만 덤비고 나머지는 둘레를 돈다"],
-    ["11-17 22:27", "관리: 원하는 검 받기 창(` 또는 F6) — 번호·이름·공격 방식·형태·등급·각인·\"갈고리\"로 찾아 칸에 받는다"],
-    ["11-17 22:02", "10단계 설계: 공격 토큰(몰려와도 표를 받은 몇 마리만 덤빈다)"],
-    ["11-17 21:35", "기능팀: 문서 — 좌클릭 규칙(GDD 2.5), 9단계 끝, CLAUDE.md의 data/attacks와 Moves, 설계서 7절(만들며 정한 것)"],
-    ["11-17 21:34", "기능팀: 화면 연결 — MoveFx·MoveMotion을 잇고, 카드에 공격 방식 이름과 동작 아이콘"]
+    ["11-17 22:27", "관리: 원하는 검 받기 창(` 또는 F6) — 번호·이름·공격 방식·형태·등급·각인·\"갈고리\"로 찾아 칸에 받는다"]
   ]
 };
 
