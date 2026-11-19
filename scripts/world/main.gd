@@ -203,6 +203,9 @@ func _setup_console() -> void:
 	_hud.add_child(_console)
 	_console.closed.connect(func() -> void: _capture(true))
 	_console.picked.connect(_on_console_pick)
+	_console.shards_given.connect(func(n: int) -> void:
+		meta.shards = maxi(0, meta.shards + n)
+		meta.save())
 
 
 ## 관리 창에서 고른 검을 칸에 쥐여 준다. slot이 -1이면 지금 쥔 칸.

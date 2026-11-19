@@ -2,10 +2,12 @@ class_name SwordConsole
 extends Control
 ## 관리: 원하는 검 받기(` 또는 F6). 번호(1~300), 이름 일부, 공격 방식 이름, 형태, 등급, 각인, "갈고리"로 찾는다.
 ## 낱말을 여러 개 쓰면 모두 맞는 검만(예: "신화 불꽃", "갈고리 대검"). 끝에 1이나 2를 붙이면 그 칸에 받는다.
+## "조각 500"처럼 쓰고 Enter면 조각을 준다(shards_given, 음수면 뺀다).
 ## ↑↓로 고르고 Enter로 받는다. Esc나 같은 키로 닫는다. 열려 있는 동안 싸움은 멈춘다(main이 틱을 돌리지 않는다).
 
 signal picked(d: SwordData, slot: int)
 signal closed
+signal shards_given(n: int)
 
 const SHOW: int = 9
 
@@ -16,6 +18,7 @@ var _count: Label
 var _hits: Array[SwordData] = []
 var _sel: int = 0
 var _slot: int = -1
+var _give: int = 0   # "조각 N"이면 N, 아니면 0
 
 
 func setup(d: GameData) -> void:
@@ -34,7 +37,7 @@ func _ready() -> void:
 	var box := UiKit.center_panel(self)
 	box.custom_minimum_size = Vector2(620, 0)
 	UiKit.header(box, "관리: 검 받기", close)
-	var hint := UiKit.label("번호, 이름, 공격 방식, 형태, 등급, 각인, \"갈고리\"로 찾는다. 끝에 1이나 2를 붙이면 그 칸. ↑↓ 고르기 · Enter 받기 · Esc 닫기", 13, UiKit.MUTED)
+	var hint := UiKit.label("번호, 이름, 공격 방식, 형태, 등급, 각인, \"갈고리\"로 찾는다. \"조각 500\"은 조각 주기. 끝에 1이나 2를 붙이면 그 칸. ↑↓ 고르기 · Enter 받기 · Esc 닫기", 13, UiKit.MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 	_field = LineEdit.new()
@@ -111,7 +114,12 @@ func _search(q: String) -> void:
 	_hits.clear()
 	_sel = 0
 	_slot = -1
+	_give = 0
 	var words: PackedStringArray = q.strip_edges().split(" ", false)
+	if words.size() == 2 and words[0] == "조각" and words[1].is_valid_int():
+		_give = int(words[1])
+		_draw()
+		return
 	# 끝의 1, 2는 칸(낱말이 두 개 이상일 때)
 	if words.size() >= 2 and (words[-1] == "1" or words[-1] == "2"):
 		_slot = int(words[-1]) - 1
@@ -142,6 +150,9 @@ func _draw() -> void:
 	if _field.text.strip_edges() == "":
 		_count.text = "찾을 말을 쓰면 여기에 나온다."
 		return
+	if _give != 0:
+		_count.text = "Enter: 조각 %+d" % _give
+		return
 	_count.text = "%d자루%s" % [_hits.size(), (" · %d번 칸에 받는다" % (_slot + 1)) if _slot >= 0 else " · 지금 쥔 칸에 받는다"]
 	if _hits.is_empty():
 		_count.text = "맞는 검이 없다."
@@ -169,6 +180,11 @@ func _draw() -> void:
 
 
 func _pick() -> void:
+	if _give != 0:
+		var n: int = _give
+		close()
+		shards_given.emit(n)
+		return
 	if _hits.is_empty():
 		return
 	var d: SwordData = _hits[_sel]
