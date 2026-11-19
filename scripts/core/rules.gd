@@ -45,6 +45,9 @@ signal pack_engaged(id: StringName)
 signal pack_returned(id: StringName)
 signal pack_cleared(id: StringName)
 ## 들판 보스(18단계): 깨어났다, 제자리로 돌아갔다(체력이 다 찼다), 쓰러졌다.
+## 들판 낮밤(29단계): 해가 졌다(밤 무리가 선다) / 날이 밝았다(쓰러뜨린 낮 무리가 다시 서고 밤 무리가 사라진다).
+signal field_dusk
+signal field_dawn
 signal field_boss_woke(e: Enemy)
 signal field_boss_returned(e: Enemy)
 signal field_boss_slain(e: Enemy)
@@ -195,8 +198,13 @@ var yard: bool = false
 ## 들판 모드(17단계, docs/outside.md): 낮밤과 구역 시간이 흐르지 않고 밤 나오기가 없다. 적은 spawn_pack으로 자리에 둔다.
 ## 영주는 늘 "밤"(맞고 휘두른다)이고, 무리가 쓰러지거나 돌아가는 일은 _step_field가 맡는다.
 var field: bool = false
-## 들판 무리: id → {home, wander, zone(0부터), state, spawned, cleared}. state는 PACK_*.
+## 들판 무리: id → {home, wander, zone(0부터), state, spawned, cleared, night}. state는 PACK_*. night는 밤에만 서는 무리(29단계).
 var packs: Dictionary = {}
+## 들판 시계(29단계): 켜져 있으면 틱마다 dt초씩 세고(FIELD_DAY + FIELD_NIGHT초마다 0으로 돌아감, 0은 아침) field_night(밤)이 바뀔 때 신호를 낸다.
+## 지하 무덤은 켜지 않는다(시계 없음 = 늘 낮 규칙).
+var field_clock_on: bool = false
+var field_clock: float = 0.0
+var field_night: bool = false
 ## 들판 보스(18단계): 무덤 기사 한 마리. 상태는 BOSS_*(자는 중, 깨어남, 돌아가는 중, 쓰러뜨림).
 var field_boss: Enemy = null
 var field_boss_state: int = BOSS_SLEEP
@@ -1259,7 +1267,8 @@ func spawn_dummy(p: Vector2) -> Enemy:
 # ---------------------------------------------------------------- 들판 무리 (17단계)
 
 ## 들판 모드를 켠다: 영주는 체력이 가득한 채 "밤"에 서고, 시간은 흐르지 않는다.
-func start_field() -> void:
+## clock가 0 이상이면 들판 시계를 그 값(초)에서 켠다(밤이면 밤 무리도 선다). 안 주면 시계 없음.
+func start_field(clock: float = -1.0) -> void:
 	field = true
 	phase = Phase.NIGHT
 	night_left = night_total
@@ -1267,25 +1276,77 @@ func start_field() -> void:
 	altar = null
 	event = null
 	lord.hp = max_hp()
+	if clock >= 0.0:
+		field_clock_on = true
+		field_clock = fposmod(clock, FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT)
+		field_night = field_clock >= FieldLayout.FIELD_DAY
+		if field_night:
+			spawn_night_packs()
+
+
+## 들판 시계를 한 틱 센다. 낮 → 밤이면 해가 지고(밤 무리가 선다), 밤 → 낮(한 바퀴)이면 날이 밝는다(쓰러뜨린 낮 무리가 다시 선다).
+func _step_field_clock() -> void:
+	if not field_clock_on:
+		return
+	field_clock += dt
+	var cycle: float = FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT
+	if field_clock >= cycle:
+		field_clock -= cycle
+	var night: bool = field_clock >= FieldLayout.FIELD_DAY
+	if night == field_night:
+		return
+	field_night = night
+	if night:
+		spawn_night_packs()
+		field_dusk.emit()
+	else:
+		_field_dawn()
+		field_dawn.emit()
+
+
+## 날이 밝았다: 쓰러뜨린 낮 무리의 기록을 지우고 빈 자리의 무리를 다시 세운다(안 쓰러뜨린 무리는 그대로).
+## 밤 무리는 _step_field가 덤비는 중이 아닌 것부터 거둔다.
+func _field_dawn() -> void:
+	for id in packs.keys():
+		if packs[id].cleared and not bool(packs[id].night):
+			packs.erase(id)
+	spawn_packs()
+
+
+## 밤 무리(FieldLayout.NIGHT_PACKS)를 모두 세운다(이미 서 있는 것은 그대로).
+func spawn_night_packs() -> void:
+	for id in FieldLayout.NIGHT_PACKS:
+		spawn_pack(StringName(id))
+
+
+## 밤 무리 하나를 거둔다: 쓰러뜨린 것으로 치지 않고(보상 없음, 신호 없음) 무리 기록을 지운다.
+func _vanish_pack(id: StringName) -> void:
+	for e in enemies:
+		if e.pack == id and not e.dead:
+			e.dead = true
+			tokens.release(e, true)
+	packs.erase(id)
 
 
 ## FieldLayout.PACKS의 무리를 자리에 둔다. def를 주면 그 무리(테스트용)를 둔다: {at, wander, zone, foes}.
 ## 세기는 zone(1부터)의 RunData 구역 배수다. 적은 제자리 둘레에 퍼져 선다(랜덤은 rng).
 func spawn_pack(id: StringName, def: Dictionary = {}) -> Array[Enemy]:
 	var out: Array[Enemy] = []
-	var P: Dictionary = def if not def.is_empty() else FieldLayout.PACKS.get(String(id), {})
+	var P: Dictionary = def if not def.is_empty() else FieldLayout.PACKS.get(String(id), FieldLayout.NIGHT_PACKS.get(String(id), {}))
 	if P.is_empty() or packs.has(id):
 		return out
+	var night_pack: bool = bool(P.get("night", false)) or (def.is_empty() and FieldLayout.NIGHT_PACKS.has(String(id)))
 	var home: Vector2 = P.at
 	var wander: float = float(P.wander)
 	var pz: int = clampi(int(P.zone) - 1, 0, data.run.zone_hp.size() - 1)
+	var spawn_z: int = clampi(pz + (FieldLayout.FIELD_NIGHT_ZONE if night_pack else 0), 0, data.run.zone_hp.size() - 1)   # 밤에 서는 무리는 한 구역 더 세다
 	var kinds: Array[StringName] = []
 	for f in P.foes:
 		for _i in int(f[1]):
 			kinds.append(StringName(f[0]))
 	var a0: float = rng.randf() * TAU
 	var keep_zone: int = zone
-	zone = pz
+	zone = spawn_z
 	for i in kinds.size():
 		var at: Vector2 = home + Vector2.from_angle(a0 + TAU * i / kinds.size()) * wander * (0.35 + 0.35 * rng.randf())
 		var e := spawn_at(kinds[i], at)
@@ -1295,7 +1356,7 @@ func spawn_pack(id: StringName, def: Dictionary = {}) -> Array[Enemy]:
 		e.wander_t = rng.randf_range(FieldLayout.PACK_WANDER_WAIT.x, FieldLayout.PACK_WANDER_WAIT.y)
 		out.append(e)
 	zone = keep_zone
-	packs[id] = {"home": home, "wander": wander, "zone": pz, "state": PACK_IDLE, "spawned": out.size(), "cleared": false}
+	packs[id] = {"home": home, "wander": wander, "zone": pz, "state": PACK_IDLE, "spawned": out.size(), "cleared": false, "night": night_pack}
 	return out
 
 
@@ -1319,7 +1380,8 @@ func _engage_pack(id: StringName) -> void:
 	if int(p.state) == PACK_ENGAGED:
 		return
 	p.state = PACK_ENGAGED
-	zone = int(p.zone)   # 공격 표 수와 불려 오는 적의 세기가 이 무리를 따른다
+	# 공격 표 수와 불려 오는 적의 세기가 이 무리를 따른다. 밤에는 한 구역 더 세다(구역 표 길이를 넘지 않게 자른다)
+	zone = clampi(int(p.zone) + (FieldLayout.FIELD_NIGHT_ZONE if field_night else 0), 0, data.run.zone_hp.size() - 1)
 	pack_engaged.emit(id)
 
 
@@ -1341,9 +1403,14 @@ func _recall_pack(id: StringName) -> void:
 func _step_field() -> void:
 	if phase == Phase.DAY:
 		phase = Phase.NIGHT
+	_step_field_clock()
 	_step_boss()
-	for id in packs:
+	var aggro: float = FieldLayout.FIELD_NIGHT_AGGRO if field_night else FieldLayout.PACK_AGGRO
+	for id in packs.keys():
 		var p: Dictionary = packs[id]
+		if bool(p.night) and not field_night and (int(p.state) != PACK_ENGAGED or p.cleared):
+			_vanish_pack(id)   # 날이 밝았다: 덤비는 중이 아닌 밤 무리(이미 쓰러뜨린 것의 기록도)는 사라진다
+			continue
 		if p.cleared:
 			continue
 		if pack_alive(id) == 0:
@@ -1353,13 +1420,13 @@ func _step_field() -> void:
 		var d: float = lord.pos.distance_to(p.home)
 		match int(p.state):
 			PACK_IDLE:
-				if d <= FieldLayout.PACK_AGGRO:
+				if d <= aggro:
 					_engage_pack(id)
 			PACK_ENGAGED:
 				if d > FieldLayout.PACK_LEASH:
 					_recall_pack(id)
 			_:
-				if d <= FieldLayout.PACK_AGGRO:
+				if d <= aggro:
 					_engage_pack(id)
 				else:
 					var home_all: bool = true
@@ -2042,6 +2109,7 @@ func state_hash() -> int:
 		parts.append_array([h.omen, h.shown_omen, h.revealed])
 	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
 	if field:
+		parts.append_array([field_clock_on, field_clock, field_night])
 		parts.append(str(packs))
 		parts.append_array([field_boss_state, field_boss_home, field_boss.id if field_boss else -1])
 		for e in enemies:

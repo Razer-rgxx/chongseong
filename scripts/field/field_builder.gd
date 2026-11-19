@@ -761,6 +761,9 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 	for k in FieldLayout.PACKS:
 		if c.distance_to(FieldLayout.PACKS[k].at) < float(FieldLayout.PACKS[k].wander) + 1.5:
 			return false
+	for k in FieldLayout.NIGHT_PACKS:
+		if c.distance_to(FieldLayout.NIGHT_PACKS[k].at) < float(FieldLayout.NIGHT_PACKS[k].wander) + 1.5:
+			return false
 	for w in FieldLayout.KEEP_WALLS:
 		if w.grow(3.0).has_point(c):
 			return false

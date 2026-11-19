@@ -211,6 +211,52 @@ const PASS_RISE: float = 5.0
 const PASS_WALL: float = 4.0
 
 
+## ---- 들판 낮밤과 다시 생기는 적(29단계, docs/outside.md). 수치는 여기 하나에만 둔다.
+## 낮과 밤의 길이(초). 시계는 Rules(들판 모드)가 30Hz로 세고 한 바퀴(낮 + 밤)마다 0으로 돌아간다. 0은 아침.
+const FIELD_DAY: float = 240.0
+const FIELD_NIGHT: float = 150.0
+## 밤에 무리가 덤빌 때 세기 구역에 더하는 수(RunData.zone_hp 길이를 넘지 않게 자른다)와 밤의 덤빔 거리(낮은 PACK_AGGRO).
+const FIELD_NIGHT_ZONE: int = 1
+const FIELD_NIGHT_AGGRO: float = 14.0
+## 해질녘·새벽에 하늘과 빛이 바뀌는 시간(초, night_amount). 화면만 쓴다.
+const FIELD_TWILIGHT: float = 40.0
+## 영주 횃불의 세기(낮 / 밤). 언덕의 밤 횃불(main.torch_energy)과 같다.
+const FIELD_TORCH_DAY: float = 0.0
+const FIELD_TORCH_NIGHT: float = 2.6
+## 화면(field.gd, night_amount 0~1로 섞는다): 해 빛 세기·빛깔(낮 / 해질녘 / 밤), 해 기울기(낮 / 지는 해 / 달, 도), 환경광, 안개.
+const FIELD_SUN_ENERGY: Vector3 = Vector3(0.9, 0.06, 0.5)   ## 낮, 해질녘(가장 낮은 때), 밤
+const FIELD_SUN_COLOR_DAY: Color = Color(1.0, 0.78, 0.6)
+const FIELD_SUN_COLOR_DUSK: Color = Color(1.0, 0.48, 0.26)
+const FIELD_SUN_COLOR_NIGHT: Color = Color(0.55, 0.65, 1.0)
+const FIELD_SUN_TILT: Vector3 = Vector3(-35.0, -6.0, -48.0)   ## 낮, 지는 해, 달
+const FIELD_SUN_YAW: Vector2 = Vector2(-60.0, 120.0)           ## 해 / 달이 오는 쪽
+const FIELD_AMBIENT_NIGHT: Color = Color(0.34, 0.4, 0.55)
+const FIELD_AMBIENT_NIGHT_ENERGY: float = 1.5
+const FIELD_AMBIENT_NIGHT_SKY: float = 0.1                     ## 밤에 환경광이 하늘에서 받는 몫(낮 1)
+const FIELD_FOG_NIGHT: Color = Color(0.05, 0.06, 0.09)
+const FIELD_FOG_NIGHT_MULT: float = 1.4
+const FIELD_SKY_TINT_NIGHT: Color = Color(0.75, 0.85, 1.0)
+const FIELD_SKY_TINT_DUSK: Color = Color(1.0, 0.5, 0.32)
+## 밤에만 서는 무리(낮 무리와 같은 모양, 해가 지면 서고 날이 밝으면 덤비는 중이 아닌 것부터 사라진다). 세기 zone은 낮 무리처럼 1부터이고 서는 밤에는 FIELD_NIGHT_ZONE이 더해진다.
+## 자리는 막힌 곳과 낮 무리·상자·비석에서 떨어뜨려 테스트가 본다.
+const NIGHT_PACKS: Dictionary = {
+	"night_road": {"at": Vector2(62, 36), "wander": 3.5, "zone": 3, "foes": [[&"wraith", 3], [&"wolf", 1]]},
+	"night_brook": {"at": Vector2(70, 56), "wander": 3.5, "zone": 3, "foes": [[&"wolf", 2], [&"wraith", 2]]},
+	"night_old_field": {"at": Vector2(64, 92), "wander": 3.5, "zone": 4, "foes": [[&"wraith", 3], [&"wolf", 2]]},
+	"night_hamlet": {"at": Vector2(222, 54), "wander": 3.0, "zone": 8, "foes": [[&"wraith", 3], [&"wolf", 2]]},
+}
+
+
+## 시계(초)로 본 밤의 정도 0(낮)~1(밤)(화면용). 해질녘은 해가 지는 때(FIELD_DAY)를 가운데로 FIELD_TWILIGHT초에 걸쳐 어두워지고,
+## 새벽은 날이 밝는 때(한 바퀴 끝, 시계 0)에 끝나도록 그 앞 FIELD_TWILIGHT초에 걸쳐 밝아진다. 그래서 시계 0(아침)은 늘 0이다.
+static func night_amount(clock: float) -> float:
+	var cycle: float = FIELD_DAY + FIELD_NIGHT
+	var s: float = fposmod(clock, cycle)
+	if s < cycle - FIELD_TWILIGHT:
+		return smoothstep(FIELD_DAY - FIELD_TWILIGHT / 2.0, FIELD_DAY + FIELD_TWILIGHT / 2.0, s)
+	return 1.0 - smoothstep(cycle - FIELD_TWILIGHT, cycle, s)
+
+
 static func area_at(c: Vector2) -> StringName:
 	for id in AREA_ORDER:
 		if (AREAS[id] as Rect2).has_point(c):

@@ -35,8 +35,10 @@ var lore_read: Dictionary = {}
 var lore_paid: bool = false
 var glints: Array[int] = []
 var glints_ready: bool = false
-## 들판 싸움(17단계): 이미 쓰러뜨린 무리 id(→ 1). 판이 끝날 때(record_run) 비운다.
+## 들판 싸움(17단계): 이미 쓰러뜨린 무리 id(→ 1). 판이 끝날 때(record_run)와 들판에 날이 밝을 때(29단계, field.gd) 비운다.
 var packs_cleared: Dictionary = {}
+## 들판 시계(29단계, 초): 들판을 떠날 때 저장하고 다시 들어오면 이어 간다. 옛 저장은 0(아침). 들판 밖에서는 흐르지 않는다.
+var field_clock: float = 0.0
 ## 들판 보스(18단계): 이번 판에 무덤 기사를 쓰러뜨렸는지(판이 끝날 때 record_run이 비운다, 쓰러뜨렸으면 들판에 다시 와도 안 선다)와 처음 보상을 받았는지(저장).
 var boss_down: bool = false
 var boss_first: bool = false
@@ -79,7 +81,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -129,6 +131,7 @@ func from_dict(d: Dictionary) -> void:
 	packs_cleared = {}
 	for k in d.get("packs_cleared", {}):
 		packs_cleared[str(k)] = 1
+	field_clock = clampf(float(d.get("field_clock", 0.0)), 0.0, FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT)
 	boss_down = bool(d.get("boss_down", false))
 	boss_first = bool(d.get("boss_first", false))
 	crypt_cleared = {}

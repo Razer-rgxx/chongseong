@@ -96,6 +96,7 @@ func _init() -> void:
 	(load("res://tests/field_fight_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_boss_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_region_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/field_night_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/crypt_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/settings_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/duel_tests.gd") as GDScript).call("run", d, check)

@@ -3,6 +3,8 @@ extends Node3D
 ## 규칙은 Rules(들판 모드)가 돌리고(싸움터 크기만 들판으로), 막힌 곳은 화면 쪽에서 밀어낸다.
 ## 높이는 FieldBuilder.walk_height를 따라 영주와 적을 그린다. 보상과 읽음은 Meta에 저장한다.
 ## 마을 북문에서 고른 검(Meta.carry_sword)은 부러지지 않는 검으로 칸 0에 쥔다. 쓰러지면 잃는 것 없이 마을 북문 앞에서 깬다.
+## 낮밤(29단계): Rules의 들판 시계(Meta.field_clock에서 이어 가고 떠날 때 저장)를 받아 해·하늘·환경광·안개·영주 횃불을 천천히 바꾸고, 해 질 때와 밝을 때 한 줄을 띄운다.
+## 날이 밝으면 Meta.packs_cleared를 비운다(Rules가 쓰러뜨린 낮 무리를 다시 세운다).
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -30,6 +32,10 @@ var _env: Environment
 var _fog_base: float = 0.0
 var _fog_color: Color = Color.WHITE
 var _fog_k: float = 0.0   ## 안개 늪의 짙은 안개 정도(0~1, 늪에 들어서면 천천히 오르고 나가면 내린다. 화면만)
+var _night_k: float = -1.0   ## 마지막으로 맞춘 밤의 정도(바뀔 때만 해·하늘을 다시 맞춘다)
+var _ambient_day: Color = Color.WHITE
+var _ambient_day_energy: float = 0.45
+var _sky_tint: Color = Color(1.0, 0.8, 0.68)   ## 낮의 하늘빛(밤·해질녘으로 섞는다)
 var _want_attack: bool = false
 var _want_hook: bool = false
 var _over: bool = false
@@ -54,7 +60,7 @@ func _ready() -> void:
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
 	Grid.size = FieldLayout.SIZE   # Rules가 싸움터 크기로 영주를 가둔다: 들판 크기로
-	rules.start_field()
+	rules.start_field(meta.field_clock)   # 시계는 지난번 떠난 데서 이어 간다(밤이면 밤 무리도 서 있다)
 	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
@@ -67,6 +73,8 @@ func _ready() -> void:
 	var env: Environment = ($Environment as WorldEnvironment).environment
 	HillBuilder.apply_sky(env, Color(1.0, 0.8, 0.68), 0.75)
 	_env = env
+	_ambient_day = env.ambient_light_color
+	_ambient_day_energy = env.ambient_light_energy
 	_fog_base = env.fog_density
 	_fog_color = env.fog_light_color
 	var blockers: Dictionary = FieldBuilder.build(self, env)
@@ -78,7 +86,7 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
-	_lord.torch.light_energy = 1.2
+	_lord.torch.light_energy = FieldLayout.FIELD_TORCH_DAY   # 밤이 오면 _light가 켠다
 	add_child(_fx)
 	_pfx.setup(rules)
 	add_child(_pfx)
@@ -100,13 +108,15 @@ func _ready() -> void:
 	rules.enemy_died.connect(_on_enemy_died)
 	rules.pack_cleared.connect(_on_pack_cleared)
 	rules.field_boss_slain.connect(_on_boss_slain)
+	rules.field_dusk.connect(_on_dusk)
+	rules.field_dawn.connect(_on_dawn)
 	rules.enemy_act.connect(_on_enemy_act)
 	rules.run_ended.connect(_on_down)
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
 	_camera.yaw = 0.0
 	_camera.snap()
-	_sun.rotation_degrees = Vector3(-35.0, -60.0, 0.0)
+	_light(0.0, true)
 	_capture(true)
 	WebQuality.apply(self, env, _sun, _camera)   # 웹판에서만 가볍게
 
@@ -199,7 +209,7 @@ func _process(delta: float) -> void:
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
 	_boss_bar()
 	_creatures.step(delta, _lord.position)
-	_marsh_fog(delta)
+	_light(delta)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
 	if a != _area:
@@ -222,15 +232,57 @@ func _process(delta: float) -> void:
 	_hud.set_prompt("E", _prompt(_near) if _near != "" else "")
 
 
-## 안개 늪(20단계): 영주가 늪에 있으면 환경 안개를 천천히 짙게 하고 빛깔을 바꾼다(규칙과 상관없는 화면, 나가면 되돌린다).
-func _marsh_fog(delta: float) -> void:
+## 낮밤(29단계)과 안개 늪(20단계)을 한 번에 섞는다. 시계의 밤의 정도(FieldLayout.night_amount)로 해 기울기·빛 세기와 빛깔·하늘·환경광·안개·영주 횃불을 바꾸고,
+## 영주가 늪에 있으면 그 위에 안개를 천천히 짙게 한다(규칙과 상관없는 화면, 나가면 되돌린다). now가 참이면 안개 늪의 변화도 바로 맞춘다.
+func _light(delta: float, now: bool = false) -> void:
+	var k: float = FieldLayout.night_amount(rules.field_clock)
 	var want: float = 1.0 if FieldLayout.area_at(rules.lord.pos) == &"marsh" else 0.0
-	if is_equal_approx(_fog_k, want):
+	if now:
+		_fog_k = want
+	if is_equal_approx(k, _night_k) and is_equal_approx(_fog_k, want):
 		return
 	_fog_k = move_toward(_fog_k, want, delta / FieldLayout.MARSH_FOG_TIME)
-	var k: float = smoothstep(0.0, 1.0, _fog_k)
-	_env.fog_density = lerpf(_fog_base, _fog_base * FieldLayout.MARSH_FOG_MULT, k)
-	_env.fog_light_color = _fog_color.lerp(FieldLayout.MARSH_FOG_COLOR, k)
+	if not is_equal_approx(k, _night_k):
+		_night_k = k
+		_apply_day_night(k)
+	var mk: float = smoothstep(0.0, 1.0, _fog_k)
+	var dens: float = _fog_base * lerpf(1.0, FieldLayout.FIELD_FOG_NIGHT_MULT, k)
+	var col: Color = _fog_color.lerp(FieldLayout.FIELD_FOG_NIGHT, smoothstep(0.0, 1.0, k))
+	col = col.lerp(FieldLayout.FIELD_SUN_COLOR_DUSK * 0.45, sin(k * PI) * 0.5)
+	_env.fog_density = lerpf(dens, dens * FieldLayout.MARSH_FOG_MULT, mk)
+	_env.fog_light_color = col.lerp(FieldLayout.MARSH_FOG_COLOR.darkened(0.75 * k), mk)
+
+
+## k(0 낮 ~ 1 밤)에 맞게 해, 하늘, 환경광, 횃불을 바꾼다. 해질녘(k 0.5 근처)은 해가 낮고 붉다.
+func _apply_day_night(k: float) -> void:
+	var E: Vector3 = FieldLayout.FIELD_SUN_ENERGY
+	_sun.light_energy = lerpf(E.x, E.y, smoothstep(0.0, 0.55, k)) if k < 0.55 else lerpf(E.y, E.z, smoothstep(0.55, 1.0, k))
+	var c: Color = FieldLayout.FIELD_SUN_COLOR_DAY.lerp(FieldLayout.FIELD_SUN_COLOR_NIGHT, smoothstep(0.4, 1.0, k))
+	_sun.light_color = c.lerp(FieldLayout.FIELD_SUN_COLOR_DUSK, sin(k * PI) * 0.7)
+	var T: Vector3 = FieldLayout.FIELD_SUN_TILT
+	var tilt: float = lerpf(T.x, T.y, smoothstep(0.0, 0.5, k)) if k < 0.5 else lerpf(T.y, T.z, smoothstep(0.5, 1.0, k))
+	_sun.rotation_degrees = Vector3(tilt, FieldLayout.FIELD_SUN_YAW.x if k < 0.5 else FieldLayout.FIELD_SUN_YAW.y, 0.0)
+	if HillBuilder.sky_material:
+		HillBuilder.sky_material.set_shader_parameter("night", k)
+		var tint: Color = _sky_tint.lerp(FieldLayout.FIELD_SKY_TINT_NIGHT, smoothstep(0.3, 1.0, k))
+		HillBuilder.sky_material.set_shader_parameter("tint", tint.lerp(FieldLayout.FIELD_SKY_TINT_DUSK, sin(k * PI) * 0.6))
+	_env.ambient_light_color = _ambient_day.lerp(FieldLayout.FIELD_AMBIENT_NIGHT, k)
+	_env.ambient_light_energy = lerpf(_ambient_day_energy, FieldLayout.FIELD_AMBIENT_NIGHT_ENERGY, k)
+	_env.ambient_light_sky_contribution = lerpf(1.0, FieldLayout.FIELD_AMBIENT_NIGHT_SKY, k)
+	_lord.torch.light_energy = lerpf(FieldLayout.FIELD_TORCH_DAY, FieldLayout.FIELD_TORCH_NIGHT, smoothstep(0.2, 0.9, k))
+
+
+## 해가 졌다: 한 줄과 밤 소리. 밤 무리는 Rules가 세웠다.
+func _on_dusk() -> void:
+	_hud.toast("해가 진다")
+	_sfx.play(&"night", _lord.position, -2.0)
+
+
+## 날이 밝았다: 한 줄. 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 비운다. 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
+func _on_dawn() -> void:
+	meta.packs_cleared = {}
+	_hud.toast("날이 밝는다")
+	_saved()
 
 
 func _spots() -> Dictionary:
@@ -433,6 +485,7 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 func _on_down(_won: bool) -> void:
 	_over = true
 	Meta.carry_sword = -1
+	meta.field_clock = rules.field_clock
 	meta.save()
 	Meta.wake_at_gate = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -447,12 +500,14 @@ func _end_read() -> void:
 
 
 func _saved() -> void:
+	meta.field_clock = rules.field_clock
 	meta.save()
 	_hud.refresh_top()
 
 
 func _leave(path: String) -> void:
 	Meta.carry_sword = -1   # 들판을 떠나면 검을 내려놓는다
+	meta.field_clock = rules.field_clock   # 시계는 들판 밖에서 흐르지 않고 다시 들어오면 이어 간다
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(path)
