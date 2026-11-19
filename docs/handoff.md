@@ -1,0 +1,70 @@
+# 인계서 (2026-11-19)
+
+다음 Claude에게. 사용자는 한국어로 짧게 답받기를 원하는 1인 개발자(학생)다. 먼저 `CLAUDE.md`(규칙 전부)와 `docs/GDD.md`의 0·1·3절을 읽는다.
+
+## 어디에 있나
+
+- 저장소: https://github.com/Razer-rgxx/chongseong , 가지 **geom-hill** (PR #4). main이 아니다.
+- 사용자 PC: `C:\Users\user\Documents\chongseong` (원격 없음). 받는 법(Godot 끄고 한 줄씩):
+  ```
+  cd C:\Users\user\Documents\chongseong
+  git stash
+  git pull https://github.com/Razer-rgxx/chongseong.git geom-hill
+  ```
+- 웹판(웨일북용): https://razer-rgxx.github.io/chongseong/ — `gh-pages` 가지. 다시 만들기: `python3 docs/web_build.py <godot> <폴더>` 후 그 폴더를 gh-pages로 강제 푸시.
+- 확인: Godot 4.6.1 리눅스 실행 파일로 `--headless --path . -s tests/run_all.gd` (지금 **589 통과, 0 실패**). 화면은 Xvfb + `--rendering-driver opengl3 --rendering-method gl_compatibility`.
+
+## 지금까지 (끝난 것)
+
+1~4단계(표·규칙·화면·마을과 3인칭), 6~14단계, 15·16단계가 끝났다. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일로 남아 있다.
+
+- 9: 좌클릭 150가지(기본 동작 20개 조합, `Moves`, docs/attacks.md)
+- 10: 적 공격 표(`Tokens`, docs/attack_tokens.md)
+- 11~14: 새 적 5종, 밤 목표·구역 규칙, 새벽 갈림길·낮 사건, 뽑기 타이밍·손잡이 조짐 (docs/content.md)
+- 15: 마을 — 의뢰판, 수련장(허수아비), 주민 5명 대사, 떠돌이 상인 (docs/village.md, `data/village.tres`)
+- 16: 마을 북문 밖 들판(싸움 없는 탐험, `scenes/field/`, `FieldLayout`)
+- 그 밖: 원하는 검 얻는 콘솔(` 또는 F6, `SwordConsole`), 웹판 전용 그래픽 낮춤(`WebQuality`), 현황판 자동 채우기(`python3 docs/board.py`)
+
+## 사용자가 정한 것 (지킬 것)
+
+- 화풍: 어두운 사실풍. AI 생성 에셋 금지. 우주/Sol's RNG 느낌, 수묵화, 양산형 금지.
+- 소리: 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리 금지.
+- 확률 보장(천장) 대신 다른 비용을 낮춘다.
+- 화면 글자는 엘든 링식. 세계(3D)에 글자를 띄우지 않는다(피해 숫자만 예외).
+- 갈고리(입체기동)는 갈고리 베기가 든 검만.
+- 저주받은 손잡이의 밤: 적이 강해진다(체력·피해 ×1.25).
+- 커밋 메시지 끝에 사용자 이메일을 넣지 않는다. 사용자 이메일은 밖에 공유하지 않는다.
+
+## 일하는 방식
+
+- GDD "3. 앞으로의 계획"을 위에서부터. 끝나면 `[x]`, "1. 지금까지 한 일"에 한 줄, 커밋·푸시, 사용자가 PC에서 볼 것을 짧게.
+- 규칙은 `scripts/core/`의 노드 없는 RefCounted(`Rules` 중심), 30Hz 고정 틱, 랜덤은 `Rules.rng` 하나(판 밖은 `Meta.rng`), `state_hash`로 결정성 테스트. 수치는 `.tres`. 화면은 신호를 받아 그린다.
+- 큰 일은 모양팀 → 기능팀 에이전트(CLAUDE.md). **사용자 주간 한도가 빠듯하니** 작은 모델로 한 에이전트가 끝까지 하는 쪽이 낫다(15·16단계는 그렇게 했다).
+- 15·16단계는 절약판이라 모양이 기본 도형이고, 갤러리·아이콘·들판 효과가 없다. 들판은 직접 걸어 보지 못했다(E 상호작용, 장면 바꾸기, 다리, 짐승 도망은 확인 전).
+
+## 사용자가 다음에 하려는 것
+
+### 1. 대결(PvP) — 아직 설계 전
+
+정할 것부터 사용자에게 묻는다: 몇 명(1대1?), 어디서(언덕 싸움터, 마을 수련장?), 무엇을 겨루나(서로 베기 / 같은 시드로 누가 높이 오르나), 같은 PC(분할 화면)인지 네트워크인지, 웹판도 되어야 하는지(웹은 WebSocket/WebRTC와 중계 서버가 필요).
+
+쓸 수 있는 바탕:
+- 규칙이 결정적이고 입력이 틱마다 `LordInput` 하나다 → 호스트가 규칙을 돌리고 다른 쪽은 입력만 보내는 방식, 또는 입력만 주고받는 락스텝이 쉽다.
+- 지금 `Rules`는 영주가 하나다(`rules.lord`). 영주 여럿, 영주끼리 맞히기(`Moves`는 지금 적만 맞힌다), 누가 뽑나, 공격 표(`Tokens`)를 누구에게 주나를 바꿔야 한다.
+- 가장 작은 첫걸음 후보: **같은 시드 대결**(둘이 따로 같은 시드로 오르고 기록 비교) — 네트워크 없이 시드 공유와 기록만으로 된다.
+
+### 2. 마을 더하기
+
+- 15단계로 의뢰판·수련장·주민·상인이 있다. 더할 것은 사용자에게 묻는다. GDD 2.14(정하지 않은 것) 항목은 묻기 전에 바꾸지 않는다.
+- 자리: `scripts/lobby/lobby.gd`(들를 곳 `@export` 자리, `_near`, `_interact`, 막힘 `_rects/_circles`), 모양 `VillageProps`/`VillageBuilder`, 창 `LobbyHud`, 수치·대사 `data/village.tres`, 저장 `Meta`.
+- 마을은 34 × 22칸으로 좁다. 자리가 모자라면 들판(`FieldLayout`)에 둘 수도 있다.
+
+## 남은 계획 (GDD 3절)
+
+17 관리 패널 → 18 화풍과 모델 → 19 소리 에셋 → 20 난이도와 강화 균형 → 21 시작 화면·설정·Windows 내보내기.
+
+## 알려진 구멍
+
+- "메아리 계곡"은 호를 다시 그리고, "바람의 왕"+회전은 싸움터 전체를 맞힌다. 3인칭에서 앞에 적이 없으면 도약이 3칸 고정이다. `FormData.combo`는 안 쓴다.
+- 들판 수치(보상·비석 글·곳 이름)는 `data/field.tres`가 아니라 `FieldLayout` 상수에 있다.
+- Mixamo 캐릭터와 사운드 팩은 git에 없다(PC에만). 없으면 기본 도형·코드 소리로 돈다.
