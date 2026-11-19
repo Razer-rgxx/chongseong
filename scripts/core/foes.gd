@@ -130,7 +130,7 @@ func step(e: Enemy, foe: Enemy, to: Vector2, d: float, k: float, dt: float) -> b
 		&"caller":
 			_caller(e, to, d, k, dt)
 			return true
-		&"grave_knight":
+		&"grave_knight", &"crypt_lord":
 			_knight(e, to, d, k, dt)
 			return true
 	return false

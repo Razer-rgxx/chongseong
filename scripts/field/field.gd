@@ -7,6 +7,7 @@ extends Node3D
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
 const RUN_PATH: String = "res://scenes/world/main.tscn"
+const CRYPT_PATH: String = "res://scenes/crypt/crypt.tscn"
 
 @export var reach: float = 2.0
 @export var max_ticks_per_frame: int = 8
@@ -54,6 +55,9 @@ func _ready() -> void:
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
 	rules.lord.pos = FieldLayout.START
+	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
+		Meta.wake_at_crypt = false
+		rules.lord.pos = FieldLayout.CRYPT_WAKE
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
 	var env: Environment = ($Environment as WorldEnvironment).environment
@@ -211,7 +215,7 @@ func _process(delta: float) -> void:
 
 
 func _spots() -> Dictionary:
-	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD}
+	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD, "crypt": FieldLayout.CRYPT_DOOR}
 	for id in FieldLayout.CACHES:
 		if not meta.field_found.has(id):
 			s[id] = FieldLayout.CACHES[id][0]
@@ -227,6 +231,8 @@ func _prompt(key: String) -> String:
 		return "마을로 돌아간다"
 	if key == "trail":
 		return "언덕으로 오른다"
+	if key == "crypt":
+		return "지하 무덤으로 내려간다"
 	if key.begins_with("cache"):
 		return "유품을 연다"
 	if key.begins_with("stone"):
@@ -244,6 +250,10 @@ func _interact() -> void:
 		_leave(VILLAGE_PATH)
 	elif _near == "trail":
 		_leave(RUN_PATH)
+	elif _near == "crypt":
+		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		get_tree().change_scene_to_file(CRYPT_PATH)
 	elif _near.begins_with("cache"):
 		var got: int = meta.field_open(_near, FieldLayout.CACHES[_near][1])
 		if got > 0:

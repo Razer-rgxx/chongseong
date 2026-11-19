@@ -116,6 +116,13 @@ const BOSS_SHARDS: int = 30
 const BOSS_CHARM: StringName = &"charm"
 
 
+## ---- 지하 무덤 입구(19단계, docs/outside.md). 검은 숲 가장자리의 무너진 무덤.
+## 모양이 서는 곳(막힘, 칸 단위), E를 누르는 자리, 나오거나 쓰러져 깰 자리(입구 앞).
+const CRYPT_BLOCK: Rect2 = Rect2(28.5, 26.0, 7.0, 3.6)
+const CRYPT_DOOR: Vector2 = Vector2(32, 31)
+const CRYPT_WAKE: Vector2 = Vector2(32, 33.5)
+
+
 static func area_at(c: Vector2) -> StringName:
 	for id in AREA_ORDER:
 		if (AREAS[id] as Rect2).has_point(c):

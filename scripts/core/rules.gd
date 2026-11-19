@@ -167,6 +167,8 @@ var packs: Dictionary = {}
 var field_boss: Enemy = null
 var field_boss_state: int = BOSS_SLEEP
 var field_boss_home: Vector2 = Vector2.ZERO
+## 불려 오는 적의 세기 구역(1부터). 들판은 FieldLayout.BOSS_ZONE, 지하 무덤은 방이 정한다.
+var field_boss_zone: int = FieldLayout.BOSS_ZONE
 const BOSS_SLEEP: int = 0
 const BOSS_AWAKE: int = 1
 const BOSS_RETURNING: int = 2
@@ -1360,12 +1362,14 @@ func _step_pack_idle(e: Enemy, k: float) -> void:
 # ---------------------------------------------------------------- 들판 보스 (18단계)
 
 ## 무덤 기사를 자리에 세운다. 이미 있으면 새로 세우지 않는다. at을 주면 그 자리(테스트용)에 선다.
-func spawn_field_boss(at: Vector2 = FieldLayout.BOSS_AT) -> Enemy:
+## kind·boss_zone은 지하 무덤(19단계)의 무덤 주인이 쓴다(같은 행동, 다른 적 표).
+func spawn_field_boss(at: Vector2 = FieldLayout.BOSS_AT, kind: StringName = FieldLayout.BOSS_ID, boss_zone: int = FieldLayout.BOSS_ZONE) -> Enemy:
 	if field_boss != null:
 		return null
+	field_boss_zone = boss_zone
 	var keep_zone: int = zone
-	zone = clampi(FieldLayout.BOSS_ZONE - 1, 0, data.run.zone_hp.size() - 1)
-	var e := spawn_at(FieldLayout.BOSS_ID, at)
+	zone = clampi(boss_zone - 1, 0, data.run.zone_hp.size() - 1)
+	var e := spawn_at(kind, at)
 	zone = keep_zone
 	e.home = at
 	e.face = Vector2.DOWN
@@ -1379,7 +1383,7 @@ func _wake_boss() -> void:
 	if field_boss == null or field_boss.dead:
 		return
 	field_boss_state = BOSS_AWAKE
-	zone = clampi(FieldLayout.BOSS_ZONE - 1, 0, data.run.zone_hp.size() - 1)   # 불려 오는 망령의 세기
+	zone = clampi(field_boss_zone - 1, 0, data.run.zone_hp.size() - 1)   # 불려 오는 망령의 세기
 	field_boss.cooldown = maxf(field_boss.cooldown, field_boss.data.cooldown)
 	field_boss_woke.emit(field_boss)
 

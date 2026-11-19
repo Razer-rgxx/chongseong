@@ -94,7 +94,7 @@ func _ready() -> void:
 	match D.id:
 		&"wolf":
 			_build_wolf(grow, D.color)
-		&"giant", &"boss", &"grave_knight":
+		&"giant", &"boss", &"grave_knight", &"crypt_lord":
 			if LordCharacter.available():
 				_build_knight(grow, D.color, D.boss)
 			else:

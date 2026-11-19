@@ -36,6 +36,7 @@
 - 들판(16단계, docs/village.md): 마을 북문 밖 `scenes/field/field.tscn`(싸움 없음). 자리와 보상은 `FieldLayout`, 땅·꾸밈은 `FieldBuilder`(높이 `walk_height`), 짐승은 `FieldCreatures`, 장면은 `field.gd`(Rules로 걷고 `Grid.size`를 들판 크기로). 상자·조각·비석은 `Meta.field_open/take_glint/read_stone`.
 - 들판 싸움(17단계, docs/outside.md): 마을 북문 E → 검 고르기(`LobbyHud.open_field_pick`, 걸이와 같은 목록) → `Meta.carry_sword`(static, 저장 안 함)가 들판으로 넘어가 `Meta.unbreakable_sword`로 칸 0에 쥔다. `Rules.field`(`start_field`)는 낮밤·구역 시간이 없고 영주가 늘 "밤"이며, 적은 `spawn_pack`/`spawn_packs`로 `FieldLayout.PACKS` 자리에 둔다(`Enemy.pack/home`, `Rules.packs`: 덤빔·돌아감 상태). 서성임·덤빔·돌아감·보상 수치는 `FieldLayout` 상수, 무리 상태는 `state_hash`에 든다. 보상은 `Meta.field_kill`(1)·`field_clear`(5~10, `Meta.rng`)와 `packs_cleared`(`record_run`이 비운다). 쓰러지면 `Meta.wake_at_gate`로 북문 앞에서 깬다. 화면은 `field.gd`가 EnemyView·MoveFx·EnemyFx·HitFx를 main처럼 잇고 높이는 `walk_height`.
 - 들판 보스(18단계, docs/outside.md): 옛 싸움터의 무덤 기사(`data/enemies/10_grave_knight.tres`, `FieldLayout.BOSS_*`)는 `Rules.spawn_field_boss`/`field_boss`·`field_boss_state`로 무리와 따로 센다(깨어남 8칸·돌아감 14칸, 신호 `field_boss_woke`·`field_boss_returned`·`field_boss_slain`). 행동(휘두르기·돌진·부르기·빨라짐)은 `Foes._knight`와 `EnemyData`의 무덤 기사 칸. 보상은 `Meta.boss_defeat`(조각 80/30, `charm`을 `Meta.pack`에), `Meta.boss_down`(`record_run`이 비운다)·`boss_first`(저장). 화면은 EnemyView(`model_scale`)·EnemyFx(`swing_wind` 부채꼴, `height_of`)·`LobbyHud.set_boss`.
+- 지하 무덤(19단계, docs/outside.md): 들판 검은 숲 가장자리 입구(`FieldLayout.CRYPT_*`)에서 E → `scenes/crypt/crypt.tscn`. 방·문·관·무리 자리와 수치는 `CryptLayout`(static const) 한 곳, 규칙 쪽은 `CryptRun`(방에 들어서면 `Rules.spawn_pack`/`spawn_field_boss`로 세우고, 쓰러뜨린 방을 `Meta.crypt_clear`에 적는다. 문이 닫혔는지는 영주가 든 방과 `Rules.packs`·`field_boss_state`에서 읽고, 막힘은 `CryptLayout.push_in`). 마지막 방은 무덤 주인(`crypt_lord`, `Foes._knight` 공유). 보상은 `Meta.crypt_open`(관 10~25, 큰 관 60+운 부적), `crypt_cleared`·`crypt_opened`(저장, `record_run`이 비운다). 화면은 `CryptBuilder`(돌판 문, 낮은 벽, 횃불)와 `crypt.gd`, 나오거나 쓰러지면 `Meta.wake_at_crypt`로 입구 앞.
 - 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
 - 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
 - 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
@@ -81,8 +82,8 @@
 
 ```
 project.godot
-scenes/   lobby/ (마을, 시작 장면), world/ (언덕), lord/, debug/
-scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, lord/, enemies/, ui/, debug/
+scenes/   lobby/ (마을, 시작 장면), world/ (언덕), field/ (들판), crypt/ (지하 무덤), lord/, debug/
+scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, field/, crypt/, lord/, enemies/, ui/, debug/
 data/     swords/, inscriptions/, forms/, enemies/, attacks/ (moves/, patterns/), grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres, powers.tres
 assets/   characters/, nature/, ui/, video/, sound/
 tests/

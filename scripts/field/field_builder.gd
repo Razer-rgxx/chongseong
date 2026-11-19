@@ -83,6 +83,7 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_old_field(parent, rng, circles)
 	_grove(parent, rng, circles)
 	_foot(parent, circles)
+	_crypt_gate(parent, rects)
 	_palisade(parent)
 	_far_hill(parent)
 	_forest(parent, rng, circles)
@@ -446,6 +447,38 @@ static func _grove(parent: Node3D, rng: RandomNumberGenerator, circles: Array) -
 		_box(parent, Vector3(0.18, 0.18, 2.2), pa + Vector3(0, 0.9, 0) + rb, _mat("dead_wood", Color(0.12, 0.1, 0.08)), Vector3(0.3, rng.randf() * TAU, 0.4))
 
 
+# ---------------------------------------------------------------- 무덤 입구 (19단계)
+
+## 무너진 무덤 입구: 기울어진 돌기둥 둘과 부러진 상인방, 땅속으로 내려가는 계단과 검은 입구. 글자 없음.
+static func _crypt_gate(parent: Node3D, rects: Array[Rect2]) -> void:
+	var b: Rect2 = FieldLayout.CRYPT_BLOCK
+	var c: Vector2 = b.get_center()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 19
+	var st: Material = _stone()
+	var cx: float = c.x * Grid.CELL
+	var cz: float = c.y * Grid.CELL
+	var base: float = height(cx, cz)
+	var hw: float = b.size.x * Grid.CELL / 2.0
+	var hd: float = b.size.y * Grid.CELL / 2.0
+	_box(parent, Vector3(hw * 2.0, 2.2, hd * 2.0), Vector3(cx, base + 0.5, cz - 0.4), st)   # 흙에 묻힌 돌 둔덕
+	var dark := _mat("crypt_dark", Color(0.0, 0.0, 0.0), 1.0)
+	_box(parent, Vector3(3.2, 3.0, 0.4), Vector3(cx, base + 1.4, cz + hd - 0.4), dark)   # 검은 입구
+	for i in 4:   # 내려가는 계단
+		_box(parent, Vector3(3.6, 0.3, 0.8), Vector3(cx, base + 0.15 - i * 0.05, cz + hd + 0.2 + i * 0.7), st)
+	for s in [-1.0, 1.0]:
+		_box(parent, Vector3(0.9, 4.2, 0.9), Vector3(cx + s * 2.3, base + 2.0, cz + hd - 0.2), st, Vector3(0, 0.1 * s, 0.07 * s))
+	_box(parent, Vector3(2.4, 0.7, 1.0), Vector3(cx - 1.4, base + 4.0, cz + hd - 0.3), st, Vector3(0, 0.0, 0.25))   # 부러진 상인방
+	for i in 12:   # 무너진 돌
+		var a: float = rng.randf() * TAU
+		var r: float = rng.randf_range(hw * 0.8, hw + 2.5)
+		var s: float = rng.randf_range(0.3, 1.0)
+		var x: float = cx + cos(a) * r
+		var z: float = cz + sin(a) * r * 0.7 + hd * 0.4
+		_box(parent, Vector3(s, s * 0.7, s * 1.2), Vector3(x, height(x, z) + s * 0.2, z), st, Vector3(rng.randf() * 0.6, rng.randf() * TAU, rng.randf() * 0.6), 90.0)
+	rects.append(b)
+
+
 # ---------------------------------------------------------------- 언덕 발치
 
 static func _foot(parent: Node3D, circles: Array) -> void:
@@ -555,6 +588,8 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 	var x: float = c.x * Grid.CELL
 	var z: float = c.y * Grid.CELL
 	if road_dist(x, z) < 5.0 or absf(z - brook_z(x)) < 9.0:
+		return false
+	if c.distance_to(FieldLayout.CRYPT_DOOR) < 6.0:
 		return false
 	if c.distance_to(FieldLayout.TOWER) < 7.0 or c.distance_to(Vector2(76, 84)) < 4.0:
 		return false
