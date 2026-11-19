@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 CHUNK = 90 * 1024 * 1024
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +24,7 @@ LOADER = """setStatusMode('progress');
 		let got = 0;
 		async function fetchParts() {
 			for (const part of PARTS) {
-				const res = await fetch(part);
+				const res = await fetch(part + '?v=%(version)d');  // 조각 이름이 늘 같아서, 옛 조각이 캐시에서 섞이지 않게
 				if (!res.ok) {
 					throw new Error('Failed to load ' + part + ' (' + res.status + ')');
 				}
@@ -72,7 +73,7 @@ def main() -> None:
     html = open(html_path, encoding="utf-8").read()
     a = html.index("setStatusMode('progress');\n\t\tengine.startGame(")
     b = html.index("}());", a) + len("}());")
-    html = html[:a] + LOADER % {"parts": json.dumps(parts), "total": len(data)} + html[b:]
+    html = html[:a] + LOADER % {"parts": json.dumps(parts), "total": len(data), "version": int(time.time())} + html[b:]
     html = html.replace("<html lang=\"en\">", "<html lang=\"ko\">")
     open(html_path, "w", encoding="utf-8").write(html)
     open(os.path.join(out, ".nojekyll"), "w").close()
