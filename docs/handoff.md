@@ -56,11 +56,12 @@
   ```
   git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
   ```
-  bundle은 `7163afa..geom-hill`로 만든다(7163afa는 GitHub에 있는 커밋이라 사용자 PC에도 있다). 매번 그때까지 전부 들어 있어서 최신 것 하나만 받으면 된다. **다른 기준(예: a5399b4)으로 만들지 말 것**: PC에 그 커밋이 없으면 pull이 실패한다.
+  bundle은 **`75be671..geom-hill`**로 만든다. 2026-11-19 밤에 PC를 직접 열어 보니 PC의 geom-hill은 `75be671`(검 받기 창)에서 멈춰 있었다. GitHub의 7163afa도, 그 뒤 bundle도 PC에 들어간 적이 없다(7163afa 기준 bundle은 "필요한 커밋 없음"으로 실패했다). PC가 따라잡으면(사용자가 pull에 성공하면) 그 커밋을 새 기준으로 삼는다. 매번 그때까지 전부 들어 있어서 최신 것 하나만 받으면 된다.
+- PC가 이 세션에 연결돼 있으면(`mcp__remote-devices__*`) `device_commit_files`로 bundle을 저장소 맨 위에 `update.bundle`로 바로 써 준다(`.git` 안은 쓰기가 막힌다, `*.bundle`은 .gitignore). 사용자는 `git pull .\update.bundle geom-hill` 한 줄만 친다. PC의 git 상태는 `.git/logs/HEAD`·`refs/heads/geom-hill`을 stage해서 본다(device_bash 없음).
 - 사용자의 터미널은 **PowerShell**이다(`&&`가 안 된다, `;`로 잇는다). Godot 폴더(바탕화면)에서 연 PowerShell에 붙여 넣는다.
 - 사용자에게는 **명령 한 줄**로 준다(파일을 풀거나 복사하게 하지 않는다). 사용자는 "왜 내가 푸냐, 전 클로드는 한 줄이면 됐다"고 했다:
   ```
-  cd C:\Users\user\Documents\chongseong; git stash; git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
+  cd C:\Users\user\Documents\chongseong; git stash; git pull .\update.bundle geom-hill
   ```
 - **GitHub로 올리기**(사용자 PC에서): `git push https://github.com/Razer-rgxx/chongseong.git HEAD:geom-hill`
 - PC에만 있고 git에 없는 것: Mixamo 기사 모델·동작(`assets/characters/`), 사운드 팩(`assets/sound/`), 뽑기 영상(`assets/video/`). 클라우드에서는 기본 도형·코드 소리로 돈다(정상).
@@ -123,7 +124,7 @@
 4. bundle 다시 만들고 인계서 복사해 SendUserFile:
    ```
    cd /home/claude/chongseong && mkdir -p /home/claude/out
-   git bundle create /home/claude/out/chongseong.bundle 7163afa..geom-hill
+   git bundle create /home/claude/out/chongseong.bundle 75be671..geom-hill
    cp docs/handoff.md /home/claude/out/handoff.md
    ```
    (푸시가 되면 bundle 대신 `git push origin geom-hill`.)
