@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"spin"
+display_name = "회전베기"
+link_name = "돌고"
+end_name = "회전"
+role = "finish"
+shape = &"circle"
+damage = 1.3
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.2
+delay = 0.0
+lock = 0.0
+walk = -1.0
+reach = 1.0
+arc = 1.0
+radius_reach = 1.0

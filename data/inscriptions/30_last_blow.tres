@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "마지막 일격"
+text = "부러질 때 둘레 2칸에 N 피해"
+values = PackedFloat32Array(30, 39, 51, 66, 96, 138)

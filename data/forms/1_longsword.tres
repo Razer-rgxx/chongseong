@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="FormData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/form_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+display_name = "장검"
+damage = 1.0
+speed = 1.0
+reach = 1.0
+arc = 1.0
+durability = 1.0
+combo = 3
+knockback = 1.0
+pierce = 0
+blade_length = 1.10
+blade_width = 0.08
+description = "3연 베기, 3타째 큰 베기. 기본형"

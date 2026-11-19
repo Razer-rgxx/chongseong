@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PatternData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/pattern_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 129
+display_name = "불꽃 갈고리 걸고 베고 베고 칼 던지기"
+grade = 4
+moves = PackedStringArray("hook", "sweep", "sweep", "boomerang")
+element = &"fire"
+echo = true

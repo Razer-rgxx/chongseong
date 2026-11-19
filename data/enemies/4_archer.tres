@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"archer"
+display_name = "활잡이"
+hp = 18
+damage = 7
+speed = 1.4
+radius = 0.28
+cooldown = 1.6
+color = Color(0.62, 0.58, 0.48, 1)
+knockback_mult = 1.0
+big = false
+wraith = false
+boss = false
+token_cost = 1
+wait_range = 8.0
+keep_near = 5.0
+keep_far = 8.0
+act_after = 0.3
+aim_time = 0.6
+shot_speed = 11.0
+shot_range = 12.0
+shot_radius = 0.35

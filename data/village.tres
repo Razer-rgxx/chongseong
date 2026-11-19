@@ -1,0 +1,308 @@
+[gd_resource type="Resource" script_class="VillageData" load_steps=44 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/village_data.gd" id="1_s"]
+[ext_resource type="Script" path="res://scripts/core/data/quest_data.gd" id="2_q"]
+[ext_resource type="Script" path="res://scripts/core/data/goods_data.gd" id="3_g"]
+[ext_resource type="Script" path="res://scripts/core/data/villager_data.gd" id="4_v"]
+
+[sub_resource type="Resource" id="q1"]
+script = ExtResource("2_q")
+kind = &"kill"
+n = 40
+reward = 20
+
+[sub_resource type="Resource" id="q2"]
+script = ExtResource("2_q")
+kind = &"kill"
+n = 60
+reward = 25
+min_best = 2
+
+[sub_resource type="Resource" id="q3"]
+script = ExtResource("2_q")
+kind = &"kill"
+n = 120
+reward = 45
+min_best = 5
+
+[sub_resource type="Resource" id="q4"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"wolf"
+n = 15
+reward = 20
+
+[sub_resource type="Resource" id="q5"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"giant"
+n = 4
+reward = 25
+min_best = 3
+
+[sub_resource type="Resource" id="q6"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"archer"
+n = 8
+reward = 25
+min_best = 3
+
+[sub_resource type="Resource" id="q7"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"archer"
+n = 12
+reward = 30
+min_best = 5
+
+[sub_resource type="Resource" id="q8"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"shield"
+n = 8
+reward = 30
+min_best = 4
+
+[sub_resource type="Resource" id="q9"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"charger"
+n = 6
+reward = 30
+min_best = 5
+
+[sub_resource type="Resource" id="q10"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"bomber"
+n = 6
+reward = 30
+min_best = 6
+
+[sub_resource type="Resource" id="q11"]
+script = ExtResource("2_q")
+kind = &"kill_kind"
+target = &"caller"
+n = 3
+reward = 35
+min_best = 7
+
+[sub_resource type="Resource" id="q12"]
+script = ExtResource("2_q")
+kind = &"zones"
+n = 3
+reward = 20
+
+[sub_resource type="Resource" id="q13"]
+script = ExtResource("2_q")
+kind = &"zones"
+n = 5
+reward = 30
+min_best = 3
+
+[sub_resource type="Resource" id="q14"]
+script = ExtResource("2_q")
+kind = &"zones"
+n = 8
+reward = 45
+min_best = 6
+
+[sub_resource type="Resource" id="q15"]
+script = ExtResource("2_q")
+kind = &"elites"
+n = 2
+reward = 25
+min_best = 2
+
+[sub_resource type="Resource" id="q16"]
+script = ExtResource("2_q")
+kind = &"elites"
+n = 3
+reward = 35
+min_best = 4
+
+[sub_resource type="Resource" id="q17"]
+script = ExtResource("2_q")
+kind = &"elites"
+n = 5
+reward = 50
+min_best = 6
+
+[sub_resource type="Resource" id="q18"]
+script = ExtResource("2_q")
+kind = &"pull_grade"
+grade = 1
+n = 4
+reward = 20
+
+[sub_resource type="Resource" id="q19"]
+script = ExtResource("2_q")
+kind = &"pull_grade"
+grade = 2
+n = 1
+reward = 30
+min_best = 2
+
+[sub_resource type="Resource" id="q20"]
+script = ExtResource("2_q")
+kind = &"pull_grade"
+grade = 2
+n = 2
+reward = 45
+min_best = 4
+
+[sub_resource type="Resource" id="q21"]
+script = ExtResource("2_q")
+kind = &"perfect"
+n = 2
+reward = 20
+
+[sub_resource type="Resource" id="q22"]
+script = ExtResource("2_q")
+kind = &"perfect"
+n = 3
+reward = 25
+
+[sub_resource type="Resource" id="q23"]
+script = ExtResource("2_q")
+kind = &"perfect"
+n = 5
+reward = 35
+min_best = 3
+
+[sub_resource type="Resource" id="q24"]
+script = ExtResource("2_q")
+kind = &"goal"
+target = &"hunt"
+n = 1
+reward = 25
+min_best = 2
+
+[sub_resource type="Resource" id="q25"]
+script = ExtResource("2_q")
+kind = &"goal"
+target = &"hunt"
+n = 2
+reward = 35
+min_best = 4
+
+[sub_resource type="Resource" id="q26"]
+script = ExtResource("2_q")
+kind = &"goal"
+target = &"defend"
+n = 2
+reward = 30
+min_best = 3
+
+[sub_resource type="Resource" id="q27"]
+script = ExtResource("2_q")
+kind = &"goal"
+target = &"siege"
+n = 2
+reward = 30
+min_best = 3
+
+[sub_resource type="Resource" id="q28"]
+script = ExtResource("2_q")
+kind = &"events"
+n = 2
+reward = 15
+min_best = 2
+
+[sub_resource type="Resource" id="q29"]
+script = ExtResource("2_q")
+kind = &"events"
+n = 3
+reward = 20
+min_best = 3
+
+[sub_resource type="Resource" id="g1"]
+script = ExtResource("3_g")
+id = &"ticket"
+display_name = "뽑기 표"
+text = "다음 판 공짜 뽑기 +1"
+value = 1
+price = 25
+
+[sub_resource type="Resource" id="g2"]
+script = ExtResource("3_g")
+id = &"whetstone"
+display_name = "숫돌"
+text = "다음 판 처음 쥔 검의 최대 내구 +20%"
+value = 0.2
+price = 20
+
+[sub_resource type="Resource" id="g3"]
+script = ExtResource("3_g")
+id = &"charm"
+display_name = "운 부적"
+text = "다음 판 1~2구역 낮의 뽑기 운 ×1.2"
+value = 1.2
+price = 30
+
+[sub_resource type="Resource" id="g4"]
+script = ExtResource("3_g")
+id = &"note"
+display_name = "점쟁이 쪽지"
+text = "다음 판 1구역 낮에 손잡이 조짐이 참으로 보인다"
+value = 1
+price = 20
+
+[sub_resource type="Resource" id="g5"]
+script = ExtResource("3_g")
+id = &"bread"
+display_name = "말린 빵"
+text = "다음 판 최대 체력 +15"
+value = 15
+price = 20
+
+[sub_resource type="Resource" id="v1"]
+script = ExtResource("4_v")
+id = &"gatekeeper"
+display_name = "문지기"
+lines = PackedStringArray("언덕으로 가는 길은 이 북문 하나다. 문 앞에서 E를 누르면 열어 주지.", "낮에는 꽂힌 칼을 E로 뽑고, N을 누르면 밤이 온다. 밤에는 그 칼로 버텨라.", "나도 한 번 올라갔다. 셋째 구역에 왼손을 두고 왔지.", "중턱을 넘었다고? 그 위로는 바람이 칼 소리를 낸다. 귀를 믿지 마라.", "정상에서 걸어 내려온 자는 네가 처음이다. 문을 닫지 않은 보람이 있군.")
+cond = PackedStringArray("", "", "runs", "best", "top")
+cond_n = PackedInt32Array(0, 0, 1, 5, 0)
+
+[sub_resource type="Resource" id="v2"]
+script = ExtResource("4_v")
+id = &"elder"
+display_name = "마을 어른"
+lines = PackedStringArray("이 마을은 언덕보다 늦다. 칼이 먼저 있었고, 칼을 고치는 사람이 뒤에 왔다.", "쓰러진 자리에 그 사람 칼을 꽂는다. 그게 이 언덕의 장례였다.", "밤에 오는 망령들 말이다. 제 칼을 찾으러 내려온다는 말이 있지. 나는 믿는다.", "언덕지기는 처음 정상에 오른 영주였다고 한다. 안 내려온 게 아니라 못 내려온 거라고.", "그를 쓰러뜨렸다면, 이제 정상엔 누가 서 있느냐. …대답하지 마라.")
+cond = PackedStringArray("", "", "runs", "best", "top")
+cond_n = PackedInt32Array(0, 0, 3, 5, 0)
+
+[sub_resource type="Resource" id="v3"]
+script = ExtResource("4_v")
+id = &"drunk"
+display_name = "술꾼"
+lines = PackedStringArray("한 잔 사면 언덕 얘기를 해 주지. 안 사도 하겠지만.", "어제 올라간 놈은 칼만 내려왔어. 칼이 혼자 굴러 내려오더라. …농담이야. 아마.", "전설짜리를 뽑았다고? 그런 칼은 주인을 고르는 거다. 네가 고른 게 아니야.", "난 열두 번 올라갔다. 아니, 열세 번인가. 셀 때마다 하나씩 늘어.", "의뢰판 일을 맡았나. 그 종이 붙이는 놈들, 언덕엔 발도 안 디뎌 봤을걸.")
+cond = PackedStringArray("", "", "legend", "runs", "quest")
+cond_n = PackedInt32Array(0, 0, 0, 5, 0)
+
+[sub_resource type="Resource" id="v4"]
+script = ExtResource("4_v")
+id = &"herbalist"
+display_name = "약초꾼"
+lines = PackedStringArray("언덕 아래 풀은 쇠 맛이 난다. 뿌리가 꽂힌 칼에 감겨 자라거든.", "밤에 다친 데는 새벽까지 버티면 반은 붙는다. 나머지 반은 운이고.", "오를수록 숨이 짧아지지? 언덕이 조금씩 가져가는 거다. 그래서 다들 성소에 간다.", "바위턱 위로는 풀이 안 난다. 땅이 피를 너무 많이 먹었어.")
+cond = PackedStringArray("", "", "runs", "best")
+cond_n = PackedInt32Array(0, 0, 2, 4)
+
+[sub_resource type="Resource" id="v5"]
+script = ExtResource("4_v")
+id = &"apprentice"
+display_name = "대장장이 도제"
+lines = PackedStringArray("스승님은 검집만 벼리세요. 언덕에서 뽑아 온 전설 이상만 받으시고요.", "수련장 검 걸이에서 E로 칼을 골라 쥐고, 울타리 안에서 좌클릭으로 허수아비를 치세요.", "칼은 벨 때마다 닳아요. 언덕에선 Q로 다른 칸 칼과 바꿔 쥐고, 부러지기 전에 아껴 쓰세요.", "그 전설 칼, 스승님께 보여 드리세요. 검집에 넣으면 다음에도 들고 올라가요.", "스승님도 젊을 때 올라가셨대요. 망치 쥔 손이 떠는 게 그때부터라고.")
+cond = PackedStringArray("", "", "", "legend", "runs")
+cond_n = PackedInt32Array(0, 0, 0, 0, 3)
+
+[resource]
+script = ExtResource("1_s")
+board_size = 3
+quests = Array[ExtResource("2_q")]([SubResource("q1"), SubResource("q2"), SubResource("q3"), SubResource("q4"), SubResource("q5"), SubResource("q6"), SubResource("q7"), SubResource("q8"), SubResource("q9"), SubResource("q10"), SubResource("q11"), SubResource("q12"), SubResource("q13"), SubResource("q14"), SubResource("q15"), SubResource("q16"), SubResource("q17"), SubResource("q18"), SubResource("q19"), SubResource("q20"), SubResource("q21"), SubResource("q22"), SubResource("q23"), SubResource("q24"), SubResource("q25"), SubResource("q26"), SubResource("q27"), SubResource("q28"), SubResource("q29")])
+stock_size = 3
+goods = Array[ExtResource("3_g")]([SubResource("g1"), SubResource("g2"), SubResource("g3"), SubResource("g4"), SubResource("g5")])
+charm_zones = 2
+yard_window = 5.0
+villagers = Array[ExtResource("4_v")]([SubResource("v1"), SubResource("v2"), SubResource("v3"), SubResource("v4"), SubResource("v5")])

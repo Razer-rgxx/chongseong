@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PatternData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/pattern_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 3
+display_name = "휘두르고 돌진베기"
+grade = 0
+moves = PackedStringArray("crescent", "lunge")
+element = &""
+echo = false

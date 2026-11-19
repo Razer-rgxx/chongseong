@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "새벽"
+text = "밤의 마지막 30초 동안 피해 +N%"
+values = PackedFloat32Array(30, 39, 51, 66, 96, 138)

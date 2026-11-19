@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-이 저장소는 Godot 4.6 게임 「영지」(가제)다. 이전 기획 「총성」은 접었고 git 기록에만 남아 있다. 기획은 [docs/GDD.md](docs/GDD.md)에 있고, 수치는 모두 HTML 시연판에서 옮긴 첫 값이라 테스트하며 바뀐다.
+이 저장소는 Godot 4.6 게임 「검의 언덕」(가제)이다. 이전 기획 「총성」과 「영지」는 접었고 git 기록에만 남아 있다. 기획은 [docs/GDD.md](docs/GDD.md)에 있고, 수치는 모두 HTML 시험판에서 옮긴 첫 값이라 테스트하며 바뀐다.
 
 ## 작업 방식
 
@@ -8,60 +8,80 @@
 - 단계마다 커밋하고, 끝나면 무엇을 만들었는지와 사용자가 PC의 Godot에서 무엇을 확인하면 되는지 한국어로 짧게 정리한다.
 - 사용자는 Godot 4.6과 GDScript를 쓰는 1인 개발자(학생)다. 답과 설명은 한국어로, 짧게 한다. 처음 여는 세션이면 docs/GDD.md의 "0. 인계 요약", "1. 지금까지 한 일", "3. 앞으로의 계획"부터 읽는다.
 - 기획에 없는 시스템은 새로 만들지 않는다. 애매하면 가장 단순한 쪽으로 만들고 정리에 적는다. GDD "2.14 정하지 않은 것"의 항목은 사용자에게 묻기 전에는 바꾸지 않는다.
-- `prototype/`의 HTML 시연판은 참고용이다. 규칙과 수치는 거기서 가져오되 코드는 GDScript로 새로 쓴다. 시연판 파일은 고치지 않는다.
+- 큰 일은 두 팀으로 나눠 이 순서로 한다: **모양팀**(아트·모션·이펙트: 모양, 아이콘, 움직임, 효과, 확인용 갤러리) → **기능팀**(규칙, 데이터, 테스트, 화면 연결). 2026-11-18까지는 네 팀(아트 → 모션 → 이펙트 → 기능)이었고, 사용자가 빠르게 하려고 합쳤다. 서로 겹치지 않는 단계의 모양팀은 동시에 돌려도 된다. 팀마다 Claude Code 대표 모델(Opus) 에이전트 하나가 맡고, 자기 파일만 고친다. 팀 사이의 약속(id, 신호, 자료 모양)은 시작 전에 `docs/`의 설계서에 쓴다(예: `docs/attacks.md`). 진행 상황은 팀 현황판 `docs/team_board.html`이고, `python3 docs/board.py` 한 줄로 git 기록(`모양팀: N단계`, `기능팀: N단계` 커밋)과 GDD 체크리스트에서 다시 채운다(손으로 고치지 않는다). 다시 올리는 것은 단계가 끝날 때만.
+- `prototype/`의 HTML 시험판은 참고용이다. 규칙과 수치는 거기서 가져오되 코드는 GDScript로 새로 쓴다. 시험판 파일은 고치지 않는다. 규칙 코드는 `prototype/game_reference.js`에 있다.
 
 ## 기술 규칙
 
 - Godot 4.6, GDScript만 쓴다. 타입을 붙인 GDScript로 쓴다.
-- 1칸 = 2m, 영지는 33 × 33칸, 영주관은 가운데 칸 (16, 16)이다. 칸 좌표(Vector2i)와 월드 좌표 변환은 `Grid.cell_to_world()`, `Grid.world_to_cell()` 두 함수로 통일한다. 시연판 수치는 칸 단위라 미터로는 2배다(영주 4.3칸/초 = 8.6m/초).
+- 1칸 = 2m. 싸움터는 34 × 22칸(`RunData.arena_size`)이다. 규칙의 위치는 칸 단위 실수(Vector2)이고, 월드 좌표 변환은 `Grid`의 함수(`cells_to_world`, `world_to_cells` 등)로만 한다. 시험판 수치는 칸 단위라 미터로는 2배다(영주 4.3칸/초 = 8.6m/초).
 - 수치는 코드에 박지 않는다. 표 한 줄을 리소스 하나에 담는다.
-  - `data/buildings/*.tres` (BuildingData), `data/people/classes/*.tres` (ClassData), `data/people/grades.tres` (GradeTable)
-  - `data/enemies/*.tres` (EnemyData), `data/lord.tres` (LordData), `data/run.tres` (RunData: 일수, 낮 길이, 설계함 값, 시작 자원 등), `data/box_tiers.tres` (TierTable)
-- 게임 규칙(판정, 체력, 자원, 뽑기, 길찾기, 습격)은 화면 코드와 섞지 않는다. `scripts/core/` 아래에 노드에 기대지 않는 RefCounted 클래스로 쓰고, 화면은 신호로 받는다. 나중에 서버 판정으로 옮기기 쉽게 다음을 지킨다.
+  - `data/swords/001.tres` … `300.tres` (SwordData), `data/inscriptions/*.tres` (InscriptionData, 등급별 수치 6개)
+  - `data/forms/*.tres` (FormData: 단검, 장검, 대검, 세검), `data/unarmed.tres` (맨손)
+  - `data/grades.tres` (GradeTable), `data/enemies/*.tres` (EnemyData), `data/lord.tres` (LordData), `data/run.tres` (RunData: 구역, 낮의 뽑기와 제단, 밤의 적과 정예)
+  - `data/meta.tres` (MetaData: 조각, 대장간 검집, 성소 축복), `data/powers.tres` (PowerTable: 각인 규칙과 고유 능력의 정해진 수치)
+  - `data/attacks/moves/<id>.tres` (MoveData: 좌클릭 기본 동작 20개), `data/attacks/patterns/000.tres` … `150.tres` (PatternData: 공격 방식, 000은 맨손). 001~150과 검 표의 `attack`은 `scripts/debug/build_attacks.gd`가 만든다(손으로 고치지 않는다)
+- 게임 규칙(뽑기, 판정, 체력, 내구, 적, 구역)은 화면 코드와 섞지 않는다. `scripts/core/` 아래에 노드에 기대지 않는 RefCounted 클래스로 쓰고(`Rules`가 중심), 화면은 신호와 상태를 받아 그린다. 나중에 서버 판정으로 옮기기 쉽게 다음을 지킨다.
   - 규칙은 고정 틱(30Hz)으로 돈다. `_physics_process`에서 누적 시간을 틱으로 쪼갠다.
-  - 랜덤은 전부 시드가 있는 `RandomNumberGenerator` 하나(`Rules.rng`)를 거친다. 전역 `randf()`, `randi()`는 쓰지 않는다. 같은 시드와 같은 입력이면 결과가 같아야 한다.
-- 적 길찾기는 영주관에서 거꾸로 퍼지는 거리 표(flow field, 다익스트라)를 칸이 바뀔 때만 다시 계산하고, 모든 적이 그 표 하나를 같이 쓴다. 칸 비용은 GDD 2.9에 있다. AStarGrid2D는 한 개체의 경로가 따로 필요할 때만 쓴다.
-- 위치가 있는 소리(타격, 화살, 짓기, 발소리)는 AudioStreamPlayer3D로 낸다. 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리는 쓰지 않는다(사용자가 싫어한다).
-- 규칙 단위 테스트를 `tests/`에 둔다. 애드온 없이 `extends SceneTree` 스크립트로 쓰고 `godot --headless -s tests/run_all.gd`로 돌린다. 규칙을 바꾸면 테스트도 같이 고친다.
+  - 랜덤은 전부 시드가 있는 `RandomNumberGenerator` 하나(`Rules.rng`)를 거친다. 전역 `randf()`, `randi()`는 쓰지 않는다. 같은 시드와 같은 입력이면 결과가 같아야 한다(`Rules.state_hash()`로 테스트한다). 화면 흔들림 같은 꾸밈용 랜덤은 화면 쪽에 따로 둔다.
+  - 영주의 입력은 틱마다 `LordInput` 하나로 넘긴다. 밤 시작(`start_night`), 고르기(`choose`), 제단(`use_altar`)은 틱 사이에 부르는 함수다.
+- 각인 36종과 고유 능력은 `Powers`(scripts/core/powers.gd)가 맡는다. Rules는 휘두르기·베기·쓰러뜨림·맞기·돌진·뽑기·부러짐 자리에서 부르고, 정해진 수치는 `data/powers.tres`(PowerTable)에 있다. 고유 능력은 검 이름으로 찾고, 넣은 것은 `Powers.READY`와 검 표의 `unique_ready`를 같이 켠다(테스트가 둘이 같은지 본다). 화면에 그릴 일은 `Rules.effect` 신호로 보내고 `PowerFx`가 그린다.
+- 좌클릭은 `Moves`(scripts/core/moves.gd)가 맡는다: 쥔 검의 PatternData에서 다음 MoveData를 골라 판정·늦게 터지는 것·날아가는 것(`Rules.projectiles`)·반격 자세·속성·메아리를 돌리고, 맞힐 때마다 Powers의 자리를 예전 베기와 같은 순서로 부른다. 화면에는 `move_started`·`move_area`·`projectile_spawned`·`projectile_ended` 신호(docs/attacks.md 4절)로 알리고, `MoveFx`(scripts/world/move_fx.gd, 판정 모양·효과)와 `MoveMotion`(scripts/lord/move_motion.gd, 영주의 몸, LordView가 부른다)이 그린다. 우클릭 갈고리는 방식에 갈고리 베기가 든 검만.
+- 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자, docs/content.md 11단계)의 행동은 `Foes`(scripts/core/foes.gd)가 맡고 수치는 `EnemyData`의 행동 칸이다. 화면에는 `Rules.enemy_act(e, act, info)`와 `enemy_projectile_spawned/ended`(화살은 `Rules.enemy_projectiles`)로 알리고, 몸은 `EnemyArt`(짓기)·`EnemyMotion`(움직임, EnemyView가 부른다), 효과는 `EnemyFx`(main이 잇는다)가 그린다.
+- 적이 영주를 때리려면 공격 표가 있어야 한다(`Tokens`, scripts/core/tokens.gd, docs/attack_tokens.md). 표 없는 적은 둘레를 돈다. 표 수와 표 값은 `RunData`(밤: 공격 표)와 `EnemyData.token_cost`.
+- 밤마다 목표(`Rules.goal`: survive·defend·hunt·siege)와 구역 규칙(`Rules.rule`: 없음·fog·embers·graves)이 하나씩 붙는다(docs/content.md 12단계). 다음 밤 것은 낮에 `Rules.next_goal/next_rule`로 정하고 `set_next_night`로 바꾼다. 수치는 `RunData`(밤: 목표와 구역 규칙), 화면은 `NightArt`·`NightFx`(main이 잇는다)와 HUD의 위 가운데 진행 줄(`Hud.set_goal`).
+- 새벽에는 갈림길(13단계): `Rules.path_open` 동안 시간이 멈추고, 지도 창(`PathMap`, `assets/ui/map/*.svg`)에서 고르면 `choose_path`가 다음 밤과 보상을 정하고 낮을 연다. 2구역부터 낮마다 사건 하나(`Rules.event`, `DayEvent`: 대장장이·저주받은 손잡이·순례자·점쟁이)가 서고 E로 한 번 쓴다. 수치는 `RunData`(갈림길과 낮 사건), 화면은 `EventArt`·`EventFx`(main이 잇는다).
+- 뽑기 손맛(14단계): 버팀마다 창(`pull_window`, k × `pull_step` ± 0.08초)이 열리고 뽑는 동안의 E·좌클릭(`LordInput.pull_press`)을 버팀마다 한 번 판정한다(`pull_good`·`pull_perfect`·`pull_miss`). 손잡이 조짐은 `Hilt.omen`(운 배수)·`shown_omen`(75% 맞음), 점쟁이가 `revealed`. 수치는 `RunData`(낮: 뽑기 손맛), 화면은 `OmenArt`(HiltView)·`PullMotion`(LordView)·`PullTimingFx`(main)다.
+- 마을 컨텐츠(15단계, docs/village.md): 의뢰판·상인·주민·수련장의 수치와 대사는 `data/village.tres`(VillageData), 의뢰·상인·말은 `Meta`(`quest_board`, `take_quest`, `buy`/`pack`, `talk`)가 맡고 `Rules.run_stats`를 판 동안 센다(`record_run`이 의뢰 보상). 허수아비는 `EnemyData.still`인 규칙의 적이고 `Rules.yard`가 켜진 마을에서만 낮에 좌클릭이 먹는다. 모양은 `VillageProps`, 창은 `LobbyHud`, 연결은 `lobby.gd`.
+- 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
+- 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
+- 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
+- 영주와 적의 움직임과 부딪힘은 물리 엔진이 아니라 규칙이 계산한다. 화면 노드는 Node3D이고, 규칙의 위치(prev_pos → pos)를 틱 사이로 이어 그린다. 싸움터에는 장애물이 없어서 적은 영주에게 곧장 온다(길찾기가 필요해지면 그때 넣는다).
+- 위치가 있는 소리(타격, 휘두름, 뽑기, 부러짐)는 AudioStreamPlayer3D(`Sfx`)로 낸다. 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리는 쓰지 않는다(사용자가 싫어한다).
+- 규칙 단위 테스트를 `tests/`에 둔다. 애드온 없이 `extends SceneTree` 스크립트로 쓰고 `godot --headless --path . -s tests/run_all.gd`로 돌린다. 규칙을 바꾸면 테스트도 같이 고친다.
+- GDScript 람다는 바깥 지역 변수를 값으로 가져간다. 신호를 세는 테스트는 `Array`에 넣어 센다.
 
 ### 충돌 레이어
 
-프로젝트 설정에 이름을 붙여 등록한다.
+프로젝트 설정에 이름이 붙어 있다. 지금은 쓰지 않는다(규칙이 판정한다). 화면 쪽에서 마우스로 고르기나 시각 효과에 쓸 때 이 뜻을 지킨다.
 
 | 번호 | 이름 | 무엇 |
 | --- | --- | --- |
-| 1 | world | 바닥, 영지 경계 |
+| 1 | world | 바닥, 언덕 |
 | 2 | lord | 영주 |
 | 3 | enemy | 적 |
-| 4 | structure | 성벽, 건물, 영주관. 적을 막는다 |
-| 5 | nature | 나무, 바위. 영주와 적을 모두 막는다 |
-| 6 | pick | 마우스로 칸을 고를 때 쓰는 바닥 판 |
+| 4 | structure | (비어 있음) |
+| 5 | nature | 나무, 바위 |
+| 6 | pick | 마우스로 땅을 고를 때 쓰는 판 |
 
-- 영주의 마스크: world, nature, enemy. 시연판처럼 자기 성벽과 건물은 지나간다(GDD 2.14에서 다시 정한다).
-- 적의 마스크: world, structure, nature, lord
-- 화살, 돌, 마법 같은 투사체는 물리로 맞히지 않고 규칙이 목표를 따라가 맞힌다(시연판과 같다).
+- 투사체가 생기면 물리로 맞히지 않고 규칙이 목표를 따라가 맞힌다.
 
 ## 에셋
 
 - 에셋은 `assets/` 아래에 둔다. AI 생성 에셋은 쓰지 않는다.
-- 에셋 파일은 사용자가 PC에서 받아 넣는다. KayKit(CC0)을 먼저 쓴다. 아직 없으면 기본 도형으로 자리를 채우고, 나중에 바꿔 끼우기 쉽게 씬 하나로 감싼다.
+- 에셋 파일은 사용자가 PC에서 받아 넣는다. 화풍은 어두운 사실풍이다(GDD 2.14). 모델이 아직 없는 자리는 기본 도형으로 자리를 채우고, 바꿔 끼우기 쉽게 한 곳에 모은다(`HiltView._build`, `EnemyView._build_*`, `AltarView`, `scenes/lord/lord_model.tscn`과 `LordCharacter`, `HillBuilder`, `lobby._build_*`와 `VillageBuilder`). 마을의 집·소품은 VillageBuilder가 기본 도형과 질감으로 짓는다. 언덕의 땅·하늘·바위·꽂힌 검·먼 숲은 `HillBuilder`가 짓고(땅 셰이더 `terrain.gdshader`, 하늘 `hill_sky.gdshader`), Poly Haven(CC0) 질감·모델·HDRI를 저장소에 넣어 쓴다(`assets/hill/`, `assets/nature/`, `assets/sky/`). 나무와 돌은 마을도 HillBuilder의 것을 같이 쓴다. 적: 망령은 해진 망토 셰이더(`wraith_cloak.gdshader`), 늑대는 `CreatureMesh`로 짓고 다리를 코드로 움직인다. 거인과 언덕지기는 기사 모델(`LordCharacter`)을 어둡게 칠해 키우고, 없으면 도형이다. 칼은 모두 `SwordModel`(형태·등급·칼 번호로 모양이 정해진다)로 그리고, 베기 궤적과 베기 빛은 `SlashFx`다.
+- 글꼴은 Noto Serif KR을 쓰는 글자만 남겨 넣었다(`assets/ui/fonts/`). 테마 `assets/ui/theme.tres`는 손으로 고치지 않고 `scripts/debug/build_theme.gd`를 고쳐 다시 만든다. 굵기는 FontVariation에 숫자 태그(2003265652 = wght)로 준다.
+- 화면 글자는 엘든 링식이다. 세계(3D)에 글자를 띄우지 않는다(피해 숫자만 예외). 다가갔을 때 안내와 알림은 `Band`, 새 곳의 이름은 `AreaTitle`, 창은 `UiKit`(모서리 없는 검은 판, 놋쇠빛 줄, 따뜻한 글자색). 표에 드문 글자가 새로 생기면 `assets/ui/fonts/README.md`대로 다시 만든다.
 - 에셋을 넣으면 `CREDITS.md`에 이름, 작가, 라이선스, 링크를 적는다.
-- 설계함 연출은 `prototype/yeongji_pc.html`의 연출을 사용자가 녹화한 영상(.ogv, Ogg Theora)을 등급마다 하나씩 `assets/video/`에 넣어 VideoStreamPlayer로 튼다. 영상이 없으면 0.5초 번쩍임으로 대신한다.
+- 소리(`assets/sound/<이름>/*.wav`)도 약관 문구가 없는 팩이라 git에 올리지 않는다(`assets/sound/README.md`). 파일이 없으면 `Sfx`가 코드로 만든 소리로 대신한다.
+- Mixamo 캐릭터와 동작(`assets/characters/`)은 원본을 다시 나눠 주면 안 되어 git에 올리지 않는다(.gitignore). 무엇을 어디에 두는지는 `assets/characters/README.md`에 적는다. 파일이 없으면 기본 도형으로 돌아가야 한다(`LordCharacter.available()`).
+- 뽑기 연출은 `PullFx`다: 당기는 동안 땅이 갈라지고, 뽑히면 등급만큼 먼지·불똥·불씨·빛·충격파가 커지고 뽑힌 칼이 땅에서 솟아 떠 있다. 전설 이상은 사용자가 녹화한 영상(`assets/video/grade_<등급>.ogv`, Ogg Theora)이 있으면 화면 가득 튼다(`assets/video/README.md`). 연출 중에는 글자를 띄우지 않고, 끝난 뒤 이름 알림과 고르기 창을 연다.
 
 ## 확인
 
-- 클라우드에서는 Godot 에디터로 직접 플레이할 수 없다. Godot 실행 파일을 받을 수 있으면 헤드리스로 프로젝트를 열어 스크립트 오류와 `tests/`를 확인하고, 받을 수 없으면 그 사실을 정리에 적는다.
-- 손맛(이동, 타격, 넉백, 돌진, 히트스톱)은 사용자가 PC에서 맞춘다. 수치를 리소스로 빼 두는 이유다.
-- 규칙이 시연판과 같게 도는지 헷갈리면 `prototype/yeongji_pc.html`을 브라우저로 열어 본다. ` 키로 관리 패널이 열린다.
+- 클라우드에서는 Godot 에디터로 직접 플레이할 수 없다. Godot 실행 파일을 받을 수 있으면 헤드리스로 프로젝트를 열어 스크립트 오류와 `tests/`를 확인하고, Xvfb와 gl_compatibility로 화면을 찍어 본다. 받을 수 없으면 그 사실을 정리에 적는다.
+- 손맛(이동, 베기, 넉백, 돌진, 히트스톱)은 사용자가 PC에서 맞춘다. 수치를 리소스로 빼 두는 이유다.
+- 웹판: `python3 docs/web_build.py <godot> <폴더>`가 `export_presets.cfg`의 "Web"(스레드 없음)으로 내보내고, 100MB가 넘는 index.pck를 90MB 조각으로 잘라 index.html이 이어 붙이게 고친다. 그 폴더를 `gh-pages` 가지로 올리면 https://razer-rgxx.github.io/chongseong/ 에서 돈다(웨일북용). 사운드 팩은 공개 웹판에서도 뺀다. 웹판에서만 `WebQuality`(scripts/world/web_quality.gd, 마을·언덕 _ready 끝)가 그래픽을 가볍게 한다(3D 해상도 0.6, 해 그림자 한 겹, 작은 빛 그림자·번짐 판·빛 번짐 끔, 풀 30%).
+- 규칙이 시험판과 같게 도는지 헷갈리면 `prototype/geom_hill.html`을 브라우저로 열어 본다. ` 키로 관리 패널이 열린다.
 
 ## 폴더 구조
 
 ```
 project.godot
-scenes/   world/, lord/, enemies/, buildings/, people/, inn/, ui/, debug/
-scripts/  core/ (규칙), world/, lord/, enemies/, buildings/, people/, inn/, ui/, debug/
-data/     buildings/, people/, enemies/, lord.tres, run.tres, box_tiers.tres
-assets/   characters/, buildings/, nature/, ui/, video/, sound/
+scenes/   lobby/ (마을, 시작 장면), world/ (언덕), lord/, debug/
+scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, lord/, enemies/, ui/, debug/
+data/     swords/, inscriptions/, forms/, enemies/, attacks/ (moves/, patterns/), grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres, powers.tres
+assets/   characters/, nature/, ui/, video/, sound/
 tests/
-prototype/  HTML 시연판 (고치지 않는다)
+prototype/  HTML 시험판 (고치지 않는다)
 ```
