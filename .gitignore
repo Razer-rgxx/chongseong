@@ -15,3 +15,4 @@ assets/sound/*
 
 # GD-Sync 키(플러그인이 쓰는 자리). 이 프로젝트는 user://gdsync_keys.cfg를 쓰지만 같이 막아 둔다. 절대 올리지 않는다.
 addons/GD-Sync/keys.cfg
+*.bundle
