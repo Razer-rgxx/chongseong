@@ -90,22 +90,25 @@ func _ready() -> void:
 	add_child(_body)
 	var D := enemy.data
 	var r: float = Grid.cells_to_meters(enemy.radius)
-	var grow: float = enemy.radius / D.radius
+	# 32단계 우두머리는 이미 있는 적의 큰 판: 그 종류(acts)의 몸을 view_scale배로 짓는다(언덕지기의 붉은 빛은 입히지 않는다)
+	var kind: StringName = D.acts()
+	var grow: float = enemy.radius / D.radius * D.view_scale
+	var hill_boss: bool = D.boss and D.kind == &""
 	# 24단계: 이 적의 Mixamo 모델(assets/characters/enemies/<id>.fbx)이 있으면 그것으로 선다. 늑대·허수아비·방패병은 따로.
-	var own: String = "" if D.id in [&"wolf", &"dummy", &"shield"] else LordCharacter.enemy_path(D.id)
+	var own: String = "" if kind in [&"wolf", &"dummy", &"shield"] else LordCharacter.enemy_path(kind)
 	if own != "":
-		_build_knight(grow, D.color, D.boss, own)
+		_build_knight(grow, D.color, hill_boss, own)
 	else:
-		match D.id:
+		match kind:
 			&"wolf":
 				_build_wolf(grow, D.color)
 			&"giant", &"boss", &"grave_knight", &"crypt_lord":
 				if LordCharacter.available():
-					_build_knight(grow, D.color, D.boss)
+					_build_knight(grow, D.color, hill_boss)
 				else:
-					_build_giant(r * (D.model_scale / 2.5 if D.model_scale > 0.0 else 1.0), D.color, D.boss)
+					_build_giant(r * (D.model_scale / 2.5 if D.model_scale > 0.0 else 1.0), D.color, hill_boss)
 			&"archer", &"shield", &"charger", &"bomber", &"caller":
-				_build_new(D.id, grow, D.color)
+				_build_new(kind, grow, D.color)
 			_:
 				_build_wraith(grow, D.color)
 	if enemy.elite:
@@ -595,18 +598,19 @@ func _build_knight(grow: float, c: Color, boss: bool, own: String = "") -> void:
 		_knight.char_path = own
 	_body.add_child(_knight)
 	var rust: bool = enemy.data.model_scale > 0.0   # 무덤 기사: 녹슨 빛, 큰 칼
-	var big: bool = enemy.data.id in [&"giant", &"boss"] or rust
+	var kind: StringName = enemy.data.acts()
+	var chief: bool = enemy.data.kind != &""   # 32단계 우두머리: 제 표의 색을 더 짙게 얹는다
+	var big: bool = kind in [&"giant", &"boss"] or rust
 	_knight_scale = (enemy.data.model_scale if rust else (2.5 if boss else (1.85 if big else 1.0))) * grow
 	_knight.scale = Vector3.ONE * _knight_scale
 	_height = 1.8 * _knight_scale
-	var mul: Color = c if rust else (Color(0.3, 0.1, 0.1) if boss else Color(0.4, 0.4, 0.42).lerp(c, 0.15))
-	var kind: StringName = enemy.data.id
+	var mul: Color = c if rust else (Color(0.3, 0.1, 0.1) if boss else Color(0.4, 0.4, 0.42).lerp(c, 0.45 if chief else 0.15))
 	if not big and not rust and own == "":
 		# 사람형 적(활잡이·돌격병·자폭병·부르는 자): 표의 색을 더 짙게 얹어 서로 구별한다
 		mul = Color(0.45, 0.44, 0.44).lerp(c, 0.4)
 	if own != "":
 		# 제 모델은 제 질감을 살려 조금만 어둡게
-		mul = Color(0.8, 0.78, 0.76).lerp(c, 0.1) if not boss else Color(0.7, 0.55, 0.55)
+		mul = Color(0.8, 0.78, 0.76).lerp(c, 0.35 if chief else 0.1) if not boss else Color(0.7, 0.55, 0.55)
 	var mats := _knight.recolor(mul, Color(0.55, 0.22, 0.05) if rust else (Color(0.6, 0.06, 0.02) if boss else Color.BLACK), 0.1 if (boss or rust) else 0.0)
 	for m in mats:
 		_mats.append(m)
@@ -627,7 +631,7 @@ func _build_knight(grow: float, c: Color, boss: bool, own: String = "") -> void:
 	# 투구 안의 눈. 뼈의 방향이 모델마다 달라서 첫 프레임에 머리 앞에 맞춘다(_place_eyes)
 	_eyes = Node3D.new()
 	_knight.attach("mixamorig_Head", _eyes)
-	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.022, Color(1.0, 0.35, 0.15) if boss else Color(0.7, 0.85, 1.0))
+	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.022, Color(1.0, 0.35, 0.15) if boss or chief else Color(0.7, 0.85, 1.0))
 	_knight.play("idle")
 
 
@@ -706,7 +710,7 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 		var hm := _mat(Color(0.1, 0.02, 0.03))
 		_add(_body, horn, hm, Vector3(-r * 0.3, r * 4.5, 0), Vector3(0, 0, 0.5))
 		_add(_body, horn, hm, Vector3(r * 0.3, r * 4.5, 0), Vector3(0, 0, -0.5))
-	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Color(1.0, 0.8, 0.35) if boss else Color(0.75, 0.9, 1.0))
+	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Color(1.0, 0.8, 0.35) if boss or enemy.data.kind != &"" else Color(0.75, 0.9, 1.0))
 	if enemy.data.model_scale > 0.0:
 		# 무덤 기사: 녹슨 도형 몸에 큰 칼을 든 오른팔(어깨에서 돌린다)
 		_arm_pivot = Node3D.new()
@@ -798,7 +802,7 @@ func _animate_new(delta: float) -> void:
 		"attack": _attack,
 		"hit": _hit_anim,
 	}
-	EnemyMotion.animate(parts, _motion, enemy.data.id, state, delta)
+	EnemyMotion.animate(parts, _motion, enemy.data.acts(), state, delta)
 	# 나타날 때: 두건 쓴 적은 연기처럼 맺힌다
 	if not _cloaks.is_empty():
 		for c in _cloaks:

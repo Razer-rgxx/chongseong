@@ -151,6 +151,28 @@ const BOSS_SHARDS: int = 30
 const BOSS_CHARM: StringName = &"charm"
 
 
+## ---- 곳마다 우두머리(32단계, docs/field_life.md). 옛 싸움터의 무덤 기사처럼 깨어나고 놓아주고 돌아가면 체력이 찬다(Rules.chiefs).
+## 우두머리 id → {area: 곳, at: 제자리(칸), kind: 적 표 id(data/enemies, 이미 있는 적의 큰 판), zone: 불려 오는 적의 세기 구역(1부터), sword: 처음 쓰러뜨리면 주는 오픈월드 한정 검 id}.
+## 자리는 그 곳 안에서 막힌 곳·길·상자·비석·무리 둘레를 피한다(테스트가 본다). 숲·바위는 둘레에 서지 않는다(FieldBuilder._free).
+const CHIEFS: Dictionary = {
+	"chief_tower": {"area": &"watchtower", "at": Vector2(100, 38), "kind": &"chief_archer", "zone": 4, "sword": 301},
+	"chief_grove": {"area": &"grove", "at": Vector2(19, 42), "kind": &"chief_wolf", "zone": 5, "sword": 302},
+	"chief_foot": {"area": &"foot", "at": Vector2(67, 20), "kind": &"chief_giant", "zone": 6, "sword": 303},
+	"chief_keep": {"area": &"keep", "at": Vector2(148, 33), "kind": &"chief_shield", "zone": 7, "sword": 304},
+	"chief_marsh": {"area": &"marsh", "at": Vector2(139, 88), "kind": &"chief_caller", "zone": 7, "sword": 305},
+	"chief_quarry": {"area": &"quarry", "at": Vector2(201, 30), "kind": &"chief_charger", "zone": 8, "sword": 306},
+	"chief_hamlet": {"area": &"hamlet", "at": Vector2(187, 54), "kind": &"chief_burnt", "zone": 8, "sword": 307},
+	"chief_pass": {"area": &"pass", "at": Vector2(186, 95), "kind": &"chief_knight", "zone": 9, "sword": 308},
+}
+## 깨어남·놓아줌 거리(칸, 들판 보스와 같다), 처음 쓰러뜨리면 받는 조각, 그다음부터 받는 조각.
+const CHIEF_WAKE: float = 8.0
+const CHIEF_LEASH: float = 14.0
+const CHIEF_FIRST_SHARDS: int = 50
+const CHIEF_SHARDS: int = 15
+## 제자리 둘레 이만큼(칸)에는 숲·바위 흩뿌림이 서지 않는다.
+const CHIEF_CLEAR: float = 4.5
+
+
 ## ---- 지하 무덤 입구(19단계, docs/outside.md). 검은 숲 가장자리의 무너진 무덤.
 ## 모양이 서는 곳(막힘, 칸 단위), E를 누르는 자리, 나오거나 쓰러져 깰 자리(입구 앞).
 const CRYPT_BLOCK: Rect2 = Rect2(28.5, 26.0, 7.0, 3.6)

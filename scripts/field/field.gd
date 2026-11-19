@@ -64,6 +64,7 @@ func _ready() -> void:
 	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
+	rules.spawn_chiefs(meta.chiefs_down)   # 32단계 곳마다 우두머리: 이번 판에 쓰러뜨린 것은 안 선다
 	rules.lord.pos = FieldLayout.START
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
@@ -108,6 +109,8 @@ func _ready() -> void:
 	rules.enemy_died.connect(_on_enemy_died)
 	rules.pack_cleared.connect(_on_pack_cleared)
 	rules.field_boss_slain.connect(_on_boss_slain)
+	rules.chief_slain.connect(_on_chief_slain)
+	rules.chief_woke.connect(_on_chief_woke)
 	rules.field_dusk.connect(_on_dusk)
 	rules.field_dawn.connect(_on_dawn)
 	rules.enemy_act.connect(_on_enemy_act)
@@ -455,13 +458,34 @@ func _on_pack_cleared(id: StringName) -> void:
 	_saved()
 
 
-## 들판 보스가 깨어 있는 동안만 화면 아래 가운데에 체력 막대를 그린다(쓰러뜨리거나 멀어져 돌아가면 사라진다).
+## 들판 보스나 곳마다 우두머리(32단계)가 깨어 있는 동안만 화면 아래 가운데에 체력 막대를 그린다(쓰러뜨리거나 멀어져 돌아가면 사라진다).
+## 둘 다 깨어 있으면 무덤 기사, 우두머리가 여럿이면 영주에게 가까운 것.
 func _boss_bar() -> void:
 	var b: Enemy = rules.field_boss
-	if b != null and rules.field_boss_state == Rules.BOSS_AWAKE and not b.dead:
+	if b == null or rules.field_boss_state != Rules.BOSS_AWAKE or b.dead:
+		b = rules.awake_chief()
+	if b != null:
 		_hud.set_boss(b.data.display_name, b.hp, b.max_hp)
 	elif _hud.boss_bar_shown():
 		_hud.set_boss("", 0.0, 1.0)
+
+
+## 우두머리가 깨어났다: 낮은 소리와 작은 흔들림(꾸밈). 이름은 체력 막대가 띄운다.
+func _on_chief_woke(_id: StringName, e: Enemy) -> void:
+	_camera.add_shake(0.2)
+	_sfx.play(&"thump", Grid.cells_to_world(e.pos), -4.0, 0.6)
+
+
+## 우두머리를 쓰러뜨렸다(32단계): 조각과, 처음이면 그 곳의 오픈월드 한정 검(Meta.chief_defeat)을 토스트로 알린다.
+func _on_chief_slain(id: StringName, e: Enemy) -> void:
+	var r: Dictionary = meta.chief_defeat(String(id))
+	_camera.add_shake(data.lord.shake_big * 2.0)
+	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
+	var t: String = "%s 쓰러뜨렸다. 조각 %d개" % [UiKit.josa(e.data.display_name, "을", "를"), r.shards]
+	if int(r.sword) > 0:
+		t += " · 들판의 검 「%s」" % data.sword_by_id(int(r.sword)).display_name
+	_hud.toast(t)
+	_saved()
 
 
 ## 무덤 기사를 쓰러뜨렸다: 조각과 운 부적(Meta.boss_defeat)을 토스트로 알린다.
@@ -475,7 +499,7 @@ func _on_boss_slain(_e: Enemy) -> void:
 
 ## 무덤 기사의 큰 일(휘두르기 내려침, 돌진)에 흔들림과 소리를 더한다(꾸밈).
 func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
-	if e.data.id != FieldLayout.BOSS_ID:
+	if e.data.id != FieldLayout.BOSS_ID and e.chief == &"":   # 우두머리(32단계)도 큰 일에 흔들린다
 		return
 	if act == &"swing" or act == &"charge_end":
 		_camera.add_shake(0.35)

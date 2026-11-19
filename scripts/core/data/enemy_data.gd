@@ -20,6 +20,10 @@ extends Resource
 @export var boss: bool = false
 ## 영주를 때리려면 가져가야 하는 공격 표 수(정예는 +1). 0이면 표 없이 덤빈다(언덕지기).
 @export var token_cost: int = 1
+## 우두머리(32단계)는 이미 있는 적의 큰 판이다: 행동(Foes)과 몸(EnemyView·EnemyArt·EnemyMotion)을 이 종류(적 id)에서 빌린다. 비면 id 그대로.
+@export var kind: StringName = &""
+## 몸을 그리는 크기 배수(우두머리는 그 종류의 몸을 이만큼 키운다). 규칙의 크기는 radius.
+@export var view_scale: float = 1.0
 
 @export_group("행동(11단계, docs/content.md)")
 ## 표를 청하는 거리(칸, 영주와 가운데 사이). 0이면 사거리 + token_wait_gap(걸어와 때리는 적).
@@ -102,3 +106,8 @@ extends Resource
 @export var still: bool = false
 ## 0보다 크면 이만큼(초) 안 맞으면 체력이 다 차고, 쓰러지지 않는다(체력이 1 밑으로 내려가지 않는다).
 @export var refill_after: float = 0.0
+
+
+## 행동과 몸을 고르는 종류: kind가 있으면 그것(우두머리), 없으면 id.
+func acts() -> StringName:
+	return kind if kind != &"" else id

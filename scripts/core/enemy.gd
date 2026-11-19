@@ -25,6 +25,8 @@ var idle_t: float = 0.0
 # ---- 들판 무리(17단계, Rules.field). 무리에 속하지 않으면 &"".
 ## 속한 무리 id. 부르는 자가 불러낸 적도 같은 무리다.
 var pack: StringName = &""
+## 들판의 곳마다 우두머리(32단계)면 그 id(FieldLayout.CHIEFS, Rules.chiefs). 아니면 비었다.
+var chief: StringName = &""
 ## 제자리(돌아갈 곳)와 서성이는 목표, 다음 목표까지 남은 시간(초).
 var home: Vector2 = Vector2.ZERO
 var wander_to: Vector2 = Vector2.ZERO

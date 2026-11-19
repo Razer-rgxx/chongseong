@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"chief_burnt"
+display_name = "불탄 거인"
+kind = &"giant"
+view_scale = 1.0
+hp = 1400
+damage = 28
+speed = 1.0
+radius = 0.9
+cooldown = 1.5
+color = Color(0.2, 0.12, 0.08, 1)
+knockback_mult = 0.2
+big = true
+boss = true
+token_cost = 0
+model_scale = 2.6

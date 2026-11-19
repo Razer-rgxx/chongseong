@@ -42,6 +42,10 @@ var field_clock: float = 0.0
 ## 들판 보스(18단계): 이번 판에 무덤 기사를 쓰러뜨렸는지(판이 끝날 때 record_run이 비운다, 쓰러뜨렸으면 들판에 다시 와도 안 선다)와 처음 보상을 받았는지(저장).
 var boss_down: bool = false
 var boss_first: bool = false
+## 곳마다 우두머리(32단계): 처음 보상을 받은 우두머리 id(→ 1, 저장)와 이번 판에 쓰러뜨린 우두머리 id(→ 1, 저장, 판이 끝날 때 record_run이 비운다.
+## 쓰러뜨렸으면 들판에 다시 와도 안 선다). 옛 저장은 빈 값으로 읽힌다.
+var chiefs_first: Dictionary = {}
+var chiefs_down: Dictionary = {}
 ## 지하 무덤(19단계): 이번 판에 쓰러뜨린 방 id(→ 1)와 연 관 id(→ 1). 판이 끝날 때(record_run) 비운다. 옛 저장은 빈 값으로 읽힌다.
 var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
@@ -81,7 +85,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -134,6 +138,12 @@ func from_dict(d: Dictionary) -> void:
 	field_clock = clampf(float(d.get("field_clock", 0.0)), 0.0, FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT)
 	boss_down = bool(d.get("boss_down", false))
 	boss_first = bool(d.get("boss_first", false))
+	chiefs_first = {}
+	for k in d.get("chiefs_first", {}):
+		chiefs_first[str(k)] = 1
+	chiefs_down = {}
+	for k in d.get("chiefs_down", {}):
+		chiefs_down[str(k)] = 1
 	crypt_cleared = {}
 	for k in d.get("crypt_cleared", {}):
 		crypt_cleared[str(k)] = 1
@@ -312,6 +322,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	roll_glints()
 	packs_cleared = {}
 	boss_down = false
+	chiefs_down = {}
 	crypt_cleared = {}
 	crypt_opened = {}
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
@@ -358,6 +369,23 @@ func boss_defeat() -> Dictionary:
 	if charm:
 		pack.append(FieldLayout.BOSS_CHARM)
 	return {"shards": n, "first": first, "charm": charm}
+
+
+## 곳마다 우두머리(32단계)를 쓰러뜨렸다. 처음이면 조각 CHIEF_FIRST_SHARDS와 그 곳의 오픈월드 한정 검(도감에 든다),
+## 다음부터 CHIEF_SHARDS. {shards, first, sword(새로 얻은 검 id, 없으면 0)}을 돌려준다. 모르는 id면 shards 0.
+func chief_defeat(id: String) -> Dictionary:
+	var r := {"shards": 0, "first": false, "sword": 0}
+	if not FieldLayout.CHIEFS.has(id):
+		return r
+	r.first = not chiefs_first.has(id)
+	r.shards = FieldLayout.CHIEF_FIRST_SHARDS if r.first else FieldLayout.CHIEF_SHARDS
+	shards += r.shards
+	chiefs_first[id] = 1
+	chiefs_down[id] = 1
+	if r.first:
+		r.sword = int(FieldLayout.CHIEFS[id].sword)
+		note_found(r.sword)
+	return r
 
 
 ## 지하 무덤(19단계): 방을 쓰러뜨렸다(저장된다. 쓰러져도 남는다).
