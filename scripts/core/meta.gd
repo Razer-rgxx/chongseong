@@ -398,10 +398,14 @@ func take_glint(i: int) -> int:
 	return n
 
 
-## 비석을 읽는다. 여섯 개를 다 읽은 그 순간에만 보상 조각 수를, 아니면 0을 돌려준다(한 번뿐).
+## 비석을 읽는다. 모든 비석(FieldLayout.STONES 전부, 20단계에서 7개)을 다 읽은 그 순간에만 보상 조각 수를, 아니면 0을 돌려준다(한 번뿐:
+## 옛 저장에서 여섯 개를 읽고 이미 받은 사람(lore_paid)은 일곱 번째를 읽어도 다시 받지 않는다).
 func read_stone(id: String) -> int:
 	lore_read[id] = 1
-	if not lore_paid and lore_read.size() >= FieldLayout.STONES.size():
+	var all: bool = true
+	for k in FieldLayout.STONES:
+		all = all and lore_read.has(k)
+	if not lore_paid and all:
 		lore_paid = true
 		shards += FieldLayout.LORE_REWARD
 		return FieldLayout.LORE_REWARD

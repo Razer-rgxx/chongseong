@@ -3,21 +3,25 @@ extends RefCounted
 ## 들판(16단계, docs/village.md 16)의 자리와 값. 자리는 여기 하나에만 둔다. 모든 자리는 칸 좌표(1칸 = 2m).
 ## 위쪽(y 작은 쪽)이 북쪽이다: 언덕 발치는 북, 마을 문은 남.
 
-const SIZE: Vector2i = Vector2i(110, 110)
-const WORLD: float = 220.0
+const SIZE: Vector2i = Vector2i(170, 110)   ## 20단계: 동쪽으로 60칸 넓혔다(원래는 110 x 110)
+const WORLD_X: float = 340.0   ## m
+const WORLD_Z: float = 220.0
 
-const AREA_ORDER: PackedStringArray = ["foot", "watchtower", "grove", "old_field", "brook", "road"]
+const AREA_ORDER: PackedStringArray = ["keep", "marsh", "foot", "watchtower", "grove", "old_field", "brook", "road"]
 const AREAS: Dictionary = {
+	&"keep": Rect2(110, 2, 58, 46),
+	&"marsh": Rect2(110, 68, 58, 40),
 	&"foot": Rect2(30, 0, 50, 24),
 	&"watchtower": Rect2(78, 24, 32, 28),
 	&"grove": Rect2(0, 22, 38, 30),
 	&"old_field": Rect2(58, 66, 52, 44),
-	&"brook": Rect2(0, 52, 110, 14),
-	&"road": Rect2(0, 0, 110, 110),
+	&"brook": Rect2(0, 52, 170, 14),
+	&"road": Rect2(0, 0, 170, 110),
 }
 const AREA_NAMES: Dictionary = {
 	&"road": "언덕길", &"old_field": "옛 싸움터", &"watchtower": "무너진 망루",
 	&"brook": "개울가", &"grove": "검은 숲 가장자리", &"foot": "언덕 발치",
+	&"keep": "무너진 성채", &"marsh": "안개 늪",
 }
 
 ## 흙길이 지나는 점(남 → 북). 개울은 x 52 근처에서 돌다리로 건넌다.
@@ -40,18 +44,21 @@ const CACHES: Dictionary = {
 	"cache_3": [Vector2(88, 42), 25], "cache_4": [Vector2(102, 46), 40],
 	"cache_5": [Vector2(12, 42), 15], "cache_6": [Vector2(30, 44), 25],
 	"cache_7": [Vector2(14, 60), 10], "cache_8": [Vector2(70, 14), 35],
+	"cache_9": [Vector2(127, 17), 45], "cache_10": [Vector2(151, 26), 55],
 }
 
-## 흩어진 조각 후보 16곳. 판마다 GLINT_ACTIVE곳이 새로 생긴다. 하나에 GLINT_MIN~GLINT_MAX 조각.
+## 흩어진 조각 후보 20곳(16~19번은 안개 늪, 20단계). 판마다 GLINT_ACTIVE곳이 새로 생긴다. 하나에 GLINT_MIN~GLINT_MAX 조각.
 const GLINTS: PackedVector2Array = [
 	Vector2(40, 100), Vector2(70, 96), Vector2(30, 84), Vector2(90, 98), Vector2(100, 84), Vector2(70, 74),
 	Vector2(40, 72), Vector2(20, 70), Vector2(24, 62), Vector2(12, 52), Vector2(46, 40), Vector2(70, 40),
 	Vector2(100, 30), Vector2(76, 24), Vector2(30, 10), Vector2(92, 12),
+	Vector2(122, 76), Vector2(140, 86), Vector2(158, 78), Vector2(134, 100),
 ]
 const GLINT_ACTIVE: int = 4
 const GLINT_MIN: int = 2
 const GLINT_MAX: int = 5
 
+## 비석을 모두(STONES 전부) 읽으면 한 번 받는 조각. 이미 받은 사람(Meta.lore_paid)은 비석이 늘어도 다시 받지 않는다.
 const LORE_REWARD: int = 30
 
 ## 이야기 비석 id → [칸 자리, 이름, 글]. 글은 줄바꿈(\n)으로 띠에 2~3줄.
@@ -62,12 +69,14 @@ const STONES: Dictionary = {
 	"stone_4": [Vector2(84, 44), "망루의 비석", "봉화가 꺼진 날 밤, 망루지기는 끝내 내려오지 않았다.\n불을 지키는 일이 그의 맹세였다."],
 	"stone_5": [Vector2(20, 30), "검은 숲의 비석", "숲은 해마다 한 걸음씩 길로 다가온다.\n마른 나무 사이에서 소리를 들어도 돌아보지 마라."],
 	"stone_6": [Vector2(44, 12), "발치의 비석", "여기서부터 길은 언덕의 것이다.\n칼이 부르면 오르고, 부러지면 다시 내려오라."],
+	"stone_7": [Vector2(139, 34), "성채의 비석", "성문은 안에서 잠겨 있었다.\n적은 밖에서 오지 않았다.\n성주는 끝내 문을 열지 않았다."],
 }
 
 ## 들판에서 영주가 못 들어가는 곳(칸 단위): 둘레의 숲·벼랑과 목책, 망루, 수레, 쓰러진 거목, 돌다리 난간.
 const BORDER_RECTS: Array[Rect2] = [
-	Rect2(0, 0, 3, 110), Rect2(107, 0, 3, 110), Rect2(0, 0, 110, 2),
-	Rect2(0, 108.3, 52, 2), Rect2(58, 108.3, 52, 2),
+	Rect2(0, 0, 3, 110), Rect2(167, 0, 3, 110), Rect2(0, 0, 170, 2),
+	Rect2(0, 108.3, 52, 2), Rect2(58, 108.3, 112, 2),
+	Rect2(107, 0, 3, 52), Rect2(107, 66, 3, 44),   # 원래 동쪽 둘레: 개울 근처(y 52~66)만 틈을 내 동쪽으로 이어진다
 ]
 
 
@@ -99,6 +108,11 @@ const PACKS: Dictionary = {
 	"grove": {"at": Vector2(8, 28), "wander": 3.0, "zone": 5, "foes": [[&"wolf", 3], [&"bomber", 1], [&"wraith", 2]]},
 	"foot": {"at": Vector2(40, 16), "wander": 3.5, "zone": 6, "foes": [[&"giant", 1], [&"charger", 2], [&"archer", 1]]},
 	"foot_east": {"at": Vector2(74, 8), "wander": 3.5, "zone": 6, "foes": [[&"caller", 1], [&"wraith", 3], [&"shield", 1]]},
+	## 20단계 새 지역(7~8구역 세기)
+	"keep_yard": {"at": Vector2(138, 24), "wander": 3.5, "zone": 7, "foes": [[&"giant", 1], [&"shield", 2], [&"archer", 2]]},
+	"keep_gate": {"at": Vector2(130, 45), "wander": 3.5, "zone": 7, "foes": [[&"charger", 2], [&"wraith", 2], [&"bomber", 1]]},
+	"marsh_west": {"at": Vector2(126, 84), "wander": 3.5, "zone": 7, "foes": [[&"wraith", 3], [&"caller", 1], [&"bomber", 1]]},
+	"marsh_east": {"at": Vector2(152, 96), "wander": 4.0, "zone": 8, "foes": [[&"wolf", 2], [&"charger", 1], [&"archer", 2], [&"shield", 1]]},
 }
 
 
@@ -121,6 +135,21 @@ const BOSS_CHARM: StringName = &"charm"
 const CRYPT_BLOCK: Rect2 = Rect2(28.5, 26.0, 7.0, 3.6)
 const CRYPT_DOOR: Vector2 = Vector2(32, 31)
 const CRYPT_WAKE: Vector2 = Vector2(32, 33.5)
+
+
+## ---- 새 지역(20단계, docs/outside.md). 모양이 서는 곳은 여기 하나에만 둔다(칸 단위).
+## 무너진 성채의 성벽 조각(군데군데 틈이 있다): 그린 돌 상자와 막힘이 같은 표를 쓴다. 반쯤 남은 탑은 KEEP_TOWER.
+const KEEP_WALLS: Array[Rect2] = [
+	Rect2(122, 12, 12, 1.2), Rect2(138, 12, 12, 1.2),            # 북쪽 성벽(가운데 틈, 동쪽 끝은 무너짐)
+	Rect2(122, 39, 14, 1.2), Rect2(142, 39, 16, 1.2),            # 남쪽 성벽(가운데가 성문 자리)
+	Rect2(122, 12, 1.2, 10), Rect2(122, 30, 1.2, 10),            # 서쪽 성벽(가운데 틈)
+	Rect2(157, 12, 1.2, 12), Rect2(157, 30, 1.2, 10),            # 동쪽 성벽(가운데 틈)
+]
+const KEEP_TOWER: Rect2 = Rect2(148, 15, 6, 6)
+## 안개 늪: 들어서면 환경 안개 짙기가 MARSH_FOG_MULT배로 MARSH_FOG_TIME초에 걸쳐 짙어지고 빛깔이 바뀐다(화면만, 규칙과 상관없다).
+const MARSH_FOG_MULT: float = 5.0
+const MARSH_FOG_TIME: float = 2.5
+const MARSH_FOG_COLOR: Color = Color(0.3, 0.37, 0.34, 1.0)
 
 
 static func area_at(c: Vector2) -> StringName:

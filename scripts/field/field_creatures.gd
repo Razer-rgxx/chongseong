@@ -5,8 +5,8 @@ extends Node3D
 
 const CROW_FLEE: float = 9.0
 const DEER_FLEE: float = 16.0
-## 까마귀 자리(칸): 망루와 옛 싸움터. 사슴 자리: 개울과 숲가.
-const CROW_SPOTS: PackedVector2Array = [Vector2(90, 34), Vector2(94, 38), Vector2(88, 40), Vector2(80, 84), Vector2(86, 90), Vector2(98, 80), Vector2(74, 78), Vector2(95, 33)]
+## 까마귀 자리(칸): 망루, 옛 싸움터, 안개 늪(끝 넷). 사슴 자리: 개울과 숲가.
+const CROW_SPOTS: PackedVector2Array = [Vector2(90, 34), Vector2(94, 38), Vector2(88, 40), Vector2(80, 84), Vector2(86, 90), Vector2(98, 80), Vector2(74, 78), Vector2(95, 33), Vector2(118, 90), Vector2(134, 78), Vector2(146, 102), Vector2(160, 88)]
 const DEER_SPOTS: PackedVector2Array = [Vector2(30, 58), Vector2(22, 66), Vector2(36, 38)]
 
 var _rng := RandomNumberGenerator.new()
@@ -136,8 +136,8 @@ func _step_deer(d: Dictionary, delta: float, lord: Vector3) -> void:
 		d.run -= delta
 		var away: Vector3 = flat.normalized() if dist > 0.1 else Vector3.LEFT
 		var np: Vector3 = n.position + away * 9.0 * delta
-		np.x = clampf(np.x, 14.0, FieldLayout.WORLD - 14.0)
-		np.z = clampf(np.z, 30.0, FieldLayout.WORLD - 30.0)
+		np.x = clampf(np.x, 14.0, FieldLayout.WORLD_X - 14.0)
+		np.z = clampf(np.z, 30.0, FieldLayout.WORLD_Z - 30.0)
 		if absf(np.z - FieldBuilder.brook_z(np.x)) < 2.0:
 			np.z += 3.0 * delta   # 물가를 건널 때만 걸린 듯 지나간다
 		np.y = FieldBuilder.height(np.x, np.z)

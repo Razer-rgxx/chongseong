@@ -26,6 +26,10 @@ var _area: StringName = &""
 var _shown: Dictionary = {}
 var _reading: String = ""
 var _creatures := FieldCreatures.new()
+var _env: Environment
+var _fog_base: float = 0.0
+var _fog_color: Color = Color.WHITE
+var _fog_k: float = 0.0   ## 안개 늪의 짙은 안개 정도(0~1, 늪에 들어서면 천천히 오르고 나가면 내린다. 화면만)
 var _want_attack: bool = false
 var _want_hook: bool = false
 var _over: bool = false
@@ -62,6 +66,9 @@ func _ready() -> void:
 	_hud.setup(data, meta)
 	var env: Environment = ($Environment as WorldEnvironment).environment
 	HillBuilder.apply_sky(env, Color(1.0, 0.8, 0.68), 0.75)
+	_env = env
+	_fog_base = env.fog_density
+	_fog_color = env.fog_light_color
 	var blockers: Dictionary = FieldBuilder.build(self, env)
 	_rects.assign(blockers.rects)
 	_circles = blockers.circles
@@ -192,6 +199,7 @@ func _process(delta: float) -> void:
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
 	_boss_bar()
 	_creatures.step(delta, _lord.position)
+	_marsh_fog(delta)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
 	if a != _area:
@@ -212,6 +220,17 @@ func _process(delta: float) -> void:
 	if _reading != "":
 		return
 	_hud.set_prompt("E", _prompt(_near) if _near != "" else "")
+
+
+## 안개 늪(20단계): 영주가 늪에 있으면 환경 안개를 천천히 짙게 하고 빛깔을 바꾼다(규칙과 상관없는 화면, 나가면 되돌린다).
+func _marsh_fog(delta: float) -> void:
+	var want: float = 1.0 if FieldLayout.area_at(rules.lord.pos) == &"marsh" else 0.0
+	if is_equal_approx(_fog_k, want):
+		return
+	_fog_k = move_toward(_fog_k, want, delta / FieldLayout.MARSH_FOG_TIME)
+	var k: float = smoothstep(0.0, 1.0, _fog_k)
+	_env.fog_density = lerpf(_fog_base, _fog_base * FieldLayout.MARSH_FOG_MULT, k)
+	_env.fog_light_color = _fog_color.lerp(FieldLayout.MARSH_FOG_COLOR, k)
 
 
 func _spots() -> Dictionary:

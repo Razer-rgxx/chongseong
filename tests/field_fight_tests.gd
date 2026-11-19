@@ -36,14 +36,14 @@ func _field(seed_value: int = 1) -> Rules:
 
 func _layout() -> void:
 	var P := FieldLayout.PACKS
-	check.call(P.size() == 8, "들판 싸움: 무리 자리는 8곳")
+	check.call(P.size() == 12, "들판 싸움: 무리 자리는 12곳(원래 8 + 새 지역 4)")
 	var zones := {}
 	var ok_kinds: bool = true
 	var ok_count: bool = true
 	var ok_area: bool = true
 	var ok_off: bool = true
-	var areas := {"road_south": &"road", "road_mid": &"road", "brook_east": &"brook", "old_field": &"old_field", "tower": &"watchtower", "grove": &"grove", "foot": &"foot", "foot_east": &"foot"}
-	var zone_of := {&"road": [1, 2], &"brook": [1, 2], &"old_field": [3, 4], &"watchtower": [3, 4], &"grove": [5, 6], &"foot": [5, 6]}
+	var areas := {"road_south": &"road", "road_mid": &"road", "brook_east": &"brook", "old_field": &"old_field", "tower": &"watchtower", "grove": &"grove", "foot": &"foot", "foot_east": &"foot", "keep_yard": &"keep", "keep_gate": &"keep", "marsh_west": &"marsh", "marsh_east": &"marsh"}
+	var zone_of := {&"road": [1, 2], &"brook": [1, 2], &"old_field": [3, 4], &"watchtower": [3, 4], &"grove": [5, 6], &"foot": [5, 6], &"keep": [7, 8], &"marsh": [7, 8]}
 	for id in P:
 		var p: Dictionary = P[id]
 		var n: int = 0
@@ -63,7 +63,7 @@ func _layout() -> void:
 			near = minf(near, (p.at as Vector2).distance_to(FieldLayout.STONES[k][0]))
 		ok_off = ok_off and near > float(p.wander) + 1.0
 	check.call(ok_kinds and ok_count, "들판 싸움: 무리는 있는 적(영주·허수아비 아님) 3~6마리")
-	check.call(zones.size() == 6, "들판 싸움: 세기 구역 1~6이 모두 있다")
+	check.call(zones.size() == 8, "들판 싸움: 세기 구역 1~8이 모두 있다")
 	check.call(ok_area, "들판 싸움: 곳과 세기가 설계서대로(길·개울 1~2, 싸움터·망루 3~4, 숲·발치 5~6)")
 	check.call(ok_off, "들판 싸움: 자리는 길·상자·비석에서 떨어져 있다")
 	# 막힌 곳(나무·바위·망루 …)을 피한다
@@ -100,7 +100,7 @@ func _spawn() -> void:
 	var r2 := _field()
 	var skip := {"road_south": 1, "road_mid": 1}
 	r2.spawn_packs(skip)
-	check.call(r2.packs.size() == 6 and not r2.packs.has(&"road_south"), "spawn_packs: 이미 쓰러뜨린 무리는 안 생긴다")
+	check.call(r2.packs.size() == 10 and not r2.packs.has(&"road_south"), "spawn_packs: 이미 쓰러뜨린 무리는 안 생긴다")
 	var kinds: int = 0
 	for e in r2.enemies:
 		kinds += 1 if e.pack == &"" else 0
@@ -239,13 +239,13 @@ func _rewards() -> void:
 	# 쓰러뜨린 무리는 안 생기고, 판이 끝나면(record_run) 비워져 다시 생긴다
 	var r2 := _field()
 	r2.spawn_packs(m.packs_cleared)
-	check.call(not r2.packs.has(&"road_south") and r2.packs.size() == 7, "보상: 쓰러뜨린 무리는 들판에 들어와도 안 생긴다")
+	check.call(not r2.packs.has(&"road_south") and r2.packs.size() == 11, "보상: 쓰러뜨린 무리는 들판에 들어와도 안 생긴다")
 	var hill := Rules.new(d, 5)
 	m.record_run(hill, d.meta)
 	check.call(m.packs_cleared.is_empty(), "보상: record_run에서 쓰러뜨린 무리를 비운다")
 	var r3 := _field()
 	r3.spawn_packs(m.packs_cleared)
-	check.call(r3.packs.size() == 8, "보상: 판이 끝나면 무리가 다시 생긴다")
+	check.call(r3.packs.size() == 12, "보상: 판이 끝나면 무리가 다시 생긴다")
 	# 무리 전멸은 마지막이 자폭해도 센다
 	var r4 := _field()
 	r4.spawn_pack(&"x", {"at": Vector2(30, 30), "wander": 2.0, "zone": 1, "foes": [[&"bomber", 3]]})

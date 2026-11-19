@@ -12,11 +12,11 @@
   git pull https://github.com/Razer-rgxx/chongseong.git geom-hill
   ```
 - 웹판(웨일북용): https://razer-rgxx.github.io/chongseong/ — `gh-pages` 가지. 다시 만들기: `python3 docs/web_build.py <godot> <폴더>` 후 그 폴더를 gh-pages로 강제 푸시.
-- 확인: Godot 4.6.1 리눅스 실행 파일로 `--headless --path . -s tests/run_all.gd` (지금 **766 통과, 0 실패**). 화면은 Xvfb + `--rendering-driver opengl3 --rendering-method gl_compatibility`.
+- 확인: Godot 4.6.1 리눅스 실행 파일로 `--headless --path . -s tests/run_all.gd` (지금 **836 통과, 0 실패**). 화면은 Xvfb + `--rendering-driver opengl3 --rendering-method gl_compatibility`.
 
 ## 지금까지 (끝난 것)
 
-1~4단계(표·규칙·화면·마을과 3인칭), 6~19단계가 끝났다. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일로 남아 있다.
+1~4단계(표·규칙·화면·마을과 3인칭), 6~20단계가 끝났다. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일로 남아 있다.
 
 - 9: 좌클릭 150가지(기본 동작 20개 조합, `Moves`, docs/attacks.md)
 - 10: 적 공격 표(`Tokens`, docs/attack_tokens.md)
@@ -26,6 +26,7 @@
 - 17: 들판 싸움 — 북문에서 검 고르기, 무리 8곳, `Rules` 들판 모드(`start_field`, `spawn_pack`), 조각 보상 (docs/outside.md)
 - 18: 들판 보스 무덤 기사(`Foes._knight`, `FieldLayout.BOSS_*`, `Meta.boss_defeat`), 화면 아래 체력 막대 (docs/outside.md)
 - 19: 지하 무덤 — 들판 입구 → 방 6개(문이 닫히고 무리를 쓰러뜨리면 열림), 돌 관, 무덤 주인 (`CryptLayout`·`CryptRun`·`CryptBuilder`, `Meta.crypt_*`, docs/outside.md)
+- 20: 새 지역 — 들판을 170×110칸으로 동쪽에 넓힘, 무너진 성채(`keep`)와 안개 늪(`marsh`), 무리 넷·상자 둘·비석 하나·조각 후보 4곳, 늪 안개는 화면만 (`FieldLayout.KEEP_*`·`MARSH_FOG_*`, `field.gd._marsh_fog`, docs/outside.md)
 - 그 밖: 원하는 검 얻는 콘솔(` 또는 F6, `SwordConsole`), 웹판 전용 그래픽 낮춤(`WebQuality`), 현황판 자동 채우기(`python3 docs/board.py`)
 
 ## 사용자가 정한 것 (지킬 것)
@@ -47,16 +48,16 @@
 
 ## 사용자가 정한 것 (2026-11-19 오후, GDD 2.15)
 
-- 마을 밖 큰 것: 들판 싸움(17, 끝) → 들판 보스(18, 끝) → 지하 무덤(19, 끝) → 새 지역(20). 설계서 docs/outside.md.
+- 마을 밖 큰 것: 들판 싸움(17) → 들판 보스(18) → 지하 무덤(19) → 새 지역(20), 모두 끝. 설계서 docs/outside.md.
 - 1대1 결투: 모르는 사람과 매칭, **GD-Sync 무료판**(사용자가 가입·키 받기 필요), 웹판 없음, 서로 베기, 언덕 싸움터, **검집의 검**을 들고 감. 21 규칙(같은 PC 두 입력으로 먼저) → 22 온라인. 설계서 docs/duel.md는 21단계에서 쓴다.
 
 ## 다음
 
-20단계 새 지역(들판 동쪽, 성채와 안개 늪)부터. 17~19단계처럼 에이전트 하나가 설계서대로 끝까지 하고 테스트·화면 한 장·문서·커밋까지 했다.
+21단계 결투 규칙부터. **docs/duel.md 설계서를 먼저 쓴다**(정해진 것은 GDD 2.15: 같은 PC 두 입력으로 먼저, 서로 베기, 언덕 싸움터, 검집의 검, GD-Sync 온라인은 22단계). 17~20단계처럼 에이전트 하나가 설계서대로 끝까지 하고 테스트·화면 한 장·문서·커밋까지 했다.
 
 ## 남은 계획 (GDD 3절)
 
-20 새 지역 → 21 결투 규칙 → 22 온라인 매칭 → 23 관리 패널 → 24 화풍과 모델 → 25 소리 에셋 → 26 난이도와 강화 균형 → 27 시작 화면·설정·Windows 내보내기.
+21 결투 규칙 → 22 온라인 매칭 → 23 관리 패널 → 24 화풍과 모델 → 25 소리 에셋 → 26 난이도와 강화 균형 → 27 시작 화면·설정·Windows 내보내기.
 
 ## 알려진 구멍
 

@@ -31,6 +31,7 @@
 
 | 날짜 | 한 일 |
 | --- | --- |
+| 2026-11-19 | 20단계: 새 지역. 들판을 동쪽으로 넓혔다(`FieldLayout.SIZE` 110×110 → 170×110칸, `WORLD_X`·`WORLD_Z`). 원래 동쪽 둘레는 개울 근처(y 52~66)만 틈을 내고 동쪽으로 이어진다. 무너진 성채(`keep`, 무너진 성벽 `KEEP_WALLS`와 반쯤 남은 탑 `KEEP_TOWER`는 그린 곳이 곧 막힌 곳, 무리 둘, 유품 상자 `cache_9`·`cache_10`, 비석 `stone_7`)와 안개 늪(`marsh`, 얕은 물 판·갈대·마른 나무, 무리 둘, 흩어진 조각 후보 16 → 20, 까마귀 넷, 들어서면 화면 안개가 2.5초에 걸쳐 5배로 짙어진다: `field.gd`가 환경 안개만 바꾸고 규칙은 그대로). 무리 넷은 `FieldLayout.PACKS`(7~8구역). 비석은 7개이고 조각 30은 모든 비석을 읽을 때 한 번(이미 받았으면 다시 안 준다). 테스트 `tests/field_region_tests.gd`, 설계서 docs/outside.md |
 | 2026-11-19 | 19단계: 지하 무덤. 들판 검은 숲 가장자리의 무너진 입구(`FieldLayout.CRYPT_*`)에서 E → `scenes/crypt/crypt.tscn`, 쥔 검(`Meta.carry_sword`)을 그대로 가져가고 나오는 문·쓰러짐은 들판의 입구 앞(`Meta.wake_at_crypt`). 방 6개·문 5개(`CryptLayout`, 입구 → 갈림 → 두 갈래 → 서쪽 끝/마지막 방): 들어서면 그 방 무리가 서고(`spawn_pack`, 5~7구역) 문 돌판이 내려와 닫히며 다 쓰러뜨리면 열린다(`CryptRun`, 문 열림은 `Rules.packs`·`field_boss_state`에서 읽음, 막힘은 `CryptLayout.push_in`). 방마다 돌 관(조각 10~25, `Meta.crypt_open`), 마지막 방은 무덤 주인(`data/enemies/11_crypt_lord.tres`, 무덤 기사 행동을 빌린 더 약한 기사)과 큰 관(조각 60, 운 부적). `Meta.crypt_cleared`·`crypt_opened`는 저장되고 쓰러져도 남고 `record_run`이 비운다. 모양은 `CryptBuilder`(낮은 돌 벽, 횃불 빛, 어둠, HillBuilder 바위 질감), 천장 없음. 테스트 `tests/crypt_tests.gd`. 설계서 docs/outside.md |
 | 2026-11-19 | 18단계: 들판 보스. 옛 싸움터 가운데(`FieldLayout.BOSS_AT`)에 무덤 기사(`data/enemies/10_grave_knight.tres`, 2.2배, 녹슨 빛, 큰 칼)가 서 있다가 영주가 8칸 안에 오면 깨어나고 둘레 14칸을 넘으면 돌아가 체력이 찬다. 행동 셋(`Foes._knight`): 앞 150° 크게 휘두르기(0.8초 예고, 땅의 부채꼴 빛), 돌진 베기(8칸, 돌격병 표현 재사용), 체력 50% 밑에서 망령 4마리 한 번 부르기, 50% 밑에서 모든 행동 ×1.2. 처음 쓰러뜨리면 조각 80, 다음부터 30, 쓰러뜨릴 때마다 운 부적이 `Meta.pack`에 든다(`Meta.boss_down` 이번 판, `boss_first` 저장). 깨어 있는 동안 아래 가운데에 체력 막대(`LobbyHud.set_boss`). `EnemyFx.height_of`로 들판에서도 땅 효과가 보인다. 테스트 `tests/field_boss_tests.gd`. 설계서 docs/outside.md |
 | 2026-11-19 | 17단계: 들판 싸움. 마을 북문에서 E → 검 고르기 창(검 걸이와 같은 목록) → 들판, 고른 검은 부러지지 않고 칸 0에 쥔다(좌클릭·갈고리). 들판에 무리 8곳(`FieldLayout.PACKS`, 3~6마리, 세기 1~6구역): 제자리 반지름 안을 서성이다 영주가 10칸 안이면 덤비고(공격 표 그대로), 25칸 넘게 멀어지면 돌아가며 체력이 찬다. 적 하나 조각 1, 무리 전멸 5~10(`Meta.packs_cleared`, 판이 끝나면 비운다). `Rules.field` 모드(낮밤 없음, `spawn_pack`, `state_hash`). 쓰러지면 잃는 것 없이 북문 앞에서 깬다. 테스트 45개 |
@@ -268,7 +269,7 @@
 - [x] 17단계: 들판 싸움(2026-11-19 사용자가 정함). 들판에 떠도는 적 무리. 설계서 docs/outside.md
 - [x] 18단계: 들판 보스(2026-11-19 사용자가 정함). 옛 싸움터의 무덤 기사. 설계서 docs/outside.md
 - [x] 19단계: 지하 무덤(던전). 들판에서 들어가는 방 여러 개, 싸움과 보물. 설계서 docs/outside.md
-- [ ] 20단계: 새 지역. 들판을 넓혀 곳을 더 잇는다. 설계서 docs/outside.md
+- [x] 20단계: 새 지역. 들판을 넓혀 곳을 더 잇는다. 설계서 docs/outside.md
 - [ ] 21단계: 1대1 결투 규칙. 영주 둘, 영주끼리 맞히기, 검집의 검을 들고 언덕 싸움터에서. 같은 PC에서 두 입력으로 먼저 돌린다. 설계서 docs/duel.md
 - [ ] 22단계: 온라인 매칭(GD-Sync 무료판). 모르는 사람과 1대1. 웹판은 없다. 설계서 docs/duel.md
 - [ ] 23단계: 관리 패널(등급 고정, 검 받기, 무적, 속도, 구역 넘기기, 조각 주기)

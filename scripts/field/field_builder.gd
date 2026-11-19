@@ -26,8 +26,17 @@ static func brook_z(x: float) -> float:
 
 
 static func _outside(x: float, z: float) -> float:
-	var w: float = FieldLayout.WORLD
-	return Vector2(x - clampf(x, 0.0, w), z - clampf(z, 0.0, w)).length()
+	return Vector2(x - clampf(x, 0.0, FieldLayout.WORLD_X), z - clampf(z, 0.0, FieldLayout.WORLD_Z)).length()
+
+
+## 안개 늪 자리의 가장자리를 부드럽게 한 0~1(m 좌표).
+static func marsh_mask(x: float, z: float) -> float:
+	var a: Rect2 = FieldLayout.AREAS[&"marsh"]
+	var x0: float = a.position.x * Grid.CELL
+	var x1: float = a.end.x * Grid.CELL
+	var z0: float = a.position.y * Grid.CELL
+	var z1: float = a.end.y * Grid.CELL
+	return smoothstep(0.0, 14.0, minf(x - x0, x1 - x)) * smoothstep(0.0, 14.0, minf(z - z0, z1 - z))
 
 
 ## 땅 높이(m): 완만한 굴곡, 개울 바닥, 북쪽으로 오르는 땅, 둘레의 오르막.
@@ -38,6 +47,12 @@ static func height(x: float, z: float) -> float:
 	h += 7.0 * (1.0 - smoothstep(0.0, 70.0, z))
 	var e: float = _outside(x, z)
 	h += 14.0 * smoothstep(0.0, 60.0, e) + e * 0.03
+	# 원래 동쪽 둘레(x 214~220m)는 개울 근처만 틈을 낸 언덕 띠(20단계)
+	h += 4.5 * exp(-pow((x - 217.0) / 5.0, 2.0)) * smoothstep(6.0, 14.0, absf(z - 118.0))
+	var m: float = marsh_mask(x, z)
+	if m > 0.0:   # 안개 늪: 얕은 물 높이보다 조금 높은 땅과 군데군데 웅덩이
+		var pool: float = smoothstep(0.02, 0.22, _n.get_noise_2d(x * 2.6 + 900.0, z * 2.6))
+		h = lerpf(h, 0.35 + _n.get_noise_2d(x * 5.0, z * 5.0) * 0.15 - pool * 0.9, m)
 	var w: float = exp(-pow((z - brook_z(x)) / 4.5, 2.0))
 	return lerpf(h, -1.8, w * 0.95)
 
@@ -80,6 +95,8 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_road(parent)
 	_bridge(parent, rects)
 	_tower(parent, rects)
+	_keep(parent, rects)
+	_east_ridge(parent, circles)
 	_old_field(parent, rng, circles)
 	_grove(parent, rng, circles)
 	_foot(parent, circles)
@@ -89,6 +106,7 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_forest(parent, rng, circles)
 	_rocks(parent, rng)
 	_reeds(parent, rng)
+	_marsh(parent, circles)
 	_grass(parent, rng)
 	return {"rects": rects, "circles": circles}
 
@@ -186,7 +204,7 @@ static func _road(parent: Node3D) -> void:
 
 # ---------------------------------------------------------------- 땅
 
-static func _axis() -> PackedFloat32Array:
+static func _axis(world: float) -> PackedFloat32Array:
 	var left: Array[float] = []
 	var s: float = 2.0
 	var q: float = -8.0
@@ -197,12 +215,12 @@ static func _axis() -> PackedFloat32Array:
 	left.reverse()
 	var a := PackedFloat32Array(left)
 	var x: float = -8.0
-	while x <= FieldLayout.WORLD + 8.0:
+	while x <= world + 8.0:
 		a.append(x)
 		x += 2.0
 	s = 2.0
 	q = x - 2.0
-	while q < FieldLayout.WORLD + 560.0:
+	while q < world + 560.0:
 		s = minf(s * 1.12, 40.0)
 		q += s
 		a.append(q)
@@ -210,18 +228,20 @@ static func _axis() -> PackedFloat32Array:
 
 
 static func _terrain(parent: Node3D) -> void:
-	var ax := _axis()
+	var ax := _axis(FieldLayout.WORLD_X)
+	var az := _axis(FieldLayout.WORLD_Z)
 	var n: int = ax.size()
+	var nz: int = az.size()
 	var verts := PackedVector3Array()
-	verts.resize(n * n)
-	for j in n:
+	verts.resize(n * nz)
+	for j in nz:
 		for i in n:
-			verts[j * n + i] = Vector3(ax[i], height(ax[i], ax[j]), ax[j])
+			verts[j * n + i] = Vector3(ax[i], height(ax[i], az[j]), az[j])
 	var norms := PackedVector3Array()
-	norms.resize(n * n)
-	for j in n:
+	norms.resize(n * nz)
+	for j in nz:
 		var j0: int = maxi(j - 1, 0)
-		var j1: int = mini(j + 1, n - 1)
+		var j1: int = mini(j + 1, nz - 1)
 		for i in n:
 			var i0: int = maxi(i - 1, 0)
 			var i1: int = mini(i + 1, n - 1)
@@ -229,9 +249,9 @@ static func _terrain(parent: Node3D) -> void:
 			var dz: Vector3 = verts[j1 * n + i] - verts[j0 * n + i]
 			norms[j * n + i] = dz.cross(dx).normalized()
 	var idx := PackedInt32Array()
-	idx.resize((n - 1) * (n - 1) * 6)
+	idx.resize((n - 1) * (nz - 1) * 6)
 	var k: int = 0
-	for j in n - 1:
+	for j in nz - 1:
 		for i in n - 1:
 			var a: int = j * n + i
 			var c: int = a + n
@@ -266,13 +286,13 @@ static func _water(parent: Node3D) -> void:
 	m.roughness = 0.06
 	m.metallic = 0.25
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(300.0, 34.0)
+	pm.size = Vector2(560.0, 34.0)
 	var mi := MeshInstance3D.new()
 	mi.name = "Brook"
 	mi.mesh = pm
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.position = Vector3(110.0, WATER_Y, 116.0)
+	mi.position = Vector3(170.0, WATER_Y, 116.0)
 	parent.add_child(mi)
 
 
@@ -326,6 +346,105 @@ static func _tower(parent: Node3D, rects: Array[Rect2]) -> void:
 	for i in 3:
 		_box(parent, Vector3(0.3, 0.3, 5.5), c + Vector3(rng.randf_range(-2, 2), base + 3.2 + i * 0.5, rng.randf_range(-2, 2)), wd, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * PI, rng.randf_range(-0.3, 0.3)))
 	rects.append(Rect2(FieldLayout.TOWER.x - 3.6, FieldLayout.TOWER.y - 3.6, 7.2, 7.2).grow(0.0))
+
+
+# ---------------------------------------------------------------- 무너진 성채 (20단계)
+
+## 무너진 성벽(KEEP_WALLS의 돌 상자 줄, 높이가 들쭉날쭉하고 군데군데 낮게 무너졌다)과 반쯤 남은 탑(KEEP_TOWER).
+## 그린 곳이 곧 막힌 곳이다(표 하나). 글자 없음.
+static func _keep(parent: Node3D, rects: Array[Rect2]) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20
+	var st: Material = _stone()
+	for w in FieldLayout.KEEP_WALLS:
+		var along_x: bool = w.size.x >= w.size.y
+		var length: float = (w.size.x if along_x else w.size.y) * Grid.CELL
+		var thick: float = (w.size.y if along_x else w.size.x) * Grid.CELL
+		var n: int = maxi(int(length / 2.4), 1)
+		var seg: float = length / n
+		for k in n:
+			var h: float = rng.randf_range(1.4, 4.4)
+			if rng.randf() < 0.3:
+				h = rng.randf_range(0.4, 1.0)   # 무너진 자리
+			var along: float = (k + 0.5) * seg
+			var cx: float = (w.position.x * Grid.CELL + along) if along_x else (w.position.x + w.size.x / 2.0) * Grid.CELL
+			var cz: float = (w.position.y + w.size.y / 2.0) * Grid.CELL if along_x else (w.position.y * Grid.CELL + along)
+			var size: Vector3 = Vector3(seg * 1.04, h, thick) if along_x else Vector3(thick, h, seg * 1.04)
+			_box(parent, size, Vector3(cx, height(cx, cz) + h / 2.0 - 0.3, cz), st, Vector3(0.0, rng.randf_range(-0.04, 0.04), 0.0), 200.0)
+		rects.append(w)
+		# 벽 곁에 떨어진 돌
+		for k in 6:
+			var s: float = rng.randf_range(0.4, 1.0)
+			var px: float = (w.position.x + w.size.x * rng.randf()) * Grid.CELL + (rng.randf_range(-3.5, 3.5) if not along_x else 0.0)
+			var pz: float = (w.position.y + w.size.y * rng.randf()) * Grid.CELL + (rng.randf_range(-3.5, 3.5) if along_x else 0.0)
+			_box(parent, Vector3(s, s * 0.7, s * 1.2), Vector3(px, height(px, pz) + s * 0.2, pz), st, Vector3(rng.randf() * 0.5, rng.randf() * TAU, rng.randf() * 0.5), 120.0)
+	# 반쯤 남은 탑: 둘레에 돌 상자를 두르고 한쪽 모서리만 높이 남았다
+	var c: Vector2 = FieldLayout.KEEP_TOWER.get_center() * Grid.CELL
+	var half: float = FieldLayout.KEEP_TOWER.size.x * Grid.CELL / 2.0 - 0.8
+	var base: float = height(c.x, c.y)
+	for side in 4:
+		var yaw: float = side * PI / 2.0
+		var dir := Vector3(cos(yaw), 0, sin(yaw))
+		var out := Vector3(-dir.z, 0, dir.x) * half
+		for k in 7:
+			var off: float = -half + 0.8 + k * 1.6
+			var h: float = rng.randf_range(1.0, 5.0)
+			if side == 3 and k >= 5:
+				h = 10.5 if k == 6 else 8.0
+			elif side == 1 and k >= 2 and k <= 4:
+				h = rng.randf_range(0.3, 0.7)   # 무너져 열린 쪽
+			var p: Vector3 = Vector3(c.x, 0, c.y) + dir * off + out
+			_box(parent, Vector3(1.7, h, 1.0), Vector3(p.x, base + h / 2.0 - 0.3, p.z), st, Vector3(0, -yaw + PI / 2.0, 0), 220.0)
+	for i in 14:   # 탑에서 쏟아진 돌
+		var a: float = rng.randf() * TAU
+		var r: float = rng.randf_range(half + 1.0, half + 5.0)
+		var s: float = rng.randf_range(0.4, 1.2)
+		var x: float = c.x + cos(a) * r
+		var z: float = c.y + sin(a) * r
+		_box(parent, Vector3(s, s * 0.7, s * 1.2), Vector3(x, height(x, z) + s * 0.2, z), st, Vector3(rng.randf() * 0.6, rng.randf() * TAU, rng.randf() * 0.6), 120.0)
+	var wd: Material = _wood()
+	for i in 3:
+		_box(parent, Vector3(0.3, 0.3, 6.0), Vector3(c.x + rng.randf_range(-1.5, 1.5), base + 3.4 + i * 0.5, c.y + rng.randf_range(-1.5, 1.5)), wd, Vector3(rng.randf_range(-0.4, 0.4), rng.randf() * PI, rng.randf_range(-0.3, 0.3)))
+	rects.append(FieldLayout.KEEP_TOWER)
+
+
+# ---------------------------------------------------------------- 원래 동쪽 둘레 (20단계)
+
+## 원래 동쪽 둘레(x 214~220m)의 숲과 벼랑 돌. 개울 근처(z 약 104~132m)만 틈을 내 새 지역으로 이어진다(막힘은 BORDER_RECTS).
+static func _east_ridge(parent: Node3D, _circles: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 22
+	var by_v: Array = [[], [], []]
+	var n: int = 0
+	var tries: int = 0
+	while n < 120 and tries < 4000:
+		tries += 1
+		var x: float = rng.randf_range(206.0, 226.0)
+		var z: float = rng.randf_range(-10.0, FieldLayout.WORLD_Z + 10.0)
+		if absf(z - 118.0) < 15.0:
+			continue
+		var s: float = rng.randf_range(0.9, 1.7)
+		by_v[n % 3].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, height(x, z) - 0.1, z)))
+		n += 1
+	for v in 3:
+		var xs: Array[Transform3D] = []
+		xs.assign(by_v[v])
+		if not xs.is_empty():
+			HillBuilder._multi(parent, HillBuilder.pine(v), xs, true, HillBuilder.pine_mat()).visibility_range_end = 260.0
+	var parts: Array[Dictionary] = HillBuilder.rock_parts()
+	for i in 16:
+		var x: float = rng.randf_range(210.0, 224.0)
+		var z: float = rng.randf_range(0.0, FieldLayout.WORLD_Z - 12.0)
+		if absf(z - 118.0) < 14.0:
+			continue
+		var at := Vector3(x, height(x, z), z)
+		var s: float = rng.randf_range(2.5, 4.5)
+		var mi: MeshInstance3D
+		if parts.is_empty():
+			mi = _box(parent, Vector3(1.4, 1.0, 1.1) * s, at + Vector3(0, 0.3 * s, 0), _stone(), Vector3(0, rng.randf() * TAU, 0))
+		else:
+			mi = HillBuilder.put_flat(parent, parts[rng.randi() % parts.size()], at, rng.randf() * TAU, s)
+		mi.visibility_range_end = 160.0
 
 
 # ---------------------------------------------------------------- 옛 싸움터
@@ -527,7 +646,7 @@ static func _palisade(parent: Node3D) -> void:
 	rng.seed = 4
 	var xs: Array[Transform3D] = []
 	var x: float = 0.0
-	while x < FieldLayout.WORLD:
+	while x < FieldLayout.WORLD_X:
 		if x < gap_a or x > gap_b:
 			var h: float = rng.randf_range(2.6, 3.5)
 			xs.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(1, h / 3.0, 1)), Vector3(x, height(x, z) + h / 2.0 - 0.3, z + rng.randf_range(-0.08, 0.08))))
@@ -536,7 +655,7 @@ static func _palisade(parent: Node3D) -> void:
 	pm.size = Vector3(0.3, 3.0, 0.3)
 	HillBuilder._multi(parent, pm, xs, true, _wood()).name = "PalisadePosts"
 	for r in 2:
-		for seg in [[0.0, gap_a], [gap_b, FieldLayout.WORLD]]:
+		for seg in [[0.0, gap_a], [gap_b, FieldLayout.WORLD_X]]:
 			var len: float = seg[1] - seg[0]
 			var mx: float = (seg[0] + seg[1]) / 2.0
 			_box(parent, Vector3(len, 0.2, 0.2), Vector3(mx, 1.0 + r * 1.3, z - 0.25), _wood())
@@ -604,6 +723,14 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 	for g in FieldLayout.GLINTS:
 		if c.distance_to(g) < gap:
 			return false
+	for k in FieldLayout.PACKS:
+		if c.distance_to(FieldLayout.PACKS[k].at) < float(FieldLayout.PACKS[k].wander) + 1.5:
+			return false
+	for w in FieldLayout.KEEP_WALLS:
+		if w.grow(3.0).has_point(c):
+			return false
+	if FieldLayout.KEEP_TOWER.grow(5.0).has_point(c):
+		return false
 	return true
 
 
@@ -611,21 +738,22 @@ static func _forest(parent: Node3D, rng: RandomNumberGenerator, circles: Array) 
 	var by_v: Array = [[], [], []]
 	var tries: int = 0
 	var n: int = 0
-	var W: float = FieldLayout.WORLD
-	while n < 520 and tries < 20000:
+	var WX: float = FieldLayout.WORLD_X
+	var WZ: float = FieldLayout.WORLD_Z
+	while n < 700 and tries < 30000:
 		tries += 1
-		var x: float = rng.randf_range(-80.0, W + 80.0)
-		var z: float = rng.randf_range(-100.0, W + 70.0)
+		var x: float = rng.randf_range(-80.0, WX + 80.0)
+		var z: float = rng.randf_range(-100.0, WZ + 70.0)
 		var e: float = _outside(x, z)
-		var inner: float = minf(minf(x, W - x), minf(z, W - z))
+		var inner: float = minf(minf(x, WX - x), minf(z, WZ - z))
 		var in_field: bool = e <= 0.0
 		# 들판 안은 둘레 6m 띠(막힌 곳)와 드문 외톨이만, 밖은 짙게
 		if in_field and inner > 6.0:
-			if rng.randf() > 0.06 or not _free(Vector2(x, z) / Grid.CELL, 4.0):
+			if rng.randf() > 0.06 or not _free(Vector2(x, z) / Grid.CELL, 4.0) or marsh_mask(x, z) > 0.0:
 				continue
 		if not in_field and e > 70.0 + 30.0 * rng.randf():
 			continue
-		if absf(x - 110.0) < 14.0 and (z < 14.0 or z > W - 14.0):
+		if absf(x - 110.0) < 14.0 and (z < 14.0 or z > WZ - 14.0):
 			continue
 		var h: float = height(x, z)
 		var s: float = rng.randf_range(0.9, 1.7)
@@ -642,28 +770,28 @@ static func _forest(parent: Node3D, rng: RandomNumberGenerator, circles: Array) 
 
 static func _rocks(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var parts: Array[Dictionary] = HillBuilder.rock_parts()
-	var W: float = FieldLayout.WORLD
-	for i in 46:
-		var edge: bool = i < 36
+	var WX: float = FieldLayout.WORLD_X
+	var WZ: float = FieldLayout.WORLD_Z
+	for i in 60:
+		var edge: bool = i < 48
 		var x: float
 		var z: float
 		if edge:
 			var side: int = rng.randi() % 3
-			var t: float = rng.randf_range(0.0, W)
 			if side == 0:
 				x = rng.randf_range(2.0, 7.0)
-				z = t
+				z = rng.randf_range(0.0, WZ)
 			elif side == 1:
-				x = W - rng.randf_range(2.0, 7.0)
-				z = t
+				x = WX - rng.randf_range(2.0, 7.0)
+				z = rng.randf_range(0.0, WZ)
 			else:
-				x = t
+				x = rng.randf_range(0.0, WX)
 				z = rng.randf_range(2.0, 7.0)
-			if z > W - 8.0 or absf(x - 110.0) < 12.0 and z < 12.0:
+			if z > WZ - 8.0 or absf(x - 110.0) < 12.0 and z < 12.0:
 				continue
 		else:
-			x = rng.randf_range(10.0, W - 10.0)
-			z = rng.randf_range(20.0, W - 20.0)
+			x = rng.randf_range(10.0, WX - 10.0)
+			z = rng.randf_range(20.0, WZ - 20.0)
 			if not _free(Vector2(x, z) / Grid.CELL, 3.0):
 				continue
 		var at := Vector3(x, height(x, z), z)
@@ -679,9 +807,9 @@ static func _rocks(parent: Node3D, rng: RandomNumberGenerator) -> void:
 static func _reeds(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var xs: Array[Transform3D] = []
 	var tries: int = 0
-	while xs.size() < 260 and tries < 4000:
+	while xs.size() < 380 and tries < 6000:
 		tries += 1
-		var x: float = rng.randf_range(4.0, FieldLayout.WORLD - 4.0)
+		var x: float = rng.randf_range(4.0, FieldLayout.WORLD_X - 4.0)
 		var side: float = -1.0 if rng.randf() < 0.5 else 1.0
 		var z: float = brook_z(x) + side * rng.randf_range(4.0, 8.0)
 		if absf(x - FieldLayout.BRIDGE_X) < 4.0 or road_dist(x, z) < 3.0:
@@ -704,15 +832,14 @@ static func _grass(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var xs: Array[Transform3D] = []
 	var cs: Array[Color] = []
 	var tries: int = 0
-	var W: float = FieldLayout.WORLD
-	while xs.size() < 16000 and tries < 60000:
+	while xs.size() < 22000 and tries < 85000:
 		tries += 1
-		var x: float = rng.randf_range(4.0, W - 4.0)
-		var z: float = rng.randf_range(4.0, W - 4.0)
+		var x: float = rng.randf_range(4.0, FieldLayout.WORLD_X - 4.0)
+		var z: float = rng.randf_range(4.0, FieldLayout.WORLD_Z - 4.0)
 		if road_dist(x, z) < 2.6:
 			continue
 		var h: float = height(x, z)
-		if h < -0.3:
+		if h < -0.3 or (h < 0.12 and marsh_mask(x, z) > 0.2):
 			continue
 		var slope: float = absf(height(x + 1.0, z) - h) + absf(height(x, z + 1.0) - h)
 		if slope > 1.0:
@@ -733,6 +860,70 @@ static func _grass(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mmi.visibility_range_end = 80.0
 	parent.add_child(mmi)
+
+
+# ---------------------------------------------------------------- 안개 늪 (20단계)
+
+## 얕은 물 판, 마른 나무(MultiMesh), 갈대 덤불(MultiMesh). 안개는 field.gd가 화면만 짙게 한다.
+static func _marsh(parent: Node3D, circles: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var a: Rect2 = FieldLayout.AREAS[&"marsh"]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.13, 0.19, 0.16, 0.72)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.roughness = 0.1
+	m.metallic = 0.2
+	var pm := PlaneMesh.new()
+	pm.size = a.size * Grid.CELL
+	var water := MeshInstance3D.new()
+	water.name = "MarshWater"
+	water.mesh = pm
+	water.material_override = m
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.position = Vector3(a.get_center().x * Grid.CELL, 0.0, a.get_center().y * Grid.CELL)
+	parent.add_child(water)
+	var by_v: Array = [[], [], [], []]
+	var n: int = 0
+	var tries: int = 0
+	while n < 36 and tries < 3000:
+		tries += 1
+		var c := Vector2(rng.randf_range(a.position.x + 3.0, a.end.x - 3.0), rng.randf_range(a.position.y + 3.0, a.end.y - 3.0))
+		if not _free(c, 3.0):
+			continue
+		var x: float = c.x * Grid.CELL
+		var z: float = c.y * Grid.CELL
+		if height(x, z) < 0.1:
+			continue
+		var s: float = rng.randf_range(0.9, 1.5)
+		by_v[n % 4].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, height(x, z) - 0.1, z)))
+		circles.append([c, 0.3])
+		n += 1
+	for v in 4:
+		var xs: Array[Transform3D] = []
+		xs.assign(by_v[v])
+		if not xs.is_empty():
+			HillBuilder._multi(parent, HillBuilder.bare_tree(v), xs, true, HillBuilder.bark()).visibility_range_end = 150.0
+	var reeds: Array[Transform3D] = []
+	var clumps: int = 0
+	tries = 0
+	while clumps < 90 and tries < 3000:
+		tries += 1
+		var cx: float = rng.randf_range(a.position.x + 2.0, a.end.x - 2.0) * Grid.CELL
+		var cz: float = rng.randf_range(a.position.y + 2.0, a.end.y - 2.0) * Grid.CELL
+		var hc: float = height(cx, cz)
+		if hc > 0.6 or hc < -0.5:
+			continue
+		for k in 7:
+			var x: float = cx + rng.randf_range(-1.4, 1.4)
+			var z: float = cz + rng.randf_range(-1.4, 1.4)
+			var h: float = rng.randf_range(1.1, 2.2)
+			var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.25, 0.25))
+			reeds.append(Transform3D(b.scaled(Vector3(1, h, 1)), Vector3(x, height(x, z) + h / 2.0 - 0.05, z)))
+		clumps += 1
+	var rm := BoxMesh.new()
+	rm.size = Vector3(0.04, 1.0, 0.04)
+	HillBuilder._multi(parent, rm, reeds, false, _mat("reed", Color(0.28, 0.27, 0.12))).visibility_range_end = 90.0
 
 
 # ---------------------------------------------------------------- 찾을 것의 모양
