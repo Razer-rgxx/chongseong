@@ -278,9 +278,10 @@ func _on_dusk() -> void:
 	_sfx.play(&"night", _lord.position, -2.0)
 
 
-## 날이 밝았다: 한 줄. 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 비운다. 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
+## 날이 밝았다: 한 줄. 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 맞춘다(영주 곁이라 건너뛴 것만 남는다).
+## 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
 func _on_dawn() -> void:
-	meta.packs_cleared = {}
+	meta.packs_cleared = rules.field_cleared_ids()
 	_hud.toast("날이 밝는다")
 	_saved()
 

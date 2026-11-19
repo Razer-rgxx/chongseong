@@ -1024,6 +1024,8 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 		return
 	if debug_god:
 		return
+	if field_night and attacker != null and attacker.pack != &"":
+		d *= FieldLayout.FIELD_NIGHT_DAMAGE   # 29단계: 들판의 밤에는 무리 적이 더 아프게 때린다(보스는 무리가 아니다)
 	d = powers.lord_damage(d, attacker)
 	L.hp -= d
 	L.invuln = data.lord.hurt_invuln
@@ -1305,12 +1307,29 @@ func _step_field_clock() -> void:
 
 
 ## 날이 밝았다: 쓰러뜨린 낮 무리의 기록을 지우고 빈 자리의 무리를 다시 세운다(안 쓰러뜨린 무리는 그대로).
+## 영주가 제자리에서 FIELD_DAWN_SAFE칸 안에 있는 무리는 곁에서 솟지 않게 이번 새벽은 건너뛴다(쓰러뜨린 채로, 다음 새벽에).
 ## 밤 무리는 _step_field가 덤비는 중이 아닌 것부터 거둔다.
 func _field_dawn() -> void:
-	for id in packs.keys():
-		if packs[id].cleared and not bool(packs[id].night):
-			packs.erase(id)
-	spawn_packs()
+	var skip: Dictionary = {}
+	for id in FieldLayout.PACKS:
+		var sid := StringName(id)
+		var near: bool = lord.pos.distance_to(FieldLayout.PACKS[id].at) <= FieldLayout.FIELD_DAWN_SAFE
+		if packs.has(sid):
+			if packs[sid].cleared and not near:
+				packs.erase(sid)
+		elif near:
+			skip[id] = 1
+	spawn_packs(skip)
+
+
+## 쓰러뜨린 채로 있는(또는 아직 안 선) 낮 무리 id. 장면이 새벽에 Meta.packs_cleared를 이것으로 맞춘다.
+func field_cleared_ids() -> Dictionary:
+	var out: Dictionary = {}
+	for id in FieldLayout.PACKS:
+		var sid := StringName(id)
+		if not packs.has(sid) or bool(packs[sid].cleared):
+			out[id] = 1
+	return out
 
 
 ## 밤 무리(FieldLayout.NIGHT_PACKS)를 모두 세운다(이미 서 있는 것은 그대로).

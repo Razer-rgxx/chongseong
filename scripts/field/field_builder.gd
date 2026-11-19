@@ -1055,7 +1055,7 @@ static func _quarry(parent: Node3D, rects: Array[Rect2]) -> void:
 		var hi := Vector2(-1e9, -1e9)
 		for p in posts:
 			var pc: Vector2 = p.get_center() * Grid.CELL
-			_box(parent, Vector3(p.size.x * Grid.CELL, 4.6, p.size.y * Grid.CELL), Vector3(pc.x, height(pc.x, pc.y) + 2.0, pc.y), wd, Vector3(0.0, 0.0, rng.randf_range(-0.03, 0.03)))
+			_box(parent, Vector3(p.size.x * Grid.CELL * 0.75, 4.6, p.size.y * Grid.CELL * 0.75), Vector3(pc.x, height(pc.x, pc.y) + 2.0, pc.y), wd, Vector3(0.0, 0.0, rng.randf_range(-0.03, 0.03)))
 			rects.append(p)
 			lo = lo.min(pc)
 			hi = hi.max(pc)

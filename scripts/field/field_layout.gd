@@ -185,9 +185,9 @@ const QUARRY_CLIFFS: Array[Rect2] = [
 const QUARRY_BLOCKS: Array[Rect2] = [
 	Rect2(181, 10, 4, 3), Rect2(210, 9, 5, 3), Rect2(214, 32, 4, 3), Rect2(177, 10, 3, 3),
 ]
-const QUARRY_POSTS: Array[Rect2] = [   # 비계 둘(기둥만 막힘, 위의 널은 머리 위)
-	Rect2(199, 12, 0.7, 0.7), Rect2(199, 15.3, 0.7, 0.7), Rect2(201.65, 12, 0.7, 0.7), Rect2(201.65, 15.3, 0.7, 0.7), Rect2(204.3, 12, 0.7, 0.7), Rect2(204.3, 15.3, 0.7, 0.7),
-	Rect2(203, 30, 0.7, 0.7), Rect2(203, 33.3, 0.7, 0.7), Rect2(207.3, 30, 0.7, 0.7), Rect2(207.3, 33.3, 0.7, 0.7),
+const QUARRY_POSTS: Array[Rect2] = [   # 비계 둘(기둥만 막힘, 위의 널은 머리 위). 기둥은 가는 통나무(0.6m)라 막힘도 그만큼
+	Rect2(199.2, 12.2, 0.3, 0.3), Rect2(199.2, 15.5, 0.3, 0.3), Rect2(201.85, 12.2, 0.3, 0.3), Rect2(201.85, 15.5, 0.3, 0.3), Rect2(204.5, 12.2, 0.3, 0.3), Rect2(204.5, 15.5, 0.3, 0.3),
+	Rect2(203.2, 30.2, 0.3, 0.3), Rect2(203.2, 33.5, 0.3, 0.3), Rect2(207.5, 30.2, 0.3, 0.3), Rect2(207.5, 33.5, 0.3, 0.3),
 ]
 ## 불탄 마을: 지붕 없이 그을린 집 벽 여섯 채(문 자리와 무너진 자리는 비움), 우물, 무너진 울타리.
 const HAMLET_WALLS: Array[Rect2] = [
@@ -218,6 +218,10 @@ const FIELD_NIGHT: float = 150.0
 ## 밤에 무리가 덤빌 때 세기 구역에 더하는 수(RunData.zone_hp 길이를 넘지 않게 자른다)와 밤의 덤빔 거리(낮은 PACK_AGGRO).
 const FIELD_NIGHT_ZONE: int = 1
 const FIELD_NIGHT_AGGRO: float = 14.0
+## 밤에 무리 적(낮 무리·밤 무리, 보스 빼고)이 영주에게 주는 피해 배수. 저주받은 밤(×1.25)과 같은 값.
+const FIELD_NIGHT_DAMAGE: float = 1.25
+## 새벽에 쓰러뜨린 무리를 다시 세울 때, 영주가 제자리에서 이만큼(칸) 안이면 이번 새벽은 건너뛴다(곁에서 솟아 바로 덤비지 않게, 밤 덤빔 거리와 같다).
+const FIELD_DAWN_SAFE: float = 14.0
 ## 해질녘·새벽에 하늘과 빛이 바뀌는 시간(초, night_amount). 화면만 쓴다.
 const FIELD_TWILIGHT: float = 40.0
 ## 영주 횃불의 세기(낮 / 밤). 언덕의 밤 횃불(main.torch_energy)과 같다.

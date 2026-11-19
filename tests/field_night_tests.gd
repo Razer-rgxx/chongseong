@@ -18,6 +18,7 @@ func _all() -> void:
 	_night_strength()
 	_night_packs()
 	_dawn_respawn()
+	_night_damage()
 	_replay()
 	_save()
 	Grid.size = Vector2i(34, 22)
@@ -272,6 +273,26 @@ func _dawn_respawn() -> void:
 	check.call(not s.packs.has(&"foot") and not s.packs.has(&"tower"), "새벽 되살림: 이미 쓰러뜨려 건너뛴 무리는 아직 없다")
 	_run(s, 2.5)
 	check.call(s.packs.has(&"foot") and s.packs.has(&"tower") and s.pack_alive(&"foot") == 4, "새벽 되살림: 건너뛴 무리도 날이 밝으면 다시 선다")
+	check.call(not s.field_cleared_ids().has("foot"), "새벽 되살림: 다시 선 무리는 쓰러뜨린 기록에서 빠진다")
+	# 영주 곁(FIELD_DAWN_SAFE 안)의 쓰러뜨린 무리는 이번 새벽에 솟지 않고 다음 새벽에 선다
+	var n := _field(0.0)
+	n.spawn_packs()
+	for e in n.enemies:
+		if e.pack == &"road_south":
+			n.hurt(e, 1e9, Vector2.ZERO, false)
+	_run(n, 0.2)
+	n.lord.pos = FieldLayout.PACKS["road_south"].at + Vector2(6, 0)
+	n.lord.prev_pos = n.lord.pos
+	n.field_clock = FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT - 0.5
+	n.field_night = true
+	_run(n, 1.0)
+	check.call(n.packs[&"road_south"].cleared and n.pack_alive(&"road_south") == 0 and n.field_cleared_ids().has("road_south"), "새벽 되살림: 영주 곁의 무리는 곁에서 솟지 않는다(쓰러뜨린 채로 남는다)")
+	n.lord.pos = Vector2(55, 105)
+	n.lord.prev_pos = n.lord.pos
+	n.field_clock = FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT - 0.5
+	n.field_night = true
+	_run(n, 1.0)
+	check.call(not n.packs[&"road_south"].cleared and n.pack_alive(&"road_south") == 3, "새벽 되살림: 멀어진 뒤 다음 새벽에는 선다")
 	# Meta: 날이 밝을 때 packs_cleared를 비우면 다시 보상을 받는다(장면이 field_dawn에서 한다), 상자·조각·보스·무덤은 그대로
 	var m := Meta.new()
 	m.rng.seed = 2
@@ -287,6 +308,26 @@ func _dawn_respawn() -> void:
 	m2.field_clock = 123.0
 	m2.record_run(hill, d.meta)
 	check.call(m2.packs_cleared.is_empty() and m2.field_clock == 123.0, "새벽 되살림: record_run도 지금처럼 무리를 비우고 시계는 건드리지 않는다")
+
+
+## 밤에는 무리 적이 영주를 더 아프게 때린다(보스·무리 아닌 적은 그대로).
+func _night_damage() -> void:
+	var hits: Array = []
+	for night in [false, true]:
+		var r := _field(FieldLayout.FIELD_DAY + 5.0 if night else 5.0)
+		r.debug_god = false
+		var e := r.spawn_at(&"wraith", r.lord.pos + Vector2(3, 0))
+		e.pack = &"road_south"
+		var hp0: float = r.lord.hp
+		r._hurt_lord(10.0, e)
+		hits.append(hp0 - r.lord.hp)
+		var b := r.spawn_at(&"wraith", r.lord.pos + Vector2(-3, 0))
+		r.lord.invuln = 0.0
+		var hp1: float = r.lord.hp
+		r._hurt_lord(10.0, b)
+		hits.append(hp1 - r.lord.hp)
+	check.call(is_equal_approx(hits[2], hits[0] * FieldLayout.FIELD_NIGHT_DAMAGE), "밤 세기: 밤에는 무리 적의 피해가 ×%.2f" % FieldLayout.FIELD_NIGHT_DAMAGE)
+	check.call(is_equal_approx(hits[3], hits[1]), "밤 세기: 무리가 아닌 적(보스 등)의 피해는 그대로")
 
 
 func _replay() -> void:
