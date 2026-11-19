@@ -56,7 +56,7 @@
   ```
   git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
   ```
-  bundle은 **`75be671..geom-hill`**로 만든다. 2026-11-19 밤에 PC를 직접 열어 보니 PC의 geom-hill은 `75be671`(검 받기 창)에서 멈춰 있었다. GitHub의 7163afa도, 그 뒤 bundle도 PC에 들어간 적이 없다(7163afa 기준 bundle은 "필요한 커밋 없음"으로 실패했다). PC가 따라잡으면(사용자가 pull에 성공하면) 그 커밋을 새 기준으로 삼는다. 매번 그때까지 전부 들어 있어서 최신 것 하나만 받으면 된다.
+  bundle은 **PC의 지금 커밋..geom-hill**로 만든다(2026-11-19 23시: PC는 `3e913be`, 그 전에는 `75be671`). 2026-11-19 밤에 PC를 직접 열어 보니 PC의 geom-hill은 `75be671`(검 받기 창)에서 멈춰 있었다. GitHub의 7163afa도, 그 뒤 bundle도 PC에 들어간 적이 없다(7163afa 기준 bundle은 "필요한 커밋 없음"으로 실패했다). PC가 따라잡으면(사용자가 pull에 성공하면) 그 커밋을 새 기준으로 삼는다. 매번 그때까지 전부 들어 있어서 최신 것 하나만 받으면 된다.
 - PC가 이 세션에 연결돼 있으면(`mcp__remote-devices__*`) `device_commit_files`로 bundle을 저장소 맨 위에 `update.bundle`로 바로 써 준다(`.git` 안은 쓰기가 막힌다, `*.bundle`은 .gitignore). 사용자는 `git pull .\update.bundle geom-hill` 한 줄만 친다. PC의 git 상태는 `.git/logs/HEAD`·`refs/heads/geom-hill`을 stage해서 본다(device_bash 없음).
 - 사용자의 터미널은 **PowerShell**이다(`&&`가 안 된다, `;`로 잇는다). Godot 폴더(바탕화면)에서 연 PowerShell에 붙여 넣는다.
 - 사용자에게는 **명령 한 줄**로 준다(파일을 풀거나 복사하게 하지 않는다). 사용자는 "왜 내가 푸냐, 전 클로드는 한 줄이면 됐다"고 했다:
@@ -87,7 +87,7 @@
 | 22 | 온라인 결투(GD-Sync, 입력만 주고받는 락스텝) | `scripts/net/`, `addons/GD-Sync` |
 | 23 | 관리 패널: 나머지는 이미 있었고 **조각 주기만** 더함 | 검 콘솔(` 또는 F6, 언덕에서)에 `조각 500` + Enter |
 | 24 | 적 모델: 적은 **이미 다 모양이 있다**(망령 망토, 늑대, 새 적 5종 EnemyArt, 큰 적·방패병은 Mixamo 기사). 바꿔 끼울 자리만 만듦: `assets/characters/enemies/<적 id>.fbx`가 있으면 그것(`LordCharacter.enemy_path`·`char_path`) | assets/characters/README.md "적 모델" |
-| 27 | 시작 화면(시작·설정·끝내기), 설정 창(소리 크기·마우스 감도·키 11개, `user://settings.cfg`), 마을·언덕에서 F10, Windows 내보내기 설정 "Windows Desktop" | `scenes/title/`, `GameSettings`, `SettingsPanel` |
+| 27 | 시작 화면(해 질 녘 언덕 3D 배경, 금빛 검·불씨·재, "아무 키나 누르세요" → 시작·설정·끝내기, `scripts/title/title.gd`, 찍기 `scripts/debug/shots/shot_title.gd`), 설정 창(소리 크기·마우스 감도·키 11개, `user://settings.cfg`), 마을·언덕에서 F10, Windows 내보내기 설정 "Windows Desktop" | `scenes/title/`, `GameSettings`, `SettingsPanel` |
 | 28 | 새 지역 더: 들판 230×110칸, 버려진 채석장·불탄 마을·까마귀 고개(그린 곳 = 막힌 곳 표, 틈 셋), 무리 5·상자 4·비석 2·조각 후보 3 | `FieldLayout.QUARRY_*`·`HAMLET_*`·`PASS_*`, `FieldBuilder._quarry/_hamlet/_pass/new_land` |
 | 29 | 들판 낮밤과 다시 생기는 적: 시계(낮 240초·밤 150초, `Meta.field_clock`), 밤엔 덤빔 14칸·세기 구역 +1·무리 적 피해 ×1.25(`FIELD_NIGHT_DAMAGE`), 밤에만 서는 무리 4곳, 새벽마다 낮 무리 되살림(영주 14칸 안의 무리는 그 새벽 건너뜀, `FIELD_DAWN_SAFE`), 밤 화면과 영주 횃불 | `Rules._step_field_clock`, `FieldLayout.NIGHT_PACKS`·`night_amount`, `field.gd._light`, docs/outside.md |
 
@@ -124,7 +124,7 @@
 4. bundle 다시 만들고 인계서 복사해 SendUserFile:
    ```
    cd /home/claude/chongseong && mkdir -p /home/claude/out
-   git bundle create /home/claude/out/chongseong.bundle 75be671..geom-hill
+   git bundle create /home/claude/out/chongseong.bundle <PC의 커밋>..geom-hill   # PC의 .git/logs/HEAD 마지막 줄에서 본다
    cp docs/handoff.md /home/claude/out/handoff.md
    ```
    (푸시가 되면 bundle 대신 `git push origin geom-hill`.)
