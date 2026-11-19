@@ -70,6 +70,7 @@
 
 - 클라우드에서는 Godot 에디터로 직접 플레이할 수 없다. Godot 실행 파일을 받을 수 있으면 헤드리스로 프로젝트를 열어 스크립트 오류와 `tests/`를 확인하고, Xvfb와 gl_compatibility로 화면을 찍어 본다. 받을 수 없으면 그 사실을 정리에 적는다.
 - 손맛(이동, 베기, 넉백, 돌진, 히트스톱)은 사용자가 PC에서 맞춘다. 수치를 리소스로 빼 두는 이유다.
+- 웹판: `python3 docs/web_build.py <godot> <폴더>`가 `export_presets.cfg`의 "Web"(스레드 없음)으로 내보내고, 100MB가 넘는 index.pck를 90MB 조각으로 잘라 index.html이 이어 붙이게 고친다. 그 폴더를 `gh-pages` 가지로 올리면 https://razer-rgxx.github.io/chongseong/ 에서 돈다(웨일북용). 사운드 팩은 공개 웹판에서도 뺀다.
 - 규칙이 시험판과 같게 도는지 헷갈리면 `prototype/geom_hill.html`을 브라우저로 열어 본다. ` 키로 관리 패널이 열린다.
 
 ## 폴더 구조
