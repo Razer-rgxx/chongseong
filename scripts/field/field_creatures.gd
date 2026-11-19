@@ -5,8 +5,8 @@ extends Node3D
 
 const CROW_FLEE: float = 9.0
 const DEER_FLEE: float = 16.0
-## 까마귀 자리(칸): 망루, 옛 싸움터, 안개 늪(끝 넷). 사슴 자리: 개울과 숲가.
-const CROW_SPOTS: PackedVector2Array = [Vector2(90, 34), Vector2(94, 38), Vector2(88, 40), Vector2(80, 84), Vector2(86, 90), Vector2(98, 80), Vector2(74, 78), Vector2(95, 33), Vector2(118, 90), Vector2(134, 78), Vector2(146, 102), Vector2(160, 88)]
+## 까마귀 자리(칸): 망루, 옛 싸움터, 안개 늪(넷), 까마귀 고개(넷)와 불탄 마을(둘)(끝 여섯, 28단계). 사슴 자리: 개울과 숲가.
+const CROW_SPOTS: PackedVector2Array = [Vector2(90, 34), Vector2(94, 38), Vector2(88, 40), Vector2(80, 84), Vector2(86, 90), Vector2(98, 80), Vector2(74, 78), Vector2(95, 33), Vector2(118, 90), Vector2(134, 78), Vector2(146, 102), Vector2(160, 88), Vector2(180, 96), Vector2(196, 94), Vector2(210, 97), Vector2(222, 92), Vector2(190, 48), Vector2(216, 75)]
 const DEER_SPOTS: PackedVector2Array = [Vector2(30, 58), Vector2(22, 66), Vector2(36, 38)]
 
 var _rng := RandomNumberGenerator.new()

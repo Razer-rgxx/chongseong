@@ -49,12 +49,33 @@ static func height(x: float, z: float) -> float:
 	h += 14.0 * smoothstep(0.0, 60.0, e) + e * 0.03
 	# 원래 동쪽 둘레(x 214~220m)는 개울 근처만 틈을 낸 언덕 띠(20단계)
 	h += 4.5 * exp(-pow((x - 217.0) / 5.0, 2.0)) * smoothstep(6.0, 14.0, absf(z - 118.0))
+	# 20단계 동쪽 둘레(x 334~340m): 틈(EAST_GAPS) 셋을 빼고 솟은 언덕 띠(28단계)
+	var rk: float = 1.0
+	for g in FieldLayout.EAST_GAPS:
+		rk = minf(rk, smoothstep(g.y - 8.0, g.y, absf(z - g.x)))
+	h += 4.5 * exp(-pow((x - 337.0) / 5.0, 2.0)) * rk
+	h += new_land(x, z)
 	var m: float = marsh_mask(x, z)
 	if m > 0.0:   # 안개 늪: 얕은 물 높이보다 조금 높은 땅과 군데군데 웅덩이
 		var pool: float = smoothstep(0.02, 0.22, _n.get_noise_2d(x * 2.6 + 900.0, z * 2.6))
 		h = lerpf(h, 0.35 + _n.get_noise_2d(x * 5.0, z * 5.0) * 0.15 - pool * 0.9, m)
 	var w: float = exp(-pow((z - brook_z(x)) / 4.5, 2.0))
 	return lerpf(h, -1.8, w * 0.95)
+
+
+## 새 곳 셋(28단계)이 더하는 높이(m): 채석장의 구덩이(깊이 QUARRY_PIT_DEPTH), 고개의 오르막과 양쪽 벼랑 옆 솟음.
+static func new_land(x: float, z: float) -> float:
+	var out: float = 0.0
+	var c: Vector2 = FieldLayout.QUARRY_PIT_AT * Grid.CELL
+	var r: Vector2 = FieldLayout.QUARRY_PIT_R * Grid.CELL
+	var q: float = Vector2((x - c.x) / r.x, (z - c.y) / r.y).length()
+	out -= FieldLayout.QUARRY_PIT_DEPTH * (1.0 - smoothstep(0.55, 1.0, q))
+	if x > 340.0:   # 까마귀 고개: 동쪽으로 오르고, 길(z 184~196) 양쪽은 솟는다(불탄 마을 쪽 틈은 빼고)
+		var in_pass: float = smoothstep(158.0, 170.0, z) * (1.0 - smoothstep(214.0, 222.0, z))
+		out += FieldLayout.PASS_RISE * smoothstep(344.0, 452.0, x) * in_pass
+		var side: float = smoothstep(8.0, 14.0, absf(z - 190.0)) * smoothstep(3.0, 9.0, absf(x - 386.0))
+		out += FieldLayout.PASS_WALL * side * in_pass * smoothstep(340.0, 350.0, x)
+	return out
 
 
 ## 걸을 때의 높이: 돌다리 위는 다리 판 높이.
@@ -97,6 +118,10 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_tower(parent, rects)
 	_keep(parent, rects)
 	_east_ridge(parent, circles)
+	_east_ridge(parent, circles, 337.0, 23)
+	_quarry(parent, rects)
+	_hamlet(parent, rects)
+	_pass(parent, rects)
 	_old_field(parent, rng, circles)
 	_grove(parent, rng, circles)
 	_foot(parent, circles)
@@ -292,7 +317,7 @@ static func _water(parent: Node3D) -> void:
 	mi.mesh = pm
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.position = Vector3(170.0, WATER_Y, 116.0)
+	mi.position = Vector3(230.0, WATER_Y, 116.0)
 	parent.add_child(mi)
 
 
@@ -410,18 +435,21 @@ static func _keep(parent: Node3D, rects: Array[Rect2]) -> void:
 
 # ---------------------------------------------------------------- 원래 동쪽 둘레 (20단계)
 
-## 원래 동쪽 둘레(x 214~220m)의 숲과 벼랑 돌. 개울 근처(z 약 104~132m)만 틈을 내 새 지역으로 이어진다(막힘은 BORDER_RECTS).
-static func _east_ridge(parent: Node3D, _circles: Array) -> void:
+## 동쪽 둘레(원래 x 214~220m, 28단계에서 새 둘레 x 334~340m도)의 숲과 벼랑 돌. 틈(gaps: Vector2(가운데 z m, 반폭 m))만 비워 이어진다(막힘은 BORDER_RECTS).
+static func _east_ridge(parent: Node3D, _circles: Array, cx: float = 217.0, seed_value: int = 22) -> void:
+	var gaps: Array[Vector2] = [Vector2(118.0, 14.0)]
+	if cx > 300.0:
+		gaps.assign(FieldLayout.EAST_GAPS)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 22
+	rng.seed = seed_value
 	var by_v: Array = [[], [], []]
 	var n: int = 0
 	var tries: int = 0
 	while n < 120 and tries < 4000:
 		tries += 1
-		var x: float = rng.randf_range(206.0, 226.0)
+		var x: float = rng.randf_range(cx - 11.0, cx + 9.0)
 		var z: float = rng.randf_range(-10.0, FieldLayout.WORLD_Z + 10.0)
-		if absf(z - 118.0) < 15.0:
+		if _in_gap(z, gaps, 1.0):
 			continue
 		var s: float = rng.randf_range(0.9, 1.7)
 		by_v[n % 3].append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, height(x, z) - 0.1, z)))
@@ -433,9 +461,9 @@ static func _east_ridge(parent: Node3D, _circles: Array) -> void:
 			HillBuilder._multi(parent, HillBuilder.pine(v), xs, true, HillBuilder.pine_mat()).visibility_range_end = 260.0
 	var parts: Array[Dictionary] = HillBuilder.rock_parts()
 	for i in 16:
-		var x: float = rng.randf_range(210.0, 224.0)
+		var x: float = rng.randf_range(cx - 7.0, cx + 7.0)
 		var z: float = rng.randf_range(0.0, FieldLayout.WORLD_Z - 12.0)
-		if absf(z - 118.0) < 14.0:
+		if _in_gap(z, gaps, 0.0):
 			continue
 		var at := Vector3(x, height(x, z), z)
 		var s: float = rng.randf_range(2.5, 4.5)
@@ -445,6 +473,13 @@ static func _east_ridge(parent: Node3D, _circles: Array) -> void:
 		else:
 			mi = HillBuilder.put_flat(parent, parts[rng.randi() % parts.size()], at, rng.randf() * TAU, s)
 		mi.visibility_range_end = 160.0
+
+
+static func _in_gap(z: float, gaps: Array[Vector2], extra: float) -> bool:
+	for g in gaps:
+		if absf(z - g.x) < g.y + extra:
+			return true
+	return false
 
 
 # ---------------------------------------------------------------- 옛 싸움터
@@ -731,7 +766,31 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 			return false
 	if FieldLayout.KEEP_TOWER.grow(5.0).has_point(c):
 		return false
+	for r in _new_blocks():   # 28단계 새 곳의 막힘 둘레에는 숲·바위 흩뿌림이 서지 않는다
+		if r.grow(3.0).has_point(c):
+			return false
+	if FieldLayout.QUARRY_PIT_AT.distance_to(c) < FieldLayout.QUARRY_PIT_R.x + 2.0 and absf(c.y - FieldLayout.QUARRY_PIT_AT.y) < FieldLayout.QUARRY_PIT_R.y + 2.0:
+		return false
 	return true
+
+
+## 돌바닥 곳(채석장·까마귀 고개): 숲과 풀이 서지 않는다(m 좌표).
+static func _rocky(x: float, z: float) -> bool:
+	var c := Vector2(x, z) / Grid.CELL
+	return (FieldLayout.AREAS[&"quarry"] as Rect2).has_point(c) or (FieldLayout.AREAS[&"pass"] as Rect2).has_point(c)
+
+
+## 새 곳 셋의 막힌 곳(칸 단위) 전부.
+static func _new_blocks() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	out.append_array(FieldLayout.QUARRY_CLIFFS)
+	out.append_array(FieldLayout.QUARRY_BLOCKS)
+	out.append_array(FieldLayout.QUARRY_POSTS)
+	out.append_array(FieldLayout.HAMLET_WALLS)
+	out.append_array(FieldLayout.HAMLET_FENCES)
+	out.append(FieldLayout.HAMLET_WELL)
+	out.append_array(FieldLayout.PASS_CLIFFS)
+	return out
 
 
 static func _forest(parent: Node3D, rng: RandomNumberGenerator, circles: Array) -> void:
@@ -740,7 +799,7 @@ static func _forest(parent: Node3D, rng: RandomNumberGenerator, circles: Array) 
 	var n: int = 0
 	var WX: float = FieldLayout.WORLD_X
 	var WZ: float = FieldLayout.WORLD_Z
-	while n < 700 and tries < 30000:
+	while n < 920 and tries < 40000:
 		tries += 1
 		var x: float = rng.randf_range(-80.0, WX + 80.0)
 		var z: float = rng.randf_range(-100.0, WZ + 70.0)
@@ -752,6 +811,8 @@ static func _forest(parent: Node3D, rng: RandomNumberGenerator, circles: Array) 
 			if rng.randf() > 0.06 or not _free(Vector2(x, z) / Grid.CELL, 4.0) or marsh_mask(x, z) > 0.0:
 				continue
 		if not in_field and e > 70.0 + 30.0 * rng.randf():
+			continue
+		if in_field and _rocky(x, z):
 			continue
 		if absf(x - 110.0) < 14.0 and (z < 14.0 or z > WZ - 14.0):
 			continue
@@ -772,8 +833,8 @@ static func _rocks(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var parts: Array[Dictionary] = HillBuilder.rock_parts()
 	var WX: float = FieldLayout.WORLD_X
 	var WZ: float = FieldLayout.WORLD_Z
-	for i in 60:
-		var edge: bool = i < 48
+	for i in 80:
+		var edge: bool = i < 64
 		var x: float
 		var z: float
 		if edge:
@@ -832,14 +893,14 @@ static func _grass(parent: Node3D, rng: RandomNumberGenerator) -> void:
 	var xs: Array[Transform3D] = []
 	var cs: Array[Color] = []
 	var tries: int = 0
-	while xs.size() < 22000 and tries < 85000:
+	while xs.size() < 28000 and tries < 110000:
 		tries += 1
 		var x: float = rng.randf_range(4.0, FieldLayout.WORLD_X - 4.0)
 		var z: float = rng.randf_range(4.0, FieldLayout.WORLD_Z - 4.0)
 		if road_dist(x, z) < 2.6:
 			continue
 		var h: float = height(x, z)
-		if h < -0.3 or (h < 0.12 and marsh_mask(x, z) > 0.2):
+		if h < -0.3 or (h < 0.12 and marsh_mask(x, z) > 0.2) or _rocky(x, z):
 			continue
 		var slope: float = absf(height(x + 1.0, z) - h) + absf(height(x, z + 1.0) - h)
 		if slope > 1.0:
@@ -926,6 +987,163 @@ static func _marsh(parent: Node3D, circles: Array) -> void:
 	HillBuilder._multi(parent, rm, reeds, false, _mat("reed", Color(0.28, 0.27, 0.12))).visibility_range_end = 90.0
 
 
+# ---------------------------------------------------------------- 새 곳 셋 (28단계)
+
+static func _char_mat() -> Material:
+	return VillageBuilder.noise_mat("hamlet_char", Color(0.02, 0.017, 0.015), Color(0.1, 0.078, 0.064), 3.0, 0.09)
+
+
+static func _cut_stone() -> Material:
+	return VillageBuilder.noise_mat("quarry_cut", Color(0.3, 0.28, 0.26), Color(0.52, 0.5, 0.46), 2.0, 0.05)
+
+
+## 돌 벼랑 한 줄(칸 표 rect): 긴 쪽을 따라 돌 상자를 세운다(높이가 들쭉날쭉). 그린 곳이 곧 막힌 곳이다.
+static func _cliff(parent: Node3D, r: Rect2, rng: RandomNumberGenerator, m: Material, hmin: float, hmax: float) -> void:
+	var along_x: bool = r.size.x >= r.size.y
+	var length: float = (r.size.x if along_x else r.size.y) * Grid.CELL
+	var depth: float = (r.size.y if along_x else r.size.x) * Grid.CELL
+	var n: int = maxi(int(length / 2.8), 1)
+	var seg: float = length / n
+	for k in n:
+		var h: float = rng.randf_range(hmin, hmax)
+		var along: float = (k + 0.5) * seg
+		var cx: float = (r.position.x * Grid.CELL + along) if along_x else (r.position.x + r.size.x / 2.0) * Grid.CELL
+		var cz: float = (r.position.y + r.size.y / 2.0) * Grid.CELL if along_x else (r.position.y * Grid.CELL + along)
+		var base: float = height(cx, cz)
+		var size: Vector3 = Vector3(seg * 1.05, h, depth) if along_x else Vector3(depth, h, seg * 1.05)
+		_box(parent, size, Vector3(cx, base + h / 2.0 - 1.2, cz), m, Vector3(0.0, rng.randf_range(-0.03, 0.03), 0.0), 260.0)
+
+
+## 흩어진 돌(깬 돌, 불탄 잔해)을 rect 둘레에 뿌린다. 작아서 막힘에 넣지 않는다.
+static func _scatter(parent: Node3D, r: Rect2, count: int, spread: float, m: Material, rng: RandomNumberGenerator, smin: float = 0.3, smax: float = 0.9) -> void:
+	for i in count:
+		var x: float = (r.position.x + r.size.x * rng.randf()) * Grid.CELL + rng.randf_range(-spread, spread)
+		var z: float = (r.position.y + r.size.y * rng.randf()) * Grid.CELL + rng.randf_range(-spread, spread)
+		var sz: float = rng.randf_range(smin, smax)
+		_box(parent, Vector3(sz, sz * 0.7, sz * 1.2), Vector3(x, height(x, z) + sz * 0.2, z), m, Vector3(rng.randf() * 0.5, rng.randf() * TAU, rng.randf() * 0.5), 110.0)
+
+
+## 버려진 채석장: 파인 구덩이(땅 높이 new_land), 돌 벼랑, 잘린 돌덩이, 나무 비계 둘. 글자 없음.
+static func _quarry(parent: Node3D, rects: Array[Rect2]) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 28
+	var st: Material = _stone()
+	for c in FieldLayout.QUARRY_CLIFFS:
+		_cliff(parent, c, rng, st, 4.0, 8.0)
+		rects.append(c)
+	var cut: Material = _cut_stone()
+	for b in FieldLayout.QUARRY_BLOCKS:   # 잘린 돌덩이: 큰 상자 위에 얹은 작은 상자
+		var cx: float = b.get_center().x * Grid.CELL
+		var cz: float = b.get_center().y * Grid.CELL
+		var h: float = rng.randf_range(2.2, 3.4)
+		var base: float = height(cx, cz)
+		_box(parent, Vector3(b.size.x * Grid.CELL, h, b.size.y * Grid.CELL), Vector3(cx, base + h / 2.0 - 0.4, cz), cut)
+		_box(parent, Vector3(b.size.x * Grid.CELL * 0.5, 0.9, b.size.y * Grid.CELL * 0.6), Vector3(cx + 0.4, base + h + 0.1, cz - 0.2), cut, Vector3(0.0, rng.randf_range(-0.3, 0.3), 0.0))
+		rects.append(b)
+	_scatter(parent, Rect2(176, 6, 46, 32), 40, 0.0, cut, rng)
+	# 나무 비계: 기둥(막힘) 위에 가로대와 반쯤 남은 널
+	var wd: Material = _wood()
+	for gi in 2:
+		var posts: Array[Rect2] = []
+		for i in FieldLayout.QUARRY_POSTS.size():
+			if (i < 6) == (gi == 0):
+				posts.append(FieldLayout.QUARRY_POSTS[i])
+		var lo := Vector2(1e9, 1e9)
+		var hi := Vector2(-1e9, -1e9)
+		for p in posts:
+			var pc: Vector2 = p.get_center() * Grid.CELL
+			_box(parent, Vector3(p.size.x * Grid.CELL, 4.6, p.size.y * Grid.CELL), Vector3(pc.x, height(pc.x, pc.y) + 2.0, pc.y), wd, Vector3(0.0, 0.0, rng.randf_range(-0.03, 0.03)))
+			rects.append(p)
+			lo = lo.min(pc)
+			hi = hi.max(pc)
+		var mid: Vector2 = (lo + hi) / 2.0
+		var base: float = height(mid.x, mid.y)
+		_box(parent, Vector3(hi.x - lo.x + 0.4, 0.22, 0.22), Vector3(mid.x, base + 1.8, lo.y), wd)
+		_box(parent, Vector3(hi.x - lo.x + 0.4, 0.22, 0.22), Vector3(mid.x, base + 1.8, hi.y), wd)
+		_box(parent, Vector3(0.22, 0.22, hi.y - lo.y + 0.4), Vector3(lo.x, base + 3.4, mid.y), wd)
+		_box(parent, Vector3(0.22, 0.22, hi.y - lo.y + 0.4), Vector3(hi.x, base + 3.4, mid.y), wd)
+		_box(parent, Vector3((hi.x - lo.x) * 0.55, 0.16, hi.y - lo.y + 0.6), Vector3(lo.x + (hi.x - lo.x) * 0.3, base + 3.55, mid.y), wd)   # 반쯤 남은 널
+		_box(parent, Vector3(0.18, 0.18, 4.2), Vector3(mid.x + 0.8, base + 1.2, mid.y), wd, Vector3(0.6, 0.4, 0.2))   # 쓰러진 대들보
+
+
+## 불탄 마을: 지붕 없이 그을린 집 벽(HAMLET_WALLS, 군데군데 낮게 무너짐), 우물, 무너진 울타리, 재와 숯 들보. 글자 없음.
+static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 29
+	var ch: Material = _char_mat()
+	for w in FieldLayout.HAMLET_WALLS:
+		var along_x: bool = w.size.x >= w.size.y
+		var length: float = (w.size.x if along_x else w.size.y) * Grid.CELL
+		var thick: float = (w.size.y if along_x else w.size.x) * Grid.CELL
+		var n: int = maxi(int(length / 1.4), 1)
+		var seg: float = length / n
+		for k in n:
+			var h: float = rng.randf_range(1.6, 3.2)
+			if rng.randf() < 0.3:
+				h = rng.randf_range(0.4, 0.9)   # 타서 내려앉은 자리
+			var along: float = (k + 0.5) * seg
+			var cx: float = (w.position.x * Grid.CELL + along) if along_x else (w.position.x + w.size.x / 2.0) * Grid.CELL
+			var cz: float = (w.position.y + w.size.y / 2.0) * Grid.CELL if along_x else (w.position.y * Grid.CELL + along)
+			var size: Vector3 = Vector3(seg * 1.04, h, thick) if along_x else Vector3(thick, h, seg * 1.04)
+			_box(parent, size, Vector3(cx, height(cx, cz) + h / 2.0 - 0.2, cz), ch, Vector3(0.0, rng.randf_range(-0.03, 0.03), 0.0), 220.0)
+		rects.append(w)
+	# 집마다 타다 남은 들보와 재 무더기
+	var ash: Material = _mat("ash", Color(0.06, 0.055, 0.05))
+	for hz in [Rect2(174, 45, 7, 5), Rect2(198, 45, 6, 5), Rect2(212, 45, 7, 5), Rect2(176, 66, 7, 6), Rect2(200, 67, 6, 6), Rect2(214, 66, 7, 6)]:
+		var c: Vector2 = (hz as Rect2).get_center() * Grid.CELL
+		var base: float = height(c.x, c.y)
+		_box(parent, Vector3((hz as Rect2).size.x * Grid.CELL * 0.8, 0.05, (hz as Rect2).size.y * Grid.CELL * 0.8), Vector3(c.x, base + 0.04, c.y), ash)
+		for i in 3:
+			_box(parent, Vector3(0.22, 0.22, rng.randf_range(2.2, 4.0)), Vector3(c.x + rng.randf_range(-1.5, 1.5), base + 0.5 + i * 0.15, c.y + rng.randf_range(-1.2, 1.2)), ch, Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * PI, rng.randf_range(-0.25, 0.25)))
+		_scatter(parent, hz, 5, 0.5, ch, rng, 0.3, 0.7)
+	# 우물: 돌 테두리와 부러진 두레박 기둥
+	var well: Rect2 = FieldLayout.HAMLET_WELL
+	var wc: Vector2 = well.get_center() * Grid.CELL
+	var wb: float = height(wc.x, wc.y)
+	var st: Material = _stone()
+	for k in 8:
+		var a: float = k * TAU / 8.0
+		_box(parent, Vector3(0.9, 0.9, 0.5), Vector3(wc.x + cos(a) * 1.3, wb + 0.4, wc.y + sin(a) * 1.3), st, Vector3(0, -a + PI / 2.0, 0))
+	_box(parent, Vector3(2.0, 0.04, 2.0), Vector3(wc.x, wb + 0.1, wc.y), _mat("ash", Color(0.06, 0.055, 0.05)))
+	_box(parent, Vector3(0.2, 2.6, 0.2), Vector3(wc.x + 1.3, wb + 1.3, wc.y), _wood())
+	_box(parent, Vector3(1.8, 0.16, 0.16), Vector3(wc.x + 0.5, wb + 2.5, wc.y), _wood(), Vector3(0.0, 0.0, 0.35))
+	rects.append(well)
+	# 무너진 울타리: 기둥과 부러진 가로대
+	var wd: Material = _wood()
+	for f in FieldLayout.HAMLET_FENCES:
+		var along_x: bool = f.size.x >= f.size.y
+		var length: float = (f.size.x if along_x else f.size.y) * Grid.CELL
+		var n: int = maxi(int(length / 1.6), 2)
+		for k in n + 1:
+			var t: float = float(k) / n
+			var x: float = (f.position.x + (f.size.x * t if along_x else f.size.x / 2.0)) * Grid.CELL
+			var z: float = (f.position.y + (f.size.y / 2.0 if along_x else f.size.y * t)) * Grid.CELL
+			var h: float = rng.randf_range(0.5, 1.4)
+			_box(parent, Vector3(0.18, h, 0.18), Vector3(x, height(x, z) + h / 2.0 - 0.1, z), wd, Vector3(rng.randf_range(-0.2, 0.2), 0.0, rng.randf_range(-0.2, 0.2)), 200.0)
+		var mx: float = (f.get_center().x) * Grid.CELL
+		var mz: float = (f.get_center().y) * Grid.CELL
+		_box(parent, Vector3(length * 0.7, 0.1, 0.1) if along_x else Vector3(0.1, 0.1, length * 0.7), Vector3(mx, height(mx, mz) + 0.8, mz), wd, Vector3(0.0, 0.0, rng.randf_range(-0.15, 0.15)), 200.0)
+		rects.append(f)
+
+
+## 까마귀 고개: 양쪽 돌 벼랑(PASS_CLIFFS, 땅은 new_land가 오르막으로 만든다), 길 가의 돌과 마른 나무.
+static func _pass(parent: Node3D, rects: Array[Rect2]) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 30
+	var st: Material = _stone()
+	for c in FieldLayout.PASS_CLIFFS:
+		_cliff(parent, c, rng, st, 6.0, 11.0)
+		rects.append(c)
+	_scatter(parent, Rect2(172, 91, 54, 8), 30, 0.0, st, rng, 0.3, 1.1)
+	var bt: Array[Transform3D] = []
+	for i in 7:
+		var x: float = rng.randf_range(176.0, 220.0) * Grid.CELL
+		var z: float = (rng.randf_range(91.8, 92.8) if i % 2 == 0 else rng.randf_range(97.2, 98.2)) * Grid.CELL
+		var s: float = rng.randf_range(0.8, 1.3)
+		bt.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s), Vector3(x, height(x, z) - 0.1, z)))
+	HillBuilder._multi(parent, HillBuilder.bare_tree(0), bt, true, HillBuilder.bark()).visibility_range_end = 150.0
+
+
 # ---------------------------------------------------------------- 찾을 것의 모양
 
 ## 유품 상자(홀수는 나무 상자, 짝수는 자루 꾸러미). 열림은 open_cache.
@@ -934,6 +1152,8 @@ static func cache(parent: Node3D, id: String) -> Node3D:
 	n.name = id
 	n.position = at_cell(FieldLayout.CACHES[id][0])
 	n.rotation.y = float(id.hash() % 628) / 100.0
+	if FieldLayout.BIG_CACHES.has(id):
+		n.scale = Vector3.ONE * 1.6
 	var chest: bool = int(id.substr(id.length() - 1)) % 2 == 1
 	n.set_meta("chest", chest)
 	if chest:

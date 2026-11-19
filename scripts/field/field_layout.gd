@@ -3,25 +3,29 @@ extends RefCounted
 ## 들판(16단계, docs/village.md 16)의 자리와 값. 자리는 여기 하나에만 둔다. 모든 자리는 칸 좌표(1칸 = 2m).
 ## 위쪽(y 작은 쪽)이 북쪽이다: 언덕 발치는 북, 마을 문은 남.
 
-const SIZE: Vector2i = Vector2i(170, 110)   ## 20단계: 동쪽으로 60칸 넓혔다(원래는 110 x 110)
-const WORLD_X: float = 340.0   ## m
+const SIZE: Vector2i = Vector2i(230, 110)   ## 28단계: 동쪽으로 60칸 더(20단계 170, 원래 110 x 110)
+const WORLD_X: float = 460.0   ## m
 const WORLD_Z: float = 220.0
 
-const AREA_ORDER: PackedStringArray = ["keep", "marsh", "foot", "watchtower", "grove", "old_field", "brook", "road"]
+const AREA_ORDER: PackedStringArray = ["quarry", "hamlet", "pass", "keep", "marsh", "foot", "watchtower", "grove", "old_field", "brook", "road"]
 const AREAS: Dictionary = {
+	&"quarry": Rect2(170, 2, 58, 42),
+	&"hamlet": Rect2(170, 44, 58, 36),
+	&"pass": Rect2(170, 80, 58, 28),
 	&"keep": Rect2(110, 2, 58, 46),
 	&"marsh": Rect2(110, 68, 58, 40),
 	&"foot": Rect2(30, 0, 50, 24),
 	&"watchtower": Rect2(78, 24, 32, 28),
 	&"grove": Rect2(0, 22, 38, 30),
 	&"old_field": Rect2(58, 66, 52, 44),
-	&"brook": Rect2(0, 52, 170, 14),
-	&"road": Rect2(0, 0, 170, 110),
+	&"brook": Rect2(0, 52, 170, 14),   # 새 곳(170~)과 겹치면 AREA_ORDER로 새 곳이 이긴다
+	&"road": Rect2(0, 0, 230, 110),
 }
 const AREA_NAMES: Dictionary = {
 	&"road": "언덕길", &"old_field": "옛 싸움터", &"watchtower": "무너진 망루",
 	&"brook": "개울가", &"grove": "검은 숲 가장자리", &"foot": "언덕 발치",
 	&"keep": "무너진 성채", &"marsh": "안개 늪",
+		&"quarry": "버려진 채석장", &"hamlet": "불탄 마을", &"pass": "까마귀 고개",
 }
 
 ## 흙길이 지나는 점(남 → 북). 개울은 x 52 근처에서 돌다리로 건넌다.
@@ -45,14 +49,19 @@ const CACHES: Dictionary = {
 	"cache_5": [Vector2(12, 42), 15], "cache_6": [Vector2(30, 44), 25],
 	"cache_7": [Vector2(14, 60), 10], "cache_8": [Vector2(70, 14), 35],
 	"cache_9": [Vector2(127, 17), 45], "cache_10": [Vector2(151, 26), 55],
+	"cache_11": [Vector2(218, 14), 50], "cache_12": [Vector2(177.5, 47.5), 35],
+	"cache_13": [Vector2(217.5, 69), 40], "cache_14": [Vector2(222, 95), 120],
 }
+## 큰 상자(그림이 크다). 고개 끝의 상자.
+const BIG_CACHES: PackedStringArray = ["cache_14"]
 
-## 흩어진 조각 후보 20곳(16~19번은 안개 늪, 20단계). 판마다 GLINT_ACTIVE곳이 새로 생긴다. 하나에 GLINT_MIN~GLINT_MAX 조각.
+## 흩어진 조각 후보 23곳(16~19번은 안개 늪, 20단계 / 20~22번은 불탄 마을, 28단계). 판마다 GLINT_ACTIVE곳이 새로 생긴다. 하나에 GLINT_MIN~GLINT_MAX 조각.
 const GLINTS: PackedVector2Array = [
 	Vector2(40, 100), Vector2(70, 96), Vector2(30, 84), Vector2(90, 98), Vector2(100, 84), Vector2(70, 74),
 	Vector2(40, 72), Vector2(20, 70), Vector2(24, 62), Vector2(12, 52), Vector2(46, 40), Vector2(70, 40),
 	Vector2(100, 30), Vector2(76, 24), Vector2(30, 10), Vector2(92, 12),
 	Vector2(122, 76), Vector2(140, 86), Vector2(158, 78), Vector2(134, 100),
+	Vector2(184, 47.5), Vector2(224, 52), Vector2(212, 74),
 ]
 const GLINT_ACTIVE: int = 4
 const GLINT_MIN: int = 2
@@ -70,14 +79,20 @@ const STONES: Dictionary = {
 	"stone_5": [Vector2(20, 30), "검은 숲의 비석", "숲은 해마다 한 걸음씩 길로 다가온다.\n마른 나무 사이에서 소리를 들어도 돌아보지 마라."],
 	"stone_6": [Vector2(44, 12), "발치의 비석", "여기서부터 길은 언덕의 것이다.\n칼이 부르면 오르고, 부러지면 다시 내려오라."],
 	"stone_7": [Vector2(139, 34), "성채의 비석", "성문은 안에서 잠겨 있었다.\n적은 밖에서 오지 않았다.\n성주는 끝내 문을 열지 않았다."],
+	"stone_8": [Vector2(181, 35), "채석장의 비석", "돌은 캐는 대로 나왔고\n사람은 캐는 대로 사라졌다.\n마지막 수레는 아직 구덩이 밑에 있다."],
+	"stone_9": [Vector2(188, 62), "불탄 마을의 비석", "불은 하룻밤이었고\n우물은 사흘 동안 말랐다.\n아무도 이 마을의 이름을 적지 않았다."],
 }
 
 ## 들판에서 영주가 못 들어가는 곳(칸 단위): 둘레의 숲·벼랑과 목책, 망루, 수레, 쓰러진 거목, 돌다리 난간.
 const BORDER_RECTS: Array[Rect2] = [
-	Rect2(0, 0, 3, 110), Rect2(167, 0, 3, 110), Rect2(0, 0, 170, 2),
-	Rect2(0, 108.3, 52, 2), Rect2(58, 108.3, 112, 2),
+	Rect2(0, 0, 3, 110), Rect2(227, 0, 3, 110), Rect2(0, 0, 230, 2),
+	Rect2(0, 108.3, 52, 2), Rect2(58, 108.3, 172, 2),
 	Rect2(107, 0, 3, 52), Rect2(107, 66, 3, 44),   # 원래 동쪽 둘레: 개울 근처(y 52~66)만 틈을 내 동쪽으로 이어진다
+	# 20단계 동쪽 둘레(x 167~170): 틈 셋(y 22~32 성채 → 채석장, 52~66 개울 → 불탄 마을, 91~99 늪 → 까마귀 고개)
+	Rect2(167, 0, 3, 22), Rect2(167, 32, 3, 20), Rect2(167, 66, 3, 25), Rect2(167, 99, 3, 11),
 ]
+## 20단계 동쪽 둘레(x 334~340m)의 틈: Vector2(가운데 z m, 반폭 m). 땅 높이의 언덕 띠와 숲·바위가 이 틈을 비운다(BORDER_RECTS의 틈과 같다).
+const EAST_GAPS: PackedVector2Array = [Vector2(54, 10), Vector2(118, 14), Vector2(190, 8)]
 
 
 ## ---- 들판 싸움(17단계, docs/outside.md). 수치는 여기 하나에만 둔다.
@@ -113,6 +128,12 @@ const PACKS: Dictionary = {
 	"keep_gate": {"at": Vector2(130, 45), "wander": 3.5, "zone": 7, "foes": [[&"charger", 2], [&"wraith", 2], [&"bomber", 1]]},
 	"marsh_west": {"at": Vector2(126, 84), "wander": 3.5, "zone": 7, "foes": [[&"wraith", 3], [&"caller", 1], [&"bomber", 1]]},
 	"marsh_east": {"at": Vector2(152, 96), "wander": 4.0, "zone": 8, "foes": [[&"wolf", 2], [&"charger", 1], [&"archer", 2], [&"shield", 1]]},
+	## 28단계 새 곳(8~9구역 세기)
+	"quarry_pit": {"at": Vector2(190, 22), "wander": 3.5, "zone": 8, "foes": [[&"charger", 2], [&"shield", 2], [&"archer", 1]]},
+	"quarry_rim": {"at": Vector2(212, 22), "wander": 3.5, "zone": 8, "foes": [[&"wraith", 2], [&"caller", 1], [&"bomber", 1], [&"wolf", 1]]},
+	"hamlet_square": {"at": Vector2(206, 55), "wander": 3.5, "zone": 8, "foes": [[&"giant", 1], [&"wraith", 2], [&"charger", 1]]},
+	"hamlet_south": {"at": Vector2(190, 74), "wander": 3.5, "zone": 8, "foes": [[&"wolf", 3], [&"bomber", 2], [&"archer", 1]]},
+	"pass_top": {"at": Vector2(204, 95), "wander": 2.5, "zone": 9, "foes": [[&"giant", 1], [&"charger", 2], [&"shield", 1], [&"archer", 1], [&"caller", 1]]},
 }
 
 
@@ -150,6 +171,44 @@ const KEEP_TOWER: Rect2 = Rect2(148, 15, 6, 6)
 const MARSH_FOG_MULT: float = 5.0
 const MARSH_FOG_TIME: float = 2.5
 const MARSH_FOG_COLOR: Color = Color(0.3, 0.37, 0.34, 1.0)
+
+
+## ---- 새 곳 셋(28단계, docs/outside.md). 모양이 서는 곳은 여기 하나에만 둔다(칸 단위). 그린 곳이 곧 막힌 곳이다.
+## 버려진 채석장: 파인 구덩이(가운데·반지름 칸, 깊이 m), 돌 벼랑, 잘린 돌덩이, 나무 비계의 기둥.
+const QUARRY_PIT_AT: Vector2 = Vector2(198, 22)
+const QUARRY_PIT_R: Vector2 = Vector2(20, 13)
+const QUARRY_PIT_DEPTH: float = 3.5
+const QUARRY_CLIFFS: Array[Rect2] = [
+	Rect2(174, 2, 50, 4), Rect2(222, 6, 5, 32),                 # 북쪽·동쪽 벼랑
+	Rect2(172, 38, 16, 4), Rect2(196, 38, 31, 4),               # 남쪽 벼랑(가운데 x 188~196이 불탄 마을로 가는 틈)
+]
+const QUARRY_BLOCKS: Array[Rect2] = [
+	Rect2(181, 10, 4, 3), Rect2(210, 9, 5, 3), Rect2(214, 32, 4, 3), Rect2(177, 10, 3, 3),
+]
+const QUARRY_POSTS: Array[Rect2] = [   # 비계 둘(기둥만 막힘, 위의 널은 머리 위)
+	Rect2(199, 12, 0.7, 0.7), Rect2(199, 15.3, 0.7, 0.7), Rect2(201.65, 12, 0.7, 0.7), Rect2(201.65, 15.3, 0.7, 0.7), Rect2(204.3, 12, 0.7, 0.7), Rect2(204.3, 15.3, 0.7, 0.7),
+	Rect2(203, 30, 0.7, 0.7), Rect2(203, 33.3, 0.7, 0.7), Rect2(207.3, 30, 0.7, 0.7), Rect2(207.3, 33.3, 0.7, 0.7),
+]
+## 불탄 마을: 지붕 없이 그을린 집 벽 여섯 채(문 자리와 무너진 자리는 비움), 우물, 무너진 울타리.
+const HAMLET_WALLS: Array[Rect2] = [
+	Rect2(174, 45, 7, 0.5), Rect2(174, 49.5, 2.3, 0.5), Rect2(178.7, 49.5, 2.3, 0.5), Rect2(174, 45.5, 0.5, 1.4), Rect2(180.5, 45.5, 0.5, 4),
+	Rect2(198, 45, 6, 0.5), Rect2(198, 49.5, 1.8, 0.5), Rect2(202.2, 49.5, 1.8, 0.5), Rect2(198, 45.5, 0.5, 4), Rect2(203.5, 47.5, 0.5, 2),
+	Rect2(212, 45, 3.5, 0.5), Rect2(212, 49.5, 2.3, 0.5), Rect2(216.7, 49.5, 2.3, 0.5), Rect2(212, 45.5, 0.5, 4), Rect2(218.5, 45.5, 0.5, 4),
+	Rect2(176, 66, 2.3, 0.5), Rect2(180.7, 66, 2.3, 0.5), Rect2(176, 71.5, 7, 0.5), Rect2(176, 66.5, 0.5, 5), Rect2(182.5, 66.5, 0.5, 1.5), Rect2(182.5, 70.5, 0.5, 1),
+	Rect2(200, 67, 1.8, 0.5), Rect2(204.2, 67, 1.8, 0.5), Rect2(202.7, 72.5, 3.3, 0.5), Rect2(200, 67.5, 0.5, 5), Rect2(205.5, 67.5, 0.5, 5),
+	Rect2(214, 66, 2.3, 0.5), Rect2(218.7, 66, 2.3, 0.5), Rect2(214, 71.5, 7, 0.5), Rect2(214, 66.5, 0.5, 2.5), Rect2(220.5, 66.5, 0.5, 5),
+]
+const HAMLET_WELL: Rect2 = Rect2(191, 51.5, 2, 2)
+const HAMLET_FENCES: Array[Rect2] = [
+	Rect2(176, 77, 7, 0.4), Rect2(200, 77, 8, 0.4), Rect2(212, 77, 7, 0.4), Rect2(185, 62, 0.4, 4), Rect2(222, 68, 0.4, 5),
+]
+## 까마귀 고개: 양쪽이 벼랑인 좁은 오르막 길(x 172~226, y 91~99). 북쪽 벼랑 가운데(x 190~196)는 불탄 마을로 가는 틈.
+const PASS_CLIFFS: Array[Rect2] = [
+	Rect2(172, 80, 18, 11), Rect2(196, 80, 31, 11), Rect2(172, 99, 55, 9),
+]
+## 길이 오르는 높이(m)와 벼랑 옆 땅이 솟는 높이(m).
+const PASS_RISE: float = 5.0
+const PASS_WALL: float = 4.0
 
 
 static func area_at(c: Vector2) -> StringName:
