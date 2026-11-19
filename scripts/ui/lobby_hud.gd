@@ -11,6 +11,8 @@ signal closed()
 signal quest_taken(i: int)
 signal bought(id: StringName)
 signal yard_sword_picked(id: int)
+## 17단계: 북문에서 검을 골라 들판으로 나선다(SwordData.id, 0은 맨손).
+signal field_go(id: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -40,6 +42,10 @@ var _yard: Control
 var _yard_box: VBoxContainer
 var _yard_pick: Label
 var _readout: Label
+## 17단계: 검 고르기 창이 북문용인지(검 걸이 창을 같이 쓴다)와 거기서 고른 검, 들판의 체력 막대.
+var _gate_mode: bool = false
+var _gate_pick: int = 0
+var _hp_bar: ProgressBar
 var _say: Band
 
 
@@ -110,6 +116,7 @@ func is_open() -> bool:
 func close() -> void:
 	if _busy:
 		return
+	_gate_mode = false
 	_forge.visible = false
 	_shrine.visible = false
 	_rack.visible = false
@@ -117,6 +124,28 @@ func close() -> void:
 	_shop.visible = false
 	_yard.visible = false
 	closed.emit()
+
+
+## 들판의 체력 막대(17단계). 글자 없이 줄만 그린다.
+func set_hp(hp: float, max_hp: float) -> void:
+	if _hp_bar == null:
+		_hp_bar = ProgressBar.new()
+		_hp_bar.show_percentage = false
+		_hp_bar.custom_minimum_size = Vector2(300, 12)
+		_hp_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		_hp_bar.offset_left = 28
+		_hp_bar.offset_right = 328
+		_hp_bar.offset_top = -40
+		_hp_bar.offset_bottom = -28
+		var bg := UiKit.style(Color(UiKit.LINE, 0.4), 1, Color(0.02, 0.018, 0.015, 0.75))
+		var fill := UiKit.style(Color(0.7, 0.16, 0.14), 0, Color(0.7, 0.16, 0.14))
+		for sb in [bg, fill]:
+			sb.set_content_margin_all(0)
+		_hp_bar.add_theme_stylebox_override("background", bg)
+		_hp_bar.add_theme_stylebox_override("fill", fill)
+		add_child(_hp_bar)
+	_hp_bar.max_value = max_hp
+	_hp_bar.value = maxf(0.0, hp)
 
 
 func toast(t: String) -> void:
@@ -416,15 +445,29 @@ func open_yard_rack() -> void:
 	_render_yard_rack()
 
 
+## 북문(17단계): 들고 나갈 검을 고른다. 목록은 검 걸이와 같다(검집의 검 + 도감에서 찾은 검 + 맨손).
+func open_field_pick() -> void:
+	_gate_mode = true
+	_gate_pick = Meta.carry_sword if Meta.carry_sword >= 0 else maxi(0, meta.sheath_id)
+	_yard.visible = true
+	_render_yard_rack()
+
+
 func _render_yard_rack() -> void:
 	for c in _yard_box.get_children():
 		c.queue_free()
-	UiKit.header(_yard_box, "수련장 검 걸이", close)
-	_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다. 울타리 안에서 좌클릭으로 허수아비를 친다.", 14, UiKit.MUTED)))
+	UiKit.header(_yard_box, "들판으로 나선다" if _gate_mode else "수련장 검 걸이", func() -> void:
+		_gate_mode = false
+		close())
+	if _gate_mode:
+		_yard_box.add_child(_wrap(UiKit.label("고른 검은 들판에서만 쥔다. 부러지지 않는다. 쓰러져도 잃는 것은 없다.", 14, UiKit.MUTED)))
+	else:
+		_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다. 울타리 안에서 좌클릭으로 허수아비를 친다.", 14, UiKit.MUTED)))
 	var ids := meta.yard_swords(data)
-	if ids.is_empty():
+	if ids.is_empty() and not _gate_mode:
 		_yard_box.add_child(UiKit.label("걸어 둘 검이 없다. 언덕에서 뽑아 와야 한다.", 16, UiKit.TEXT))
 		return
+	var chosen: int = _gate_pick if _gate_mode else meta.yard_sword
 	var pick := OptionButton.new()
 	pick.focus_mode = Control.FOCUS_NONE
 	pick.custom_minimum_size = Vector2(520, 36)
@@ -432,15 +475,18 @@ func _render_yard_rack() -> void:
 	for id in ids:
 		var d := data.sword_by_id(id)
 		pick.add_item("%s%s · %s (%s)" % ["[검집] " if id == meta.sheath_id else "", data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name], id)
-		if id == meta.yard_sword:
+		if id == chosen:
 			pick.select(pick.item_count - 1)
 	pick.item_selected.connect(func(i: int) -> void:
 		var id: int = pick.get_item_id(i)
-		yard_sword_picked.emit(id)
+		if _gate_mode:
+			_gate_pick = id
+		else:
+			yard_sword_picked.emit(id)
 		_render_yard_rack())
 	_yard_box.add_child(pick)
-	if meta.yard_sword > 0:
-		var s: Sword = meta.yard_sword_made(data)
+	if chosen > 0:
+		var s: Sword = meta.unbreakable_sword(data, chosen)
 		if s:
 			var card := PanelContainer.new()
 			card.add_theme_stylebox_override("panel", UiKit.style(data.grades.colors[s.grade], 2))
@@ -448,6 +494,8 @@ func _render_yard_rack() -> void:
 			r.text = SwordCard.bbcode(s, data)
 			card.add_child(r)
 			_yard_box.add_child(card)
+	if _gate_mode:
+		_yard_box.add_child(UiKit.button("나선다", func() -> void: field_go.emit(_gate_pick), 40.0))
 
 
 func _layer() -> Control:

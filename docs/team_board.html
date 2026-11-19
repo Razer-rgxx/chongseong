@@ -139,13 +139,13 @@ code.id { color: var(--line); font-size: 12.5px; }
 <script>
 // 현황은 여기만 고친다. 상태: "done" 끝, "doing" 하는 중, "wait" 아직.
 const STATE = {
-  stage: "지금 15단계: 마을 컨텐츠 · 15 마을 컨텐츠 / 16 마을 밖 들판 (설계서 docs/village.md)",
-  updated: "2026-11-19 11:41",
+  stage: "15~16단계 끝 · 15 끝 / 16 끝 (설계서 docs/village.md)",
+  updated: "2026-11-19 15:55",
   lead: {
     name: "총괄",
     model: "Claude Opus 5.5 · Claude Code 대표 모델 (이 대화)",
     does: "설계서로 팀 사이의 약속(동작 id, 신호, 자료 모양)을 정하고, 팀을 차례로 부르고, 끝나면 테스트·화면 확인·커밋·푸시를 한다.",
-    status: "doing",
+    status: "done",
     note: "모양팀이 먼저(겹치지 않는 단계는 동시에), 기능팀이 차례로 잇는다. 단계가 끝나면 테스트·화면 확인·푸시."
   },
   teams: [
@@ -154,11 +154,11 @@ const STATE = {
       files: ["scripts/enemies/enemy_art.gd · enemy_motion.gd", "scripts/world/enemy_fx.gd", "scripts/world/night_art.gd · night_fx.gd", "scripts/world/event_art.gd · event_fx.gd · assets/ui/map/*.svg", "scripts/world/omen_art.gd · pull_timing_fx.gd · scripts/lord/pull_motion.gd", "scripts/debug/*_gallery.gd"],
       gets: "설계서 docs/content.md", gives: "파일 머리의 API → 기능팀이 잇는다",
       note: "하는 중: 15단계, 16단계" },
-    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "doing",
+    { key: "func", name: "기능팀", model: "Claude Opus 5.5 에이전트", status: "done",
       does: ["규칙과 수치(.tres)", "신호, 화면 연결(EnemyView·main·hud)", "테스트, GDD·CLAUDE.md"],
       files: ["scripts/core/", "data/", "scripts/enemies/enemy_view.gd", "scenes/world/main.gd", "tests/", "docs/"],
       gets: "모양팀이 만든 것 전부", gives: "게임에서 도는 단계",
-      note: "하는 중: 15단계 마을 컨텐츠 · 남음: 16단계" }
+      note: "끝: 15단계, 16단계" }
   ],
   // 동작별 팀 진행: [아트, 모션, 이펙트, 기능]
   moves: [
@@ -177,6 +177,12 @@ const STATE = {
   ],
   swords_assigned: 300,
   log: [
+    ["11-19 15:55", "기능팀: 17단계 들판 싸움(북문 검 고르기, 무리 8곳, Rules 들판 모드, 조각 보상, 쓰러지면 북문 앞)"],
+    ["11-19 15:37", "계획: 17~22단계(들판 싸움·보스·지하 무덤·새 지역·1대1 결투·온라인 매칭), 설계서 docs/outside.md"],
+    ["11-19 15:28", "인계서(docs/handoff.md)"],
+    ["11-19 12:07", "기능팀: 16단계 들판(싸움 없는 탐험, 유품 상자·흩어진 조각·비석·짐승, 마을 북문 연결)"],
+    ["11-19 11:55", "기능팀: 15단계 마을 컨텐츠 (의뢰판, 수련장, 주민, 떠돌이 상인)"],
+    ["11-19 11:41", "15·16단계 설계: 마을 컨텐츠(의뢰판·수련장·주민·떠돌이 상인)와 마을 밖 들판(싸움 없는 탐험)"],
     ["11-19 11:17", "웹판: 조각에 판 번호를 붙여 옛 조각이 캐시에서 섞이지 않게"],
     ["11-19 11:16", "웹판만 가볍게(WebQuality): 3D 해상도 0.6, 해 그림자 한 겹, 작은 빛 그림자·번짐 판·빛 번짐 끔, 풀 30% — PC판은 그대로"],
     ["11-19 10:45", "웹판 만들기: Web 내보내기 설정과 docs/web_build.py(pck를 조각내 GitHub Pages에 올림)"],
@@ -195,13 +201,7 @@ const STATE = {
     ["11-18 18:02", "모양팀: 14단계 손잡이 조짐 모습(OmenArt), 뽑기 버팀 몸짓(PullMotion), 타이밍 고리(PullTimingFx), 확인 갤러리"],
     ["11-18 18:02", "모양팀: 13단계 낮 사건의 모양과 효과(EventArt: 대장장이·순례자·점쟁이·저주받은 손잡이 재질, EventFx: 검은 기운·쓰일 때·사라질 때)와 지도 아이콘 SVG"],
     ["11-18 18:02", "모양팀: 12단계 밤의 모양과 효과(NightArt: 봉화·우두머리 고리·무덤 흙더미, NightFx: 봉화 맞음·꺼짐, 불씨 땅, 무덤, 포위 띠, 안개, 고리 따라가기)와 확인용 night_gallery"],
-    ["11-18 17:47", "기능팀: 11단계 새 적 5종의 규칙과 화면 연결"],
-    ["11-18 14:00", "이펙트팀: 11단계 새 적 5종의 효과(EnemyFx)와 갤러리"],
-    ["11-18 08:50", "모션팀: 11단계 새 적 5종의 몸 움직임(EnemyMotion)"],
-    ["11-18 08:19", "아트팀: 11단계 새 적 5종의 몸(EnemyArt)"],
-    ["11-18 07:41", "11~14단계 설계: 적 행동, 밤 목표와 구역 규칙, 낮 사건과 갈림길, 뽑기 손맛"],
-    ["11-17 23:13", "10단계 공격 토큰: 표를 가진 적만 덤비고 나머지는 둘레를 돈다"],
-    ["11-17 22:27", "관리: 원하는 검 받기 창(` 또는 F6) — 번호·이름·공격 방식·형태·등급·각인·\"갈고리\"로 찾아 칸에 받는다"]
+    ["11-18 17:47", "기능팀: 11단계 새 적 5종의 규칙과 화면 연결"]
   ]
 };
 

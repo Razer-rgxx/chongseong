@@ -22,6 +22,14 @@ var dead: bool = false
 ## 허수아비: 마지막으로 맞은 뒤 지난 시간(초). refill_after가 지나면 체력이 찬다.
 var idle_t: float = 0.0
 
+# ---- 들판 무리(17단계, Rules.field). 무리에 속하지 않으면 &"".
+## 속한 무리 id. 부르는 자가 불러낸 적도 같은 무리다.
+var pack: StringName = &""
+## 제자리(돌아갈 곳)와 서성이는 목표, 다음 목표까지 남은 시간(초).
+var home: Vector2 = Vector2.ZERO
+var wander_to: Vector2 = Vector2.ZERO
+var wander_t: float = 0.0
+
 # ---- 행동(11단계, Foes, docs/content.md). 화면은 읽기만 한다.
 ## 지금 하는 일(aim, shoot, block, guard_break, wind, charge, charge_end, fuse, explode, call_wind, call). &""이면 걷기다.
 var act: StringName = &""

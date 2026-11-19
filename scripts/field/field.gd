@@ -1,7 +1,8 @@
 extends Node3D
-## 마을 밖 들판(16단계, docs/village.md 16). 싸움 없이 걷고 구르며 찾는다.
-## 영주의 걷기는 마을과 같은 Rules로 돌리고(싸움터 크기만 들판으로), 막힌 곳은 화면 쪽에서 밀어낸다.
-## 높이는 FieldBuilder.walk_height를 따라 영주를 그린다. 보상과 읽음은 Meta에 저장한다.
+## 마을 밖 들판(16단계 탐험, 17단계 싸움). 걷고 구르며 찾고, 무리를 만나면 싸운다.
+## 규칙은 Rules(들판 모드)가 돌리고(싸움터 크기만 들판으로), 막힌 곳은 화면 쪽에서 밀어낸다.
+## 높이는 FieldBuilder.walk_height를 따라 영주와 적을 그린다. 보상과 읽음은 Meta에 저장한다.
+## 마을 북문에서 고른 검(Meta.carry_sword)은 부러지지 않는 검으로 칸 0에 쥔다. 쓰러지면 잃는 것 없이 마을 북문 앞에서 깬다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -24,6 +25,15 @@ var _area: StringName = &""
 var _shown: Dictionary = {}
 var _reading: String = ""
 var _creatures := FieldCreatures.new()
+var _want_attack: bool = false
+var _want_hook: bool = false
+var _over: bool = false
+var _enemies: Dictionary = {}
+var _dying: Array[EnemyView] = []
+var _fx := HitFx.new()
+var _pfx := PowerFx.new()
+var _move_fx := MoveFx.new()
+var _enemy_fx := EnemyFx.new()
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -37,9 +47,10 @@ func _ready() -> void:
 	meta.fix_sheath(data)
 	meta.ensure_glints()
 	meta.save()
-	rules = Rules.new(data, 1)
+	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
 	Grid.size = FieldLayout.SIZE   # Rules가 싸움터 크기로 영주를 가둔다: 들판 크기로
-	rules.hilts.clear()
+	rules.start_field()
+	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
 	rules.lord.pos = FieldLayout.START
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
@@ -48,13 +59,34 @@ func _ready() -> void:
 	var blockers: Dictionary = FieldBuilder.build(self, env)
 	_rects.assign(blockers.rects)
 	_circles = blockers.circles
+	HillBuilder.setup(Vector2(FieldLayout.SIZE) * Grid.CELL)   # 적의 몸이 들판을 싸움터 안으로 본다(비탈에서 올라오지 않는다)
 	_build_props()
 	add_child(_creatures)
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
-	_lord.set_sword(meta.sheath_sword(data), data.grades)
 	_lord.torch.light_energy = 1.2
+	add_child(_fx)
+	_pfx.setup(rules)
+	add_child(_pfx)
+	add_child(_move_fx)
+	_move_fx.setup(rules)
+	add_child(_enemy_fx)
+	_enemy_fx.setup(rules, _enemy_parts)
+	_hold_sword()
+	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -2.0 if big else -6.0))
+	rules.lord_dashed.connect(func() -> void:
+		_sfx.play(&"dash", _lord.position, -6.0)
+		_camera.kick(4.0))
+	rules.lord_hooked.connect(func(_e: Enemy) -> void:
+		_sfx.play(&"draw", _lord.position, -2.0, 1.25)
+		_camera.kick(10.0))
+	rules.lord_hurt.connect(_on_lord_hurt)
+	rules.enemy_hit.connect(_on_enemy_hit)
+	rules.enemy_died.connect(_on_enemy_died)
+	rules.pack_cleared.connect(_on_pack_cleared)
+	rules.run_ended.connect(_on_down)
+	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
 	_camera.yaw = 0.0
 	_camera.snap()
@@ -94,6 +126,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_capture(true)
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("attack"):
+		_want_attack = true
+	if event.is_action_pressed("hook"):
+		_want_hook = true
 	if event.is_action_pressed("pull"):
 		_interact()
 	if k and k.pressed and not k.echo:
@@ -111,12 +147,25 @@ func _physics_process(delta: float) -> void:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
-		if _camera.third() and inp.move.length() > 0.1:
-			inp.aim_valid = true
-			inp.aim = rules.lord.pos + inp.move
+		inp.attack = Input.is_action_pressed("attack") or _want_attack
+		inp.hook = _want_hook
+		if _camera.third():
+			if inp.attack or inp.hook:
+				inp.aim_valid = true
+				inp.aim = rules.lord.pos + _camera.forward_cells() * 3.0
+			elif inp.move.length() > 0.1:
+				inp.aim_valid = true
+				inp.aim = rules.lord.pos + inp.move
+		else:
+			var g: Variant = _camera.ground_point(get_viewport().get_mouse_position())
+			if g != null:
+				inp.aim_valid = true
+				inp.aim = Grid.world_to_cells(g)
 		rules.step(inp)
 		rules.lord.pos = _push_out(rules.lord.pos)
 		_want_dash = false
+		_want_attack = false
+		_want_hook = false
 		_acc -= rules.dt
 		n += 1
 	if n == max_ticks_per_frame:
@@ -128,6 +177,10 @@ func _process(delta: float) -> void:
 	_lord.draw(alpha, delta)
 	_lord.position.y = FieldBuilder.walk_height(_lord.position.x, _lord.position.z)
 	_camera.target = _lord.position
+	_move_fx.draw(alpha)
+	_enemy_fx.draw(alpha)
+	_sync_enemies(alpha, delta)
+	_hud.set_hp(rules.lord.hp, rules.max_hp())
 	_creatures.step(delta, _lord.position)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
@@ -176,6 +229,8 @@ func _prompt(key: String) -> String:
 
 
 func _interact() -> void:
+	if _over:
+		return
 	if _reading != "":
 		_end_read()
 		return
@@ -212,6 +267,118 @@ func _interact() -> void:
 			_saved()
 
 
+## 고른 검을 칸 0에 쥔다(부러지지 않는다). 안 골랐으면 검집의 검, 0이면 맨손.
+func _hold_sword() -> void:
+	var id: int = Meta.carry_sword if Meta.carry_sword >= 0 else meta.sheath_id
+	var s: Sword = meta.unbreakable_sword(data, id)
+	rules.slots[0] = s
+	rules.active = 0
+	rules.lord.combo = 0
+	_lord.set_sword(s, data.grades)
+	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
+
+
+## 규칙의 적 목록과 맞춘다(main과 같다). 들판의 높이에 세운다.
+func _sync_enemies(alpha: float, delta: float) -> void:
+	var alive := {}
+	for e in rules.enemies:
+		alive[e.id] = true
+		if not _enemies.has(e.id):
+			var v := EnemyView.new()
+			v.setup(e)
+			add_child(v)
+			_enemies[e.id] = v
+	for id in _enemies.keys():
+		var v: EnemyView = _enemies[id]
+		if not alive.has(id) or v.enemy.dead:
+			_enemies.erase(id)
+			v.die()
+			_dying.append(v)
+		else:
+			v.draw(alpha, delta)
+			_stand(v)
+	for i in range(_dying.size() - 1, -1, -1):
+		var done: bool = _dying[i].draw(alpha, delta)
+		_stand(_dying[i])
+		if done:
+			_dying[i].queue_free()
+			_dying.remove_at(i)
+
+
+func _stand(v: EnemyView) -> void:
+	v.position.y = FieldBuilder.walk_height(v.position.x, v.position.z)
+
+
+func _enemy_parts(e: Enemy) -> Dictionary:
+	var v: EnemyView = _enemies.get(e.id)
+	return v.parts if v else {}
+
+
+func _float(at: Vector3, text: String, c: Color, size: int) -> void:
+	var t := FloatText.new()
+	t.text = text
+	t.font_size = size
+	t.modulate = c
+	add_child(t)
+	t.global_position = at
+
+
+func _on_lord_hurt(d: float) -> void:
+	_sfx.play(&"hurt", _lord.position, -4.0)
+	_camera.add_shake(0.25)
+	_hud.flash(Color(1, 0.2, 0.25), 0.18, 0.3)
+	_float(_lord.position + Vector3(0, 2.4, 0), "-%d" % roundi(d), Color(1, 0.42, 0.42), 34)
+
+
+func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	at.y = FieldBuilder.walk_height(at.x, at.z)
+	if _enemies.has(e.id):
+		_enemies[e.id].hit(big)
+	var chest: Vector3 = at + Vector3(0, 0.9 + Grid.cells_to_meters(e.radius) * 1.2, 0)
+	var dir: Vector3 = (at - _lord.position).normalized()
+	if e.data.wraith:
+		_fx.wisp(chest, dir, big)
+	else:
+		_fx.blood(chest, dir, big)
+	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, 52 if big else 34)
+	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
+	_sfx.play(&"hit_big" if big else &"hit", at, 0.0)
+
+
+func _on_enemy_died(e: Enemy) -> void:
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	at.y = FieldBuilder.walk_height(at.x, at.z)
+	if e.act != &"explode":
+		if e.data.wraith:
+			_fx.wisp(at + Vector3(0, 1.0, 0), Vector3.UP, true)
+		else:
+			_fx.splat(at, true)
+	if e.pack != &"":
+		meta.field_kill()
+		_hud.refresh_top()
+
+
+func _on_pack_cleared(id: StringName) -> void:
+	var n: int = meta.field_clear(String(id))
+	if n > 0:
+		_hud.toast("무리를 쓰러뜨렸다. 조각 %d개" % n)
+		_hud.flash(Color(1, 0.84, 0.42), 0.2, 0.6)
+	_saved()
+
+
+## 영주가 쓰러졌다: 잃는 것 없이 마을 북문 앞에서 깬다(record_run을 부르지 않는다).
+func _on_down(_won: bool) -> void:
+	_over = true
+	Meta.carry_sword = -1
+	meta.save()
+	Meta.wake_at_gate = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
+	await get_tree().create_timer(1.6).timeout
+	get_tree().change_scene_to_file(VILLAGE_PATH)
+
+
 func _end_read() -> void:
 	_reading = ""
 	_hud.say_end()
@@ -223,6 +390,7 @@ func _saved() -> void:
 
 
 func _leave(path: String) -> void:
+	Meta.carry_sword = -1   # 들판을 떠나면 검을 내려놓는다
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(path)

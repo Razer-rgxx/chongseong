@@ -71,6 +71,37 @@ const BORDER_RECTS: Array[Rect2] = [
 ]
 
 
+## ---- 들판 싸움(17단계, docs/outside.md). 수치는 여기 하나에만 둔다.
+## 적 하나를 쓰러뜨릴 때의 조각, 무리를 다 쓰러뜨릴 때의 조각(범위, Meta.rng).
+const PACK_KILL_SHARDS: int = 1
+const PACK_CLEAR_MIN: int = 5
+const PACK_CLEAR_MAX: int = 10
+## 영주가 무리 제자리에서 이 칸 안에 들면 덤비고, 이 칸 넘게 멀어지면 돌아가며 체력이 찬다.
+const PACK_AGGRO: float = 10.0
+const PACK_LEASH: float = 25.0
+## 서성이는 빠르기(걷는 빠르기의 몇 배)와 목표를 바꾸는 간격(초, 최소·최대), 돌아갈 때의 빠르기 배수.
+const PACK_WANDER_SPEED: float = 0.3
+const PACK_WANDER_WAIT: Vector2 = Vector2(1.5, 4.0)
+const PACK_RETURN_SPEED: float = 1.6
+## 돌아가는 동안 체력이 가득 차기까지 걸리는 시간(초).
+const PACK_HEAL_TIME: float = 2.0
+## 쓰러져 마을에서 깰 때의 자리(북문 앞, 마을 칸 단위)는 lobby의 gate_at 아래쪽 이 만큼.
+const WAKE_OFFSET: Vector2 = Vector2(0.0, 1.8)
+
+## 무리 id → {at: 제자리(칸), wander: 서성일 반지름(칸), zone: 세기 구역(1~6, RunData의 구역 배수), foes: [[적 id, 수], …]}.
+## 한 무리는 3~6마리. 자리는 막힌 곳(FieldBuilder.build의 rects·circles)과 길·상자·비석을 피해 그 곳(AREAS) 안에 둔다.
+const PACKS: Dictionary = {
+	"road_south": {"at": Vector2(34, 92), "wander": 3.0, "zone": 1, "foes": [[&"wraith", 3]]},
+	"road_mid": {"at": Vector2(30, 76), "wander": 3.5, "zone": 2, "foes": [[&"wolf", 2], [&"wraith", 2]]},
+	"brook_east": {"at": Vector2(82, 58), "wander": 3.5, "zone": 2, "foes": [[&"wraith", 2], [&"archer", 2]]},
+	"old_field": {"at": Vector2(84, 78), "wander": 4.0, "zone": 3, "foes": [[&"wraith", 2], [&"shield", 1], [&"charger", 1], [&"wolf", 1]]},
+	"tower": {"at": Vector2(90, 28), "wander": 3.5, "zone": 4, "foes": [[&"archer", 2], [&"shield", 2], [&"wolf", 1]]},
+	"grove": {"at": Vector2(8, 28), "wander": 3.0, "zone": 5, "foes": [[&"wolf", 3], [&"bomber", 1], [&"wraith", 2]]},
+	"foot": {"at": Vector2(40, 16), "wander": 3.5, "zone": 6, "foes": [[&"giant", 1], [&"charger", 2], [&"archer", 1]]},
+	"foot_east": {"at": Vector2(74, 8), "wander": 3.5, "zone": 6, "foes": [[&"caller", 1], [&"wraith", 3], [&"shield", 1]]},
+}
+
+
 static func area_at(c: Vector2) -> StringName:
 	for id in AREA_ORDER:
 		if (AREAS[id] as Rect2).has_point(c):

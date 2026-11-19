@@ -105,6 +105,7 @@ func _ready() -> void:
 	_hud.quest_taken.connect(func(_i: int) -> void: _sfx.play(&"thump", Grid.cells_to_world(board_at, 1.0), -4.0))
 	_hud.bought.connect(func(_id: StringName) -> void: _sfx.play(&"thump", Grid.cells_to_world(merchant_at, 1.0), -6.0))
 	_hud.yard_sword_picked.connect(_on_yard_sword)
+	_hud.field_go.connect(_on_field_go)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	rules.enemy_hit.connect(_on_dummy_hit)
@@ -116,6 +117,13 @@ func _ready() -> void:
 	_sun.rotation_degrees = Vector3(-35.0, -60.0, 0.0)
 	_refresh_anvil()
 	_hud.area_title("언덕 아래 마을")
+	if Meta.wake_at_gate:   # 들판에서 쓰러졌다: 잃은 것 없이 북문 앞에서 깬다
+		Meta.wake_at_gate = false
+		rules.lord.pos = gate_at + FieldLayout.WAKE_OFFSET
+		rules.lord.prev_pos = rules.lord.pos
+		_camera.target = Grid.cells_to_world(rules.lord.pos)
+		_camera.snap()
+		_hud.toast("들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
 	_capture(true)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
 
@@ -233,9 +241,7 @@ func _interact() -> void:
 		"rack":
 			_hud.open_rack()
 		"gate":
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			get_tree().change_scene_to_file(FIELD_PATH)
-			return
+			_hud.open_field_pick()
 		_:
 			return
 	_capture(false)
@@ -627,6 +633,13 @@ func _apply_yard_sword() -> void:
 	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
 	if s != null and rules.moves != null:
 		rules.moves.clear()
+
+
+## 북문에서 검을 골랐다: 들판으로 나선다(고른 검은 Meta.carry_sword로 넘어간다).
+func _on_field_go(id: int) -> void:
+	Meta.carry_sword = id
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(FIELD_PATH)
 
 
 func _on_yard_sword(id: int) -> void:

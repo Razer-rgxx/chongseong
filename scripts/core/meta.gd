@@ -35,6 +35,12 @@ var lore_read: Dictionary = {}
 var lore_paid: bool = false
 var glints: Array[int] = []
 var glints_ready: bool = false
+## 들판 싸움(17단계): 이미 쓰러뜨린 무리 id(→ 1). 판이 끝날 때(record_run) 비운다.
+var packs_cleared: Dictionary = {}
+## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
+## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
+static var carry_sword: int = -1
+static var wake_at_gate: bool = false
 var rng := RandomNumberGenerator.new()
 
 
@@ -60,7 +66,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -107,6 +113,9 @@ func from_dict(d: Dictionary) -> void:
 	for g in d.get("glints", []):
 		glints.append(int(g))
 	glints_ready = bool(d.get("glints_ready", false))
+	packs_cleared = {}
+	for k in d.get("packs_cleared", {}):
+		packs_cleared[str(k)] = 1
 
 
 func note_found(id: int) -> void:
@@ -267,6 +276,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	refresh_board(rules.data)
 	refresh_stock(rules.data)
 	roll_glints()
+	packs_cleared = {}
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
 	runs += 1
 	return r
@@ -281,6 +291,22 @@ func field_open(id: String, amount: int) -> int:
 	field_found[id] = 1
 	shards += amount
 	return amount
+
+
+## 들판 싸움(17단계): 적 하나를 쓰러뜨렸다. 받은 조각 수를 돌려준다.
+func field_kill() -> int:
+	shards += FieldLayout.PACK_KILL_SHARDS
+	return FieldLayout.PACK_KILL_SHARDS
+
+
+## 무리를 다 쓰러뜨렸다. 처음이면 조각(PACK_CLEAR_MIN~MAX, Meta.rng)을 받고 그 수를, 이미 쓰러뜨린 무리면 0을 돌려준다.
+func field_clear(id: String) -> int:
+	if packs_cleared.has(id):
+		return 0
+	packs_cleared[id] = 1
+	var n: int = rng.randi_range(FieldLayout.PACK_CLEAR_MIN, FieldLayout.PACK_CLEAR_MAX)
+	shards += n
+	return n
 
 
 ## 흩어진 조각 자리를 새로 뽑는다(판이 끝날 때마다).
@@ -557,13 +583,18 @@ func yard_swords(game: GameData) -> Array[int]:
 
 ## 수련장에서 쥘 검(검집의 검이면 검집 강화를 입는다). 없으면 null(맨손). 부러지지 않는다.
 func yard_sword_made(game: GameData) -> Sword:
-	if yard_sword <= 0:
+	return unbreakable_sword(game, yard_sword)
+
+
+## id의 검(검집의 검이면 검집 강화를 입는다). 0 이하나 모르는 id면 null(맨손). 부러지지 않는다. 수련장과 들판이 쓴다.
+func unbreakable_sword(game: GameData, id: int) -> Sword:
+	if id <= 0:
 		return null
-	var d := game.sword_by_id(yard_sword)
+	var d := game.sword_by_id(id)
 	if d == null:
 		return null
 	var s := Sword.new(d, game)
-	if yard_sword == sheath_id:
+	if id == sheath_id:
 		s.apply_sheath(sheath_lv, sheath_ins, game)
 	s.max_durability = -1.0
 	s.durability = -1.0

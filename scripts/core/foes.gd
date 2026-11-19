@@ -402,7 +402,9 @@ func _call(e: Enemy) -> void:
 	var spots: Array[Vector2] = []
 	for i in n:
 		var at: Vector2 = e.act_spots[i]
-		r.spawn_at(D.summon_kind, at)
+		var s: Enemy = r.spawn_at(D.summon_kind, at)
+		s.pack = e.pack   # 들판: 불려 온 적도 부른 자의 무리(제자리로 돌아간다)
+		s.home = at
 		spots.append(at)
 	e.summoned += n
 	e.cooldown = D.summon_interval

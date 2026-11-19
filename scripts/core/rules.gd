@@ -39,6 +39,10 @@ signal lord_hurt(damage: float)
 signal enemy_spawned(enemy: Enemy)
 signal enemy_hit(enemy: Enemy, damage: float, big: bool)
 signal enemy_died(enemy: Enemy)
+## 들판(17단계): 무리가 덤볐다, 제자리로 돌아간다, 무리를 다 쓰러뜨렸다(id).
+signal pack_engaged(id: StringName)
+signal pack_returned(id: StringName)
+signal pack_cleared(id: StringName)
 signal boss_spawned(enemy: Enemy)
 signal elite_spawned(enemy: Enemy)
 signal altar_opened()
@@ -150,6 +154,14 @@ var callers_out: int = 0
 var debug_god: bool = false
 ## 마을 수련장(15단계): 켜면 낮에도 좌클릭이 먹고, 허수아비(still)가 규칙의 적으로 선다.
 var yard: bool = false
+## 들판 모드(17단계, docs/outside.md): 낮밤과 구역 시간이 흐르지 않고 밤 나오기가 없다. 적은 spawn_pack으로 자리에 둔다.
+## 영주는 늘 "밤"(맞고 휘두른다)이고, 무리가 쓰러지거나 돌아가는 일은 _step_field가 맡는다.
+var field: bool = false
+## 들판 무리: id → {home, wander, zone(0부터), state, spawned, cleared}. state는 PACK_*.
+var packs: Dictionary = {}
+const PACK_IDLE: int = 0
+const PACK_ENGAGED: int = 1
+const PACK_RETURNING: int = 2
 ## 이번 판에 센 것(의뢰판이 본다, docs/village.md 15.1).
 var run_stats: Dictionary = {"kills": 0, "kills_by_kind": {}, "zones": 0, "elites": 0, "pulled_by_grade": [0, 0, 0, 0, 0, 0], "perfect": 0, "goals_done": {}, "events_used": 0}
 ## 떠돌이 상인에게서 산 것 중 아직 안 쓴 것(Meta.pack을 시작할 때 읽고 비운다).
@@ -342,6 +354,13 @@ func step(input: LordInput = null) -> void:
 	moves.tick(dt)
 	if yard:
 		_step_yard()
+	if field:
+		_step_field()
+		if phase == Phase.NIGHT:
+			_step_enemies()
+		if phase == Phase.NIGHT:
+			foes.step_arrows(dt)
+		return
 	if phase == Phase.NIGHT:
 		_step_night()
 		if phase == Phase.NIGHT:
@@ -898,6 +917,8 @@ func _break(k: int) -> void:
 func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false, src: Vector2 = Vector2.INF) -> void:
 	if e.dead:
 		return
+	if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
+		_engage_pack(e.pack)
 	var res: Array = foes.taken(e, damage, knock, big, dot, lord.pos if src == Vector2.INF else src)
 	damage = res[0]
 	knock = res[1]
@@ -1097,6 +1118,10 @@ func _step_enemies() -> void:
 			continue
 		if k <= 0.0:
 			continue
+		# 들판: 덤비지 않은 무리는 제자리를 서성이거나 돌아간다
+		if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
+			_step_pack_idle(e, k)
+			continue
 		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
 		var foe: Enemy = null
 		if e.confused > 0.0:
@@ -1169,6 +1194,148 @@ func _step_yard() -> void:
 ## 허수아비를 세운다(수련장).
 func spawn_dummy(p: Vector2) -> Enemy:
 	return spawn_at(&"dummy", p)
+
+
+# ---------------------------------------------------------------- 들판 무리 (17단계)
+
+## 들판 모드를 켠다: 영주는 체력이 가득한 채 "밤"에 서고, 시간은 흐르지 않는다.
+func start_field() -> void:
+	field = true
+	phase = Phase.NIGHT
+	night_left = night_total
+	hilts.clear()
+	altar = null
+	event = null
+	lord.hp = max_hp()
+
+
+## FieldLayout.PACKS의 무리를 자리에 둔다. def를 주면 그 무리(테스트용)를 둔다: {at, wander, zone, foes}.
+## 세기는 zone(1부터)의 RunData 구역 배수다. 적은 제자리 둘레에 퍼져 선다(랜덤은 rng).
+func spawn_pack(id: StringName, def: Dictionary = {}) -> Array[Enemy]:
+	var out: Array[Enemy] = []
+	var P: Dictionary = def if not def.is_empty() else FieldLayout.PACKS.get(String(id), {})
+	if P.is_empty() or packs.has(id):
+		return out
+	var home: Vector2 = P.at
+	var wander: float = float(P.wander)
+	var pz: int = clampi(int(P.zone) - 1, 0, data.run.zone_hp.size() - 1)
+	var kinds: Array[StringName] = []
+	for f in P.foes:
+		for _i in int(f[1]):
+			kinds.append(StringName(f[0]))
+	var a0: float = rng.randf() * TAU
+	var keep_zone: int = zone
+	zone = pz
+	for i in kinds.size():
+		var at: Vector2 = home + Vector2.from_angle(a0 + TAU * i / kinds.size()) * wander * (0.35 + 0.35 * rng.randf())
+		var e := spawn_at(kinds[i], at)
+		e.pack = id
+		e.home = at
+		e.wander_to = at
+		e.wander_t = rng.randf_range(FieldLayout.PACK_WANDER_WAIT.x, FieldLayout.PACK_WANDER_WAIT.y)
+		out.append(e)
+	zone = keep_zone
+	packs[id] = {"home": home, "wander": wander, "zone": pz, "state": PACK_IDLE, "spawned": out.size(), "cleared": false}
+	return out
+
+
+## 안 쓰러뜨린 무리를 모두 둔다(skip: 이미 쓰러뜨린 무리 id → 아무 값).
+func spawn_packs(skip: Dictionary = {}) -> void:
+	for id in FieldLayout.PACKS:
+		if not skip.has(id):
+			spawn_pack(StringName(id))
+
+
+func pack_alive(id: StringName) -> int:
+	var n: int = 0
+	for e in enemies:
+		if e.pack == id and not e.dead:
+			n += 1
+	return n
+
+
+func _engage_pack(id: StringName) -> void:
+	var p: Dictionary = packs[id]
+	if int(p.state) == PACK_ENGAGED:
+		return
+	p.state = PACK_ENGAGED
+	zone = int(p.zone)   # 공격 표 수와 불려 오는 적의 세기가 이 무리를 따른다
+	pack_engaged.emit(id)
+
+
+func _recall_pack(id: StringName) -> void:
+	packs[id].state = PACK_RETURNING
+	for e in enemies:
+		if e.pack != id or e.dead:
+			continue
+		tokens.release(e, false)
+		e.waiting = false
+		e.act = &""
+		e.act_t = 0.0
+		e.windup = 0.0
+		e.attack_soon = false
+		e.wander_t = 0.0
+
+
+## 무리마다: 영주가 가까우면 덤비고, 너무 멀어지면 돌아가고, 다 쓰러졌으면 알린다.
+func _step_field() -> void:
+	if phase == Phase.DAY:
+		phase = Phase.NIGHT
+	for id in packs:
+		var p: Dictionary = packs[id]
+		if p.cleared:
+			continue
+		if pack_alive(id) == 0:
+			p.cleared = true
+			pack_cleared.emit(id)
+			continue
+		var d: float = lord.pos.distance_to(p.home)
+		match int(p.state):
+			PACK_IDLE:
+				if d <= FieldLayout.PACK_AGGRO:
+					_engage_pack(id)
+			PACK_ENGAGED:
+				if d > FieldLayout.PACK_LEASH:
+					_recall_pack(id)
+			_:
+				if d <= FieldLayout.PACK_AGGRO:
+					_engage_pack(id)
+				else:
+					var home_all: bool = true
+					for e in enemies:
+						if e.pack == id and not e.dead and e.pos.distance_to(e.home) > 0.5:
+							home_all = false
+							break
+					if home_all:
+						p.state = PACK_IDLE
+						pack_returned.emit(id)
+
+
+## 덤비지 않은 무리의 적 하나: 제자리 반지름 안을 서성이거나(idle) 제자리로 돌아가며 체력이 찬다(returning).
+func _step_pack_idle(e: Enemy, k: float) -> void:
+	var p: Dictionary = packs[e.pack]
+	var sp: float = e.data.speed * k
+	if int(p.state) == PACK_RETURNING:
+		e.hp = minf(e.max_hp, e.hp + e.max_hp * dt / maxf(dt, FieldLayout.PACK_HEAL_TIME))
+		var to: Vector2 = e.home - e.pos
+		var step_len: float = sp * FieldLayout.PACK_RETURN_SPEED * dt
+		if to.length() <= maxf(step_len, 0.05):
+			e.pos = e.home
+			e.hp = e.max_hp
+		else:
+			e.face = to.normalized()
+			e.pos += e.face * step_len
+		return
+	e.wander_t -= dt
+	if e.wander_t <= 0.0:
+		var home: Vector2 = p.home
+		e.wander_to = home + Vector2.from_angle(rng.randf() * TAU) * float(p.wander) * rng.randf()
+		e.wander_t = rng.randf_range(FieldLayout.PACK_WANDER_WAIT.x, FieldLayout.PACK_WANDER_WAIT.y)
+	var w: Vector2 = e.wander_to - e.pos
+	var len_w: float = w.length()
+	if len_w > 0.1:
+		e.face = w / len_w
+		e.pos += e.face * minf(len_w, sp * FieldLayout.PACK_WANDER_SPEED * dt)
 
 
 ## 정예: 체력과 피해가 몇 배, 몸이 크다. 쓰러뜨리면 공짜 뽑기.
@@ -1723,5 +1890,9 @@ func state_hash() -> int:
 			parts.append_array([h.id, h.gone])
 		parts.append_array([h.omen, h.shown_omen, h.revealed])
 	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
+	if field:
+		parts.append(str(packs))
+		for e in enemies:
+			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
 	return hash(str(parts))

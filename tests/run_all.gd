@@ -93,6 +93,7 @@ func _init() -> void:
 	_test_village_yard()
 	_test_village_save()
 	_test_field_meta()
+	(load("res://tests/field_fight_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
