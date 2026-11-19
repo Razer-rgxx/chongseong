@@ -206,7 +206,7 @@ const engine = new Engine(GODOT_CONFIG);
 		let got = 0;
 		async function fetchParts() {
 			for (const part of PARTS) {
-				const res = await fetch(part);
+				const res = await fetch(part + '?v=1795054623');
 				if (!res.ok) {
 					throw new Error('Failed to load ' + part + ' (' + res.status + ')');
 				}
