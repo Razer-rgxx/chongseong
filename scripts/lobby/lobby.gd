@@ -140,7 +140,21 @@ func _capture(on: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on and _camera.third() and not _hud.is_open() else Input.MOUSE_MODE_VISIBLE
 
 
+## 27단계: F10으로 설정 창(게임을 멈춘다).
+func _open_settings() -> void:
+	if _hud.get_node_or_null("Settings"):
+		return
+	var p := SettingsPanel.new()
+	p.name = "Settings"
+	_hud.add_child(p)
+	p.open()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	var kf := event as InputEventKey
+	if kf and kf.pressed and not kf.echo and kf.physical_keycode == KEY_F10:
+		_open_settings()
+		return
 	var mm := event as InputEventMouseMotion
 	if mm and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_camera.look(mm.relative)

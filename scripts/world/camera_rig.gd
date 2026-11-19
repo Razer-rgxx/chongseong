@@ -60,6 +60,7 @@ var _radial: float = 0.0
 
 
 func _ready() -> void:
+	GameSettings.ensure()   # 27단계: 저장한 소리 크기·키를 처음 한 번 적용
 	_base_fov = fov
 	_blur = MeshInstance3D.new()
 	var q := QuadMesh.new()
@@ -107,8 +108,9 @@ func relative_move(v: Vector2) -> Vector2:
 
 
 func look(delta: Vector2) -> void:
-	yaw -= delta.x * mouse_sensitivity
-	pitch = clampf(pitch + delta.y * mouse_sensitivity, deg_to_rad(pitch_min_deg), deg_to_rad(pitch_max_deg))
+	var sens: float = mouse_sensitivity * GameSettings.mouse()   # 27단계: 설정의 감도 배수
+	yaw -= delta.x * sens
+	pitch = clampf(pitch + delta.y * sens, deg_to_rad(pitch_min_deg), deg_to_rad(pitch_max_deg))
 
 
 func _process(delta: float) -> void:

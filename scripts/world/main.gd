@@ -227,7 +227,21 @@ func _to_lobby() -> void:
 	get_tree().change_scene_to_file(LOBBY_PATH)
 
 
+## 27단계: F10으로 설정 창(게임을 멈춘다).
+func _open_settings() -> void:
+	if _hud.get_node_or_null("Settings"):
+		return
+	var p := SettingsPanel.new()
+	p.name = "Settings"
+	_hud.add_child(p)
+	p.open()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	var kf := event as InputEventKey
+	if kf and kf.pressed and not kf.echo and kf.physical_keycode == KEY_F10:
+		_open_settings()
+		return
 	if event.is_action_pressed("restart") and rules.phase == Rules.Phase.OVER:
 		_to_lobby()
 		return
