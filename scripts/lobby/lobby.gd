@@ -244,7 +244,7 @@ func _interact() -> void:
 		if _talk_i >= _talk_lines.size():
 			_end_talk()
 		else:
-			_hud.say(_talk_name(), _talk_lines[_talk_i])
+			_hud.say(_talk_name(), _talk_lines[_talk_i], _talk_i == _talk_lines.size() - 1)
 		return
 	if _near.begins_with("v_"):
 		_start_talk(StringName(_near.substr(2)))
@@ -744,7 +744,7 @@ func _start_talk(id: StringName) -> void:
 	_talker = id
 	_talk_lines = lines
 	_talk_i = 0
-	_hud.say(_talk_name(), lines[0])
+	_hud.say(_talk_name(), lines[0], lines.size() == 1)
 
 
 func _end_talk() -> void:

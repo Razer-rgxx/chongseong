@@ -55,7 +55,7 @@ var _hp_bar: ProgressBar
 var _boss_box: VBoxContainer
 var _boss_name: Label
 var _boss_bar: ProgressBar
-var _say: Band
+var _say: DialogueBox
 ## 결투 창(21단계)과 거기서 고른 1P·2P의 검.
 var _duel: Control
 var _duel_box: VBoxContainer
@@ -89,7 +89,7 @@ func _ready() -> void:
 	sb.add_child(_shards)
 	_toast = Band.make(self, 96.0, 980.0, 50.0, 18)
 	_prompt = Band.make(self, -110.0, 640.0, 50.0, 19)
-	_say = Band.make(self, -110.0, 1040.0, 100.0, 19)
+	_say = DialogueBox.make(self)   # 대사: 이름 + 줄, 화면 아래 자막
 	_title = AreaTitle.make(self)
 	_forge = _layer()
 	_forge_box = UiKit.center_panel(_forge)
@@ -223,17 +223,13 @@ func set_prompt(key: String, t: String) -> void:
 
 
 ## 주민의 말 한 줄(띠, E로 다음). 한 줄이 길면 가운데에서 끊는다.
-func say(who: String, text: String) -> void:
-	var t: String = text
-	if t.length() > 42:
-		var cut: int = t.find(" ", 34)
-		if cut > 0:
-			t = t.substr(0, cut) + "\n" + t.substr(cut + 1)
-	_say.show_key("E", "%s\n%s" % [who, t])
+## 대사 한 줄(이름 + 말). last면 오른쪽 아래 안내가 "닫기".
+func say(who: String, text: String, last: bool = false) -> void:
+	_say.show_line(who, text, last)
 
 
 func say_end() -> void:
-	_say.hide_band()
+	_say.hide_box()
 
 
 func area_title(t: String) -> void:

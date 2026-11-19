@@ -336,7 +336,7 @@ func _interact() -> void:
 	elif _near.begins_with("stone"):
 		var info: Array = FieldLayout.STONES[_near]
 		_reading = _near
-		_hud.say(info[1], info[2])
+		_hud.say(info[1], info[2], true)
 		var pay: int = 0
 		if not meta.lore_read.has(_near):
 			pay = meta.read_stone(_near)
