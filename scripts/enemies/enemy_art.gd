@@ -226,10 +226,13 @@ static func build_shield(parent: Node3D, scale: float, color: Color) -> Dictiona
 	P.height = 1.8 * SHIELD_KNIGHT_SCALE * scale
 	P.knight = null
 	P.skeleton = null
-	if not LordCharacter.available():
+	var own: String = LordCharacter.enemy_path(&"shield")   # 24단계: 방패병 제 모델이 있으면 그것
+	if own == "" and not LordCharacter.available():
 		_shield_dummy(P, color)
 		return P
 	var k := LordCharacter.new()
+	if own != "":
+		k.char_path = own
 	k.name = "Knight"
 	k.scale = Vector3.ONE * SHIELD_KNIGHT_SCALE
 	P.knight = k

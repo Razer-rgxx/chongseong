@@ -5,6 +5,9 @@ extends Node3D
 ## 같은 Mixamo 뼈대라 동작을 그대로 옮겨 붙일 수 있다. 제자리 동작이 되게 엉덩이의 앞뒤·좌우 이동은 지운다.
 
 const CHAR_PATH: String = "res://assets/characters/lord/paladin.fbx"
+## 적마다 따로 받은 Mixamo 캐릭터(24단계). assets/characters/enemies/<적 id>.fbx가 있으면 그 적은 이 모델로 선다.
+## 동작은 영주의 것(ANIM_DIR)을 같이 쓴다(같은 Mixamo 뼈대).
+const ENEMY_DIR: String = "res://assets/characters/enemies/"
 const ANIM_DIR: String = "res://assets/characters/lord/anims/"
 const HAND_BONE: String = "mixamorig_RightHand"
 ## 파일 이름에 이 낱말이 있으면 그 동작으로 쓴다(앞의 것부터 본다). 베기는 _key_for에서 따로 고른다.
@@ -24,6 +27,8 @@ const LOOPING: Array[String] = ["idle", "walk", "run", "pull"]
 @export var grip_rotation_deg: Vector3 = Vector3.ZERO
 @export var blend: float = 0.12
 
+## 읽을 캐릭터 파일. 트리에 넣기 전에 바꾼다(적 모델은 enemy_path).
+var char_path: String = CHAR_PATH
 var anims: Dictionary = {}
 ## 동작 파일은 한 번만 읽어 모든 캐릭터(영주, 거인 적)가 같이 쓴다.
 static var _lib_cache: AnimationLibrary = null
@@ -53,12 +58,23 @@ static func available() -> bool:
 	return ResourceLoader.exists(CHAR_PATH)
 
 
+## 그 적 id의 모델 파일. 없으면 "".
+static func enemy_path(id: StringName) -> String:
+	var p: String = ENEMY_DIR + str(id) + ".fbx"
+	return p if ResourceLoader.exists(p) else ""
+
+
 func _ready() -> void:
-	_body = (load(CHAR_PATH) as PackedScene).instantiate()
+	_body = (load(char_path) as PackedScene).instantiate()
 	_body.rotation.y = PI   # Mixamo 캐릭터는 +Z를 본다. 이 게임의 모델 앞은 -Z다
 	add_child(_body)
 	_skel = _body.find_child("Skeleton3D", true, false) as Skeleton3D
 	_player = _body.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _player == null:
+		# 동작 없이 받은 모델: 동작을 붙일 자리를 만든다(동작 길은 모델 뿌리 기준)
+		_player = AnimationPlayer.new()
+		_body.add_child(_player)
+		_player.root_node = NodePath("..")
 	_load_anims()
 	_hand.bone_name = HAND_BONE
 	_skel.add_child(_hand)
@@ -100,6 +116,26 @@ func _find_contacts() -> void:
 
 func contact(name: String) -> float:
 	return _contact_cache.get(name, 0.0)
+
+
+## 아무 손 뼈(mixamorig_LeftHand 등)에 쥔 자리를 만들어 node를 붙인다(24단계: 적의 활·지팡이).
+## 쥔 자리의 Y는 몸 앞쪽, X는 위(T자세 기준)다. 활과 지팡이는 X를 따라 세운다.
+func grip_node(bone: String, node: Node3D) -> void:
+	var b: int = _skel.find_bone(bone)
+	if b < 0:
+		return
+	var inv: Basis = _skel.get_bone_global_rest(b).basis.orthonormalized().inverse()
+	var y: Vector3 = (inv * Vector3(0, 0, 1)).normalized()
+	var x: Vector3 = (inv * Vector3(0, 1, 0)).normalized()
+	var z: Vector3 = x.cross(y).normalized()
+	x = y.cross(z).normalized()
+	var at := BoneAttachment3D.new()
+	at.bone_name = bone
+	_skel.add_child(at)
+	var g := Node3D.new()
+	g.transform = Transform3D(Basis(x, y, z), Vector3(0, 0.08, 0))
+	at.add_child(g)
+	g.add_child(node)
 
 
 ## 손 뼈 기준으로 칼을 쥔 자리와 방향. 쥔 자리의 Y가 칼날, X가 날이 선 쪽이다.

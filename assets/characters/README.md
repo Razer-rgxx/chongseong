@@ -7,6 +7,8 @@ Mixamo(Adobe)에서 받은 모델과 동작을 둔다. Mixamo 약관상 원본 �
 | `lord/paladin.fbx` | 영주 모델 (Paladin J Nordstrom) | 캐릭터 고르고 아무 동작이나, With Skin |
 | `lord/anims/*.fbx` | 영주 동작 | 같은 캐릭터로 동작 고르고 Without Skin, In Place 체크(With Skin도 되지만 파일이 크고 켜는 게 느려진다) |
 
+| `enemies/<적 id>.fbx` | 적 모델(24단계, 고를 수 있음) | 캐릭터 고르고 아무 동작이나, With Skin. 동작은 영주의 것(`lord/anims/`)을 같이 쓴다 |
+
 - 모델이 없으면 기본 도형 영주가 나온다.
 - 동작은 파일 이름의 낱말로 고른다: idle, run, roll, impact/hit, death/dying, pull, slash/attack(이름에 great가 있으면 대검 베기). 베기는 여러 개 넣으면 번갈아 튼다. 없는 동작은 서 있기로 대신한다.
 - Godot이 FBX를 읽으면서 `paladin_0.png` 같은 텍스처를 옆에 뽑아 둔다. 이것도 올리지 않는다.
@@ -41,3 +43,31 @@ Mixamo(Adobe)에서 받은 모델과 동작을 둔다. Mixamo 약관상 원본 �
 | 순간 베기 `blink` | (받을 것 없음) | | 베기 + 지나온 쪽을 보던 몸을 홱 돌리기 |
 | 갈고리 베기 `hook` | (받을 것 없음) | | 구르기(Stand To Roll)로 공중제비 + 닿으면 베기 |
 | 반격 자세 `parry` | sword block, parry | `block` 또는 `parry` | Slash에서 칼을 세워 몸 앞에 든 순간에 멈춘다 |
+
+## 적 모델 (24단계)
+
+받을 것은 없다. 적은 모두 이미 모양이 있다(망령 망토, 늑대, 새 적 5종의 EnemyArt, 거인·언덕지기·무덤 기사·무덤 주인·방패병은 영주 기사). 
+
+다른 사람 모델로 바꾸고 싶을 때만(고를 수 있음) 적마다 Mixamo 캐릭터 하나를 `enemies/<적 id>.fbx`로 넣으면 그 적은 그 모델로 서고, 영주의 동작(서기·걷기/달리기·베기·맞기·쓰러짐)을 같이 쓴다. 눈은 머리 뼈에 붙어 빛나고, 정예는 금빛이 돈다. 파일이 없는 적은 지금 모양 그대로다.
+
+- 받는 법: Mixamo에서 캐릭터를 고르고 아무 동작이나 골라 Download → Format FBX, **With Skin**. 받은 파일 이름을 아래 id로 바꿔 `assets/characters/enemies/`에 넣는다. 같은 모델을 두 적에 쓰려면 파일을 복사해 이름만 바꾼다.
+- 캐릭터 이름은 Mixamo Characters 탭에서 찾을 이름이다. 없으면 비슷한 어두운 것을 고른다(어두운 사실풍, 만화풍은 피한다).
+- 늑대(`wolf`)와 허수아비(`dummy`)는 사람형이 아니라 바꾸지 않는다.
+
+| id | 적 | 추천 캐릭터 | 크기 |
+| --- | --- | --- | --- |
+| `wraith` | 망령 | Skeletonzombie T Avelange | 사람 크기 |
+| `archer` | 활잡이 | Erika Archer | 사람 크기 |
+| `shield` | 방패병 | Knight D Pelegrini | 지금 방패병 크기, 방패는 그대로 왼팔에 |
+| `charger` | 돌격병 | Warzombie F Pedroso | 사람 크기 |
+| `bomber` | 자폭병 | Parasite L Starkie | 사람 크기 |
+| `caller` | 부르는 자 | Nightshade J Friedrich | 사람 크기 |
+| `giant` | 거인 | Mutant | ×1.85 |
+| `boss` | 언덕지기 | Maw J Laygo | ×2.5 |
+| `grave_knight` | 무덤 기사(들판 보스) | Knight D Pelegrini 또는 Paladin | 표의 `model_scale` |
+| `crypt_lord` | 무덤 주인 | Vampire A Lusth | 표의 `model_scale` |
+
+알아 둘 것
+- 활잡이·돌격병·자폭병·부르는 자는 제 모델을 넣으면 EnemyArt의 전용 모양과 자세(겨누기, 머리 낮추기, 심지)가 빠지고 걷기·베기·맞기·쓰러짐으로 움직인다(활잡이는 왼손에 활, 부르는 자는 오른손에 지팡이). 효과는 그대로다. 어색하면 그 파일만 빼면 된다.
+- 모델마다 뼈 이름이 `mixamorig:`로 시작해야 영주 동작이 붙는다(Mixamo 캐릭터는 다 그렇다). 동작이 안 붙고 T자로 서면 그 모델은 빼고 알려 준다.
+- 너무 밝거나 어두우면 `EnemyView._build_knight`의 `mul`(제 모델용 줄)을 고친다.
