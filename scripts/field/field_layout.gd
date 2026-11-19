@@ -155,6 +155,8 @@ const BOSS_CHARM: StringName = &"charm"
 ## 모양이 서는 곳(막힘, 칸 단위), E를 누르는 자리, 나오거나 쓰러져 깰 자리(입구 앞).
 const CRYPT_BLOCK: Rect2 = Rect2(28.5, 26.0, 7.0, 3.6)
 const CRYPT_DOOR: Vector2 = Vector2(32, 31)
+## 무덤에서 쓰러지면 쥔 검이 떨어지는 자리: 깨는 자리(CRYPT_WAKE)에서 조금 옆(깨자마자 발밑에 겹치지 않게).
+const CRYPT_DROP_OFFSET: Vector2 = Vector2(1.5, 0.5)
 const CRYPT_WAKE: Vector2 = Vector2(32, 33.5)
 
 

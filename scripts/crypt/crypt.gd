@@ -12,6 +12,8 @@ static var _titled: bool = false
 @export var reach: float = 2.0
 @export var max_ticks_per_frame: int = 8
 
+## 지금 쥔 검 번호(0 = 맨손). 쓰러지면 들판의 무덤 입구 앞에 떨군다.
+var _held_id: int = 0
 var data: GameData
 var meta: Meta
 var rules: Rules
@@ -218,6 +220,9 @@ func _interact() -> void:
 ## 고른 검을 칸 0에 쥔다(부러지지 않는다, 들판과 같다). 안 골랐으면 검집의 검, 0이면 맨손.
 func _hold_sword() -> void:
 	var id: int = Meta.carry_sword if Meta.carry_sword >= 0 else meta.sheath_id
+	if not meta.usable(id):
+		id = 0
+	_held_id = id
 	var s: Sword = meta.unbreakable_sword(data, id)
 	rules.slots[0] = s
 	rules.active = 0
@@ -336,9 +341,10 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 		_sfx.play(&"thump", Grid.cells_to_world(e.pos), -2.0, 0.7)
 
 
-## 영주가 쓰러졌다: 잃는 것 없이 들판의 무덤 입구 앞에서 깬다(쓰러뜨린 방과 연 관은 Meta에 남아 있다).
+## 영주가 쓰러졌다: 쥔 검을 들판의 무덤 입구 앞에 떨구고(먼저 떨군 검은 잃는다) 그 앞에서 깬다(쓰러뜨린 방과 연 관은 Meta에 남아 있다).
 func _on_down(_won: bool) -> void:
 	_over = true
+	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, FieldLayout.CRYPT_WAKE + FieldLayout.CRYPT_DROP_OFFSET), _held_id)
 	meta.save()
 	Meta.wake_at_crypt = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

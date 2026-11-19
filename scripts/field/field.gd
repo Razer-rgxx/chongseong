@@ -24,6 +24,12 @@ var _near: String = ""
 var _rects: Array[Rect2] = []
 var _circles: Array = []
 var _props: Dictionary = {}
+## 지금 쥔 검 번호(0 = 맨손). 쓰러지면 이것을 떨군다.
+var _held_id: int = 0
+## 떨군 검의 모양(꽂힌 검·빛·불씨). 주우면 지운다.
+var _dropped_node: Node3D
+## 들판 화면(곳 이름, 낮밤, 쥔 검, 나침반).
+var _field_hud: FieldHud
 var _area: StringName = &""
 var _shown: Dictionary = {}
 var _reading: String = ""
@@ -70,6 +76,11 @@ func _ready() -> void:
 		rules.lord.pos = FieldLayout.CRYPT_WAKE
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
+	_build_dropped()
+	_field_hud = FieldHud.make(_hud, data, meta, rules, _camera)
+	if Meta.wake_note != "":   # 무덤에서 쓰러져 검을 떨궜다
+		_hud.toast(Meta.wake_note)
+		Meta.wake_note = ""
 	var env: Environment = ($Environment as WorldEnvironment).environment
 	HillBuilder.apply_sky(env, Color(1.0, 0.8, 0.68), 0.75)
 	_env = env
@@ -288,6 +299,8 @@ func _on_dawn() -> void:
 
 func _spots() -> Dictionary:
 	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD, "crypt": FieldLayout.CRYPT_DOOR}
+	if not meta.dropped.is_empty():
+		s["dropped"] = meta.dropped_at()
 	for id in FieldLayout.CACHES:
 		if not meta.field_found.has(id):
 			s[id] = FieldLayout.CACHES[id][0]
@@ -305,6 +318,8 @@ func _prompt(key: String) -> String:
 		return "언덕으로 오른다"
 	if key == "crypt":
 		return "지하 무덤으로 내려간다"
+	if key == "dropped":
+		return "떨군 검을 줍는다"
 	if key.begins_with("cache"):
 		return "유품을 연다"
 	if key.begins_with("stone"):
@@ -322,6 +337,15 @@ func _interact() -> void:
 		_leave(VILLAGE_PATH)
 	elif _near == "trail":
 		_leave(RUN_PATH)
+	elif _near == "dropped":
+		var id: int = meta.pick_dropped()
+		if _dropped_node:
+			_dropped_node.queue_free()
+			_dropped_node = null
+		var d: SwordData = data.sword_by_id(id)
+		_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -4.0, 1.3)
+		_hud.toast("떨군 검을 되찾았다: %s" % (d.display_name if d else "?"))
+		_saved()
 	elif _near == "crypt":
 		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -355,9 +379,12 @@ func _interact() -> void:
 			_saved()
 
 
-## 고른 검을 칸 0에 쥔다(부러지지 않는다). 안 골랐으면 검집의 검, 0이면 맨손.
+## 고른 검을 칸 0에 쥔다(부러지지 않는다). 안 골랐으면 검집의 검, 0이면 맨손. 떨구거나 잃은 검이면 맨손.
 func _hold_sword() -> void:
 	var id: int = Meta.carry_sword if Meta.carry_sword >= 0 else meta.sheath_id
+	if not meta.usable(id):
+		id = 0
+	_held_id = id
 	var s: Sword = meta.unbreakable_sword(data, id)
 	rules.slots[0] = s
 	rules.active = 0
@@ -482,9 +509,10 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 		_sfx.play(&"thump", Grid.cells_to_world(e.pos), -2.0, 0.7)
 
 
-## 영주가 쓰러졌다: 잃는 것 없이 마을 북문 앞에서 깬다(record_run을 부르지 않는다).
+## 영주가 쓰러졌다: 쥔 검을 이 자리에 떨구고(먼저 떨군 검이 있으면 그것은 잃는다) 마을 북문 앞에서 깬다(record_run을 부르지 않는다).
 func _on_down(_won: bool) -> void:
 	_over = true
+	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, rules.lord.pos), _held_id)
 	Meta.carry_sword = -1
 	meta.field_clock = rules.field_clock
 	meta.save()
@@ -538,3 +566,86 @@ func _push_out(p: Vector2) -> Vector2:
 			else:
 				p.y = g.end.y
 	return p
+
+
+# ---------------------------------------------------------------- 떨군 검 (2026-11-20)
+
+## 떨군 검: 날이 땅에 박혀 기울어 있고, 붉은 숨 같은 빛과 위로 흩어지는 재가 멀리서도 보인다(세계에 글자 없음).
+func _build_dropped() -> void:
+	if meta.dropped.is_empty():
+		return
+	var at: Vector2 = meta.dropped_at()
+	var d: SwordData = data.sword_by_id(meta.dropped_id())
+	var root := Node3D.new()
+	var w: Vector3 = Grid.cells_to_world(at)
+	root.position = Vector3(w.x, FieldBuilder.height(w.x, w.z), w.z)
+	add_child(root)
+	var col: Color = data.grades.colors[d.grade] if d and d.grade < data.grades.colors.size() else Color(0.9, 0.9, 0.9)
+	var sw := SwordModel.make(data.forms[d.form] if d else null, d.grade if d else 0, d.id if d else 1, col)
+	sw.basis = Basis.from_euler(Vector3(PI + 0.18, 0.4, 0.1))
+	sw.position = Vector3(0.0, 0.5, 0.0)
+	root.add_child(sw)
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.25, 0.15)
+	light.light_energy = 2.6
+	light.omni_range = 6.0
+	light.position = Vector3(0.0, 1.0, 0.0)
+	root.add_child(light)
+	var p := CPUParticles3D.new()
+	p.amount = 70
+	p.lifetime = 3.5
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	p.emission_sphere_radius = 0.5
+	p.direction = Vector3.UP
+	p.spread = 12.0
+	p.gravity = Vector3(0.0, 0.6, 0.0)
+	p.initial_velocity_min = 0.3
+	p.initial_velocity_max = 0.8
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	ramp.colors = PackedColorArray([Color(1, 0.3, 0.15, 0), Color(1, 0.3, 0.15, 0.9), Color(0.5, 0.1, 0.05, 0)])
+	p.color_ramp = ramp
+	var q := QuadMesh.new()
+	q.size = Vector2(0.09, 0.09)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_texture = _dot_texture()
+	m.emission_enabled = true
+	m.emission = Color(1.0, 0.3, 0.15)
+	m.emission_energy_multiplier = 3.0
+	q.material = m
+	p.mesh = q
+	p.position = Vector3(0.0, 0.3, 0.0)
+	root.add_child(p)
+	# 땅에 번진 붉은 빛 웅덩이(멀리서도 보이게, 낮에도)
+	var pool := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(2.4, 2.4)
+	var pmat := StandardMaterial3D.new()
+	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pmat.albedo_texture = _dot_texture()
+	pmat.albedo_color = Color(0.9, 0.12, 0.06, 0.55)
+	pm.material = pmat
+	pool.mesh = pm
+	pool.position = Vector3(0.0, 0.04, 0.0)
+	root.add_child(pool)
+	_dropped_node = root
+
+
+## 가운데가 진하고 가장자리로 사라지는 둥근 점(불씨·빛 웅덩이).
+static func _dot_texture() -> GradientTexture2D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.55), Color(1, 1, 1, 0)])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	t.width = 64
+	t.height = 64
+	return t

@@ -8,6 +8,11 @@ const SAVE_PATH: String = "user://hill_save.json"
 var shards: int = 0
 ## 검집에 넣은 검의 SwordData.id. -1이면 비었다.
 var sheath_id: int = -1
+## 들판·무덤에서 쓰러지면 쥔 검을 그 자리에 떨군다(소울류, 2026-11-20 사용자가 정함). {"id": 검 번호, "x", "y": 들판 칸}, 비면 없음.
+## 무덤에서 쓰러지면 들판의 무덤 입구 앞에 떨어진다. 줍기 전에 또 쓰러지면 그 검은 lost로 간다.
+var dropped: Dictionary = {}
+## 잃은 검(번호 문자열 → 1). 검 걸이·북문·검집에서 빠진다. 언덕에서 다시 뽑으면(note_found) 되찾는다.
+var lost: Dictionary = {}
 var sheath_lv: int = 0
 ## 가장 높이 올랐던 단계(각인은 처음 닿을 때만 붙는다).
 var sheath_peak: int = 0
@@ -54,6 +59,8 @@ static var carry_sword: int = -1
 ## 결투(21단계)에서 1P와 2P가 든 검(SwordData.id, 0은 맨손). 마을 결투 말뚝에서 고르고 장면을 넘어 이어지는 값이라 static, 저장하지 않는다.
 static var duel_picks: Array[int] = [0, 0]
 static var wake_at_gate: bool = false
+## 쓰러져서 마을·들판에서 깰 때 한 번 띄울 말(떨군 검·잃은 검). 띄우면 비운다.
+static var wake_note: String = ""
 ## 지하 무덤에서 나왔거나 쓰러졌다: 들판의 무덤 입구 앞에서 깬다(장면을 넘어 이어지는 값이라 static, 저장하지 않는다).
 static var wake_at_crypt: bool = false
 var rng := RandomNumberGenerator.new()
@@ -81,12 +88,21 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost}
 
 
 func from_dict(d: Dictionary) -> void:
 	shards = int(d.get("shards", 0))
 	sheath_id = int(d.get("sheath_id", -1))
+	var dr: Variant = d.get("dropped", {})
+	dropped = {}
+	if dr is Dictionary and (dr as Dictionary).has("id"):
+		dropped = {"id": int(dr["id"]), "x": float(dr.get("x", 0.0)), "y": float(dr.get("y", 0.0))}
+	lost = {}
+	var lo: Variant = d.get("lost", {})
+	if lo is Dictionary:
+		for k in lo:
+			lost[str(k)] = 1
 	sheath_lv = int(d.get("sheath_lv", 0))
 	sheath_peak = int(d.get("sheath_peak", 0))
 	sheath_ins = PackedStringArray(d.get("sheath_ins", []))
@@ -154,6 +170,45 @@ func record_duel(winner: int) -> void:
 
 func note_found(id: int) -> void:
 	found[str(id)] = int(found.get(str(id), 0)) + 1
+	lost.erase(str(id))   # 잃었던 검을 다시 뽑으면 되찾는다
+
+
+# ---------------------------------------------------------------- 떨군 검 (2026-11-20)
+
+## 쓰러졌다: 먼저 떨군 검이 있으면 그것은 잃고(lost), 쥔 검(id > 0)을 at에 떨군다. 잃은 검 번호를 돌려준다(없으면 -1).
+## 검집의 검을 잃으면 검집이 비고 fix_sheath가 다음 좋은 검을 넣는다(검집 강화·각인은 검집에 남는다).
+func drop_sword(game: GameData, id: int, at: Vector2) -> int:
+	var gone: int = -1
+	if not dropped.is_empty():
+		gone = int(dropped["id"])
+		lost[str(gone)] = 1
+		dropped = {}
+		if sheath_id == gone:
+			sheath_id = -1
+			fix_sheath(game)
+	if id > 0:
+		dropped = {"id": id, "x": at.x, "y": at.y}
+	return gone
+
+
+## 떨군 검을 주웠다. 주운 검 번호(없으면 -1).
+func pick_dropped() -> int:
+	var id: int = dropped_id()
+	dropped = {}
+	return id
+
+
+func dropped_id() -> int:
+	return int(dropped["id"]) if not dropped.is_empty() else -1
+
+
+func dropped_at() -> Vector2:
+	return Vector2(float(dropped.get("x", 0.0)), float(dropped.get("y", 0.0)))
+
+
+## 지금 쥐고 나갈 수 있는 검인가(잃지도, 떨구지도 않았다).
+func usable(id: int) -> bool:
+	return id > 0 and not lost.has(str(id)) and id != dropped_id()
 
 
 func has_found(id: int) -> bool:
@@ -176,7 +231,7 @@ func bless_value(md: MetaData, key: String) -> float:
 func sheath_candidates(game: GameData) -> Array[int]:
 	var out: Array[int] = []
 	for s in game.swords:
-		if s.grade >= game.meta.sheath_min_grade and has_found(s.id):
+		if s.grade >= game.meta.sheath_min_grade and has_found(s.id) and not lost.has(str(s.id)):
 			out.append(s.id)
 	out.sort_custom(func(a: int, b: int) -> bool:
 		var ga: int = game.sword_by_id(a).grade
@@ -659,7 +714,11 @@ func yard_swords(game: GameData) -> Array[int]:
 		var gb: int = game.sword_by_id(b).grade
 		return ga > gb or (ga == gb and a < b))
 	out.append_array(ids)
-	return out
+	var ok: Array[int] = []
+	for i in out:
+		if usable(i):   # 잃은 검·떨군 검은 걸 수 없다
+			ok.append(i)
+	return ok
 
 
 ## 수련장에서 쥘 검(검집의 검이면 검집 강화를 입는다). 없으면 null(맨손). 부러지지 않는다.

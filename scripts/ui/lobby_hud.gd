@@ -507,6 +507,8 @@ func open_yard_rack() -> void:
 func open_field_pick() -> void:
 	_gate_mode = true
 	_gate_pick = Meta.carry_sword if Meta.carry_sword >= 0 else maxi(0, meta.sheath_id)
+	if not meta.usable(_gate_pick):
+		_gate_pick = 0   # 떨구거나 잃은 검은 못 들고 나간다
 	_yard.visible = true
 	_render_yard_rack()
 
@@ -518,7 +520,10 @@ func _render_yard_rack() -> void:
 		_gate_mode = false
 		close())
 	if _gate_mode:
-		_yard_box.add_child(_wrap(UiKit.label("고른 검은 들판에서만 쥔다. 부러지지 않는다. 쓰러져도 잃는 것은 없다.", 14, UiKit.MUTED)))
+		_yard_box.add_child(_wrap(UiKit.label("고른 검은 들판에서만 쥔다. 부러지지 않는다. 쓰러지면 그 자리에 떨구고, 줍기 전에 또 쓰러지면 영영 잃는다.", 14, UiKit.MUTED)))
+		if not meta.dropped.is_empty():
+			var dd: SwordData = data.sword_by_id(meta.dropped_id())
+			_yard_box.add_child(_wrap(UiKit.label("들판에 떨군 검: %s" % (dd.display_name if dd else "?"), 14, Color(1.0, 0.45, 0.35))))
 	else:
 		_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다. 울타리 안에서 좌클릭으로 허수아비를 친다.", 14, UiKit.MUTED)))
 	var ids := meta.yard_swords(data)

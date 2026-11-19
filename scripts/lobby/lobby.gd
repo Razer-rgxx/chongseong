@@ -131,7 +131,8 @@ func _ready() -> void:
 		rules.lord.prev_pos = rules.lord.pos
 		_camera.target = Grid.cells_to_world(rules.lord.pos)
 		_camera.snap()
-		_hud.toast("들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
+		_hud.toast(Meta.wake_note if Meta.wake_note != "" else "들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
+		Meta.wake_note = ""
 	_capture(true)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
 
