@@ -309,6 +309,8 @@ func _render_forge(msg: String) -> void:
 		_forge_box.add_child(b)
 		var note: String = "실패하면 한 단계 내려간다." if meta.sheath_lv >= md.sheath_drop_from else "+%d부터는 실패하면 한 단계 내려간다." % md.sheath_drop_from
 		_forge_box.add_child(UiKit.label(note + " +5, +10에 처음 닿으면 각인이 붙는다.", 13, UiKit.MUTED))
+		if meta.has_recruit("smith"):
+			_forge_box.add_child(UiKit.label("떠돌이 대장장이가 거든다: 망치질 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_FORGE) * 100.0), 13, UiKit.MUTED))
 	else:
 		_forge_box.add_child(UiKit.label("끝까지 벼렸다.", 16, UiKit.TITLE))
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
@@ -356,7 +358,7 @@ func _render_shrine(msg: String) -> void:
 		c.queue_free()
 	var md := data.meta
 	UiKit.header(_shrine_box, "성소 · 축복", close, Color(0.8, 0.84, 0.88))
-	_shrine_box.add_child(UiKit.label("실패해도 내려가지 않는다.", 13, UiKit.MUTED))
+	_shrine_box.add_child(UiKit.label("실패해도 내려가지 않는다." + ("  길 잃은 순례자가 함께 빈다: 축복 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_BLESS) * 100.0) if meta.has_recruit("pilgrim") else ""), 13, UiKit.MUTED))
 	for i in md.bless_keys.size():
 		var key: String = md.bless_keys[i]
 		var lv: int = meta.bless_level(key)

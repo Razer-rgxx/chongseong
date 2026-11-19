@@ -47,6 +47,7 @@ func _ready() -> void:
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
 	Grid.size = CryptLayout.SIZE
+	rules.bonus_hp = meta.recruit_hp()   # 34단계: 떠돌이 약초꾼(들판과 같다)
 	rules.start_field()
 	rules.lord.pos = CryptLayout.START
 	rules.lord.prev_pos = rules.lord.pos

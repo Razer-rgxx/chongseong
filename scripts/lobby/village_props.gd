@@ -11,6 +11,12 @@ const LOOKS: Dictionary = {
 	&"herbalist": [Color(0.12, 0.2, 0.13), Color(0.2, 0.24, 0.14), "basket"],
 	&"apprentice": [Color(0.22, 0.18, 0.15), Color(0.16, 0.11, 0.08), "apron"],
 	&"merchant": [Color(0.2, 0.1, 0.22), Color(0.28, 0.12, 0.3), "pack"],
+	# 34단계 떠도는 사람(FieldLayout.WANDERERS): 같은 몸, 옷 색과 소품만 다르다. 들판에 서고, 영입하면 마을에 선다.
+	&"gatherer": [Color(0.17, 0.19, 0.11), Color(0.32, 0.27, 0.18), "basket"],
+	&"smith": [Color(0.19, 0.13, 0.09), Color(0.1, 0.08, 0.06), "apron"],
+	&"hunter": [Color(0.25, 0.2, 0.13), Color(0.5, 0.48, 0.45), "spear"],
+	&"pilgrim": [Color(0.4, 0.36, 0.3), Color(0.36, 0.32, 0.26), "staff"],
+	&"knight": [Color(0.13, 0.14, 0.17), Color(0.2, 0.18, 0.17), "blade"],
 }
 
 
@@ -171,6 +177,16 @@ static func villager(kind: StringName, parent: Node3D) -> Dictionary:
 			EventArt._add(torso, EventArt._box_mesh(Vector3(0.34, 0.75, 0.04)), VillageBuilder.plain(Color(0.14, 0.1, 0.07), 0.9), Vector3(0, -0.45, 0.2))
 		"pack":
 			EventArt._add(torso, EventArt._box_mesh(Vector3(0.4, 0.5, 0.25)), VillageBuilder.plain(Color(0.36, 0.28, 0.2), 1.0), Vector3(0, 0.1, -0.27))
+		"blade":
+			# 몰락한 기사: 앞에 바랜 붉은 겉옷 자락, 허리에 찬 칼집과 쇠 칼자루, 등에 해진 망토
+			var red := VillageBuilder.plain(Color(0.21, 0.05, 0.045), 1.0)
+			EventArt._add(torso, EventArt._box_mesh(Vector3(0.24, 1.1, 0.03)), red, Vector3(0, -0.3, -0.23)).rotation = Vector3(0.08, 0.0, 0.0)
+			EventArt._add(torso, EventArt._box_mesh(Vector3(0.5, 0.95, 0.04)), red, Vector3(0, -0.1, 0.24)).rotation = Vector3(-0.12, 0.0, 0.0)
+			var leather := VillageBuilder.plain(Color(0.24, 0.16, 0.1), 0.8)
+			var steel := VillageBuilder.plain(Color(0.58, 0.58, 0.6), 0.45, 0.8)
+			EventArt._add(torso, EventArt._box_mesh(Vector3(0.06, 0.95, 0.05)), leather, Vector3(0.31, -0.72, 0.0)).rotation = Vector3(0.0, 0.0, 0.2)
+			EventArt._add(torso, EventArt._box_mesh(Vector3(0.04, 0.24, 0.04)), steel, Vector3(0.22, -0.15, 0.0)).rotation = Vector3(0.0, 0.0, 0.2)
+			EventArt._add(torso, EventArt._box_mesh(Vector3(0.2, 0.035, 0.05)), steel, Vector3(0.245, -0.27, 0.0)).rotation = Vector3(0.0, 0.0, 0.2)
 	EventArt._rest(P)
 	return P
 

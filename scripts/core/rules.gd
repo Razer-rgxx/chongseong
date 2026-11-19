@@ -292,11 +292,15 @@ var seer_used_today: bool = false
 ## 저주받은 손잡이를 뽑았다: 이번 밤 새로 나오는 적의 체력과 피해 ×cursed_enemies.
 var cursed_night: bool = false
 var _pull_cursed: bool = false
+## 떠돌이 약초꾼을 영입했으면(34단계, Meta.recruit_hp) 최대 체력에 더한다. 판은 Meta에서 받고, 들판은 장면이 넣는다.
+var bonus_hp: float = 0.0
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	data = game_data
 	meta = p_meta
+	if meta:
+		bonus_hp = meta.recruit_hp()
 	seed_value = p_seed
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
@@ -361,7 +365,7 @@ func _bless(key: String) -> float:
 func max_hp() -> float:
 	if duel:
 		return data.duel.hp
-	return data.lord.hp + _bless("hp") + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
+	return data.lord.hp + _bless("hp") + bonus_hp + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
 
 
 func pull_cost() -> float:
