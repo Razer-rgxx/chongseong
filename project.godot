@@ -88,6 +88,10 @@ restart={
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":82)]
 }
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/GD-Sync/plugin.cfg")
+
 [gui]
 
 theme/custom="res://assets/ui/theme.tres"

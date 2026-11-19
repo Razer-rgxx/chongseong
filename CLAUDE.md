@@ -38,6 +38,7 @@
 - 들판 보스(18단계, docs/outside.md): 옛 싸움터의 무덤 기사(`data/enemies/10_grave_knight.tres`, `FieldLayout.BOSS_*`)는 `Rules.spawn_field_boss`/`field_boss`·`field_boss_state`로 무리와 따로 센다(깨어남 8칸·돌아감 14칸, 신호 `field_boss_woke`·`field_boss_returned`·`field_boss_slain`). 행동(휘두르기·돌진·부르기·빨라짐)은 `Foes._knight`와 `EnemyData`의 무덤 기사 칸. 보상은 `Meta.boss_defeat`(조각 80/30, `charm`을 `Meta.pack`에), `Meta.boss_down`(`record_run`이 비운다)·`boss_first`(저장). 화면은 EnemyView(`model_scale`)·EnemyFx(`swing_wind` 부채꼴, `height_of`)·`LobbyHud.set_boss`.
 - 지하 무덤(19단계, docs/outside.md): 들판 검은 숲 가장자리 입구(`FieldLayout.CRYPT_*`)에서 E → `scenes/crypt/crypt.tscn`. 방·문·관·무리 자리와 수치는 `CryptLayout`(static const) 한 곳, 규칙 쪽은 `CryptRun`(방에 들어서면 `Rules.spawn_pack`/`spawn_field_boss`로 세우고, 쓰러뜨린 방을 `Meta.crypt_clear`에 적는다. 문이 닫혔는지는 영주가 든 방과 `Rules.packs`·`field_boss_state`에서 읽고, 막힘은 `CryptLayout.push_in`). 마지막 방은 무덤 주인(`crypt_lord`, `Foes._knight` 공유). 보상은 `Meta.crypt_open`(관 10~25, 큰 관 60+운 부적), `crypt_cleared`·`crypt_opened`(저장, `record_run`이 비운다). 화면은 `CryptBuilder`(돌판 문, 낮은 벽, 횃불)와 `crypt.gd`, 나오거나 쓰러지면 `Meta.wake_at_crypt`로 입구 앞.
 - 1대1 결투(21단계, docs/duel.md): `Rules.lords`(0 = `lord`, 비결투 모드는 하나)와 `start_duel`·`step_duel(입력1, 입력2)`. 영주마다 `DuelSeat`(검 칸·`Moves`·`Powers`·날아가는 것)를 틱마다 `Rules._seat`으로 갈아 끼워 돌리고, 상대 영주는 그림자 적(`Enemy.seat`)이라 `Moves`가 그대로 맞힌다(`Rules.hurt` → `_duel_hurt`). 각인과 고유 능력은 `Powers.off`로 끈다. 수치는 `data/duel.tres`(DuelData), 입력은 `LordInput.to_bytes/from_bytes`(22단계), 기록은 `Meta.duel_wins/duel_losses`. 화면은 마을 광장 결투 말뚝(`VillageProps.duel_post`, `LobbyHud.open_duel`) → `scenes/duel/duel.tscn`(`duel.gd`, `DuelHud`, `LordView.seat`). 1P는 키보드·마우스, 2P는 게임패드 0번.
+- 온라인 결투(22단계, docs/duel.md, GD-Sync 무료판): 입력만 주고받는 락스텝. `Lockstep`(scripts/net/lockstep.gd, 노드 없음)이 `NetLink`(전송 인터페이스: `LoopLink` 시험용, `GdSyncLink` GD-Sync)만 알고, 내 입력을 tick + `DuelData.net_delay`에 넣고 겹쳐 보내며 두 입력이 다 있는 틱만 `Rules.step_duel`로 돌린다(없으면 멈춤, 몇 틱마다 `state_hash`를 맞춰 desync를 알림). 시작 정보(시드, 두 검)는 `DuelSetup`, 마을 창에서 결투 장면까지는 `OnlineDuel`. 온라인 규칙 코드는 한 줄도 `Rules`를 바꾸지 않는다. 플러그인은 `addons/GD-Sync`(소스 그대로)이고 autoload로 두지 않는다(`GdSyncLink`가 처음 쓸 때 `/root/GDSync`로 올림). 키는 git에 올리지 않고 `user://gdsync_keys.cfg`에서 읽으며 없으면 "GD-Sync 키가 없습니다"만 알린다.
 - 판 사이에 남는 것(조각, 검집, 축복, 도감, 기록)은 `Meta`(scripts/core/meta.gd)가 `user://hill_save.json`에 저장한다. 대장간·성소의 강화 확률은 판의 규칙과 따로 `Meta.rng`를 쓴다. `Rules`는 시작할 때 Meta를 받아 축복과 검집의 검을 반영하고, 판이 끝나면 `Meta.record_run`이 조각을 센다.
 - 시작 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
 - 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
@@ -84,9 +85,10 @@
 ```
 project.godot
 scenes/   lobby/ (마을, 시작 장면), world/ (언덕), field/ (들판), crypt/ (지하 무덤), duel/ (결투), lord/, debug/
-scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, field/, crypt/, duel/, lord/, enemies/, ui/, debug/
+scripts/  core/ (규칙, Meta), core/data/ (표의 Resource 클래스), lobby/, world/, field/, crypt/, duel/, net/ (온라인 락스텝·전송), lord/, enemies/, ui/, debug/
 data/     swords/, inscriptions/, forms/, enemies/, attacks/ (moves/, patterns/), grades.tres, lord.tres, run.tres, unarmed.tres, meta.tres, powers.tres, duel.tres
 assets/   characters/, nature/, ui/, video/, sound/
+addons/   GD-Sync/ (온라인 플러그인, 소스 그대로)
 tests/
 prototype/  HTML 시험판 (고치지 않는다)
 ```

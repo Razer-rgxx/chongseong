@@ -39,6 +39,8 @@ const VILLAGERS: Dictionary = {
 const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
 @export var max_ticks_per_frame: int = 8
 
+## 온라인 찾기(22단계). 결투 장면으로 넘어가면 비운다.
+var _online: OnlineDuel = null
 var data: GameData
 var meta: Meta
 var rules: Rules
@@ -110,6 +112,8 @@ func _ready() -> void:
 	_hud.yard_sword_picked.connect(_on_yard_sword)
 	_hud.field_go.connect(_on_field_go)
 	_hud.duel_go.connect(_on_duel_go)
+	_hud.duel_online.connect(_on_duel_online)
+	_hud.duel_online_cancel.connect(_cancel_online)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	rules.enemy_hit.connect(_on_dummy_hit)
@@ -656,6 +660,40 @@ func _on_duel_go(a: int, b: int) -> void:
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(DUEL_PATH)
+
+
+## 모르는 사람과 겨루기(22단계): 검을 골랐다. 접속하고 방을 찾아 둘이 모이면 결투 장면으로 간다.
+func _on_duel_online(id: int) -> void:
+	_cancel_online()
+	_online = OnlineDuel.new(data, meta)
+	_online.status_text.connect(_hud.set_online_text)
+	_online.failed.connect(_on_online_failed)
+	_online.ready.connect(_on_online_ready)
+	_online.start(id)
+
+
+func _on_online_failed(text: String) -> void:
+	if _online != null:
+		_online.cancel()
+		_online = null
+	_hud.show_online_failed(text)
+
+
+func _on_online_ready() -> void:
+	_online = null   # 결투 장면이 OnlineDuel.current로 이어받는다
+	meta.save()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(DUEL_PATH)
+
+
+func _cancel_online() -> void:
+	if _online != null:
+		_online.cancel()
+		_online = null
+
+
+func _exit_tree() -> void:
+	_cancel_online()
 
 
 func _on_yard_sword(id: int) -> void:

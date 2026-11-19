@@ -8,6 +8,7 @@
 
 | 항목 | 내용 |
 | --- | --- |
+| 2026-11-19 | 22단계: 온라인 매칭(입력만 주고받는 락스텝, GD-Sync). `Lockstep`(scripts/net, 노드 없음)이 `NetLink`(`LoopLink` 시험용·`GdSyncLink` 실제)만 알고 내 입력을 tick + `net_delay`(4틱)에 넣어 겹쳐 보내고 두 입력이 다 있는 틱만 `Rules.step_duel`로 돌린다(없으면 멈춤, 30틱마다 `state_hash` 비교로 desync, 끊김·버전 신호). 시작 정보는 방장이 시드와 두 검(`DuelSetup`)을 정해 보낸다. 마을 결투 창 "모르는 사람과 겨루기"가 켜져 검 고르기 → 접속·공개 방 찾기(꼬리표 game·mode·ver) → 둘이 모이면 결투 장면(각자 3인칭, 상대 몸 색 다름). 키는 `user://gdsync_keys.cfg`(git에 없음), 없으면 "GD-Sync 키가 없습니다"와 넣는 법만 보인다. 플러그인 `addons/GD-Sync`(소스 그대로, autoload 없이 처음 쓸 때 올림). 한 쪽 약 2.5KB/초(한 판 3판 약 0.7MB). **실제 GD-Sync 접속은 사용자 PC에서 확인 전**이고 락스텝은 가짜 전송으로만 시험했다. 테스트 `tests/net_tests.gd`, 설계서 docs/duel.md |
 | 2026-11-19 | 21단계: 1대1 결투 규칙(같은 PC). `Rules.lords`(0 = `lord`, 비결투 모드는 하나)와 `start_duel(검, 검)`·`step_duel(입력1, 입력2)`: 영주마다 `DuelSeat`(검 칸·`Moves`·`Powers`·날아가는 것)를 틱마다 갈아 끼워 돌리고, 상대 영주는 그림자 적(`Enemy.seat`)이라 `Moves`가 그대로 맞힌다(맞으면 `_duel_hurt`: 구르기·맞은 뒤 무적, 반격 자세, 넉백, 히트스톱은 적과 같다). 각인과 고유 능력은 `Powers.off`로 끈다(속성 피해는 켜고 상태 효과는 영주에게 안 건다). 체력 300·한 판 90초·3판 2선승·시간이 다 되면 남은 체력 비율(같으면 비김)은 `data/duel.tres`(`DuelData`). `LordInput.to_bytes/from_bytes`(22단계용 18바이트), `Meta.duel_wins/duel_losses`(저장, 옛 저장은 0). 마을 광장 결투 말뚝(E → 같은 PC로 / 모르는 사람과(흐림) → 1P·2P 검 고르기: 검집의 검 또는 맨손) → `scenes/duel/duel.tscn`(`duel.gd`: 1P 키보드·마우스, 2P 게임패드 0번, 둘을 담는 쿼터뷰, 위 가운데 체력 막대 둘과 점수 `DuelHud`, 결과 창 → 마을). 테스트 `tests/duel_tests.gd`, 설계서 docs/duel.md |
 | 저장소 | github.com/Razer-rgxx/chongseong (public). 저장소 이름은 아직 총성 그대로다 |
 | 엔진 | Godot 4.6, GDScript |
@@ -272,7 +273,7 @@
 - [x] 19단계: 지하 무덤(던전). 들판에서 들어가는 방 여러 개, 싸움과 보물. 설계서 docs/outside.md
 - [x] 20단계: 새 지역. 들판을 넓혀 곳을 더 잇는다. 설계서 docs/outside.md
 - [x] 21단계: 1대1 결투 규칙. 영주 둘, 영주끼리 맞히기, 검집의 검을 들고 언덕 싸움터에서. 같은 PC에서 두 입력으로 먼저 돌린다. 설계서 docs/duel.md
-- [ ] 22단계: 온라인 매칭(GD-Sync 무료판). 모르는 사람과 1대1. 웹판은 없다. 설계서 docs/duel.md
+- [x] 22단계: 온라인 매칭(GD-Sync 무료판). 모르는 사람과 1대1. 웹판은 없다. 설계서 docs/duel.md (실제 GD-Sync 접속은 사용자 PC에서 확인 전)
 - [ ] 23단계: 관리 패널(등급 고정, 검 받기, 무적, 속도, 구역 넘기기, 조각 주기)
 - [ ] 24단계: 화풍과 모델(2.14를 정한 뒤). 마을과 영주부터
 - [ ] 25단계: 소리 에셋

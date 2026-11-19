@@ -3,6 +3,8 @@ extends Node3D
 ## 1P는 키보드와 마우스(마을과 같다), 2P는 게임패드 0번(왼 스틱 이동, 오른 스틱 겨눔, RT 좌클릭, LT 갈고리, A 구르기).
 ## 패드가 없으면 2P는 가만히 서 있는다. 카메라는 둘을 함께 담는 쿼터뷰 하나. 세계에는 글자를 띄우지 않는다(피해 숫자만 예외).
 ## 끝나면 Meta에 결투 기록을 적고 결과 창 → 마을.
+## 온라인(22단계): 마을에서 `OnlineDuel.current`가 준비되어 오면 입력만 주고받는 락스텝(`Lockstep`)으로 돌린다. 각자 3인칭으로
+## 내 영주를 따라가고(마우스로 둘러봄, 겨눔은 카메라가 보는 쪽), 상대를 기다리는 동안은 시간이 멈춘다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const LOBBY_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -39,6 +41,8 @@ var rules: Rules
 ## 1P 입력을 대신 줄 함수(Rules → LordInput). 비어 있으면 키보드와 마우스. 시험과 22단계(온라인)가 쓴다.
 var p1_source: Callable = Callable()
 var p2_source: Callable = Callable()
+## 온라인에서 내 입력을 대신 줄 함수(Rules → LordInput). 시험이 쓴다.
+var local_source: Callable = Callable()
 var _acc: float = 0.0
 var _want_attack: bool = false
 var _want_dash: bool = false
@@ -50,6 +54,11 @@ var _move_fx := MoveFx.new()
 var _shown_phase: int = -1
 var _left: bool = false
 var _zoom: float = 1.0
+## 온라인이면 락스텝과 내 자리. 아니면 null.
+var _net: Lockstep = null
+var _my: int = 0
+var _stall_msg: float = 0.0
+var _ended: bool = false
 
 @onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
@@ -62,11 +71,28 @@ func _ready() -> void:
 	data = GameData.load_default()
 	meta = Meta.load_or_new()
 	meta.fix_sheath(data)
+	var online: OnlineDuel = OnlineDuel.current
+	OnlineDuel.current = null
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
+	var a: Sword
+	var b: Sword
+	if online != null and online.lockstep != null and online.lockstep.setup != null:
+		_net = online.lockstep
+		_my = _net.link_seat()
+		s = _net.setup.seed_value
+		var made: Array[Sword] = _net.setup.make_swords(data)
+		a = made[0]
+		b = made[1]
+	else:
+		a = meta.unbreakable_sword(data, Meta.duel_picks[0])
+		b = meta.unbreakable_sword(data, Meta.duel_picks[1])
 	rules = Rules.new(data, s)
-	var a: Sword = meta.unbreakable_sword(data, Meta.duel_picks[0])
-	var b: Sword = meta.unbreakable_sword(data, Meta.duel_picks[1])
 	rules.start_duel(a, b)
+	if _net != null:
+		_net.bind(rules)
+		_net.desync.connect(_on_desync)
+		_net.peer_lost.connect(_on_peer_lost)
+		_hud.set_online(_my)
 	HillBuilder.build(self, _env.environment, data.forms)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
 	_sun.light_energy = sun_energy
@@ -78,8 +104,8 @@ func _ready() -> void:
 		v.call(&"setup", rules)
 		add_child(v)
 		v.call(&"set_sword", rules.seat_sword(i), data.grades)
-		if i == 1:
-			_tint_foe(v)
+		if i == (1 - _my if _net != null else 1):
+			_tint_foe(v)   # 같은 PC는 2P, 온라인은 상대의 몸 색을 바꿔 구별한다
 		_lords.append(v)
 	add_child(_fx)
 	add_child(_move_fx)
@@ -92,11 +118,18 @@ func _ready() -> void:
 	rules.duel_round_ended.connect(_on_round_ended)
 	rules.duel_over.connect(_on_over)
 	_hud.back_to_village.connect(_leave)
-	_camera.set(&"mode", 1)
 	_camera.set(&"zoom", 1.0)
-	_camera.set(&"target", Grid.cells_to_world((rules.lords[0].pos + rules.lords[1].pos) / 2.0))
+	if _net != null:
+		# 온라인: 3인칭으로 내 영주에 붙고, 처음에는 상대 쪽을 본다(카메라가 보는 쪽이 앞이다)
+		_camera.set(&"mode", 0)
+		_camera.set(&"yaw", -PI / 2.0 if _my == 0 else PI / 2.0)
+		_camera.set(&"target", Grid.cells_to_world(rules.lords[_my].pos))
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		_camera.set(&"mode", 1)
+		_camera.set(&"target", Grid.cells_to_world((rules.lords[0].pos + rules.lords[1].pos) / 2.0))
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_camera.call(&"snap")
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
 ## 지금 틱을 돌리는 영주의 몸(신호를 받는 순간).
@@ -136,6 +169,9 @@ func _multiply(n: Node, c: Color) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	var mm := event as InputEventMouseMotion
+	if _net != null and mm != null and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_camera.call(&"look", mm.relative)
 	if event.is_action_pressed("attack"):
 		_want_attack = true
 	if event.is_action_pressed("dash"):
@@ -153,6 +189,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_acc += delta
 	var n: int = 0
+	if _net != null:
+		_online_ticks()
+		return
 	while _acc >= rules.dt and n < max_ticks_per_frame:
 		rules.step_duel(_read_p1(), _read_p2())
 		_want_attack = false
@@ -163,6 +202,34 @@ func _physics_process(delta: float) -> void:
 		n += 1
 	if n == max_ticks_per_frame:
 		_acc = 0.0
+
+
+## 온라인 틱: 한 틱마다 내 입력을 락스텝에 넘기고, 상대 입력이 있으면 규칙이 한 틱 돈다. 기다리는 동안은 쌓인 시간을 버린다.
+func _online_ticks() -> void:
+	var n: int = 0
+	while _acc >= rules.dt and n < max_ticks_per_frame and not _ended:
+		_net.update(_read_online())
+		_want_attack = false
+		_want_dash = false
+		_want_hook = false
+		_acc -= rules.dt
+		n += 1
+	if n == max_ticks_per_frame or _net.stalled or _ended:
+		_acc = minf(_acc, rules.dt)
+
+
+## 온라인 내 입력: 키보드와 마우스(3인칭), 이동은 카메라 기준, 겨눔은 카메라가 보는 쪽.
+func _read_online() -> LordInput:
+	if local_source.is_valid():
+		return local_source.call(rules) as LordInput
+	var inp := LordInput.new()
+	inp.move = _camera.call(&"relative_move", Input.get_vector("move_left", "move_right", "move_up", "move_down"))
+	inp.attack = Input.is_action_pressed("attack") or _want_attack
+	inp.dash = _want_dash
+	inp.hook = _want_hook
+	inp.aim_valid = true
+	inp.aim = rules.lords[_my].pos + (_camera.call(&"forward_cells") as Vector2) * 3.0
+	return inp
 
 
 ## 1P: 키보드(WASD, 방향키)와 마우스(겨눔은 마우스가 가리키는 땅).
@@ -215,13 +282,28 @@ func _process(delta: float) -> void:
 	for v in _lords:
 		v.call(&"draw", alpha, delta)
 	_move_fx.draw(alpha)
-	_follow_camera(delta)
+	if _net != null:
+		_camera.set(&"target", _lords[_my].position)
+		_stall_note(delta)
+	else:
+		_follow_camera(delta)
 	var left: float = rules.duel_left if rules.duel_phase == Rules.DUEL_FIGHT else data.duel.round_time
 	_hud.set_state(rules.lords[0].hp, rules.lords[1].hp, rules.max_hp(), rules.duel_wins, left)
 	if rules.duel_phase != _shown_phase:
 		if rules.duel_phase == Rules.DUEL_FIGHT and _shown_phase == Rules.DUEL_READY:
 			_hud.announce("시작", 1.0)
 		_shown_phase = rules.duel_phase
+
+
+## 상대 입력을 기다리는 동안은 한 줄 띠로 알린다.
+func _stall_note(delta: float) -> void:
+	if not _net.stalled or _ended:
+		_stall_msg = 0.0
+		return
+	_stall_msg -= delta
+	if _stall_msg <= 0.0:
+		_stall_msg = 1.0
+		_hud.announce("상대를 기다리는 중", 1.2)
 
 
 ## 둘 사이 가운데를 보고, 멀어지면 물러난다.
@@ -253,14 +335,16 @@ func _on_hurt(seat: int, damage: float, big: bool) -> void:
 
 
 func _on_round_ended(winner: int) -> void:
-	var text: String = "비겼다" if winner < 0 else "%dP가 판을 이겼다" % (winner + 1)
+	var text: String = "비겼다" if winner < 0 else ("%s가 판을 이겼다" % _hud.player_name(winner) if _net != null else "%dP가 판을 이겼다" % (winner + 1))
 	_hud.announce(text, data.duel.break_time)
 	_hud.flash(Color(1, 0.84, 0.42), 0.2, 0.6)
 	_move_fx.clear()
 
 
 func _on_over(winner: int) -> void:
-	meta.record_duel(winner)
+	_ended = true
+	# 온라인은 내가 이기고 진 것으로 센다(같은 PC는 1P가 나)
+	meta.record_duel(winner if _net == null else (0 if winner == _my else (1 if winner == 1 - _my else -1)))
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	await get_tree().create_timer(result_delay).timeout
@@ -269,7 +353,28 @@ func _on_over(winner: int) -> void:
 	_hud.show_result(winner, rules.duel_wins, Vector2i(meta.duel_wins, meta.duel_losses))
 
 
+## 온라인이 끊겼다(기록하지 않는다).
+func _on_peer_lost(reason: String) -> void:
+	if _ended:
+		return
+	_ended = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var text: String = "상대가 방을 나갔다." if reason == "left" else ("상대의 입력이 오래 오지 않아 끊었다." if reason == "timeout" else "버전이 달라 겨룰 수 없다.")
+	_hud.show_notice("연결이 끊겼다", text + " 이 결투는 기록하지 않는다.")
+
+
+## 두 쪽의 규칙 결과가 어긋났다(기록하지 않는다).
+func _on_desync(tick: int) -> void:
+	if _ended:
+		return
+	_ended = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_hud.show_notice("어긋났다", "두 쪽의 결과가 달라졌다(%d틱). 이 결투는 기록하지 않는다." % tick)
+
+
 func _leave() -> void:
+	if _net != null:
+		_net.close()   # 방을 나가고 접속을 끊는다
 	_left = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(LOBBY_PATH)

@@ -8,6 +8,8 @@ signal back_to_village()
 const BAR_SIZE: Vector2 = Vector2(420, 16)
 const COLORS: Array[Color] = [Color(0.72, 0.62, 0.3), Color(0.55, 0.2, 0.22)]
 const NAMES: Array[String] = ["1P", "2P"]
+## 온라인(22단계)에서 쓰는 이름: 늘 내가 "나"다. 같은 PC에서는 1P·2P 그대로.
+const ONLINE_NAMES: Array[String] = ["나", "상대"]
 
 var _bars: Array[ProgressBar] = []
 var _score: Label
@@ -16,6 +18,10 @@ var _band: Band
 var _result: Control
 var _result_box: VBoxContainer
 var _flash: ColorRect
+var _name_labels: Array[Label] = []
+var _names: Array[String] = NAMES.duplicate()
+## 온라인: 내 자리(막대 왼쪽이 늘 나로 보이게 하지는 않는다. 자리 번호 그대로 두고 이름만 바꾼다).
+var _online: bool = false
 
 
 func _ready() -> void:
@@ -32,6 +38,7 @@ func _ready() -> void:
 		col.add_theme_constant_override("separation", 3)
 		var name := UiKit.label(NAMES[i], 17, UiKit.TITLE)
 		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if i == 0 else HORIZONTAL_ALIGNMENT_RIGHT
+		_name_labels.append(name)
 		col.add_child(name)
 		var bar := ProgressBar.new()
 		bar.show_percentage = false
@@ -71,6 +78,20 @@ func _ready() -> void:
 	add_child(_flash)
 
 
+## 온라인이면 이름을 "나"와 "상대"로 바꾼다(my_seat: 내 자리).
+func set_online(my_seat: int) -> void:
+	_online = true
+	_names = ["", ""]
+	_names[my_seat] = ONLINE_NAMES[0]
+	_names[1 - my_seat] = ONLINE_NAMES[1]
+	for i in 2:
+		_name_labels[i].text = _names[i]
+
+
+func player_name(i: int) -> String:
+	return _names[i]
+
+
 ## 매 화면: 체력과 점수와 남은 시간.
 func set_state(hp_a: float, hp_b: float, max_hp: float, wins: Array[int], left: float) -> void:
 	_bars[0].max_value = max_hp
@@ -95,11 +116,25 @@ func flash(c: Color, strength: float, time: float = 0.4) -> void:
 func show_result(winner: int, wins: Array[int], record: Vector2i) -> void:
 	for c in _result_box.get_children():
 		c.queue_free()
-	var title: String = "비겼다" if winner < 0 else "%s 이김" % NAMES[winner]
+	var title: String = "비겼다" if winner < 0 else ("%s가 이겼다" % _names[winner] if _online else "%s 이김" % NAMES[winner])
 	var h := UiKit.label(title, 30, UiKit.TITLE)
 	_result_box.add_child(h)
 	_result_box.add_child(UiKit.rule())
 	_result_box.add_child(UiKit.label("판 점수  %d : %d" % [wins[0], wins[1]], 20, UiKit.TEXT))
-	_result_box.add_child(UiKit.label("내 기록(1P)  이김 %d · 짐 %d" % [record.x, record.y], 15, UiKit.MUTED))
+	_result_box.add_child(UiKit.label("내 기록%s  이김 %d · 짐 %d" % ["" if _online else "(1P)", record.x, record.y], 15, UiKit.MUTED))
+	_result_box.add_child(UiKit.button("마을로", func() -> void: back_to_village.emit(), 40.0))
+	_result.visible = true
+
+
+## 온라인이 끊겼거나 어긋나 더 못 겨룬다(기록하지 않는다). 창 하나와 마을로 버튼.
+func show_notice(title: String, text: String) -> void:
+	for c in _result_box.get_children():
+		c.queue_free()
+	_result_box.add_child(UiKit.label(title, 28, UiKit.TITLE))
+	_result_box.add_child(UiKit.rule())
+	var l := UiKit.label(text, 16, UiKit.TEXT)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(460, 0)
+	_result_box.add_child(l)
 	_result_box.add_child(UiKit.button("마을로", func() -> void: back_to_village.emit(), 40.0))
 	_result.visible = true

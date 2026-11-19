@@ -15,6 +15,9 @@ signal yard_sword_picked(id: int)
 signal field_go(id: int)
 ## 21단계: 결투 말뚝에서 1P와 2P가 들 검을 골라 겨룬다(SwordData.id, 0은 맨손).
 signal duel_go(a: int, b: int)
+## 22단계: 모르는 사람과 겨루기. 검을 골랐다(찾기 시작) / 찾는 도중에 창을 닫았다(취소).
+signal duel_online(pick: int)
+signal duel_online_cancel()
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -57,6 +60,9 @@ var _say: Band
 var _duel: Control
 var _duel_box: VBoxContainer
 var _duel_pick: Array[int] = [0, 0]
+## 온라인 찾는 중이면 true(창을 닫으면 취소가 된다). 상태 글 칸.
+var _online_busy: bool = false
+var _online_label: Label
 
 
 ## 마을이 _ready에서 부른다(이 창의 _ready가 먼저 돈다).
@@ -129,6 +135,9 @@ func close() -> void:
 	if _busy:
 		return
 	_gate_mode = false
+	if _online_busy:
+		_online_busy = false
+		duel_online_cancel.emit()
 	_forge.visible = false
 	_shrine.visible = false
 	_rack.visible = false
@@ -570,10 +579,7 @@ func _render_duel(picking: bool) -> void:
 			if s != null:
 				_duel_pick = [meta.sheath_id, meta.sheath_id]
 			_render_duel(true), 40.0))
-		var online := UiKit.button("모르는 사람과 겨루기 (준비 중)", func() -> void: pass, 40.0)
-		online.disabled = true
-		online.modulate = Color(1, 1, 1, 0.45)
-		_duel_box.add_child(online)
+		_duel_box.add_child(UiKit.button("모르는 사람과 겨루기", _render_online_pick, 40.0))
 		return
 	_duel_box.add_child(_wrap(UiKit.label("1P는 키보드와 마우스, 2P는 게임패드. 검집의 검이나 맨손을 든다. 결투에서는 부러지지 않는다.", 14, UiKit.MUTED)))
 	var ids: Array[int] = [0]
@@ -594,6 +600,64 @@ func _render_duel(picking: bool) -> void:
 		pick.item_selected.connect(func(i: int) -> void: _duel_pick[who] = pick.get_item_id(i))
 		_duel_box.add_child(pick)
 	_duel_box.add_child(UiKit.button("겨룬다", func() -> void: duel_go.emit(_duel_pick[0], _duel_pick[1]), 40.0))
+
+
+## 모르는 사람과 겨루기(22단계): 키가 없으면 안내만, 있으면 내 검을 고르고 찾는다.
+func _render_online_pick() -> void:
+	for c in _duel_box.get_children():
+		c.queue_free()
+	UiKit.header(_duel_box, "모르는 사람과 겨루기", func() -> void: _render_duel(false))
+	if not GdSyncLink.has_keys():
+		show_online_failed(OnlineDuel.key_help())
+		return
+	_duel_box.add_child(_wrap(UiKit.label("검집의 검이나 맨손을 들고 간다. 각자 3인칭으로 보고, 입력이 조금(약 0.13초) 늦게 먹는다. 3판 2선승, 이기고 져도 기록뿐이다.", 14, UiKit.MUTED)))
+	var ids: Array[int] = [0]
+	var names: Array[String] = ["맨손"]
+	if meta.sheath_sword(data) != null:
+		ids.append(meta.sheath_id)
+		var d := data.sword_by_id(meta.sheath_id)
+		names.append("[검집] %s · %s (%s)" % [data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name])
+	var pick_id: Array[int] = [ids[ids.size() - 1]]
+	var pick := OptionButton.new()
+	pick.focus_mode = Control.FOCUS_NONE
+	pick.custom_minimum_size = Vector2(520, 36)
+	for k in ids.size():
+		pick.add_item(names[k], ids[k])
+	pick.select(ids.size() - 1)
+	pick.item_selected.connect(func(i: int) -> void: pick_id[0] = pick.get_item_id(i))
+	_duel_box.add_child(pick)
+	_duel_box.add_child(UiKit.button("상대를 찾는다", func() -> void: _render_online_wait(pick_id[0]), 40.0))
+
+
+func _render_online_wait(pick_id: int) -> void:
+	for c in _duel_box.get_children():
+		c.queue_free()
+	UiKit.header(_duel_box, "모르는 사람과 겨루기", close)
+	_online_label = UiKit.label("서버에 접속하는 중", 18, UiKit.TEXT)
+	_duel_box.add_child(_online_label)
+	_duel_box.add_child(_wrap(UiKit.label("창을 닫으면 찾기를 그만둔다.", 14, UiKit.MUTED)))
+	_duel_box.add_child(UiKit.button("취소", close, 40.0))
+	_online_busy = true
+	duel_online.emit(pick_id)
+
+
+## 찾는 중의 한 줄(접속, 찾는 중, 기다리는 중, 준비).
+func set_online_text(text: String) -> void:
+	if _online_label != null and is_instance_valid(_online_label) and _online_busy:
+		_online_label.text = text
+
+
+## 찾기가 안 된다(키 없음, 접속 실패 …). 한 줄과 안내를 보여 주고 뒤로 간다.
+func show_online_failed(text: String) -> void:
+	_online_busy = false
+	var lines: PackedStringArray = text.split("\n")
+	var kids: Array[Node] = _duel_box.get_children().filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	for i in range(2, kids.size()):   # 머리글과 줄은 남긴다
+		kids[i].queue_free()
+	_duel_box.add_child(UiKit.label(lines[0], 18, UiKit.TITLE))
+	for i in range(1, lines.size()):
+		_duel_box.add_child(_wrap(UiKit.label(lines[i], 14, UiKit.MUTED)))
+	_duel_box.add_child(UiKit.button("뒤로", func() -> void: _render_duel(false), 40.0))
 
 
 func _layer() -> Control:
