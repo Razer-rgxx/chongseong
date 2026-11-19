@@ -43,6 +43,10 @@ signal enemy_died(enemy: Enemy)
 signal pack_engaged(id: StringName)
 signal pack_returned(id: StringName)
 signal pack_cleared(id: StringName)
+## 들판 보스(18단계): 깨어났다, 제자리로 돌아갔다(체력이 다 찼다), 쓰러졌다.
+signal field_boss_woke(e: Enemy)
+signal field_boss_returned(e: Enemy)
+signal field_boss_slain(e: Enemy)
 signal boss_spawned(enemy: Enemy)
 signal elite_spawned(enemy: Enemy)
 signal altar_opened()
@@ -159,6 +163,14 @@ var yard: bool = false
 var field: bool = false
 ## 들판 무리: id → {home, wander, zone(0부터), state, spawned, cleared}. state는 PACK_*.
 var packs: Dictionary = {}
+## 들판 보스(18단계): 무덤 기사 한 마리. 상태는 BOSS_*(자는 중, 깨어남, 돌아가는 중, 쓰러뜨림).
+var field_boss: Enemy = null
+var field_boss_state: int = BOSS_SLEEP
+var field_boss_home: Vector2 = Vector2.ZERO
+const BOSS_SLEEP: int = 0
+const BOSS_AWAKE: int = 1
+const BOSS_RETURNING: int = 2
+const BOSS_DOWN: int = 3
 const PACK_IDLE: int = 0
 const PACK_ENGAGED: int = 1
 const PACK_RETURNING: int = 2
@@ -919,6 +931,8 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		return
 	if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
 		_engage_pack(e.pack)
+	if field and e == field_boss and field_boss_state != BOSS_AWAKE and field_boss_state != BOSS_DOWN:
+		_wake_boss()
 	var res: Array = foes.taken(e, damage, knock, big, dot, lord.pos if src == Vector2.INF else src)
 	damage = res[0]
 	knock = res[1]
@@ -1122,6 +1136,10 @@ func _step_enemies() -> void:
 		if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
 			_step_pack_idle(e, k)
 			continue
+		# 들판 보스: 깨어나기 전에는 가만히 서 있고, 돌아가는 중에는 제자리로 걸으며 체력이 찬다
+		if field and e == field_boss and field_boss_state != BOSS_AWAKE:
+			_step_boss_idle(e, k)
+			continue
 		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
 		var foe: Enemy = null
 		if e.confused > 0.0:
@@ -1281,6 +1299,7 @@ func _recall_pack(id: StringName) -> void:
 func _step_field() -> void:
 	if phase == Phase.DAY:
 		phase = Phase.NIGHT
+	_step_boss()
 	for id in packs:
 		var p: Dictionary = packs[id]
 		if p.cleared:
@@ -1336,6 +1355,94 @@ func _step_pack_idle(e: Enemy, k: float) -> void:
 	if len_w > 0.1:
 		e.face = w / len_w
 		e.pos += e.face * minf(len_w, sp * FieldLayout.PACK_WANDER_SPEED * dt)
+
+
+# ---------------------------------------------------------------- 들판 보스 (18단계)
+
+## 무덤 기사를 자리에 세운다. 이미 있으면 새로 세우지 않는다. at을 주면 그 자리(테스트용)에 선다.
+func spawn_field_boss(at: Vector2 = FieldLayout.BOSS_AT) -> Enemy:
+	if field_boss != null:
+		return null
+	var keep_zone: int = zone
+	zone = clampi(FieldLayout.BOSS_ZONE - 1, 0, data.run.zone_hp.size() - 1)
+	var e := spawn_at(FieldLayout.BOSS_ID, at)
+	zone = keep_zone
+	e.home = at
+	e.face = Vector2.DOWN
+	field_boss = e
+	field_boss_home = at
+	field_boss_state = BOSS_SLEEP
+	return e
+
+
+func _wake_boss() -> void:
+	if field_boss == null or field_boss.dead:
+		return
+	field_boss_state = BOSS_AWAKE
+	zone = clampi(FieldLayout.BOSS_ZONE - 1, 0, data.run.zone_hp.size() - 1)   # 불려 오는 망령의 세기
+	field_boss.cooldown = maxf(field_boss.cooldown, field_boss.data.cooldown)
+	field_boss_woke.emit(field_boss)
+
+
+## 너무 멀어졌다: 하던 일을 멈추고 불러낸 것을 거두고 제자리로 돌아간다(체력이 차면 부르기도 다시 쓴다).
+func _recall_boss() -> void:
+	var b: Enemy = field_boss
+	field_boss_state = BOSS_RETURNING
+	b.act = &""
+	b.act_t = 0.0
+	b.windup = 0.0
+	b.summoned = 0
+	_dismiss_minions()
+
+
+## 불려 온 적을 쓰러뜨린 것으로 치지 않고 거둔다(신호 없이).
+func _dismiss_minions() -> void:
+	if field_boss == null:
+		return
+	for e in enemies:
+		if e.caller == field_boss.id and not e.dead:
+			e.dead = true
+			tokens.release(e, true)
+
+
+func _step_boss() -> void:
+	var b: Enemy = field_boss
+	if b == null or field_boss_state == BOSS_DOWN:
+		return
+	if b.dead:
+		field_boss_state = BOSS_DOWN
+		_dismiss_minions()
+		field_boss_slain.emit(b)
+		return
+	var d: float = lord.pos.distance_to(field_boss_home)
+	match field_boss_state:
+		BOSS_SLEEP:
+			if d <= FieldLayout.BOSS_WAKE:
+				_wake_boss()
+		BOSS_AWAKE:
+			if d > FieldLayout.BOSS_LEASH:
+				_recall_boss()
+		_:
+			if d <= FieldLayout.BOSS_WAKE:
+				_wake_boss()
+			elif b.pos.distance_to(field_boss_home) <= 0.05 and b.hp >= b.max_hp:
+				field_boss_state = BOSS_SLEEP
+				field_boss_returned.emit(b)
+
+
+func _step_boss_idle(e: Enemy, k: float) -> void:
+	if field_boss_state != BOSS_RETURNING:
+		e.push = Vector2.ZERO
+		return
+	var sp: float = e.data.speed * k * FieldLayout.PACK_RETURN_SPEED
+	e.hp = minf(e.max_hp, e.hp + e.max_hp * dt / maxf(dt, FieldLayout.PACK_HEAL_TIME))
+	var to: Vector2 = field_boss_home - e.pos
+	var step_len: float = sp * dt
+	if to.length() <= maxf(step_len, 0.05):
+		e.pos = field_boss_home
+	else:
+		e.face = to.normalized()
+		e.pos += e.face * step_len
 
 
 ## 정예: 체력과 피해가 몇 배, 몸이 크다. 쓰러뜨리면 공짜 뽑기.
@@ -1892,6 +1999,7 @@ func state_hash() -> int:
 	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
 	if field:
 		parts.append(str(packs))
+		parts.append_array([field_boss_state, field_boss_home, field_boss.id if field_boss else -1])
 		for e in enemies:
 			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])

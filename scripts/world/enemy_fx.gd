@@ -74,7 +74,7 @@ const CHAR := Color(0.07, 0.058, 0.05)
 ## 부르는 자리의 갈라진 틈에서 새는 흐린 찬빛(등불과 같은 결, 훨씬 어둡게).
 const CRACK_COLD := Color(0.4, 0.52, 0.46)
 
-## 땅 판 셰이더. 모양(mode): 0 위험 띠(돌진 길), 1 위험 원(심지), 2 겨눈 줄, 3 충격 고리(먼지), 4 그을음, 5 재·불씨 고리.
+## 땅 판 셰이더. 모양(mode): 0 위험 띠(돌진 길), 1 위험 원(심지), 2 겨눈 줄, 3 충격 고리(먼지), 4 그을음, 5 재·불씨 고리, 6 위험 부채꼴(무덤 기사의 휘두르기, 판의 -Z가 앞, arc는 반각).
 ## 1 × 1 PlaneMesh를 노드 크기로 늘린다. 섞어 그리고 땅처럼 빛을 받는다(낮에는 밝고 밤에는 어둡다).
 ## 빛나는 곳(위험 표시의 검붉은 빛, 불씨)만 EMISSION으로 스스로 빛나서 밤에도 보인다(emit = 그 세기).
 ## fill: 띠·원은 찬 정도(0~1), 겨눈 줄은 짙기, 충격 고리는 퍼진 정도, 재 고리는 세기. ew·hw: 테·머리 폭(판 크기에 대한 비율).
@@ -90,6 +90,7 @@ uniform float energy = 0.0;
 uniform float ew = 0.08;
 uniform float hw = 0.02;
 uniform float seed = 0.0;
+uniform float arc = 1.3;
 varying vec2 lp;
 varying vec2 wxz;
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -140,6 +141,17 @@ void fragment() {
 			float grain = 0.62 + 0.38 * n;
 			a = 0.12 * inside * grain + 0.5 * edge * (0.75 + 0.25 * n2) + 0.26 * filled * inside * grain + 0.3 * head * inside;
 			heat = clamp(edge * 0.7 + head + 0.3 * filled * energy, 0.0, 1.0);
+		} else if (mode == 6) {
+			float ang = atan(abs(q.x), -q.y);
+			float in_arc = 1.0 - smoothstep(arc - 0.05, arc, ang);
+			float edge_r = smoothstep(1.0 - ew * 2.2, 1.0 - ew, r) * (1.0 - smoothstep(1.0 - ew * 0.3, 1.0, r));
+			float edge_a = smoothstep(arc - 0.12, arc - 0.03, ang);
+			float inside = 1.0 - smoothstep(1.0 - ew, 1.0, r);
+			float filled = 1.0 - smoothstep(fill - hw, fill, r);
+			float head = exp(-pow((r - fill) / hw, 2.0)) * step(0.002, fill) * (1.0 - step(0.998, fill));
+			float grain = 0.62 + 0.38 * n;
+			a = (0.14 * inside * grain + 0.5 * (edge_r + edge_a * inside) * (0.75 + 0.25 * n2) + 0.3 * filled * inside * grain + 0.45 * head * inside) * in_arc;
+			heat = clamp(edge_r * 0.7 + edge_a * 0.5 * inside + head + 0.25 * filled, 0.0, 1.0);
 		} else if (mode == 3) {
 			float band = smoothstep(fill - 0.2, fill, r) * (1.0 - smoothstep(fill, fill + 0.04, r));
 			a = band * pow(clamp(1.0 - fill, 0.0, 1.0), 1.2) * 0.6 * (0.55 + 0.45 * n2) * smoothstep(0.1, 0.2, fill);
@@ -160,7 +172,7 @@ void fragment() {
 	float h = clamp(heat, 0.0, 1.0);
 	ALBEDO = mix(color.rgb, hot.rgb, h);
 	ROUGHNESS = 1.0;
-	if (mode <= 2) {
+	if (mode <= 2 || mode == 6) {
 		EMISSION = mix(color.rgb, hot.rgb, h) * emit;
 	} else {
 		EMISSION = hot.rgb * h * emit;
@@ -243,6 +255,8 @@ const Q_LIT: int = 2
 var rules: Rules = null
 ## 적의 EnemyArt 부품을 돌려주는 함수(e: Enemy) -> Dictionary. 비어 있으면 어림한다.
 var body_of: Callable = Callable()
+## 땅 높이를 돌려주는 함수(x, z: m) -> m. 비어 있으면 언덕 높이(HillBuilder). 들판은 FieldBuilder.walk_height를 준다.
+var height_of: Callable = Callable()
 
 static var _cache: Dictionary = {}
 
@@ -400,6 +414,10 @@ func on_act(e: Enemy, act: StringName, info: Dictionary) -> void:
 			_fuse(e, info)
 		&"explode":
 			_explode(e, info)
+		&"swing_wind":
+			_swing_wind(e, info)
+		&"swing":
+			_swing(e, info)
 		&"call_wind":
 			_call_wind(e, info)
 		&"call":
@@ -596,6 +614,59 @@ func _shield_point(e: Enemy, info: Dictionary, dir: Vector3) -> Vector3:
 	if e != null:
 		at = _epos(e)
 	return _ground(at, 1.15 * g) + dir * 0.42 * g
+
+
+# ---------------------------------------------------------------- 무덤 기사 (18단계)
+
+## 크게 휘두르기 예고: 앞 부채꼴이 땅에 검붉은 빛으로 가운데에서 가장자리로 차오른다(글자 없음).
+func _swing_wind(e: Enemy, info: Dictionary) -> void:
+	_drop(e, "swing_wind")
+	var T: float = maxf(0.05, float(info.get("time", 0.8)))
+	var R: float = Grid.cells_to_meters(float(info.get("range", 3.4)))
+	var dir: Vector2 = _v2(info.get("dir", _face(e)))
+	var d := _decal(6)
+	if not d.is_empty():
+		_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "emit": 0.7, "arc": deg_to_rad(float(info.get("arc", 150.0))) * 0.5,
+			"ew": clampf(0.06 / maxf(R, 0.5), 0.02, 0.2), "hw": 0.06})
+	_by_enemy[_key(e, "swing_wind")] = _job(_run_swing_wind, {"e": e, "decal": d, "time": T, "dir": dir, "radius": R, "at": _v2(info.get("at", _epos(e))), "out": -1.0, "out_time": 0.3})
+	_run_swing_wind(_by_enemy[_key(e, "swing_wind")], 0.0)
+
+
+func _run_swing_wind(j: Dictionary, _dt: float) -> bool:
+	var e: Enemy = j["e"]
+	var T: float = j["time"]
+	var t: float = j["t"]
+	var d: Dictionary = j["decal"]
+	var R: float = j["radius"]
+	if not d.is_empty():
+		var c: Vector3 = _ground(_epos(e) if e != null else j["at"], 0.0)
+		c.y = _hy(c) + 0.04
+		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.looking_at(_dir3(j["dir"]), Vector3.UP) * Basis.from_scale(Vector3(R * 2.0, 1.0, R * 2.0)), c)
+	if float(j["out"]) < 0.0 and (t > T + 0.12 or not _still(e, &"swing_wind")):
+		j["out"] = t
+	var out: float = j["out"]
+	if d.is_empty():
+		return out < 0.0
+	if out < 0.0:
+		_put(d, {"fill": 1.0 - pow(1.0 - clampf(t / T, 0.0, 1.0), 1.6), "fade": 1.0})
+		return true
+	var o: float = (t - out) / float(j["out_time"])
+	if o >= 1.0:
+		return false
+	_put(d, {"fill": 1.0, "fade": 1.0 - o, "emit": 0.7 + 1.2 * (1.0 - o)})
+	return true
+
+
+## 내려친 순간: 칼끝이 닿은 둘레에 먼지와 돌조각, 낮은 쿵 소리.
+func _swing(e: Enemy, info: Dictionary) -> void:
+	var dir: Vector2 = _v2(info.get("dir", _face(e)))
+	var R: float = Grid.cells_to_meters(float(info.get("range", 3.4)))
+	var at: Vector3 = _ground(_v2(info.get("at", _epos(e))), 0.0)
+	var go: Vector3 = _dir3(dir)
+	for k in [0.45, 0.8]:
+		_dust(at + go * R * k, 8, 2.4, 0.5, 1.0, go + Vector3(0.0, 0.3, 0.0))
+	_chips(at + go * R * 0.7, 6, Color(0.2, 0.16, 0.12), 3.0, 0.7, go)
+	_play(&"enemy_skid", at + go * R * 0.6, -2.0, 0.8)
 
 
 # ---------------------------------------------------------------- 돌격병
@@ -2059,11 +2130,13 @@ static func _sound(key: StringName) -> AudioStreamWAV:
 ## 칸 위치의 땅 위 lift m(세계 좌표). 싸움터 밖이면 비탈 높이.
 func _ground(cells: Vector2, lift: float) -> Vector3:
 	var w: Vector3 = Grid.cells_to_world(cells)
-	w.y = HillBuilder.height(w.x, w.z) + lift
+	w.y = _hy(w) + lift
 	return w
 
 
 func _hy(p: Vector3) -> float:
+	if height_of.is_valid():
+		return float(height_of.call(p.x, p.z))
 	return HillBuilder.height(p.x, p.z)
 
 

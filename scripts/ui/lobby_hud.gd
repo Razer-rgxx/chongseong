@@ -46,6 +46,10 @@ var _readout: Label
 var _gate_mode: bool = false
 var _gate_pick: int = 0
 var _hp_bar: ProgressBar
+## 들판 보스의 체력 막대(18단계): 화면 아래 가운데, 이름 한 줄과 막대.
+var _boss_box: VBoxContainer
+var _boss_name: Label
+var _boss_bar: ProgressBar
 var _say: Band
 
 
@@ -146,6 +150,46 @@ func set_hp(hp: float, max_hp: float) -> void:
 		add_child(_hp_bar)
 	_hp_bar.max_value = max_hp
 	_hp_bar.value = maxf(0.0, hp)
+
+
+## 들판 보스의 체력 막대(18단계, 엘든 링식). 이름 한 줄 아래 가는 막대. name이 ""이면 감춘다.
+func set_boss(boss_name: String, hp: float, max_hp: float) -> void:
+	if _boss_box == null:
+		if boss_name == "":
+			return
+		_boss_box = VBoxContainer.new()
+		_boss_box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+		_boss_box.offset_left = -270
+		_boss_box.offset_right = 270
+		_boss_box.offset_top = -96
+		_boss_box.offset_bottom = -56
+		_boss_box.add_theme_constant_override("separation", 4)
+		_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_boss_name = UiKit.label("", 18, UiKit.TITLE)
+		_boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_boss_box.add_child(_boss_name)
+		_boss_bar = ProgressBar.new()
+		_boss_bar.show_percentage = false
+		_boss_bar.custom_minimum_size = Vector2(540, 12)
+		_boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bg := UiKit.style(Color(UiKit.LINE, 0.55), 1, Color(0.02, 0.018, 0.015, 0.8))
+		var fill := UiKit.style(Color(0.55, 0.12, 0.08), 0, Color(0.55, 0.12, 0.08))
+		for sb in [bg, fill]:
+			sb.set_content_margin_all(0)
+		_boss_bar.add_theme_stylebox_override("background", bg)
+		_boss_bar.add_theme_stylebox_override("fill", fill)
+		_boss_box.add_child(_boss_bar)
+		add_child(_boss_box)
+	_boss_box.visible = boss_name != ""
+	if boss_name == "":
+		return
+	_boss_name.text = boss_name
+	_boss_bar.max_value = max_hp
+	_boss_bar.value = maxf(0.0, hp)
+
+
+func boss_bar_shown() -> bool:
+	return _boss_box != null and _boss_box.visible
 
 
 func toast(t: String) -> void:

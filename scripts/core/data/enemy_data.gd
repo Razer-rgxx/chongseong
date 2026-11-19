@@ -80,6 +80,23 @@ extends Resource
 @export var summon_radius: float = 1.6
 @export var summon_max: int = 15
 
+@export_group("무덤 기사(18단계, docs/outside.md)")
+## 크게 휘두르기: 앞 swing_arc도(°) 부채꼴, swing_range칸(가운데에서)까지, swing_time초 예고(땅의 부채꼴 빛) 뒤에 한 번 벤다. 끝난 뒤 act_after초 멈춘다.
+@export var swing_arc: float = 0.0
+@export var swing_range: float = 3.4
+@export var swing_time: float = 0.8
+## 돌진할 수 있는 거리(charge_min~charge_max칸)에서 돌진을 고를 확률(0~1). 아니면 휘두를 거리까지 다가간다. 돌진은 돌격병과 같은 칸(wind_time, charge_*)을 쓴다.
+@export var charge_chance: float = 0.6
+## 돌진을 안 고르면 이만큼(초) 다가가다가 다시 고른다.
+@export var charge_retry: float = 0.8
+## 체력이 이 비율 아래로 내려가면 빨라진다(걷기·예고·돌진·쉬는 시간에 곱하는 배수 rage_mult). 0이면 빨라지지 않는다.
+@export var rage_hp: float = 0.0
+@export var rage_mult: float = 1.2
+## 체력이 이 비율 아래로 내려가면 summon_*으로 한 번 부른다(summon_count가 0이면 안 부른다). 0이면 체력과 상관없이 부른다(부르는 자).
+@export var summon_below: float = 0.0
+## 그림 크기 배수(기사 모델 기준 1.0). 0이면 기본.
+@export var model_scale: float = 0.0
+
 @export_group("수련장(15단계, docs/village.md)")
 ## 움직이지도 때리지도 않는다(허수아비). 넉백도 받지 않는다.
 @export var still: bool = false

@@ -94,6 +94,7 @@ func _init() -> void:
 	_test_village_save()
 	_test_field_meta()
 	(load("res://tests/field_fight_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/field_boss_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -228,7 +229,7 @@ func _test_data() -> void:
 	check(unknown.is_empty(), "방식의 동작이 모두 표에 있다 %s" % [unknown])
 	check(d.patterns[0].moves == PackedStringArray(["sweep"]) and d.pattern_for(null) == d.patterns[0], "맨손은 횡베기 하나뿐인 0번 방식")
 	check(d.grades.odds.size() == 6 and d.grades.odds[2] == 40.0 and d.grades.odds[5] == 50000.0, "등급 확률 1/6, 1/40 … 1/50000")
-	check(d.enemies.size() == 10 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 10종(새 적 5종과 허수아비 포함)")
+	check(d.enemies.size() == 11 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 11종(새 적 5종, 허수아비, 무덤 기사 포함)")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
 	var s := Sword.new(d.sword_by_name("붉은 이삭"), d)
 	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(150.0 * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 195, 무리 베기 34")

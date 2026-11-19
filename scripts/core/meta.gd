@@ -37,6 +37,9 @@ var glints: Array[int] = []
 var glints_ready: bool = false
 ## 들판 싸움(17단계): 이미 쓰러뜨린 무리 id(→ 1). 판이 끝날 때(record_run) 비운다.
 var packs_cleared: Dictionary = {}
+## 들판 보스(18단계): 이번 판에 무덤 기사를 쓰러뜨렸는지(판이 끝날 때 record_run이 비운다, 쓰러뜨렸으면 들판에 다시 와도 안 선다)와 처음 보상을 받았는지(저장).
+var boss_down: bool = false
+var boss_first: bool = false
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
 static var carry_sword: int = -1
@@ -66,7 +69,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "boss_down": boss_down, "boss_first": boss_first}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -116,6 +119,8 @@ func from_dict(d: Dictionary) -> void:
 	packs_cleared = {}
 	for k in d.get("packs_cleared", {}):
 		packs_cleared[str(k)] = 1
+	boss_down = bool(d.get("boss_down", false))
+	boss_first = bool(d.get("boss_first", false))
 
 
 func note_found(id: int) -> void:
@@ -277,6 +282,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	refresh_stock(rules.data)
 	roll_glints()
 	packs_cleared = {}
+	boss_down = false
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
 	runs += 1
 	return r
@@ -307,6 +313,20 @@ func field_clear(id: String) -> int:
 	var n: int = rng.randi_range(FieldLayout.PACK_CLEAR_MIN, FieldLayout.PACK_CLEAR_MAX)
 	shards += n
 	return n
+
+
+## 들판 보스(18단계): 무덤 기사를 쓰러뜨렸다. 처음이면 조각 BOSS_FIRST_SHARDS, 다음부터 BOSS_SHARDS를 받고, 운 부적이 pack에 든다(이미 있으면 그대로).
+## {shards, first, charm}을 돌려준다(charm은 새로 들었는지).
+func boss_defeat() -> Dictionary:
+	var first: bool = not boss_first
+	var n: int = FieldLayout.BOSS_FIRST_SHARDS if first else FieldLayout.BOSS_SHARDS
+	shards += n
+	boss_first = true
+	boss_down = true
+	var charm: bool = not pack.has(FieldLayout.BOSS_CHARM)
+	if charm:
+		pack.append(FieldLayout.BOSS_CHARM)
+	return {"shards": n, "first": first, "charm": charm}
 
 
 ## 흩어진 조각 자리를 새로 뽑는다(판이 끝날 때마다).

@@ -51,6 +51,8 @@ func _ready() -> void:
 	Grid.size = FieldLayout.SIZE   # Rules가 싸움터 크기로 영주를 가둔다: 들판 크기로
 	rules.start_field()
 	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
+	if not meta.boss_down:
+		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
 	rules.lord.pos = FieldLayout.START
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
@@ -73,6 +75,7 @@ func _ready() -> void:
 	_move_fx.setup(rules)
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)
+	_enemy_fx.height_of = FieldBuilder.walk_height   # 땅의 빛·먼지가 들판의 땅 위에 뜬다
 	_hold_sword()
 	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -2.0 if big else -6.0))
 	rules.lord_dashed.connect(func() -> void:
@@ -85,6 +88,8 @@ func _ready() -> void:
 	rules.enemy_hit.connect(_on_enemy_hit)
 	rules.enemy_died.connect(_on_enemy_died)
 	rules.pack_cleared.connect(_on_pack_cleared)
+	rules.field_boss_slain.connect(_on_boss_slain)
+	rules.enemy_act.connect(_on_enemy_act)
 	rules.run_ended.connect(_on_down)
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
@@ -181,6 +186,7 @@ func _process(delta: float) -> void:
 	_enemy_fx.draw(alpha)
 	_sync_enemies(alpha, delta)
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
+	_boss_bar()
 	_creatures.step(delta, _lord.position)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
@@ -365,6 +371,33 @@ func _on_pack_cleared(id: StringName) -> void:
 		_hud.toast("무리를 쓰러뜨렸다. 조각 %d개" % n)
 		_hud.flash(Color(1, 0.84, 0.42), 0.2, 0.6)
 	_saved()
+
+
+## 들판 보스가 깨어 있는 동안만 화면 아래 가운데에 체력 막대를 그린다(쓰러뜨리거나 멀어져 돌아가면 사라진다).
+func _boss_bar() -> void:
+	var b: Enemy = rules.field_boss
+	if b != null and rules.field_boss_state == Rules.BOSS_AWAKE and not b.dead:
+		_hud.set_boss(b.data.display_name, b.hp, b.max_hp)
+	elif _hud.boss_bar_shown():
+		_hud.set_boss("", 0.0, 1.0)
+
+
+## 무덤 기사를 쓰러뜨렸다: 조각과 운 부적(Meta.boss_defeat)을 토스트로 알린다.
+func _on_boss_slain(_e: Enemy) -> void:
+	var r: Dictionary = meta.boss_defeat()
+	_camera.add_shake(data.lord.shake_big * 2.0)
+	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
+	_hud.toast("무덤 기사를 쓰러뜨렸다. 조각 %d개%s" % [r.shards, ", 운 부적" if r.charm else ""])
+	_saved()
+
+
+## 무덤 기사의 큰 일(휘두르기 내려침, 돌진)에 흔들림과 소리를 더한다(꾸밈).
+func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
+	if e.data.id != FieldLayout.BOSS_ID:
+		return
+	if act == &"swing" or act == &"charge_end":
+		_camera.add_shake(0.35)
+		_sfx.play(&"thump", Grid.cells_to_world(e.pos), -2.0, 0.7)
 
 
 ## 영주가 쓰러졌다: 잃는 것 없이 마을 북문 앞에서 깬다(record_run을 부르지 않는다).

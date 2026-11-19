@@ -23,6 +23,10 @@ const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshade
 ## 거인 걸음 동작의 빠르기(이동 1m/초당). 걷기 동작이 있으면 그것을, 없으면 달리기를 느리게 튼다.
 @export var giant_anim_per_speed: float = 0.32
 @export var turn_speed: float = 8.0
+## 무덤 기사(18단계)의 큰 칼 크기 배수, 몸을 기울이는 정도(라디안)와 칼을 내려치는 빠르기(1/초).
+@export var rust_sword: float = 1.5
+@export var rust_lean: float = 0.3
+@export var rust_swing_rate: float = 14.0
 ## 공격 표를 든 적의 눈: 밝기 배수와 크기 배수. 때리기 직전(attack_soon)에는 더 번쩍인다.
 @export var token_eye_bright: float = 1.8
 @export var token_eye_size: float = 1.3
@@ -73,6 +77,9 @@ var parts: Dictionary = {}
 var _motion: Dictionary = {}
 var _shield_knight: LordCharacter = null
 var _vel := Vector3.ZERO
+# 무덤 기사(기사 모델이 없을 때의 도형 칼 팔 포즈와 몸 기울임)
+var _arm_pivot: Node3D = null
+var _lean: float = 0.0
 
 
 func setup(e: Enemy) -> void:
@@ -87,11 +94,11 @@ func _ready() -> void:
 	match D.id:
 		&"wolf":
 			_build_wolf(grow, D.color)
-		&"giant", &"boss":
+		&"giant", &"boss", &"grave_knight":
 			if LordCharacter.available():
 				_build_knight(grow, D.color, D.boss)
 			else:
-				_build_giant(r, D.color, D.boss)
+				_build_giant(r * (D.model_scale / 2.5 if D.model_scale > 0.0 else 1.0), D.color, D.boss)
 		&"archer", &"shield", &"charger", &"bomber", &"caller":
 			_build_new(D.id, grow, D.color)
 		_:
@@ -188,6 +195,8 @@ func draw(alpha: float, delta: float) -> bool:
 		_body.scale = Vector3(1.0 + 0.06 * _recoil, 1.0 - 0.08 * _recoil, 1.0 + 0.06 * _recoil)
 		if _attack > 0.4:
 			_attack = -1.0
+	if enemy.data.model_scale > 0.0:
+		_rust_pose(delta)
 	_paint()
 	_paint_eyes(delta)
 	return false
@@ -577,15 +586,18 @@ func _animate_wolf(delta: float) -> void:
 func _build_knight(grow: float, c: Color, boss: bool) -> void:
 	_knight = LordCharacter.new()
 	_body.add_child(_knight)
-	_knight_scale = (2.5 if boss else 1.85) * grow
+	var rust: bool = enemy.data.model_scale > 0.0   # 무덤 기사: 녹슨 빛, 큰 칼
+	_knight_scale = (enemy.data.model_scale if rust else (2.5 if boss else 1.85)) * grow
 	_knight.scale = Vector3.ONE * _knight_scale
 	_height = 1.8 * _knight_scale
-	var mul: Color = Color(0.3, 0.1, 0.1) if boss else Color(0.4, 0.4, 0.42).lerp(c, 0.15)
-	var mats := _knight.recolor(mul, Color(0.6, 0.06, 0.02) if boss else Color.BLACK, 0.08 if boss else 0.0)
+	var mul: Color = c if rust else (Color(0.3, 0.1, 0.1) if boss else Color(0.4, 0.4, 0.42).lerp(c, 0.15))
+	var mats := _knight.recolor(mul, Color(0.55, 0.22, 0.05) if rust else (Color(0.6, 0.06, 0.02) if boss else Color.BLACK), 0.1 if (boss or rust) else 0.0)
 	for m in mats:
 		_mats.append(m)
 		_base.append(m.albedo_color)
 	var sword := SwordModel.make(null, 0, 4000 + enemy.id, Color.WHITE)
+	if rust:
+		sword.scale = Vector3.ONE * rust_sword
 	_knight.hold(sword)
 	# 투구 안의 눈. 뼈의 방향이 모델마다 달라서 첫 프레임에 머리 앞에 맞춘다(_place_eyes)
 	_eyes = Node3D.new()
@@ -661,7 +673,7 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 	head.radius = r * 0.42
 	head.height = r * 0.84
 	_add(_body, head, m, Vector3(0, r * 4.0, -r * 0.1))
-	if boss:
+	if boss and enemy.data.model_scale <= 0.0:
 		var horn := CylinderMesh.new()
 		horn.top_radius = 0.0
 		horn.bottom_radius = r * 0.12
@@ -670,6 +682,42 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 		_add(_body, horn, hm, Vector3(-r * 0.3, r * 4.5, 0), Vector3(0, 0, 0.5))
 		_add(_body, horn, hm, Vector3(r * 0.3, r * 4.5, 0), Vector3(0, 0, -0.5))
 	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Color(1.0, 0.8, 0.35) if boss else Color(0.75, 0.9, 1.0))
+	if enemy.data.model_scale > 0.0:
+		# 무덤 기사: 녹슨 도형 몸에 큰 칼을 든 오른팔(어깨에서 돌린다)
+		_arm_pivot = Node3D.new()
+		_arm_pivot.position = Vector3(r * 1.0, r * 3.2, 0.0)
+		_body.add_child(_arm_pivot)
+		var sword := SwordModel.make(null, 0, 4000 + enemy.id, Color.WHITE)
+		sword.scale = Vector3.ONE * rust_sword * enemy.data.model_scale * 0.7
+		sword.position = Vector3(0.0, -r * 0.2, 0.0)
+		_arm_pivot.add_child(sword)
+		_arm_pivot.rotation = Vector3(-2.2, 0.0, 0.0)
+
+
+## 무덤 기사의 행동에 맞춘 몸 기울임: 휘두르기 예고에는 뒤로 젖히고(칼을 들어 올린다), 돌진 준비와 돌진에는 숙인다.
+## 기사 모델에는 몸만, 도형에는 칼 든 팔도 돌린다(내려치는 순간 옆에서 앞으로 쓸어낸다).
+func _rust_pose(delta: float) -> void:
+	var want: float = 0.0
+	var arm := Vector3(-2.2, 0.0, 0.0)
+	match enemy.act:
+		&"swing_wind":
+			var k: float = clampf(enemy.act_t / maxf(enemy.act_time, 0.01), 0.0, 1.0)
+			want = rust_lean * k
+			arm = Vector3(lerpf(-2.2, 0.7, k), lerpf(0.0, 1.3, k), 0.0)
+		&"swing":
+			var q: float = clampf(enemy.act_t * rust_swing_rate / 3.0, 0.0, 1.0)
+			want = -rust_lean * 0.5
+			arm = Vector3(lerpf(0.7, -2.0, q), lerpf(1.3, -1.3, q), 0.0)
+		&"wind":
+			want = -rust_lean * 0.8
+		&"charge":
+			want = -rust_lean * 1.3
+		&"charge_end":
+			want = rust_lean * 0.3
+	_lean = lerpf(_lean, want, 1.0 - exp(-12.0 * delta))
+	_body.rotation.x += _lean
+	if _arm_pivot:
+		_arm_pivot.rotation = _arm_pivot.rotation.lerp(arm, 1.0 - exp(-16.0 * delta))
 
 
 # ---------------------------------------------------------------- 11단계 새 적 5종(EnemyArt + EnemyMotion)

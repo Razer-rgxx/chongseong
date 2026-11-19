@@ -30,6 +30,9 @@ var home: Vector2 = Vector2.ZERO
 var wander_to: Vector2 = Vector2.ZERO
 var wander_t: float = 0.0
 
+## 이 적을 불러낸 적의 id(0이면 불려 온 적이 아니다). 들판 보스가 돌아가면 불려 온 적이 사라진다.
+var caller: int = 0
+
 # ---- 행동(11단계, Foes, docs/content.md). 화면은 읽기만 한다.
 ## 지금 하는 일(aim, shoot, block, guard_break, wind, charge, charge_end, fuse, explode, call_wind, call). &""이면 걷기다.
 var act: StringName = &""

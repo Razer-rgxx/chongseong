@@ -102,6 +102,20 @@ const PACKS: Dictionary = {
 }
 
 
+## ---- 들판 보스(18단계, docs/outside.md). 무덤 기사는 옛 싸움터 가운데에 한 마리 선다.
+const BOSS_ID: StringName = &"grave_knight"
+const BOSS_AT: Vector2 = Vector2(84, 96)
+## 영주가 제자리에서 이 칸 안에 들면 깨어나고, 이 칸 넘게 멀어지면 돌아가 체력이 다 찬다(돌아가는 빠르기와 시간은 PACK_RETURN_SPEED·PACK_HEAL_TIME).
+const BOSS_WAKE: float = 8.0
+const BOSS_LEASH: float = 14.0
+## 불려 나오는 망령의 세기 구역(1부터, RunData의 구역 배수. 옛 싸움터).
+const BOSS_ZONE: int = 3
+## 처음 쓰러뜨리면 받는 조각, 그다음부터 받는 조각. 쓰러뜨릴 때마다 운 부적(상인의 것, Meta.pack)이 하나 든다.
+const BOSS_FIRST_SHARDS: int = 80
+const BOSS_SHARDS: int = 30
+const BOSS_CHARM: StringName = &"charm"
+
+
 static func area_at(c: Vector2) -> StringName:
 	for id in AREA_ORDER:
 		if (AREAS[id] as Rect2).has_point(c):

@@ -9,15 +9,18 @@ extends RefCounted
 ##            영주에게 닿으면 피해와 큰 넉백(영주가 밀려난다). 끝나면 비틀거리고 그동안 받는 피해 × stagger_mult.
 ##   자폭병   표를 받고 fuse_range칸 안이면 심지(fuse_time) 뒤 터져 영주와 다른 적을 다친다. 심지가 타는 동안 죽으면 바로 터진다.
 ##   부르는 자 표를 쓰지 않고 때리지 않는다. 멀리 도망치며 summon_interval초마다 summon_time 동안 불러내고 망령을 부른다.
+##   무덤 기사 (18단계, 들판 보스) 표를 쓰지 않는다. 쿨다운이 끝나면 가까우면 크게 휘두르기(swing_wind: 앞 swing_arc° 부채꼴, swing_time초 예고),
+##            charge_min~charge_max칸이면 charge_chance 확률로 돌진 베기(돌격병과 같은 wind → charge), 아니면 다가간다. 체력이 summon_below 밑이면 망령을 한 번 부른다.
+##            체력이 rage_hp 밑이면 빠르기·예고·돌진·쉬는 시간이 rage_mult배 빨라진다(_rate).
 ## 기절하면 겨눔·머리 낮춤·불러내기가 끊기고 돌진은 멈춘다(비틀거림). 심지와 방패 깨짐, 비틀거림은 기절해도 이어진다.
 ## 랜덤은 Rules.rng만 쓴다(부를 자리의 첫 각). 화면에는 Rules.enemy_act·enemy_projectile_spawned·enemy_projectile_ended로 알린다.
 
 ## 기절하면 끊기는 일.
-const BREAKABLE: Array[StringName] = [&"aim", &"wind", &"call_wind"]
+const BREAKABLE: Array[StringName] = [&"aim", &"wind", &"call_wind", &"swing_wind"]
 ## 이 일 동안은 몸을 돌리지 않는다(정한 쪽을 본다).
-const LOCK_FACE: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge", &"charge_end", &"guard_break"]
+const LOCK_FACE: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge", &"charge_end", &"guard_break", &"swing_wind", &"swing"]
 ## 이 일 동안은 걷지 않는다(돌진은 따로 달린다). block은 막은 채 걷는다.
-const HOLD: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge_end", &"guard_break", &"fuse", &"explode", &"call_wind", &"call"]
+const HOLD: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge_end", &"guard_break", &"fuse", &"explode", &"call_wind", &"call", &"swing_wind", &"swing"]
 
 var r: Rules
 
@@ -62,12 +65,14 @@ func tick(e: Enemy, k: float, dt: float) -> void:
 		if BREAKABLE.has(e.act):
 			if e.act == &"call_wind":
 				e.cooldown = e.data.summon_interval
+			elif e.act == &"swing_wind":
+				e.cooldown = _cd(e)
 			e.act = &""
 			return
 		if e.act == &"charge":
 			_end_charge(e, false)
 			return
-	e.act_t += dt
+	e.act_t += dt * _rate(e)
 	if e.act_t < e.act_time - 0.0001:
 		return
 	match e.act:
@@ -81,6 +86,8 @@ func tick(e: Enemy, k: float, dt: float) -> void:
 			explode(e)
 		&"call_wind":
 			_call(e)
+		&"swing_wind":
+			_swing(e)
 		_:
 			e.act = &""
 
@@ -122,6 +129,9 @@ func step(e: Enemy, foe: Enemy, to: Vector2, d: float, k: float, dt: float) -> b
 			return _bomber(e, d)
 		&"caller":
 			_caller(e, to, d, k, dt)
+			return true
+		&"grave_knight":
+			_knight(e, to, d, k, dt)
 			return true
 	return false
 
@@ -289,7 +299,7 @@ func _start_charge(e: Enemy) -> void:
 		return
 	var time: float = length / maxf(D.charge_speed, 0.1)
 	_begin(e, &"charge", time)
-	r.enemy_act.emit(e, &"charge", {"from": e.act_from, "to": e.act_to, "time": time})
+	r.enemy_act.emit(e, &"charge", {"from": e.act_from, "to": e.act_to, "time": time / _rate(e)})
 
 
 func _step_charge(e: Enemy, dt: float) -> void:
@@ -297,7 +307,7 @@ func _step_charge(e: Enemy, dt: float) -> void:
 	var L := r.lord
 	e.push = Vector2.ZERO
 	var from: Vector2 = e.pos
-	var s: float = D.charge_speed * dt
+	var s: float = D.charge_speed * _rate(e) * dt
 	var left: float = e.pos.distance_to(e.act_to)
 	e.pos += e.act_dir * minf(s, left)
 	if L.dash <= 0.0 and L.hook <= 0.0 and Moves._seg_dist(L.pos, from, e.pos) <= e.radius + r.data.run.enemy_reach:
@@ -318,7 +328,7 @@ func _step_charge(e: Enemy, dt: float) -> void:
 func _end_charge(e: Enemy, hit: bool) -> void:
 	var D := e.data
 	_begin(e, &"charge_end", D.stagger_time)
-	e.cooldown = D.cooldown
+	e.cooldown = _cd(e)
 	r.tokens.release(e, true)
 	r.enemy_act.emit(e, &"charge_end", {"at": e.pos, "hit": hit, "time": D.stagger_time, "stun": D.stagger_time > 0.0})
 
@@ -405,6 +415,7 @@ func _call(e: Enemy) -> void:
 		var s: Enemy = r.spawn_at(D.summon_kind, at)
 		s.pack = e.pack   # 들판: 불려 온 적도 부른 자의 무리(제자리로 돌아간다)
 		s.home = at
+		s.caller = e.id
 		spots.append(at)
 	e.summoned += n
 	e.cooldown = D.summon_interval
@@ -418,6 +429,77 @@ func _alive() -> int:
 		if not o.dead:
 			n += 1
 	return n
+
+
+# ---------------------------------------------------------------- 무덤 기사
+
+## 빨라지는 배수: 체력이 rage_hp 밑이면 rage_mult, 아니면 1.
+func _rate(e: Enemy) -> float:
+	var D := e.data
+	if D.rage_hp > 0.0 and e.hp <= e.max_hp * D.rage_hp:
+		return D.rage_mult
+	return 1.0
+
+
+## 다음 행동까지 쉬는 시간(빨라지면 짧다).
+func _cd(e: Enemy) -> float:
+	return e.data.cooldown / _rate(e)
+
+
+## 빨라졌는지(체력이 rage_hp 밑).
+func raged(e: Enemy) -> bool:
+	return _rate(e) > 1.0
+
+
+func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
+	var D := e.data
+	var rate: float = _rate(e)
+	if d < 0.001:
+		return
+	# 부르기: 체력이 summon_below 밑으로 내려오면 한 번(summoned가 summon_max에 닿을 때까지 못 부른 만큼만)
+	if D.summon_count > 0 and e.summoned < D.summon_max and e.hp <= e.max_hp * D.summon_below and e.cooldown <= 0.0 \
+			and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
+		var n: int = D.summon_count
+		var a0: float = r.rng.randf() * TAU
+		e.act_spots = PackedVector2Array()
+		for i in n:
+			e.act_spots.append(_clamp(e.pos + Vector2.from_angle(a0 + TAU * i / n) * D.summon_radius, 1.0))
+		_begin(e, &"call_wind", D.summon_time)
+		r.enemy_act.emit(e, &"call_wind", {"at": e.pos, "radius": D.summon_radius, "time": D.summon_time / rate})
+		return
+	if e.cooldown <= 0.0:
+		if d <= D.swing_range:
+			e.act_dir = to / d
+			e.face = e.act_dir
+			_begin(e, &"swing_wind", D.swing_time)
+			r.enemy_act.emit(e, &"swing_wind", {"at": e.pos, "dir": e.act_dir, "arc": D.swing_arc, "range": D.swing_range, "time": D.swing_time / rate})
+			return
+		if d >= D.charge_min and d <= D.charge_max:
+			if r.rng.randf() < D.charge_chance:
+				e.act_dir = to / d
+				e.face = e.act_dir
+				e.act_from = e.pos
+				var length: float = _lane(e.pos, e.act_dir, D.charge_length)
+				e.act_to = e.pos + e.act_dir * length
+				_begin(e, &"wind", D.wind_time)
+				r.enemy_act.emit(e, &"wind", {"from": e.pos, "dir": e.act_dir, "length": length, "time": D.wind_time / rate, "width": e.radius * 2.0})
+				return
+			e.cooldown = D.charge_retry   # 이번엔 안 달린다: 조금 더 다가가 다시 고른다
+	if d > D.swing_range * 0.85:
+		e.pos += to / d * D.speed * k * rate * dt
+
+
+## 예고가 끝났다: 앞 swing_arc° 부채꼴 안에 영주가 있으면 벤다(구르는 중이면 지나간다).
+func _swing(e: Enemy) -> void:
+	var D := e.data
+	var L := r.lord
+	var v: Vector2 = L.pos - e.pos
+	var hit: bool = v.length() <= D.swing_range and absf(angle_difference(e.act_dir.angle(), v.angle())) <= deg_to_rad(D.swing_arc) / 2.0
+	if hit and L.dash <= 0.0 and L.hook <= 0.0:
+		r._hurt_lord(e.damage, e)
+	_begin(e, &"swing", D.act_after)
+	e.cooldown = _cd(e)
+	r.enemy_act.emit(e, &"swing", {"at": e.pos, "dir": e.act_dir, "arc": D.swing_arc, "range": D.swing_range, "hit": hit})
 
 
 # ---------------------------------------------------------------- 공통
