@@ -79,6 +79,25 @@ static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vecto
 	return out
 
 
+## 결투 말뚝(21단계): 밟아 다진 둥근 마당, 굵은 말뚝에 엇갈려 꽂힌 칼 둘, 양쪽에 걸린 천(1P 금빛, 2P 검붉음). 기본 도형.
+static func duel_post(parent: Node3D, at: Vector3) -> void:
+	var d := VillageBuilder.place(parent, at, 0.0)
+	VillageBuilder.cyl(d, 2.0, 2.1, 0.05, Vector3(0, 0.025, 0), VillageBuilder.dirt(), 24)
+	var stone := VillageBuilder.plain(Color(0.36, 0.35, 0.34), 0.95)
+	for i in 10:
+		var a: float = TAU * i / 10.0
+		VillageBuilder.box(d, Vector3(0.34, 0.2, 0.26), Vector3(cos(a) * 1.95, 0.1, sin(a) * 1.95), stone, Vector3(0, -a, 0))
+	var wood := VillageBuilder.timber()
+	VillageBuilder.box(d, Vector3(0.3, 2.5, 0.3), Vector3(0, 1.25, 0), wood)
+	VillageBuilder.box(d, Vector3(1.5, 0.12, 0.14), Vector3(0, 2.1, 0), wood)
+	var steel := VillageBuilder.plain(Color(0.62, 0.64, 0.68), 0.4, 0.85)
+	for k in [-1.0, 1.0]:
+		VillageBuilder.box(d, Vector3(0.09, 1.5, 0.03), Vector3(0, 1.55, 0.18), steel, Vector3(0, 0, k * 0.7))
+	VillageBuilder.box(d, Vector3(0.3, 0.1, 0.12), Vector3(0, 1.55, 0.18), VillageBuilder.plain(Color(0.2, 0.17, 0.14), 0.6, 0.5))
+	for pair in [[-0.6, Color(0.66, 0.54, 0.2)], [0.6, Color(0.46, 0.12, 0.14)]]:
+		VillageBuilder.box(d, Vector3(0.36, 0.7, 0.03), Vector3(pair[0], 1.7, 0.02), VillageBuilder.plain(pair[1], 1.0))
+
+
 ## 떠돌이 상인의 짐수레: 짐칸, 바퀴 둘, 천 덮개, 자루와 통, 끌채.
 static func cart(parent: Node3D, at: Vector3, facing: float) -> void:
 	var c := VillageBuilder.place(parent, at, facing)

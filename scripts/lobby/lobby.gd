@@ -8,6 +8,7 @@ extends Node3D
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const FIELD_PATH: String = "res://scenes/field/field.tscn"
+const DUEL_PATH: String = "res://scenes/duel/duel.tscn"
 
 ## 들를 곳(칸 좌표). 마을 크기는 언덕 싸움터와 같다(RunData.arena_size).
 @export var forge_at: Vector2 = Vector2(9.5, 8.0)
@@ -22,6 +23,8 @@ const FIELD_PATH: String = "res://scenes/field/field.tscn"
 @export var yard_dummies: Array[Vector2] = [Vector2(28.0, 15.3), Vector2(28.0, 16.3), Vector2(28.0, 17.3)]
 @export var yard_rack_at: Vector2 = Vector2(25.4, 14.9)
 @export var cart_at: Vector2 = Vector2(13.4, 9.7)
+## 결투 말뚝(21단계, docs/duel.md): 광장. E로 창을 열어 같은 PC로 겨루기 → 1P·2P 검 고르기 → 결투 장면.
+@export var duel_at: Vector2 = Vector2(19.4, 10.6)
 @export var merchant_at: Vector2 = Vector2(14.7, 10.4)
 ## 주민: id → [칸 자리, 바라볼 방향].
 const VILLAGERS: Dictionary = {
@@ -33,7 +36,7 @@ const VILLAGERS: Dictionary = {
 }
 
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
-const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다"}
+const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
 @export var max_ticks_per_frame: int = 8
 
 var data: GameData
@@ -106,6 +109,7 @@ func _ready() -> void:
 	_hud.bought.connect(func(_id: StringName) -> void: _sfx.play(&"thump", Grid.cells_to_world(merchant_at, 1.0), -6.0))
 	_hud.yard_sword_picked.connect(_on_yard_sword)
 	_hud.field_go.connect(_on_field_go)
+	_hud.duel_go.connect(_on_duel_go)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	rules.enemy_hit.connect(_on_dummy_hit)
@@ -194,7 +198,7 @@ func _process(delta: float) -> void:
 	var p: Vector2 = rules.lord.pos
 	_near = ""
 	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0),
-		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at}
+		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4)}
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
 	var best_d: float = reach
@@ -242,6 +246,8 @@ func _interact() -> void:
 			_hud.open_rack()
 		"gate":
 			_hud.open_field_pick()
+		"duel":
+			_hud.open_duel()
 		_:
 			return
 	_capture(false)
@@ -579,6 +585,8 @@ func _build_village_extras() -> void:
 	_rects.append(Rect2(a.position.x - 0.1, a.position.y, 0.2, yard_gap.x - a.position.y))
 	_rects.append(Rect2(a.position.x - 0.1, yard_gap.y, 0.2, a.end.y - yard_gap.y))
 	_rects.append(Rect2(yard_rack_at - Vector2(0.9, 0.2), Vector2(1.8, 0.4)))
+	VillageProps.duel_post(self, Grid.cells_to_world(duel_at))
+	_circles.append([duel_at, 0.4])
 	VillageProps.cart(self, Grid.cells_to_world(cart_at), VillageBuilder.facing_to(Vector2(1, 0)))
 	_rects.append(Rect2(cart_at - Vector2(0.6, 0.7), Vector2(1.2, 2.0)))
 	_add_folk(&"merchant", merchant_at, Vector2(1, 0))
@@ -640,6 +648,14 @@ func _on_field_go(id: int) -> void:
 	Meta.carry_sword = id
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(FIELD_PATH)
+
+
+## 결투 말뚝에서 1P·2P의 검을 골랐다: 결투 장면으로(고른 검은 Meta.duel_picks로 넘어간다).
+func _on_duel_go(a: int, b: int) -> void:
+	Meta.duel_picks = [a, b]
+	meta.save()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(DUEL_PATH)
 
 
 func _on_yard_sword(id: int) -> void:

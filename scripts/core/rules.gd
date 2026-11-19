@@ -10,6 +10,7 @@ extends RefCounted
 ## 11단계 새 적 5종(활잡이, 방패병, 돌격병, 자폭병, 부르는 자)의 행동은 Foes(foes.gd)가 맡는다.
 ## 12단계 밤마다 목표 하나(버티기·지키기·사냥·포위)와 구역 규칙 하나(없음·짙은 안개·불씨 땅·무덤). docs/content.md "12단계".
 ## 13단계 갈림길(새벽에 다음 구역의 길 두 개 중 고른다, choose_path)과 낮 사건(대장장이·저주받은 손잡이·순례자·점쟁이).
+## 21단계 1대1 결투(start_duel, step_duel, docs/duel.md): lords 둘, 영주마다 DuelSeat(검 칸·좌클릭 동작·날아가는 것)를 갈아 끼워 돌린다.
 ## 14단계 뽑기 손맛: 버팀 타이밍(pull_window·pull_good·pull_perfect·pull_miss, LordInput.pull_press)과 손잡이 조짐(Hilt.omen, 운 배수).
 
 signal day_started(zone: int)
@@ -85,8 +86,22 @@ signal path_chosen(i: int, card: Dictionary)
 signal event_placed(ev: DayEvent)
 signal event_used(ev: DayEvent, result: Dictionary)
 signal event_gone(ev: DayEvent)
+## 결투(21단계): 판이 시작됐다(n은 1부터) / 판이 끝났다(winner: 0, 1, 비김은 -1) / 결투가 끝났다(winner 같음) / 영주가 맞았다(seat, 피해, 큰 베기인지).
+signal duel_round_started(n: int)
+signal duel_round_ended(winner: int)
+signal duel_over(winner: int)
+signal duelist_hurt(seat: int, damage: float, big: bool)
 
 enum Phase { DAY, NIGHT, OVER }
+
+## 결투의 한 판 단계: 시작 전 서 있기 → 싸움 → 판 사이 쉼 → 끝.
+const DUEL_READY: int = 0
+const DUEL_FIGHT: int = 1
+const DUEL_BETWEEN: int = 2
+const DUEL_DONE: int = 3
+## duel_winner가 아직 정해지지 않았다 / 비겼다.
+const DUEL_NONE: int = -2
+const DUEL_DRAW: int = -1
 
 ## 밤의 목표와 구역 규칙(RunData.night_goals, zone_rules의 값).
 const GOALS: Array[StringName] = [&"survive", &"defend", &"hunt", &"siege"]
@@ -108,6 +123,8 @@ var night_left: float = 0.0
 ## 이 밤의 길이(초). 포위는 짧다.
 var night_total: float = 0.0
 var lord := LordState.new()
+## 영주들(21단계). 0은 lord와 같다. 결투가 아니면 하나뿐이다.
+var lords: Array[LordState] = []
 ## 두 칸. 빈 칸은 null.
 var slots: Array[Sword] = [null, null]
 var active: int = 0
@@ -156,6 +173,23 @@ var enemy_projectiles: Array[Projectile] = []
 var callers_out: int = 0
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
+## 1대1 결투(21단계, docs/duel.md). 켜면 낮밤·뽑기·적이 없고 영주 둘이 서로 벤다. 각인과 고유 능력은 듣지 않는다(Powers.off).
+var duel: bool = false
+var duel_phase: int = DUEL_READY
+## 이 단계에 남은 시간(시작 전, 판 사이)과 이 판에 남은 시간(초).
+var duel_timer: float = 0.0
+var duel_left: float = 0.0
+## 지금 몇 번째 판(1부터)과 영주마다 이긴 판 수, 판마다의 승자(0, 1, 비김 -1), 결투의 승자(DUEL_NONE이면 아직).
+var duel_round: int = 0
+var duel_wins: Array[int] = [0, 0]
+var duel_results: Array[int] = []
+var duel_winner: int = DUEL_NONE
+## 지금 틱을 돌리는 영주(규칙의 lord·slots·moves·powers·projectiles·enemies가 이 자리의 것이다). 화면은 신호를 받을 때 이것으로 누구인지 안다.
+var cur_seat: int = 0
+var _seats: Array[DuelSeat] = []
+## 상대 영주를 대신하는 그림자 적(영주 i의 몸). 이것을 맞히면 영주 i가 맞는다.
+var _proxies: Array[Enemy] = []
+var _proxy_at: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
 ## 마을 수련장(15단계): 켜면 낮에도 좌클릭이 먹고, 허수아비(still)가 규칙의 적으로 선다.
 var yard: bool = false
 ## 들판 모드(17단계, docs/outside.md): 낮밤과 구역 시간이 흐르지 않고 밤 나오기가 없다. 적은 spawn_pack으로 자리에 둔다.
@@ -252,6 +286,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
 	Grid.size = data.run.arena_size
+	lords.append(lord)
 	powers = Powers.new(self)
 	moves = Moves.new(self)
 	tokens = Tokens.new(self)
@@ -309,6 +344,8 @@ func _bless(key: String) -> float:
 
 
 func max_hp() -> float:
+	if duel:
+		return data.duel.hp
 	return data.lord.hp + _bless("hp") + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
 
 
@@ -930,6 +967,9 @@ func _break(k: int) -> void:
 ## src: 때린 자리(방패병이 막는 쪽). 없으면(INF) 영주의 자리.
 func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false, src: Vector2 = Vector2.INF) -> void:
 	if e.dead:
+		return
+	if e.seat >= 0:
+		_duel_hurt(e.seat, damage, knock, big)
 		return
 	if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
 		_engage_pack(e.pack)
@@ -2007,4 +2047,258 @@ func state_hash() -> int:
 		for e in enemies:
 			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
+	if duel:
+		parts.append_array([duel_phase, duel_timer, duel_left, duel_round, duel_wins[0], duel_wins[1], duel_winner, cur_seat])
+		for st in _seats:
+			var q: LordState = st.lord
+			parts.append_array([q.pos, q.hp, q.face, q.cooldown, q.invuln, q.push, q.dash, q.hook, q.move, q.combo, q.parry, q.move_lock, q.swing, q.dash_cooldown, q.hook_cooldown, st.slots[0].data.id if st.slots[0] else -1, st.moves.events.size(), st.powers.dash_charges])
+			for p in st.projectiles:
+				parts.append(p.pos)
 	return hash(str(parts))
+
+
+# ---------------------------------------------------------------- 1대1 결투 (21단계, docs/duel.md)
+
+## 결투를 연다: 영주 둘이 각자 검(null이면 맨손)을 들고 마주 선다. 결투의 검은 부러지지 않는다.
+## 낮밤·뽑기·적은 없고, 좌클릭은 상대 영주를 맞힌다. 각인과 고유 능력은 듣지 않는다. 틱은 step_duel로 돌린다.
+func start_duel(sword_a: Sword, sword_b: Sword) -> void:
+	duel = true
+	phase = Phase.NIGHT
+	hilts.clear()
+	altar = null
+	event = null
+	enemies.clear()
+	projectiles.clear()
+	enemy_projectiles.clear()
+	powers.off = true
+	var s0 := DuelSeat.new()
+	s0.lord = lord
+	s0.slots = slots
+	s0.moves = moves
+	s0.powers = powers
+	s0.projectiles = projectiles
+	var s1 := DuelSeat.new()
+	s1.lord = LordState.new()
+	s1.moves = Moves.new(self)
+	s1.powers = Powers.new(self)
+	s1.powers.off = true
+	_seats.clear()
+	_seats.append(s0)
+	_seats.append(s1)
+	lords.clear()
+	lords.append(s0.lord)
+	lords.append(s1.lord)
+	var swords: Array[Sword] = [sword_a, sword_b]
+	for i in 2:
+		var w: Sword = swords[i]
+		if w != null:
+			w.max_durability = -1.0
+			w.durability = -1.0
+		_seats[i].slots[0] = w
+		_seats[i].slots[1] = null
+		var p := Enemy.new()
+		p.id = _new_id()
+		p.seat = i
+		p.data = EnemyData.new()
+		p.radius = data.duel.body_radius
+		p.max_hp = data.duel.hp
+		p.hp = p.max_hp
+		_proxies.append(p)
+	s0.foes.append(_proxies[1])
+	s1.foes.append(_proxies[0])
+	cur_seat = 0
+	enemies = s0.foes
+	duel_wins = [0, 0]
+	duel_results.clear()
+	duel_round = 0
+	duel_winner = DUEL_NONE
+	_begin_round()
+
+
+## 한 영주의 몫(lord, 검 칸, 좌클릭 동작, 날아가는 것, 맞힐 것)을 규칙의 자리에 끼운다.
+func _seat(i: int) -> void:
+	if i == cur_seat:
+		return
+	_seats[cur_seat].active = active
+	var s: DuelSeat = _seats[i]
+	cur_seat = i
+	lord = s.lord
+	slots = s.slots
+	active = s.active
+	moves = s.moves
+	powers = s.powers
+	projectiles = s.projectiles
+	enemies = s.foes
+
+
+## 영주 i의 쥔 검(없으면 null). 화면이 읽는다.
+func seat_sword(i: int) -> Sword:
+	if not duel:
+		return current()
+	if i == cur_seat:
+		return slots[active]
+	var s: DuelSeat = _seats[i]
+	return s.slots[s.active]
+
+
+## 영주 i의 날아가는 것.
+func seat_projectiles(i: int) -> Array[Projectile]:
+	return projectiles if i == cur_seat or not duel else _seats[i].projectiles
+
+
+## 그림자 적을 영주의 몸에 맞춘다.
+func _sync_proxy(j: int) -> void:
+	var p: Enemy = _proxies[j]
+	var L: LordState = lords[j]
+	p.pos = L.pos
+	p.prev_pos = L.prev_pos
+	p.hp = L.hp
+	p.dead = L.hp <= 0.0
+	p.face = Vector2.from_angle(L.face)
+	_proxy_at[j] = L.pos
+
+
+func _begin_round() -> void:
+	var D := data.duel
+	duel_round += 1
+	duel_phase = DUEL_READY
+	duel_timer = D.ready_time
+	duel_left = D.round_time
+	for i in 2:
+		_seat(i)
+		var L := lord
+		L.hp = D.hp
+		L.pos = Grid.middle() + Vector2(-D.start_gap if i == 0 else D.start_gap, 0.0)
+		L.prev_pos = L.pos
+		L.face = 0.0 if i == 0 else PI
+		L.move_dir = Vector2.RIGHT if i == 0 else Vector2.LEFT
+		L.moving = false
+		L.cooldown = 0.0
+		L.combo = 0
+		L.combo_timer = 0.0
+		L.swing = 0.0
+		L.big = false
+		L.dash = 0.0
+		L.dash_cooldown = 0.0
+		L.invuln = 0.0
+		L.push = Vector2.ZERO
+		L.hook = 0.0
+		L.hook_target = null
+		L.hook_cooldown = 0.0
+		moves.clear()
+		powers.dash_charges = 1
+		powers.dash_recharge = 0.0
+	_seat(0)
+	for j in 2:
+		_sync_proxy(j)
+	duel_round_started.emit(duel_round)
+
+
+## 결투 한 틱. 영주마다 입력 하나(null이면 가만히). 시작 전과 판 사이에는 입력이 먹지 않는다.
+func step_duel(input_a: LordInput = null, input_b: LordInput = null) -> void:
+	if not duel or phase == Phase.OVER:
+		return
+	tick += 1
+	for st in _seats:
+		st.lord.prev_pos = st.lord.pos
+		for p in st.projectiles:
+			p.prev_pos = p.pos
+	if freeze > 0:
+		freeze -= 1
+		return
+	var inputs: Array = [input_a, input_b] if duel_phase == DUEL_FIGHT else [null, null]
+	for i in 2:
+		_seat(i)
+		var o: int = 1 - i
+		_sync_proxy(o)
+		moves.advance(dt)
+		powers.tick(dt)
+		_step_lord(inputs[i])
+		moves.tick(dt)
+		# 끌어당기기(pull)가 그림자 적의 자리를 옮겼으면 상대 영주도 옮긴다
+		if _proxies[o].pos != _proxy_at[o]:
+			lords[o].pos = _clamp_cells(_proxies[o].pos)
+	_seat(0)
+	_separate()
+	match duel_phase:
+		DUEL_READY:
+			duel_timer -= dt
+			if duel_timer <= 0.0:
+				duel_phase = DUEL_FIGHT
+		DUEL_FIGHT:
+			duel_left -= dt
+			_check_round_end()
+		DUEL_BETWEEN:
+			duel_timer -= dt
+			if duel_timer <= 0.0:
+				_begin_round()
+
+
+func _clamp_cells(p: Vector2) -> Vector2:
+	return p.clamp(Vector2(0.5, 0.5), Vector2(Grid.size) - Vector2(0.5, 0.5))
+
+
+## 두 영주의 몸이 겹치면 반씩 서로 밀어낸다.
+func _separate() -> void:
+	var a: LordState = lords[0]
+	var b: LordState = lords[1]
+	var min_d: float = data.duel.body_radius * 2.0
+	var d: float = a.pos.distance_to(b.pos)
+	if d >= min_d:
+		return
+	var n: Vector2 = (b.pos - a.pos) / d if d > 0.001 else Vector2.RIGHT
+	var half: float = (min_d - d) / 2.0
+	a.pos = _clamp_cells(a.pos - n * half)
+	b.pos = _clamp_cells(b.pos + n * half)
+
+
+## 상대 영주의 몸(그림자 적)이 맞았다. Moves._deal이 Rules.hurt로 부른다. 맞는 쪽의 구르기·맞은 뒤 무적은 그대로이고,
+## 반격 자세면 피해 없이 반격한다. 상태 효과(불·얼음·출혈)는 영주에게 걸리지 않는다(속성은 피해만).
+func _duel_hurt(j: int, damage: float, knock: Vector2, big: bool) -> void:
+	if duel_phase != DUEL_FIGHT:
+		return
+	var L: LordState = lords[j]
+	if L.hp <= 0.0 or L.invuln > 0.0 or L.dash > 0.0:
+		return
+	var from: int = cur_seat
+	_seat(j)
+	var parried: bool = moves.parried(_proxies[from])
+	_seat(from)
+	if parried:
+		return
+	L.hp = maxf(0.0, L.hp - damage)
+	L.invuln = data.duel.hurt_invuln
+	L.push += knock * data.duel.knockback_mult * data.lord.knock_speed
+	duelist_hurt.emit(j, damage, big)
+
+
+## 싸움 중 매 틱: 쓰러진 쪽이 있거나 시간이 다 되면 판이 끝난다.
+func _check_round_end() -> void:
+	var D := data.duel
+	var dead_a: bool = lords[0].hp <= 0.0
+	var dead_b: bool = lords[1].hp <= 0.0
+	var w: int = DUEL_NONE
+	if dead_a or dead_b:
+		w = DUEL_DRAW if dead_a and dead_b else (1 if dead_a else 0)
+	elif duel_left <= 0.0:
+		var ra: float = lords[0].hp / D.hp
+		var rb: float = lords[1].hp / D.hp
+		if absf(ra - rb) < D.tie_eps:
+			w = DUEL_DRAW
+		else:
+			w = 0 if ra > rb else 1
+	if w == DUEL_NONE:
+		return
+	duel_results.append(w)
+	if w >= 0:
+		duel_wins[w] += 1
+	duel_round_ended.emit(w)
+	var need: int = D.rounds_to_win
+	if duel_wins[0] >= need or duel_wins[1] >= need or duel_round >= need * 2 - 1:
+		duel_winner = DUEL_DRAW if duel_wins[0] == duel_wins[1] else (0 if duel_wins[0] > duel_wins[1] else 1)
+		duel_phase = DUEL_DONE
+		phase = Phase.OVER
+		duel_over.emit(duel_winner)
+	else:
+		duel_phase = DUEL_BETWEEN
+		duel_timer = D.break_time

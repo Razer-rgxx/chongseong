@@ -13,6 +13,8 @@ signal bought(id: StringName)
 signal yard_sword_picked(id: int)
 ## 17단계: 북문에서 검을 골라 들판으로 나선다(SwordData.id, 0은 맨손).
 signal field_go(id: int)
+## 21단계: 결투 말뚝에서 1P와 2P가 들 검을 골라 겨룬다(SwordData.id, 0은 맨손).
+signal duel_go(a: int, b: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -51,6 +53,10 @@ var _boss_box: VBoxContainer
 var _boss_name: Label
 var _boss_bar: ProgressBar
 var _say: Band
+## 결투 창(21단계)과 거기서 고른 1P·2P의 검.
+var _duel: Control
+var _duel_box: VBoxContainer
+var _duel_pick: Array[int] = [0, 0]
 
 
 ## 마을이 _ready에서 부른다(이 창의 _ready가 먼저 돈다).
@@ -89,6 +95,8 @@ func _ready() -> void:
 	_shop_box = UiKit.center_panel(_shop)
 	_yard = _layer()
 	_yard_box = UiKit.center_panel(_yard)
+	_duel = _layer()
+	_duel_box = UiKit.center_panel(_duel)
 	_rack = _layer()
 	var rb := UiKit.center_panel(_rack)
 	UiKit.header(rb, "검 진열대", close)
@@ -114,7 +122,7 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible
+	return _forge.visible or _shrine.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
 
 
 func close() -> void:
@@ -127,6 +135,7 @@ func close() -> void:
 	_board.visible = false
 	_shop.visible = false
 	_yard.visible = false
+	_duel.visible = false
 	closed.emit()
 
 
@@ -540,6 +549,51 @@ func _render_yard_rack() -> void:
 			_yard_box.add_child(card)
 	if _gate_mode:
 		_yard_box.add_child(UiKit.button("나선다", func() -> void: field_go.emit(_gate_pick), 40.0))
+
+
+## 결투 말뚝(21단계): 같은 PC로 겨루기, 모르는 사람과 겨루기(22단계까지 흐리게).
+func open_duel() -> void:
+	_duel.visible = true
+	_render_duel(false)
+
+
+func _render_duel(picking: bool) -> void:
+	for c in _duel_box.get_children():
+		c.queue_free()
+	UiKit.header(_duel_box, "결투 말뚝", close)
+	if not picking:
+		_duel_box.add_child(_wrap(UiKit.label("1대1로 겨룬다. 3판 2선승, 각인과 고유 능력은 쓰지 않는다. 지고 이겨도 얻는 것은 기록뿐이다.", 14, UiKit.MUTED)))
+		_duel_box.add_child(UiKit.label("내 기록  이김 %d · 짐 %d" % [meta.duel_wins, meta.duel_losses], 15, UiKit.TEXT))
+		_duel_box.add_child(UiKit.button("같은 PC로 겨루기", func() -> void:
+			_duel_pick = [0, 0]
+			var s := meta.sheath_sword(data)
+			if s != null:
+				_duel_pick = [meta.sheath_id, meta.sheath_id]
+			_render_duel(true), 40.0))
+		var online := UiKit.button("모르는 사람과 겨루기 (준비 중)", func() -> void: pass, 40.0)
+		online.disabled = true
+		online.modulate = Color(1, 1, 1, 0.45)
+		_duel_box.add_child(online)
+		return
+	_duel_box.add_child(_wrap(UiKit.label("1P는 키보드와 마우스, 2P는 게임패드. 검집의 검이나 맨손을 든다. 결투에서는 부러지지 않는다.", 14, UiKit.MUTED)))
+	var ids: Array[int] = [0]
+	var names: Array[String] = ["맨손"]
+	if meta.sheath_sword(data) != null:
+		ids.append(meta.sheath_id)
+		var d := data.sword_by_id(meta.sheath_id)
+		names.append("[검집] %s · %s (%s)" % [data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name])
+	for who in 2:
+		_duel_box.add_child(UiKit.label("1P" if who == 0 else "2P", 18, UiKit.TITLE))
+		var pick := OptionButton.new()
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.custom_minimum_size = Vector2(520, 36)
+		for k in ids.size():
+			pick.add_item(names[k], ids[k])
+			if ids[k] == _duel_pick[who]:
+				pick.select(k)
+		pick.item_selected.connect(func(i: int) -> void: _duel_pick[who] = pick.get_item_id(i))
+		_duel_box.add_child(pick)
+	_duel_box.add_child(UiKit.button("겨룬다", func() -> void: duel_go.emit(_duel_pick[0], _duel_pick[1]), 40.0))
 
 
 func _layer() -> Control:

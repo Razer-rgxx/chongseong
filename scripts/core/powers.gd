@@ -16,6 +16,8 @@ const READY: PackedStringArray = [
 ]
 
 var r: Rules
+## 결투(21단계)에서는 켠다: 각인과 고유 능력이 하나도 듣지 않는다(using·holding은 false, ins·held는 0). 돌진 충전만 돈다.
+var off: bool = false
 var T: PowerTable
 
 # ---- 판 동안
@@ -63,11 +65,15 @@ func _init(rules: Rules) -> void:
 # ---------------------------------------------------------------- 묻기
 
 func using(name: String) -> bool:
+	if off:
+		return false
 	var s := r.current()
 	return s != null and s.data.display_name == name
 
 
 func holding(name: String) -> bool:
+	if off:
+		return false
 	for s in r.slots:
 		if s and s.data.display_name == name:
 			return true
@@ -80,6 +86,8 @@ func king() -> float:
 
 ## 지금 쥔 검의 각인 값(쌍칼 서약, 언덕, 첫 번째 왕을 반영).
 func ins(k: String) -> float:
+	if off:
+		return 0.0
 	var s := r.current()
 	if s == null:
 		return 0.0
@@ -94,6 +102,8 @@ func ins(k: String) -> float:
 
 ## 들고만 있어도 되는 각인(두 칸의 합).
 func held(k: String) -> float:
+	if off:
+		return 0.0
 	var v: float = 0.0
 	for s in r.slots:
 		if s:
@@ -476,6 +486,13 @@ func _restore() -> void:
 
 ## 매 틱(낮과 밤 모두). 늦게 터지는 것, 땅의 자리, 타이머.
 func tick(dt: float) -> void:
+	if off:
+		if dash_charges < 1:
+			dash_recharge -= dt
+			if dash_recharge <= 0.0:
+				dash_charges = 1
+				dash_recharge = dash_cooldown()
+		return
 	var L := r.lord
 	giant_t -= dt
 	stop_cd -= dt

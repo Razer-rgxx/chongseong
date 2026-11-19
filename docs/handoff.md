@@ -12,11 +12,11 @@
   git pull https://github.com/Razer-rgxx/chongseong.git geom-hill
   ```
 - 웹판(웨일북용): https://razer-rgxx.github.io/chongseong/ — `gh-pages` 가지. 다시 만들기: `python3 docs/web_build.py <godot> <폴더>` 후 그 폴더를 gh-pages로 강제 푸시.
-- 확인: Godot 4.6.1 리눅스 실행 파일로 `--headless --path . -s tests/run_all.gd` (지금 **836 통과, 0 실패**). 화면은 Xvfb + `--rendering-driver opengl3 --rendering-method gl_compatibility`.
+- 확인: Godot 4.6.1 리눅스 실행 파일로 `--headless --path . -s tests/run_all.gd` (지금 **895 통과, 0 실패**). 화면은 Xvfb + `--rendering-driver opengl3 --rendering-method gl_compatibility`.
 
 ## 지금까지 (끝난 것)
 
-1~4단계(표·규칙·화면·마을과 3인칭), 6~20단계가 끝났다. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일로 남아 있다.
+1~4단계(표·규칙·화면·마을과 3인칭), 6~21단계가 끝났다. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일로 남아 있다.
 
 - 9: 좌클릭 150가지(기본 동작 20개 조합, `Moves`, docs/attacks.md)
 - 10: 적 공격 표(`Tokens`, docs/attack_tokens.md)
@@ -27,6 +27,7 @@
 - 18: 들판 보스 무덤 기사(`Foes._knight`, `FieldLayout.BOSS_*`, `Meta.boss_defeat`), 화면 아래 체력 막대 (docs/outside.md)
 - 19: 지하 무덤 — 들판 입구 → 방 6개(문이 닫히고 무리를 쓰러뜨리면 열림), 돌 관, 무덤 주인 (`CryptLayout`·`CryptRun`·`CryptBuilder`, `Meta.crypt_*`, docs/outside.md)
 - 20: 새 지역 — 들판을 170×110칸으로 동쪽에 넓힘, 무너진 성채(`keep`)와 안개 늪(`marsh`), 무리 넷·상자 둘·비석 하나·조각 후보 4곳, 늪 안개는 화면만 (`FieldLayout.KEEP_*`·`MARSH_FOG_*`, `field.gd._marsh_fog`, docs/outside.md)
+- 21: 1대1 결투 규칙(같은 PC) — `Rules.lords`·`start_duel`·`step_duel`(영주마다 `DuelSeat`를 갈아 끼움, 상대는 그림자 적), `Powers.off`, `data/duel.tres`, `LordInput.to_bytes/from_bytes`, `Meta.duel_wins/duel_losses`, 마을 광장 결투 말뚝 → `scenes/duel/duel.tscn`(1P 키보드·마우스, 2P 게임패드 0번) (docs/duel.md "정한 것")
 - 그 밖: 원하는 검 얻는 콘솔(` 또는 F6, `SwordConsole`), 웹판 전용 그래픽 낮춤(`WebQuality`), 현황판 자동 채우기(`python3 docs/board.py`)
 
 ## 사용자가 정한 것 (지킬 것)
@@ -53,14 +54,15 @@
 
 ## 다음
 
-21단계 결투 규칙부터. **docs/duel.md 설계서를 먼저 쓴다**(정해진 것은 GDD 2.15: 같은 PC 두 입력으로 먼저, 서로 베기, 언덕 싸움터, 검집의 검, GD-Sync 온라인은 22단계). 17~20단계처럼 에이전트 하나가 설계서대로 끝까지 하고 테스트·화면 한 장·문서·커밋까지 했다.
+22단계 온라인 매칭(GD-Sync). **먼저 사용자가 GD-Sync에 가입해 키를 받아야 한다**(키는 git에 올리지 않는다). 방식(방장이 규칙을 돌리고 상대는 입력만 보냄 / 입력만 주고받는 락스텝)은 시작할 때 사용자에게 묻는다. 21단계가 이미 준비해 둔 것: 규칙이 결정적이고(`state_hash` 테스트), `LordInput.to_bytes/from_bytes`(18바이트), `duel.gd`의 `p1_source`·`p2_source`(입력을 대신 주는 Callable), `Rules.step_duel(입력1, 입력2)`. 설계서 docs/duel.md 22단계 절.
 
 ## 남은 계획 (GDD 3절)
 
-21 결투 규칙 → 22 온라인 매칭 → 23 관리 패널 → 24 화풍과 모델 → 25 소리 에셋 → 26 난이도와 강화 균형 → 27 시작 화면·설정·Windows 내보내기.
+22 온라인 매칭 → 23 관리 패널 → 24 화풍과 모델 → 25 소리 에셋 → 26 난이도와 강화 균형 → 27 시작 화면·설정·Windows 내보내기.
 
 ## 알려진 구멍
 
+- 결투(21단계)는 직접 해 보지 못했다(게임패드 2P, 쿼터뷰 겨눔, 손맛, 마을 말뚝 자리). `MoveFx`의 따라가는 효과(회오리 띠)는 늘 1P를 따라간다. 영주 0이 한 틱에 먼저 돌아서 같은 틱에 서로 베면 둘 다 맞는다.
 - "메아리 계곡"은 호를 다시 그리고, "바람의 왕"+회전은 싸움터 전체를 맞힌다. 3인칭에서 앞에 적이 없으면 도약이 3칸 고정이다. `FormData.combo`는 안 쓴다.
 - 들판 수치(보상·비석 글·곳 이름)는 `data/field.tres`가 아니라 `FieldLayout` 상수에 있다.
 - Mixamo 캐릭터와 사운드 팩은 git에 없다(PC에만). 없으면 기본 도형·코드 소리로 돈다.

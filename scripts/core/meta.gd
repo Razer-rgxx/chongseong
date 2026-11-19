@@ -43,9 +43,14 @@ var boss_first: bool = false
 ## 지하 무덤(19단계): 이번 판에 쓰러뜨린 방 id(→ 1)와 연 관 id(→ 1). 판이 끝날 때(record_run) 비운다. 옛 저장은 빈 값으로 읽힌다.
 var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
+## 결투 기록(21단계, 저장): 같은 PC에서는 1P를 나로 센다. 비긴 결투는 세지 않는다. 옛 저장은 0으로 읽힌다.
+var duel_wins: int = 0
+var duel_losses: int = 0
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
 static var carry_sword: int = -1
+## 결투(21단계)에서 1P와 2P가 든 검(SwordData.id, 0은 맨손). 마을 결투 말뚝에서 고르고 장면을 넘어 이어지는 값이라 static, 저장하지 않는다.
+static var duel_picks: Array[int] = [0, 0]
 static var wake_at_gate: bool = false
 ## 지하 무덤에서 나왔거나 쓰러졌다: 들판의 무덤 입구 앞에서 깬다(장면을 넘어 이어지는 값이라 static, 저장하지 않는다).
 static var wake_at_crypt: bool = false
@@ -74,7 +79,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -132,6 +137,16 @@ func from_dict(d: Dictionary) -> void:
 	crypt_opened = {}
 	for k in d.get("crypt_opened", {}):
 		crypt_opened[str(k)] = 1
+	duel_wins = int(d.get("duel_wins", 0))
+	duel_losses = int(d.get("duel_losses", 0))
+
+
+## 결투가 끝났다(winner: 0은 1P가 이김, 1은 2P가 이김, 그 밖은 비김). 1P를 나로 센다.
+func record_duel(winner: int) -> void:
+	if winner == 0:
+		duel_wins += 1
+	elif winner == 1:
+		duel_losses += 1
 
 
 func note_found(id: int) -> void:

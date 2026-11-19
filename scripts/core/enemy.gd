@@ -30,6 +30,9 @@ var home: Vector2 = Vector2.ZERO
 var wander_to: Vector2 = Vector2.ZERO
 var wander_t: float = 0.0
 
+## 결투(21단계)에서 상대 영주를 대신하는 그림자 적이면 그 영주의 자리 번호(0, 1). 아니면 -1.
+var seat: int = -1
+
 ## 이 적을 불러낸 적의 id(0이면 불려 온 적이 아니다). 들판 보스가 돌아가면 불려 온 적이 사라진다.
 var caller: int = 0
 

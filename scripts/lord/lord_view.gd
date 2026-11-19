@@ -44,6 +44,8 @@ extends Node3D
 @export_group("")
 
 var rules: Rules
+## 결투(21단계)에서 이 몸이 규칙의 몇 번째 영주인지. -1이면 rules.lord(그 밖의 장면).
+var seat: int = -1
 
 @onready var _model: Node3D = $Model
 @onready var _hand: Node3D = get_node_or_null("Model/Hand") as Node3D
@@ -91,8 +93,13 @@ func setup(r: Rules) -> void:
 	rules = r
 	r.move_started.connect(_on_move_started)
 	r.move_area.connect(_on_move_area)
-	r.projectile_ended.connect(func(_p: Projectile) -> void: _show_sword(true))
+	r.projectile_ended.connect(func(_p: Projectile) -> void:
+		if _mine():
+			_show_sword(true))
 	r.lord_hurt.connect(func(_d: float) -> void: _hurt = true)
+	r.duelist_hurt.connect(func(s: int, _d: float, _b: bool) -> void:
+		if s == seat:
+			_hurt = true)
 	r.pull_good.connect(func(_h: Hilt, k: int) -> void: PullMotion.good(_pull, k))
 	r.pull_perfect.connect(func(_h: Hilt) -> void: PullMotion.perfect(_pull))
 
@@ -129,6 +136,24 @@ func _ready() -> void:
 	add_child(torch)
 
 
+## 이 몸의 영주 상태와 쥔 검, 날아가는 것(결투에서는 seat 번째 영주의 것).
+func _lord_state() -> LordState:
+	return rules.lords[seat] if seat >= 0 else rules.lord
+
+
+func _sword() -> Sword:
+	return rules.seat_sword(seat) if seat >= 0 else rules.current()
+
+
+func _projs() -> Array[Projectile]:
+	return rules.seat_projectiles(seat) if seat >= 0 else rules.projectiles
+
+
+## 지금 신호를 낸 영주가 이 몸인가(결투에서 영주마다 신호가 섞이지 않게).
+func _mine() -> bool:
+	return seat < 0 or rules.cur_seat == seat
+
+
 ## 쥔 검이 바뀌면 부른다. null이면 맨손.
 func set_sword(s: Sword, grades: GradeTable) -> void:
 	if character:
@@ -152,7 +177,7 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 
 ## main이 매 프레임 부른다. alpha는 지난 틱과 이번 틱 사이의 위치(0~1).
 func draw(alpha: float, delta: float) -> void:
-	var L := rules.lord
+	var L := _lord_state()
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
 	_draw_pull_stand()
 	_draw_hook(L, delta)
@@ -226,7 +251,7 @@ func _pull_sword(pulling: bool) -> void:
 		_show_sword(false)
 	elif not pulling and _pull_hid:
 		_pull_hid = false
-		if not rules.projectiles.any(func(p: Projectile) -> bool: return p.kind == &"boomerang"):
+		if not _projs().any(func(p: Projectile) -> bool: return p.kind == &"boomerang"):
 			_show_sword(true)
 
 
@@ -240,13 +265,15 @@ func echo_arc(at: Vector2, face: float, arc: float, reach: float) -> void:
 
 ## 좌클릭 동작 하나가 시작됐다. 메아리(효과만 다시 울림)는 몸을 움직이지 않는다.
 func _on_move_started(move: StringName, info: Dictionary) -> void:
-	if bool(info.get("echo", false)):
+	if not _mine() or bool(info.get("echo", false)):
 		return
 	_start_plan(MoveMotion.plan(move, info, character), info)
 
 
 ## 반격 자세에서 맞아 반격이 나가면 반격 동작으로 바꿔 튼다.
 func _on_move_area(move: StringName, info: Dictionary) -> void:
+	if not _mine():
+		return
 	if move == &"parry" and info.get("shape", &"") == &"circle" and not bool(info.get("echo", false)):
 		_start_plan(MoveMotion.plan(&"parry_counter", info, character), info)
 
@@ -304,7 +331,7 @@ func _step_hide() -> void:
 	if at < 0.0 or _plan_t < at:
 		return
 	_hide_done = true
-	for p in rules.projectiles:
+	for p in _projs():
 		if p.kind == &"boomerang":
 			_show_sword(false)
 			return
@@ -314,7 +341,7 @@ func _show_sword(on: bool) -> void:
 	if character:
 		character.set_sword_visible(on)
 	elif _blade:
-		_blade.visible = on and rules.current() != null
+		_blade.visible = on and _sword() != null
 		_guard.visible = _blade.visible
 
 
