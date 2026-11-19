@@ -111,7 +111,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":239514240,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":239603432,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -201,12 +201,12 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('progress');
 		const exe = GODOT_CONFIG['executable'];
 		const PARTS = ["index.pck.0", "index.pck.1", "index.pck.2"];
-		const TOTAL = 239514240;
+		const TOTAL = 239603432;
 		const pack = new Uint8Array(TOTAL);
 		let got = 0;
 		async function fetchParts() {
 			for (const part of PARTS) {
-				const res = await fetch(part + '?v=1795054623');
+				const res = await fetch(part + '?v=1795057646');  // 조각 이름이 늘 같아서, 옛 조각이 캐시에서 섞이지 않게
 				if (!res.ok) {
 					throw new Error('Failed to load ' + part + ' (' + res.status + ')');
 				}
