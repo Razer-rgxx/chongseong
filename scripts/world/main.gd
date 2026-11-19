@@ -193,6 +193,7 @@ func _ready() -> void:
 	_hud.area_title(_zone_name())
 	_hud.toast("%s꽂힌 검 앞에서 E를 눌러 뽑는다. 한 번에 체력 %d. 준비되면 N으로 밤을 맞는다." % [start, rules.pull_cost()])
 	_capture(true)
+	WebQuality.apply(self, _env.environment, _sun, _camera)   # 웹판에서만 가볍게
 
 
 ## 3인칭에서는 마우스를 가둬 둘러보게 한다. 창이 열리면 풀어 준다.

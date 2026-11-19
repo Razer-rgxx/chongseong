@@ -74,6 +74,7 @@ func _ready() -> void:
 	_refresh_anvil()
 	_hud.area_title("언덕 아래 마을")
 	_capture(true)
+	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
 
 
 func _capture(on: bool) -> void:

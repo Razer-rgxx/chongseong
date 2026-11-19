@@ -35,6 +35,8 @@ enum Mode { THIRD, QUARTER }
 @export var blur_mask_near: float = 9.0
 ## 빠르게 움직일 때 화면 가장자리가 가운데로 빨려 드는 세기(main이 돌진·갈고리 때 올린다).
 var speed_blur: float = 0.0
+## false면 번짐 판을 아예 그리지 않는다(웹판, WebQuality).
+var blur_allowed: bool = true
 ## 이 값이 follow_speed보다 크면 그만큼 빨리 따라간다(갈고리로 멀리 날아갈 때 main이 올린다).
 var follow_boost: float = 0.0
 ## 시야각을 잠깐 넓히는 값(도). 줄어들며 원래대로 돌아온다.
@@ -128,7 +130,7 @@ func _process(delta: float) -> void:
 	fov = _base_fov + fov_kick
 	_radial = lerpf(_radial, speed_blur, 1.0 - exp(-12.0 * delta))
 	if _blur:
-		_blur.visible = motion_blur > 0.0 or _radial > 0.001
+		_blur.visible = blur_allowed and (motion_blur > 0.0 or _radial > 0.001)
 		_blur_mat.set_shader_parameter("prev_view", Projection(_prev_xf.affine_inverse()))
 		_blur_mat.set_shader_parameter("strength", motion_blur)
 		_blur_mat.set_shader_parameter("mask_near", blur_mask_near)
