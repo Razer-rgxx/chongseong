@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 301
+display_name = "꺼진 봉화"
+grade = 2
+form = 3
+attack = 79
+inscriptions = PackedStringArray("불씨")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "봉화가 꺼진 밤, 망루지기는 이 칼을 쥔 채 끝내 내려오지 않았다."
+field_only = true

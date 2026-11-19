@@ -35,6 +35,15 @@ const VILLAGERS: Dictionary = {
 	&"apprentice": [Vector2(11.9, 9.7), Vector2(-1, 0.4)],
 }
 
+## 34단계: 들판에서 영입한 떠도는 사람(FieldLayout.WANDERERS)이 서는 자리: id → [칸 자리, 바라볼 방향]. 들를 곳·주민의 E 거리 밖, 막힘 밖.
+const RECRUITS: Dictionary = {
+	&"gatherer": [Vector2(9.0, 18.0), Vector2(1, -0.6)],
+	&"smith": [Vector2(12.8, 6.8), Vector2(-1, 0.35)],
+	&"hunter": [Vector2(11.0, 4.0), Vector2(0.8, 1)],
+	&"pilgrim": [Vector2(27.2, 10.6), Vector2(-1, -0.9)],
+	&"knight": [Vector2(26.5, 13.0), Vector2(-1, -0.2)],
+}
+
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
 const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
 @export var max_ticks_per_frame: int = 8
@@ -72,6 +81,8 @@ var _folk: Dictionary = {}
 var _talker: StringName = &""
 var _talk_lines: Array[String] = []
 var _talk_i: int = 0
+## 영입한 사람이 마을에서 한 말의 차례(id → 다음 줄 번호, 이번에 마을에 있는 동안만).
+var _recruit_said: Dictionary = {}
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -229,6 +240,9 @@ func _process(delta: float) -> void:
 		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4)}
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
+	for id in RECRUITS:
+		if meta.has_recruit(String(id)):
+			spots["v_" + id] = RECRUITS[id][0]
 	var best_d: float = reach
 	for key in spots:
 		var d: float = p.distance_to(spots[key])
@@ -240,7 +254,7 @@ func _process(delta: float) -> void:
 	if _talker != &"":
 		_hud.set_prompt("", "")
 	elif _near.begins_with("v_"):
-		_hud.set_prompt("E", "%s에게 말을 건다" % data.village.villager(StringName(_near.substr(2))).display_name)
+		_hud.set_prompt("E", "%s에게 말을 건다" % _folk_name(StringName(_near.substr(2))))
 	else:
 		_hud.set_prompt("E", PROMPTS.get(_near, ""))
 	_move_fx.draw(alpha)
@@ -487,26 +501,24 @@ func _build_rack() -> void:
 		VillageBuilder.box(self, Vector3(0.14, 2.6, 0.14), at + Vector3(-0.4, 1.3, z), VillageBuilder.timber())
 	VillageBuilder.box(self, Vector3(1.8, 0.12, 5.6), at + Vector3(0.1, 2.6, 0), VillageBuilder.roof(), Vector3(0, 0, -0.35))
 	_rects.append(Rect2(rack_at - Vector2(0.4, 1.3), Vector2(0.7, 2.6)))
-	# 도감에서 찾은 등급마다 한 자루씩 세워 둔다(등급 색)
-	var shown: int = 0
+	# 도감에서 찾은 등급마다 한 자루씩 세워 둔다(등급 색). 오픈월드 한정 검(33단계)을 찾았으면 끝에 한 자루 더
+	var show: Array[SwordData] = []
 	for g in data.grades.names.size():
-		var any := false
 		for i in data.swords_by_grade[g]:
 			if meta.has_found(data.swords[i].id):
-				any = true
+				show.append(data.swords[i])
 				break
-		if not any:
-			continue
-		var first: SwordData = null
-		for i in data.swords_by_grade[g]:
-			if meta.has_found(data.swords[i].id):
-				first = data.swords[i]
-				break
-		var m := SwordModel.make(data.forms[first.form], g, first.id, data.grades.colors[g])
-		m.position = at + Vector3(0, 0.5, -2.0 + shown * 0.8)
+	for i in data.field_swords:
+		if meta.has_found(data.swords[i].id):
+			show.append(data.swords[i])
+			break
+	var gap: float = minf(0.8, 4.0 / maxf(1.0, float(show.size() - 1)))
+	for k in show.size():
+		var sd: SwordData = show[k]
+		var m := SwordModel.make(data.forms[sd.form], sd.grade, sd.id, data.grades.colors[sd.grade])
+		m.position = at + Vector3(0, 0.5, -2.0 + k * gap)
 		m.rotation.x = 0.12
 		add_child(m)
-		shown += 1
 
 
 func _build_gate() -> void:
@@ -622,6 +634,9 @@ func _build_village_extras() -> void:
 	_add_folk(&"merchant", merchant_at, Vector2(1, 0))
 	for id in VILLAGERS:
 		_add_folk(id, VILLAGERS[id][0], VILLAGERS[id][1])
+	for id in RECRUITS:   # 34단계: 들판에서 데려온 사람
+		if meta.has_recruit(String(id)):
+			_add_folk(id, RECRUITS[id][0], RECRUITS[id][1])
 
 
 func _add_folk(id: StringName, cell: Vector2, dir: Vector2) -> void:
@@ -749,7 +764,7 @@ func _on_dummy_hit(e: Enemy, damage: float, big: bool) -> void:
 
 
 func _start_talk(id: StringName) -> void:
-	var lines := meta.talk(data, id)
+	var lines: Array[String] = meta.talk(data, id) if not RECRUITS.has(id) else _recruit_line(id)
 	if lines.is_empty():
 		return
 	meta.save()
@@ -770,12 +785,28 @@ func _end_talk() -> void:
 
 
 func _talk_name() -> String:
-	var v := data.village.villager(_talker)
+	return _folk_name(_talker)
+
+
+## 주민의 이름(마을 주민은 VillageData, 데려온 사람은 FieldLayout.WANDERERS).
+func _folk_name(id: StringName) -> String:
+	if RECRUITS.has(id):
+		return String(FieldLayout.WANDERERS[String(id)].name)
+	var v := data.village.villager(id)
 	return v.display_name if v else ""
 
 
+## 데려온 사람의 한 줄(마을 말을 돌아가며).
+func _recruit_line(id: StringName) -> Array[String]:
+	var lines: Array = FieldLayout.WANDERERS[String(id)].village
+	var i: int = int(_recruit_said.get(id, 0))
+	_recruit_said[id] = (i + 1) % lines.size()
+	var out: Array[String] = [String(lines[i])]
+	return out
+
+
 func _talker_cell() -> Vector2:
-	return VILLAGERS[_talker][0]
+	return RECRUITS[_talker][0] if RECRUITS.has(_talker) else VILLAGERS[_talker][0]
 
 
 ## 영주를 막힌 곳 밖으로 민다(Blockers, 가장 가까운 가장자리로). 공중이면 낮은 막힘은 지나간다.

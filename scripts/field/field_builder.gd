@@ -799,6 +799,12 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 	for k in FieldLayout.NIGHT_PACKS:
 		if c.distance_to(FieldLayout.NIGHT_PACKS[k].at) < float(FieldLayout.NIGHT_PACKS[k].wander) + 1.5:
 			return false
+	for k in FieldLayout.CHIEFS:   # 32단계: 우두머리 둘레는 싸울 자리라 비운다
+		if c.distance_to(FieldLayout.CHIEFS[k].at) < FieldLayout.CHIEF_CLEAR:
+			return false
+	for w in FieldLayout.WANDERER_SPOTS:   # 34단계: 떠도는 사람이 서는 자리(모닥불)
+		if c.distance_to(w.at) < 2.5:
+			return false
 	for w in FieldLayout.KEEP_WALLS:
 		if w.grow(3.0).has_point(c):
 			return false

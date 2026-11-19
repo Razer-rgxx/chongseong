@@ -9,6 +9,7 @@ extends RefCounted
 ##            영주에게 닿으면 피해와 큰 넉백(영주가 밀려난다). 끝나면 비틀거리고 그동안 받는 피해 × stagger_mult.
 ##   자폭병   표를 받고 fuse_range칸 안이면 심지(fuse_time) 뒤 터져 영주와 다른 적을 다친다. 심지가 타는 동안 죽으면 바로 터진다.
 ##   부르는 자 표를 쓰지 않고 때리지 않는다. 멀리 도망치며 summon_interval초마다 summon_time 동안 불러내고 망령을 부른다.
+## 들판의 우두머리(32단계)는 EnemyData.kind로 이 종류들의 행동을 그대로 빌린다(acts()).
 ##   무덤 기사 (18단계, 들판 보스) 표를 쓰지 않는다. 쿨다운이 끝나면 가까우면 크게 휘두르기(swing_wind: 앞 swing_arc° 부채꼴, swing_time초 예고),
 ##            charge_min~charge_max칸이면 charge_chance 확률로 돌진 베기(돌격병과 같은 wind → charge), 아니면 다가간다. 체력이 summon_below 밑이면 망령을 한 번 부른다(summon_again이 있으면 그 밑에서 한 번 더, 31단계 무덤 주인).
 ##            체력이 rage_hp 밑이면 빠르기·예고·돌진·쉬는 시간이 rage_mult배 빨라진다(_rate).
@@ -118,7 +119,7 @@ func step(e: Enemy, foe: Enemy, to: Vector2, d: float, k: float, dt: float) -> b
 		return true
 	if foe != null:
 		return false
-	match e.data.id:
+	match e.data.acts():
 		&"archer":
 			_archer(e, to, d, k, dt)
 			return true
@@ -167,7 +168,7 @@ func prep_left(e: Enemy) -> float:
 			return maxf(0.0, e.act_time - e.act_t)
 		&"charge":
 			return 0.0
-	match e.data.id:
+	match e.data.acts():
 		&"archer":
 			return e.data.aim_time
 		&"charger":
@@ -179,7 +180,7 @@ func prep_left(e: Enemy) -> float:
 
 ## 때리기 시작할 수 있는 거리(영주와 가운데 사이, 칸).
 func strike_reach(e: Enemy) -> float:
-	match e.data.id:
+	match e.data.acts():
 		&"archer":
 			return e.data.shot_range
 		&"charger":

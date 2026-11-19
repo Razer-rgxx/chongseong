@@ -151,6 +151,84 @@ const BOSS_SHARDS: int = 30
 const BOSS_CHARM: StringName = &"charm"
 
 
+## ---- 곳마다 우두머리(32단계, docs/field_life.md). 옛 싸움터의 무덤 기사처럼 깨어나고 놓아주고 돌아가면 체력이 찬다(Rules.chiefs).
+## 우두머리 id → {area: 곳, at: 제자리(칸), kind: 적 표 id(data/enemies, 이미 있는 적의 큰 판), zone: 불려 오는 적의 세기 구역(1부터), sword: 처음 쓰러뜨리면 주는 오픈월드 한정 검 id}.
+## 자리는 그 곳 안에서 막힌 곳·길·상자·비석·무리 둘레를 피한다(테스트가 본다). 숲·바위는 둘레에 서지 않는다(FieldBuilder._free).
+const CHIEFS: Dictionary = {
+	"chief_tower": {"area": &"watchtower", "at": Vector2(100, 38), "kind": &"chief_archer", "zone": 4, "sword": 301},
+	"chief_grove": {"area": &"grove", "at": Vector2(19, 42), "kind": &"chief_wolf", "zone": 5, "sword": 302},
+	"chief_foot": {"area": &"foot", "at": Vector2(67, 20), "kind": &"chief_giant", "zone": 6, "sword": 303},
+	"chief_keep": {"area": &"keep", "at": Vector2(148, 33), "kind": &"chief_shield", "zone": 7, "sword": 304},
+	"chief_marsh": {"area": &"marsh", "at": Vector2(139, 88), "kind": &"chief_caller", "zone": 7, "sword": 305},
+	"chief_quarry": {"area": &"quarry", "at": Vector2(201, 30), "kind": &"chief_charger", "zone": 8, "sword": 306},
+	"chief_hamlet": {"area": &"hamlet", "at": Vector2(187, 54), "kind": &"chief_burnt", "zone": 8, "sword": 307},
+	"chief_pass": {"area": &"pass", "at": Vector2(186, 95), "kind": &"chief_knight", "zone": 9, "sword": 308},
+}
+## 깨어남·놓아줌 거리(칸, 들판 보스와 같다), 처음 쓰러뜨리면 받는 조각, 그다음부터 받는 조각.
+const CHIEF_WAKE: float = 8.0
+const CHIEF_LEASH: float = 14.0
+const CHIEF_FIRST_SHARDS: int = 50
+const CHIEF_SHARDS: int = 15
+## 제자리 둘레 이만큼(칸)에는 숲·바위 흩뿌림이 서지 않는다.
+const CHIEF_CLEAR: float = 4.5
+
+
+## ---- 떠도는 사람과 영입(34단계, docs/field_life.md). 들판 새벽마다(그리고 들어올 때 아무도 없으면) 아직 영입하지 않은 사람 하나가
+## 후보 자리 하나에 선다(Meta.place_wanderer, Meta.rng). 자리는 길·곳 가장자리이고 무리(밤 덤빔 거리)·우두머리·무덤 기사에서 떨어져 있다(테스트가 본다).
+## pack은 늙은 사냥꾼의 조건("그 근처 무리 하나")이 보는 가장 가까운 낮 무리다.
+const WANDERER_SPOTS: Array[Dictionary] = [
+	{"at": Vector2(52, 101), "pack": "road_south"},
+	{"at": Vector2(48, 72), "pack": "road_mid"},
+	{"at": Vector2(56, 50), "pack": "brook_east"},
+	{"at": Vector2(55, 14), "pack": "foot"},
+	{"at": Vector2(100, 61), "pack": "brook_east"},
+	{"at": Vector2(141, 56), "pack": "keep_gate"},
+	{"at": Vector2(192, 40), "pack": "quarry_pit"},
+	{"at": Vector2(167, 95), "pack": "marsh_east"},
+]
+## 다섯 사람 id → {name, cond(영입 조건: shards 조각을 낸다 · field_sword 한정 검을 가졌다 · pack 근처 무리를 쓰러뜨렸다 · stones 비석을 읽었다 · chiefs 우두머리를 쓰러뜨렸다), n,
+## gift(영입하면 생기는 일, 토스트), 말(Band 한 줄씩): greet 처음, ask 조건을 말함, ready 조건이 맞음, join 영입할 때, village 마을에서(돌아가며 한 줄)}.
+const WANDERERS: Dictionary = {
+	"gatherer": {"name": "떠돌이 약초꾼", "cond": "shards", "n": 40, "gift": "체력 +10",
+		"greet": "쇠 맛 나는 풀만 자라는 땅이야. 그래도 캐면 약이 되지.",
+		"ask": "마을까지 데려가 줄 텐가. 길값으로 조각 마흔 개면 되네.",
+		"ready": "조각 마흔 개. 그거면 남은 겨울은 버틸 수 있겠어.",
+		"join": "가세. 자네 피가 마르기 전에 내 풀이 먼저 닿게 하지.",
+		"village": ["뿌리를 말려 두었네. 언덕에 오르기 전에 씹어 두게.", "들판의 풀은 죽은 자 위에서 더 잘 자라더군."]},
+	"smith": {"name": "떠돌이 대장장이", "cond": "field_sword", "n": 1, "gift": "망치질 값 -20%",
+		"greet": "모루도 없이 떠돈 지 오래다. 망치만 남았지.",
+		"ask": "들판에서만 나는 칼을 하나 가져와 봐. 그걸 보고 나서 따라가겠다.",
+		"ready": "그 칼, 언덕의 것이 아니군. 좋다, 마을로 가지.",
+		"join": "대장간 옆에 자리만 내 주게. 망치질 값은 덜 받겠다.",
+		"village": ["검집은 칼보다 오래 간다. 칼이 부러져도 다음 칼이 들어가니까.", "언덕의 칼은 뽑히고 들판의 칼은 빼앗긴다. 둘 다 피를 먹었지."]},
+	"hunter": {"name": "늙은 사냥꾼", "cond": "pack", "n": 1, "gift": "들판 무리 조각 +50%",
+		"greet": "쉿. 저쪽에 놈들이 진을 쳤다. 나는 이제 시위를 못 당겨.",
+		"ask": "근처에 진 친 놈들을 쓰러뜨려 봐. 그럼 네 칼을 믿겠다.",
+		"ready": "놈들이 조용해졌군. 네 칼이면 늙은이도 따라갈 만하다.",
+		"join": "가자. 무리를 잡으면 쓸 만한 걸 거두는 법은 내가 안다.",
+		"village": ["무리는 우두머리가 아니라 가장 굶주린 놈부터 덤빈다.", "밤에는 놈들이 멀리서도 냄새를 맡는다. 바람을 등지고 걸어라."]},
+	"pilgrim": {"name": "길 잃은 순례자", "cond": "stones", "n": 5, "gift": "성소 축복 값 -20%",
+		"greet": "성소로 가는 길을 잃었소. 돌들이 길을 알려 준다 하였는데.",
+		"ask": "들판의 비석 다섯을 읽어 주시오. 거기 적힌 말을 따라가겠소.",
+		"ready": "비석들이 말한 길이 당신의 마을로 이어지는구려.",
+		"join": "성소의 불을 같이 지키겠소. 기도 값은 조금 덜 들게 해 두지요.",
+		"village": ["축복은 사는 것이 아니오. 잠시 빌려 쓰는 것이지.", "언덕 꼭대기에도 성소가 있었다 하오. 지금은 칼만 서 있지만."]},
+	"knight": {"name": "몰락한 기사", "cond": "chiefs", "n": 3, "gift": "들판의 검",
+		"greet": "기사단은 없다. 깃발도 꺾였다. 나만 남았다.",
+		"ask": "들판의 우두머리 셋을 쓰러뜨려라. 그만한 자라면 따를 만하다.",
+		"ready": "우두머리 셋이라. 그대라면 내 칼을 맡겨도 되겠군.",
+		"join": "이 칼을 받아라. 지킬 것이 없어도 물러서지 않던 칼이다.",
+		"village": ["마을의 목책은 낮다. 그래도 지키는 자가 있으면 성벽이다.", "나는 이제 아무도 섬기지 않는다. 그대만 빼고."]},
+}
+## 영입한 사람의 효과(이미 있는 계산에 곱하거나 더한다): 약초꾼 판 시작·들판 체력 +, 대장장이 망치질 값 ×, 사냥꾼 들판 무리 전멸 조각 ×,
+## 순례자 성소 축복 값 ×, 기사가 영입할 때 주는 오픈월드 한정 검 id.
+const RECRUIT_HP: float = 10.0
+const RECRUIT_FORGE: float = 0.8
+const RECRUIT_HUNT: float = 1.5
+const RECRUIT_BLESS: float = 0.8
+const RECRUIT_SWORD: int = 310
+
+
 ## ---- 지하 무덤 입구(19단계, docs/outside.md). 검은 숲 가장자리의 무너진 무덤.
 ## 모양이 서는 곳(막힘, 칸 단위), E를 누르는 자리, 나오거나 쓰러져 깰 자리(입구 앞).
 const CRYPT_BLOCK: Rect2 = Rect2(28.5, 26.0, 7.0, 3.6)

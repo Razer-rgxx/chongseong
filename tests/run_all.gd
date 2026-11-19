@@ -98,6 +98,9 @@ func _init() -> void:
 	(load("res://tests/field_region_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_night_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/crypt_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/field_sword_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/field_chief_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/wanderer_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/settings_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/drop_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/duel_tests.gd") as GDScript).call("run", d, check)
@@ -208,15 +211,16 @@ func _test_grid() -> void:
 
 
 func _test_data() -> void:
-	check(d.swords.size() == 300, "검 300종 (지금 %d)" % d.swords.size())
+	check(d.swords.size() == 310, "검 310종(언덕 300 + 오픈월드 한정 10) (지금 %d)" % d.swords.size())
 	var per: Array[int] = []
 	for g in 6:
 		per.append(d.swords_by_grade[g].size())
-	check(per == [82, 70, 55, 40, 40, 13], "등급별 검 수 %s" % [per])
+	check(per == [82, 70, 55, 40, 40, 13], "언덕에서 뽑히는 등급별 검 수 %s(오픈월드 한정 검은 빠진다)" % [per])
+	check(d.field_swords.size() == 10, "오픈월드 한정 검 10자루(%d)" % d.field_swords.size())
 	var names := {}
 	for s in d.swords:
 		names[s.display_name] = true
-	check(names.size() == 300, "검 이름이 겹치지 않는다")
+	check(names.size() == 310, "검 이름이 겹치지 않는다")
 	var missing: Array[String] = []
 	for s in d.swords:
 		for k in s.inscriptions:
@@ -237,7 +241,7 @@ func _test_data() -> void:
 	check(unknown.is_empty(), "방식의 동작이 모두 표에 있다 %s" % [unknown])
 	check(d.patterns[0].moves == PackedStringArray(["sweep"]) and d.pattern_for(null) == d.patterns[0], "맨손은 횡베기 하나뿐인 0번 방식")
 	check(d.grades.odds.size() == 6 and d.grades.odds[2] == 40.0 and d.grades.odds[5] == 50000.0, "등급 확률 1/6, 1/40 … 1/50000")
-	check(d.enemies.size() == 12 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 12종(새 적 5종, 허수아비, 무덤 기사, 무덤 주인 포함)")
+	check(d.enemies.size() == 20 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 20종(새 적 5종, 허수아비, 무덤 기사, 무덤 주인, 곳마다 우두머리 8 포함)")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
 	var s := Sword.new(d.sword_by_name("붉은 이삭"), d)
 	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(150.0 * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 195, 무리 베기 34")

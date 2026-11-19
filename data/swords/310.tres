@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 310
+display_name = "꺾인 깃발"
+grade = 4
+form = 1
+attack = 132
+inscriptions = PackedStringArray("버팀", "연격")
+unique_text = "물러서지 않는다. 이 밤 쓰러뜨린 적 하나마다 받는 피해가 2% 줄어든다 (최대 40%)."
+unique_ready = true
+unbreakable = false
+story = "기사단이 무너진 날, 그는 깃대를 꺾어 칼자루로 삼았다. 지킬 것이 없어도 물러서지 않았다."
+field_only = true

@@ -120,3 +120,13 @@ void fragment() {
 	m.shader = sh
 	r.material = m
 	parent.add_child(r)
+
+
+## 낱말 끝 글자에 받침이 있으면 with_final, 없으면 without을 붙인다(을/를, 이/가, 은/는). 한글이 아니면 without.
+static func josa(word: String, with_final: String, without: String) -> String:
+	if word == "":
+		return without
+	var c: int = word.unicode_at(word.length() - 1)
+	if c >= 0xAC00 and c <= 0xD7A3 and (c - 0xAC00) % 28 != 0:
+		return word + with_final
+	return word + without

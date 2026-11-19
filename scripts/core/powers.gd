@@ -13,6 +13,7 @@ const READY: PackedStringArray = [
 	"거인 왕의 뼈", "산 자의 몫", "행운의 녹", "모래시계", "멈춘 순간", "바람 가르는 깃", "무너진 왕좌", "충신",
 	"영원한 파수", "두 번째 기회", "새벽 나팔", "피의 왕좌", "쌍칼 서약", "언덕", "첫 번째 왕", "언덕의 첫 검",
 	"모든 검의 어머니", "이름을 잃은 검", "마지막 장례", "겨울의 끝", "늪지기", "대화재", "피의 강", "망각",
+	"꺾인 깃발",
 ]
 
 var r: Rules
@@ -377,6 +378,8 @@ func lord_damage(d: float, attacker: Enemy) -> float:
 			if not o.dead and o.pos.distance_to(L.pos) < T.u("무너진 왕좌", "radius"):
 				n += 1
 		d *= 1.0 - minf(T.u("무너진 왕좌", "max"), T.u("무너진 왕좌", "step") * n)
+	if using("꺾인 깃발"):   # 오픈월드 한정 검(33단계, 몰락한 기사의 검): 이 밤 쓰러뜨린 만큼 덜 아프다
+		d *= 1.0 - minf(T.u("꺾인 깃발", "max"), T.u("꺾인 깃발", "step") * night_kills)
 	if shield > 0.0:
 		var a: float = minf(shield, d)
 		shield -= a

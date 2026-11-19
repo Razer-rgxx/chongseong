@@ -3,11 +3,13 @@ extends SceneTree
 ## docs/attacks.md 3절의 규칙을 따른다. 랜덤은 등급대마다 정해진 시드의 RandomNumberGenerator라서 다시 돌려도 같은 파일이 나온다.
 ##   godot --headless --path . -s scripts/debug/build_attacks.gd
 ## 검 파일은 attack 줄만 고친다(없으면 form 줄 뒤에 넣는다). 동작 이름(이음·마무리 꼴)은 data/attacks/moves/<id>.tres에서 읽는다.
+## 언덕의 검 001~300(LAST_HILL_SWORD까지)만 다룬다. 오픈월드 한정 검 301~310(field_only, 33단계)의 attack은 손으로 정한 것이라 건드리지 않는다.
 ## 000.tres(맨손)는 손으로 쓴 것이라 건드리지 않는다.
 
 const MOVES_DIR: String = "res://data/attacks/moves/"
 const PATTERN_DIR: String = "res://data/attacks/patterns/"
 const SWORD_DIR: String = "res://data/swords/"
+const LAST_HILL_SWORD: int = 300
 const SEED: int = 20261117
 
 ## 등급대: 방식 수, 이음 수(최소~최대), 이음 후보, 마무리 후보, 속성, 메아리, 갈고리 자리, 반격 자리.
@@ -181,6 +183,8 @@ func _assign(first: Array[int], count: Array[int]) -> void:
 	for f in files:
 		var text := FileAccess.get_file_as_string(SWORD_DIR + f)
 		var id: int = _field(text, "id")
+		if id > LAST_HILL_SWORD or text.contains("\nfield_only = true"):
+			continue   # 오픈월드 한정 검: 손으로 정한 방식을 그대로 둔다
 		var grade: int = _field(text, "grade")
 		by_grade[grade].append(id)
 		info[id] = f

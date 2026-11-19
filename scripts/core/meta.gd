@@ -19,7 +19,7 @@ var sheath_peak: int = 0
 var sheath_ins: PackedStringArray = PackedStringArray()
 ## 축복 키 → 단계
 var bless: Dictionary = {}
-## 뽑아 본 검: SwordData.id(문자열) → 횟수
+## 뽑아 본(들판에서 얻은 것도) 검: SwordData.id(문자열) → 횟수
 var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
@@ -47,6 +47,14 @@ var field_clock: float = 0.0
 ## 들판 보스(18단계): 이번 판에 무덤 기사를 쓰러뜨렸는지(판이 끝날 때 record_run이 비운다, 쓰러뜨렸으면 들판에 다시 와도 안 선다)와 처음 보상을 받았는지(저장).
 var boss_down: bool = false
 var boss_first: bool = false
+## 곳마다 우두머리(32단계): 처음 보상을 받은 우두머리 id(→ 1, 저장)와 이번 판에 쓰러뜨린 우두머리 id(→ 1, 저장, 판이 끝날 때 record_run이 비운다.
+## 쓰러뜨렸으면 들판에 다시 와도 안 선다). 옛 저장은 빈 값으로 읽힌다.
+var chiefs_first: Dictionary = {}
+var chiefs_down: Dictionary = {}
+## 떠도는 사람(34단계): 영입해 마을에 선 사람 id(FieldLayout.WANDERERS), 지금 들판에 선 사람 id(""이면 없음)와 그 자리(WANDERER_SPOTS 번호). 저장, 옛 저장은 비어 있다.
+var recruits: Array[String] = []
+var wanderer: String = ""
+var wanderer_at: int = -1
 ## 지하 무덤(19단계): 이번 판에 쓰러뜨린 방 id(→ 1)와 연 관 id(→ 1). 판이 끝날 때(record_run) 비운다. 옛 저장은 빈 값으로 읽힌다.
 var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
@@ -88,7 +96,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -150,6 +158,21 @@ func from_dict(d: Dictionary) -> void:
 	field_clock = clampf(float(d.get("field_clock", 0.0)), 0.0, FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT)
 	boss_down = bool(d.get("boss_down", false))
 	boss_first = bool(d.get("boss_first", false))
+	chiefs_first = {}
+	for k in d.get("chiefs_first", {}):
+		chiefs_first[str(k)] = 1
+	chiefs_down = {}
+	for k in d.get("chiefs_down", {}):
+		chiefs_down[str(k)] = 1
+	recruits = []
+	for k in d.get("recruits", []):
+		if FieldLayout.WANDERERS.has(str(k)) and not recruits.has(str(k)):
+			recruits.append(str(k))
+	wanderer = str(d.get("wanderer", ""))
+	wanderer_at = int(d.get("wanderer_at", -1))
+	if not FieldLayout.WANDERERS.has(wanderer) or recruits.has(wanderer) or wanderer_at < 0 or wanderer_at >= FieldLayout.WANDERER_SPOTS.size():
+		wanderer = ""
+		wanderer_at = -1
 	crypt_cleared = {}
 	for k in d.get("crypt_cleared", {}):
 		crypt_cleared[str(k)] = 1
@@ -227,7 +250,7 @@ func bless_value(md: MetaData, key: String) -> float:
 
 # ---------------------------------------------------------------- 검집
 
-## 검집에 넣을 수 있는 검(뽑아 본 전설 이상), 높은 등급부터.
+## 검집에 넣을 수 있는 검(찾아 본 전설 이상, 오픈월드 한정 검도), 높은 등급부터.
 func sheath_candidates(game: GameData) -> Array[int]:
 	var out: Array[int] = []
 	for s in game.swords:
@@ -249,8 +272,9 @@ func fix_sheath(game: GameData) -> void:
 		sheath_id = c[0]
 
 
+## 망치질 값. 떠돌이 대장장이를 영입했으면(34단계) RECRUIT_FORGE배.
 func sheath_cost(md: MetaData) -> int:
-	return md.sheath_cost * (sheath_lv + 1)
+	return roundi(md.sheath_cost * (sheath_lv + 1) * (FieldLayout.RECRUIT_FORGE if has_recruit("smith") else 1.0))
 
 
 func sheath_rate(md: MetaData) -> float:
@@ -296,8 +320,9 @@ func sheath_sword(game: GameData) -> Sword:
 
 # ---------------------------------------------------------------- 축복
 
+## 축복 값. 길 잃은 순례자를 영입했으면(34단계) RECRUIT_BLESS배.
 func bless_cost(md: MetaData, key: String) -> int:
-	return md.bless_cost * (bless_level(key) + 1)
+	return roundi(md.bless_cost * (bless_level(key) + 1) * (FieldLayout.RECRUIT_BLESS if has_recruit("pilgrim") else 1.0))
 
 
 func bless_rate(md: MetaData, key: String) -> float:
@@ -367,6 +392,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	roll_glints()
 	packs_cleared = {}
 	boss_down = false
+	chiefs_down = {}
 	crypt_cleared = {}
 	crypt_opened = {}
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
@@ -391,12 +417,14 @@ func field_kill() -> int:
 	return FieldLayout.PACK_KILL_SHARDS
 
 
-## 무리를 다 쓰러뜨렸다. 처음이면 조각(PACK_CLEAR_MIN~MAX, Meta.rng)을 받고 그 수를, 이미 쓰러뜨린 무리면 0을 돌려준다.
+## 무리를 다 쓰러뜨렸다. 처음이면 조각(PACK_CLEAR_MIN~MAX, Meta.rng, 늙은 사냥꾼을 영입했으면 RECRUIT_HUNT배)을 받고 그 수를, 이미 쓰러뜨린 무리면 0을 돌려준다.
 func field_clear(id: String) -> int:
 	if packs_cleared.has(id):
 		return 0
 	packs_cleared[id] = 1
 	var n: int = rng.randi_range(FieldLayout.PACK_CLEAR_MIN, FieldLayout.PACK_CLEAR_MAX)
+	if has_recruit("hunter"):   # 34단계: 늙은 사냥꾼이 거둔다
+		n = roundi(n * FieldLayout.RECRUIT_HUNT)
 	shards += n
 	return n
 
@@ -413,6 +441,123 @@ func boss_defeat() -> Dictionary:
 	if charm:
 		pack.append(FieldLayout.BOSS_CHARM)
 	return {"shards": n, "first": first, "charm": charm}
+
+
+## 곳마다 우두머리(32단계)를 쓰러뜨렸다. 처음이면 조각 CHIEF_FIRST_SHARDS와 그 곳의 오픈월드 한정 검(도감에 든다),
+## 다음부터 CHIEF_SHARDS. {shards, first, sword(새로 얻은 검 id, 없으면 0)}을 돌려준다. 모르는 id면 shards 0.
+func chief_defeat(id: String) -> Dictionary:
+	var r := {"shards": 0, "first": false, "sword": 0}
+	if not FieldLayout.CHIEFS.has(id):
+		return r
+	r.first = not chiefs_first.has(id)
+	r.shards = FieldLayout.CHIEF_FIRST_SHARDS if r.first else FieldLayout.CHIEF_SHARDS
+	shards += r.shards
+	chiefs_first[id] = 1
+	chiefs_down[id] = 1
+	if r.first:
+		r.sword = int(FieldLayout.CHIEFS[id].sword)
+		note_found(r.sword)
+	return r
+
+
+# ---------------------------------------------------------------- 떠도는 사람과 영입 (34단계)
+
+func has_recruit(id: String) -> bool:
+	return recruits.has(id)
+
+
+## 떠돌이 약초꾼을 영입했으면 판 시작·들판의 최대 체력에 더하는 값(Rules.bonus_hp).
+func recruit_hp() -> float:
+	return FieldLayout.RECRUIT_HP if has_recruit("gatherer") else 0.0
+
+
+## 들판에 설 사람을 새로 정한다(들판 새벽마다): 아직 영입하지 않은 사람 중 하나와 후보 자리 하나(Meta.rng). 다 영입했으면 아무도 없다.
+func place_wanderer() -> void:
+	var pool: Array[String] = []
+	for id in FieldLayout.WANDERERS:
+		if not recruits.has(id):
+			pool.append(id)
+	if pool.is_empty():
+		wanderer = ""
+		wanderer_at = -1
+		return
+	wanderer = pool[rng.randi_range(0, pool.size() - 1)]
+	wanderer_at = rng.randi_range(0, FieldLayout.WANDERER_SPOTS.size() - 1)
+
+
+## 들판에 들어올 때: 서 있는 사람이 없으면 세운다.
+func ensure_wanderer() -> void:
+	if wanderer == "":
+		place_wanderer()
+
+
+## 지금 선 사람의 조건이 몇까지 찼는지 [지금, 필요]. 없으면 [0, 1].
+func wanderer_count(game: GameData) -> Array[int]:
+	if wanderer == "":
+		return [0, 1]
+	var W: Dictionary = FieldLayout.WANDERERS[wanderer]
+	var need: int = int(W.n)
+	var have: int = 0
+	match String(W.cond):
+		"shards":
+			have = shards
+		"field_sword":
+			for i in game.field_swords:
+				have += 1 if has_found(game.swords[i].id) else 0
+		"pack":
+			have = 1 if wanderer_at >= 0 and packs_cleared.has(String(FieldLayout.WANDERER_SPOTS[wanderer_at].pack)) else 0
+		"stones":
+			for k in FieldLayout.STONES:
+				have += 1 if lore_read.has(k) else 0
+		"chiefs":
+			have = chiefs_first.size()
+	return [have, need]
+
+
+## 지금 선 사람을 데려갈 수 있는지(조건이 맞음).
+func wanderer_ready(game: GameData) -> bool:
+	var c: Array[int] = wanderer_count(game)
+	return wanderer != "" and c[0] >= c[1]
+
+
+## 조건의 진행을 띠에 붙일 한 줄(예: "읽은 비석 3 / 5").
+func wanderer_progress(game: GameData) -> String:
+	if wanderer == "":
+		return ""
+	var c: Array[int] = wanderer_count(game)
+	match String(FieldLayout.WANDERERS[wanderer].cond):
+		"shards":
+			return "가진 조각 %d / %d" % [c[0], c[1]]
+		"field_sword":
+			return "들판의 검 %d / %d" % [mini(c[0], c[1]), c[1]]
+		"pack":
+			var at: Vector2 = FieldLayout.PACKS[String(FieldLayout.WANDERER_SPOTS[wanderer_at].pack)].at
+			return "%s의 무리 %d / %d" % [FieldLayout.AREA_NAMES[FieldLayout.area_at(at)], c[0], c[1]]
+		"stones":
+			return "읽은 비석 %d / %d" % [c[0], c[1]]
+		"chiefs":
+			return "쓰러뜨린 우두머리 %d / %d" % [mini(c[0], c[1]), c[1]]
+	return ""
+
+
+## 지금 선 사람을 데려간다(조건이 맞을 때만). 약초꾼은 조각을 내고, 기사는 오픈월드 한정 검(RECRUIT_SWORD)을 준다.
+## {ok, id, paid(낸 조각), sword(받은 검 id, 없으면 0)}을 돌려준다. 데려가면 들판에는 아무도 없다(다음 새벽에 다른 사람).
+func recruit(game: GameData) -> Dictionary:
+	var r := {"ok": false, "id": wanderer, "paid": 0, "sword": 0}
+	if not wanderer_ready(game):
+		return r
+	var W: Dictionary = FieldLayout.WANDERERS[wanderer]
+	if String(W.cond) == "shards":
+		r.paid = int(W.n)
+		shards -= r.paid
+	if wanderer == "knight":
+		r.sword = FieldLayout.RECRUIT_SWORD
+		note_found(r.sword)
+	recruits.append(wanderer)
+	r.ok = true
+	wanderer = ""
+	wanderer_at = -1
+	return r
 
 
 ## 지하 무덤(19단계): 방을 쓰러뜨렸다(저장된다. 쓰러져도 남는다).

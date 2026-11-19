@@ -54,6 +54,10 @@ signal field_dawn
 signal field_boss_woke(e: Enemy)
 signal field_boss_returned(e: Enemy)
 signal field_boss_slain(e: Enemy)
+## 곳마다 우두머리(32단계): 깨어남, 돌아가 다시 잠, 쓰러뜨림(id는 FieldLayout.CHIEFS).
+signal chief_woke(id: StringName, e: Enemy)
+signal chief_returned(id: StringName, e: Enemy)
+signal chief_slain(id: StringName, e: Enemy)
 signal boss_spawned(enemy: Enemy)
 signal elite_spawned(enemy: Enemy)
 signal altar_opened()
@@ -214,6 +218,9 @@ var field_boss_state: int = BOSS_SLEEP
 var field_boss_home: Vector2 = Vector2.ZERO
 ## 불려 오는 적의 세기 구역(1부터). 들판은 FieldLayout.BOSS_ZONE, 지하 무덤은 방이 정한다.
 var field_boss_zone: int = FieldLayout.BOSS_ZONE
+## 곳마다 우두머리(32단계): FieldLayout.CHIEFS의 id → {e: Enemy, state: BOSS_*, home: 제자리, zone: 불려 오는 적의 세기 구역(1부터)}.
+## 들판 보스(field_boss)와 같은 틀(깨어남 CHIEF_WAKE, 놓아줌 CHIEF_LEASH, 돌아가면 체력이 참)을 여럿으로. 무리(packs)와 따로 센다.
+var chiefs: Dictionary = {}
 const BOSS_SLEEP: int = 0
 const BOSS_AWAKE: int = 1
 const BOSS_RETURNING: int = 2
@@ -288,11 +295,15 @@ var seer_used_today: bool = false
 ## 저주받은 손잡이를 뽑았다: 이번 밤 새로 나오는 적의 체력과 피해 ×cursed_enemies.
 var cursed_night: bool = false
 var _pull_cursed: bool = false
+## 떠돌이 약초꾼을 영입했으면(34단계, Meta.recruit_hp) 최대 체력에 더한다. 판은 Meta에서 받고, 들판은 장면이 넣는다.
+var bonus_hp: float = 0.0
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	data = game_data
 	meta = p_meta
+	if meta:
+		bonus_hp = meta.recruit_hp()
 	seed_value = p_seed
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
@@ -357,7 +368,7 @@ func _bless(key: String) -> float:
 func max_hp() -> float:
 	if duel:
 		return data.duel.hp
-	return data.lord.hp + _bless("hp") + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
+	return data.lord.hp + _bless("hp") + bonus_hp + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
 
 
 func pull_cost() -> float:
@@ -703,8 +714,7 @@ func _step_pull(input: LordInput = null) -> void:
 	pulls += 1
 	run_stats.pulled_by_grade[pull_grade] += 1
 	best_grade = maxi(best_grade, pull_grade)
-	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
-	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
+	var s := Sword.new(pick_sword(pull_grade), data)
 	powers.on_pulled(s)
 	# 모두 제대로 당겼다: 최대 내구 +10%(반올림, 적어도 1). 언덕의 첫 검 뒤, 저주의 절반 앞
 	if pull_all_good and s.breakable():
@@ -715,6 +725,12 @@ func _step_pull(input: LordInput = null) -> void:
 		_cursed_pulled(h, s)
 	sword_pulled.emit(s)
 	_receive(s)
+
+
+## 그 등급에서 뽑힐 검 하나(rng). 후보는 GameData.swords_by_grade라 오픈월드 한정 검(33단계, field_only)은 나오지 않는다.
+func pick_sword(grade: int) -> SwordData:
+	var list: PackedInt32Array = data.swords_by_grade[grade]
+	return data.swords[list[rng.randi_range(0, list.size() - 1)]]
 
 
 ## 뽑는 동안 누른 것을 판정한다(at: 눌린 때, pull_t의 시계). 지금 창의 버팀을 한 번만 판정한다.
@@ -998,6 +1014,8 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		_engage_pack(e.pack)
 	if field and e == field_boss and field_boss_state != BOSS_AWAKE and field_boss_state != BOSS_DOWN:
 		_wake_boss()
+	if field and e.chief != &"" and chiefs.has(e.chief) and int(chiefs[e.chief].state) != BOSS_AWAKE and int(chiefs[e.chief].state) != BOSS_DOWN:
+		_wake_chief(e.chief)
 	var res: Array = foes.taken(e, damage, knock, big, dot, lord.pos if src == Vector2.INF else src)
 	damage = res[0]
 	knock = res[1]
@@ -1039,8 +1057,8 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 		return
 	if debug_god:
 		return
-	if field_night and attacker != null and attacker.pack != &"":
-		d *= FieldLayout.FIELD_NIGHT_DAMAGE   # 29단계: 들판의 밤에는 무리 적이 더 아프게 때린다(보스는 무리가 아니다)
+	if field_night and attacker != null and (attacker.pack != &"" or attacker.chief != &""):
+		d *= FieldLayout.FIELD_NIGHT_DAMAGE   # 29단계: 들판의 밤에는 무리 적과 곳마다 우두머리(32단계)가 더 아프게 때린다(옛 싸움터의 무덤 기사는 그대로)
 	d = powers.lord_damage(d, attacker)
 	L.hp -= d
 	L.invuln = data.lord.hurt_invuln
@@ -1206,6 +1224,10 @@ func _step_enemies() -> void:
 		# 들판 보스: 깨어나기 전에는 가만히 서 있고, 돌아가는 중에는 제자리로 걸으며 체력이 찬다
 		if field and e == field_boss and field_boss_state != BOSS_AWAKE:
 			_step_boss_idle(e, k)
+			continue
+		# 곳마다 우두머리(32단계): 들판 보스와 같다
+		if field and e.chief != &"" and chiefs.has(e.chief) and int(chiefs[e.chief].state) != BOSS_AWAKE:
+			_step_chief_idle(e, k)
 			continue
 		# 망각에 걸린 적은 가장 가까운 다른 적을 친다
 		var foe: Enemy = null
@@ -1443,6 +1465,7 @@ func _step_field() -> void:
 		phase = Phase.NIGHT
 	_step_field_clock()
 	_step_boss()
+	_step_chiefs()
 	var aggro: float = FieldLayout.FIELD_NIGHT_AGGRO if field_night else FieldLayout.PACK_AGGRO
 	for id in packs.keys():
 		var p: Dictionary = packs[id]
@@ -1589,6 +1612,123 @@ func _step_boss_idle(e: Enemy, k: float) -> void:
 	var step_len: float = sp * dt
 	if to.length() <= maxf(step_len, 0.05):
 		e.pos = field_boss_home
+	else:
+		e.face = to.normalized()
+		e.pos += e.face * step_len
+
+
+# ---------------------------------------------------------------- 곳마다 우두머리 (32단계)
+
+## 우두머리 하나를 제자리(FieldLayout.CHIEFS)에 세운다. 이미 있거나 모르는 id면 null. at을 주면 그 자리(테스트용).
+## 세기는 적 표 그대로(boss라 구역 배수를 받지 않는다). 불려 오는 적의 세기는 그 곳의 zone.
+func spawn_chief(id: StringName, at: Vector2 = Vector2.INF) -> Enemy:
+	if chiefs.has(id) or not FieldLayout.CHIEFS.has(String(id)):
+		return null
+	var C: Dictionary = FieldLayout.CHIEFS[String(id)]
+	var home: Vector2 = C.at if at == Vector2.INF else at
+	var keep_zone: int = zone
+	zone = clampi(int(C.zone) - 1, 0, data.run.zone_hp.size() - 1)
+	var e := spawn_at(C.kind, home)
+	zone = keep_zone
+	e.home = home
+	e.face = Vector2.DOWN
+	e.chief = id
+	chiefs[id] = {"e": e, "state": BOSS_SLEEP, "home": home, "zone": int(C.zone)}
+	return e
+
+
+## 안 쓰러뜨린 우두머리를 모두 세운다(skip: 이번 판에 쓰러뜨린 우두머리 id → 아무 값, Meta.chiefs_down).
+func spawn_chiefs(skip: Dictionary = {}) -> void:
+	for id in FieldLayout.CHIEFS:
+		if not skip.has(id):
+			spawn_chief(StringName(id))
+
+
+## 깨어 있는 우두머리 중 영주에게 가장 가까운 것(화면 아래 체력 막대). 없으면 null.
+func awake_chief() -> Enemy:
+	var best: Enemy = null
+	var bd: float = INF
+	for id in chiefs:
+		var c: Dictionary = chiefs[id]
+		var b: Enemy = c.e
+		if int(c.state) == BOSS_AWAKE and not b.dead and b.pos.distance_to(lord.pos) < bd:
+			bd = b.pos.distance_to(lord.pos)
+			best = b
+	return best
+
+
+func _wake_chief(id: StringName) -> void:
+	var c: Dictionary = chiefs[id]
+	var b: Enemy = c.e
+	if b.dead:
+		return
+	c.state = BOSS_AWAKE
+	zone = clampi(int(c.zone) - 1, 0, data.run.zone_hp.size() - 1)   # 공격 표 수와 불려 오는 적의 세기
+	b.cooldown = maxf(b.cooldown, b.data.cooldown)
+	chief_woke.emit(id, b)
+
+
+## 너무 멀어졌다: 하던 일을 멈추고 불러낸 것을 거두고 제자리로 돌아간다(체력이 차면 부르기도 다시 쓴다).
+func _recall_chief(id: StringName) -> void:
+	var c: Dictionary = chiefs[id]
+	var b: Enemy = c.e
+	c.state = BOSS_RETURNING
+	b.act = &""
+	b.act_t = 0.0
+	b.windup = 0.0
+	b.summoned = 0
+	tokens.release(b, false)
+	_dismiss_called(b)
+
+
+## b가 불러낸 적을 쓰러뜨린 것으로 치지 않고 거둔다(신호 없이).
+func _dismiss_called(b: Enemy) -> void:
+	for e in enemies:
+		if e.caller == b.id and not e.dead:
+			e.dead = true
+			tokens.release(e, true)
+
+
+## 우두머리마다: 영주가 제자리에서 CHIEF_WAKE칸 안에 오면 깨어나고, CHIEF_LEASH칸 넘게 멀어지면 돌아간다. 쓰러지면 한 번 알린다.
+func _step_chiefs() -> void:
+	for id in chiefs:
+		var c: Dictionary = chiefs[id]
+		var b: Enemy = c.e
+		if int(c.state) == BOSS_DOWN:
+			continue
+		if b.dead:
+			c.state = BOSS_DOWN
+			_dismiss_called(b)
+			chief_slain.emit(id, b)
+			continue
+		var d: float = lord.pos.distance_to(c.home)
+		match int(c.state):
+			BOSS_SLEEP:
+				if d <= FieldLayout.CHIEF_WAKE:
+					_wake_chief(id)
+			BOSS_AWAKE:
+				if d > FieldLayout.CHIEF_LEASH:
+					_recall_chief(id)
+			_:
+				if d <= FieldLayout.CHIEF_WAKE:
+					_wake_chief(id)
+				elif b.pos.distance_to(c.home) <= 0.05 and b.hp >= b.max_hp:
+					c.state = BOSS_SLEEP
+					chief_returned.emit(id, b)
+
+
+## 깨지 않은 우두머리: 자는 동안은 가만히 서 있고, 돌아가는 중에는 제자리로 걸으며 체력이 찬다.
+func _step_chief_idle(e: Enemy, k: float) -> void:
+	var c: Dictionary = chiefs[e.chief]
+	if int(c.state) != BOSS_RETURNING:
+		e.push = Vector2.ZERO
+		return
+	var home: Vector2 = c.home
+	var step_len: float = e.data.speed * k * FieldLayout.PACK_RETURN_SPEED * dt
+	e.hp = minf(e.max_hp, e.hp + e.max_hp * dt / maxf(dt, FieldLayout.PACK_HEAL_TIME))
+	var to: Vector2 = home - e.pos
+	if to.length() <= maxf(step_len, 0.05):
+		e.pos = home
 	else:
 		e.face = to.normalized()
 		e.pos += e.face * step_len
@@ -2158,6 +2298,8 @@ func state_hash() -> int:
 		parts.append_array([field_clock_on, field_clock, field_night])
 		parts.append(str(packs))
 		parts.append_array([field_boss_state, field_boss_home, field_boss.id if field_boss else -1])
+		for id in chiefs:
+			parts.append_array([id, chiefs[id].state, chiefs[id].home, (chiefs[id].e as Enemy).id])
 		for e in enemies:
 			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])

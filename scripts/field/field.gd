@@ -5,6 +5,8 @@ extends Node3D
 ## 마을 북문에서 고른 검(Meta.carry_sword)은 부러지지 않는 검으로 칸 0에 쥔다. 쓰러지면 잃는 것 없이 마을 북문 앞에서 깬다.
 ## 낮밤(29단계): Rules의 들판 시계(Meta.field_clock에서 이어 가고 떠날 때 저장)를 받아 해·하늘·환경광·안개·영주 횃불을 천천히 바꾸고, 해 질 때와 밝을 때 한 줄을 띄운다.
 ## 날이 밝으면 Meta.packs_cleared를 비운다(Rules가 쓰러뜨린 낮 무리를 다시 세운다).
+## 떠도는 사람(34단계): 아직 영입하지 않은 사람 하나가 후보 자리에 서 있다(Meta.wanderer). E로 말을 걸고, 조건이 맞으면 E로 데려간다(마을에 선다).
+## 날이 밝으면 다른 사람(또는 같은 사람이 다른 자리)으로 바뀐다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -55,6 +57,16 @@ var _fx := HitFx.new()
 var _pfx := PowerFx.new()
 var _move_fx := MoveFx.new()
 var _enemy_fx := EnemyFx.new()
+## 떠도는 사람(34단계): 몸(VillageProps 주민 모양), 곁의 작은 모닥불 빛, 선 자리(칸), 막힘 원, 말 상대 id와 말 단계(0 없음, 1 인사, 2 조건, 3 영입한 뒤).
+var _wander: Node3D = null
+var _wander_P: Dictionary = {}
+var _wander_fire: OmniLight3D = null
+var _wander_at: Vector2 = Vector2.ZERO
+var _wander_circle: Array = []
+var _wander_id: String = ""
+var _wander_step: int = 0
+var _wt: float = 0.0
+var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -67,13 +79,16 @@ func _ready() -> void:
 	meta = Meta.load_or_new()
 	meta.fix_sheath(data)
 	meta.ensure_glints()
+	meta.ensure_wanderer()   # 34단계: 아무도 없으면 한 사람이 선다
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
 	Grid.size = FieldLayout.SIZE   # Rules가 싸움터 크기로 영주를 가둔다: 들판 크기로
+	rules.bonus_hp = meta.recruit_hp()   # 34단계: 떠돌이 약초꾼을 영입했으면 들판 체력 +
 	rules.start_field(meta.field_clock)   # 시계는 지난번 떠난 데서 이어 간다(밤이면 밤 무리도 서 있다)
 	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
+	rules.spawn_chiefs(meta.chiefs_down)   # 32단계 곳마다 우두머리: 이번 판에 쓰러뜨린 것은 안 선다
 	rules.lord.pos = FieldLayout.START
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
@@ -99,6 +114,7 @@ func _ready() -> void:
 	_low_circles = blockers.low_circles
 	HillBuilder.setup(Vector2(FieldLayout.SIZE) * Grid.CELL)   # 적의 몸이 들판을 싸움터 안으로 본다(비탈에서 올라오지 않는다)
 	_build_props()
+	_build_wanderer()
 	add_child(_creatures)
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
@@ -127,6 +143,8 @@ func _ready() -> void:
 	rules.enemy_died.connect(_on_enemy_died)
 	rules.pack_cleared.connect(_on_pack_cleared)
 	rules.field_boss_slain.connect(_on_boss_slain)
+	rules.chief_slain.connect(_on_chief_slain)
+	rules.chief_woke.connect(_on_chief_woke)
 	rules.field_dusk.connect(_on_dusk)
 	rules.field_dawn.connect(_on_dawn)
 	rules.enemy_act.connect(_on_enemy_act)
@@ -233,6 +251,7 @@ func _process(delta: float) -> void:
 	_boss_bar()
 	_creatures.step(delta, _lord.position)
 	_light(delta)
+	_animate_wanderer(delta)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
 	if a != _area:
@@ -251,6 +270,7 @@ func _process(delta: float) -> void:
 	if _reading != "" and _near != _reading:
 		_end_read()
 	if _reading != "":
+		_hud.set_prompt("E", "")   # 읽거나 말하는 동안은 안내 띠를 내린다(말 띠와 겹치지 않게)
 		return
 	_hud.set_prompt("E", _prompt(_near) if _near != "" else "")
 
@@ -305,6 +325,10 @@ func _on_dusk() -> void:
 ## 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
 func _on_dawn() -> void:
 	meta.packs_cleared = rules.field_cleared_ids()
+	meta.place_wanderer()   # 34단계: 새벽마다 다른 사람이 선다
+	if _reading == "wanderer":
+		_end_read()
+	_build_wanderer()
 	_hud.toast("날이 밝는다")
 	_saved()
 
@@ -313,6 +337,8 @@ func _spots() -> Dictionary:
 	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD, "crypt": FieldLayout.CRYPT_DOOR}
 	if not meta.dropped.is_empty():
 		s["dropped"] = meta.dropped_at()
+	if _wander != null:
+		s["wanderer"] = _wander_at
 	for id in FieldLayout.CACHES:
 		if not meta.field_found.has(id):
 			s[id] = FieldLayout.CACHES[id][0]
@@ -332,6 +358,8 @@ func _prompt(key: String) -> String:
 		return "지하 무덤으로 내려간다"
 	if key == "dropped":
 		return "떨군 검을 줍는다"
+	if key == "wanderer":
+		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
 	if key.begins_with("cache"):
 		return "유품을 연다"
 	if key.begins_with("stone"):
@@ -341,6 +369,9 @@ func _prompt(key: String) -> String:
 
 func _interact() -> void:
 	if _over:
+		return
+	if _reading == "wanderer":
+		_wander_next()
 		return
 	if _reading != "":
 		_end_read()
@@ -358,6 +389,8 @@ func _interact() -> void:
 		_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -4.0, 1.3)
 		_hud.toast("떨군 검을 되찾았다: %s" % (d.display_name if d else "?"))
 		_saved()
+	elif _near == "wanderer":
+		_wander_talk()
 	elif _near == "crypt":
 		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -389,6 +422,106 @@ func _interact() -> void:
 			_sfx.play(&"thump", _lord.position, -10.0, 1.6)
 			_hud.toast("쇳조각 조각 %d개" % got)
 			_saved()
+
+
+# ---------------------------------------------------------------- 떠도는 사람 (34단계)
+
+## Meta.wanderer를 그 자리에 세운다(있던 몸은 치운다). 마을 쪽(들판 시작 자리)을 보고 서고, 곁에 꺼져 가는 작은 모닥불.
+func _build_wanderer() -> void:
+	if _wander != null:
+		_wander.queue_free()
+		_circles.erase(_wander_circle)
+		_wander = null
+		_wander_P = {}
+		_wander_fire = null
+	_wander_id = meta.wanderer
+	if _wander_id == "":
+		return
+	_wander_at = FieldLayout.WANDERER_SPOTS[meta.wanderer_at].at
+	var p: Vector3 = Grid.cells_to_world(_wander_at)
+	p.y = FieldBuilder.walk_height(p.x, p.z)
+	var dir: Vector2 = FieldLayout.START - _wander_at
+	_wander = VillageBuilder.place(self, p, VillageBuilder.facing_to(dir.normalized() if dir.length() > 0.5 else Vector2.DOWN) + PI)
+	_wander_P = VillageProps.villager(StringName(_wander_id), _wander)
+	# 모닥불: 돌 몇 개와 그을린 장작, 낮게 깔리는 불빛(밤에 멀리서 보인다). 앞은 -Z(몸이 보는 쪽)
+	var fire := Node3D.new()
+	fire.position = Vector3(0.7, 0.0, -0.9)
+	_wander.add_child(fire)
+	var stone := VillageBuilder.plain(Color(0.25, 0.24, 0.23), 0.95)
+	for i in 6:
+		var a: float = TAU * i / 6.0
+		VillageBuilder.box(fire, Vector3(0.16, 0.1, 0.12), Vector3(cos(a) * 0.3, 0.05, sin(a) * 0.3), stone, Vector3(0.0, -a, 0.0))
+	var wood := VillageBuilder.plain(Color(0.12, 0.08, 0.05), 0.9)
+	for k in 3:
+		VillageBuilder.box(fire, Vector3(0.06, 0.06, 0.45), Vector3(0.0, 0.07, 0.0), wood, Vector3(0.0, k * 1.05, 0.12))
+	VillageBuilder.ball(fire, 0.09, Vector3(0.0, 0.12, 0.0), VillageBuilder.glow(Color(1.0, 0.45, 0.15), 3.0), Vector3(1.0, 0.6, 1.0))
+	_wander_fire = OmniLight3D.new()
+	_wander_fire.light_color = Color(1.0, 0.55, 0.25)
+	_wander_fire.omni_range = 6.0
+	_wander_fire.light_energy = 1.2
+	_wander_fire.position = Vector3(0.0, 0.5, 0.0)
+	fire.add_child(_wander_fire)
+	_wander_circle = [_wander_at, 0.4]
+	_circles.append(_wander_circle)
+	_flicker.seed = hash(_wander_id)
+
+
+## 숨 쉬고, 영주가 가까우면 고개를 돌리고, 말하는 동안 손짓. 모닥불은 흔들린다.
+func _animate_wanderer(delta: float) -> void:
+	if _wander == null or _wander_P.is_empty():
+		return
+	_wt += delta
+	EventArt.breathe(_wander_P, _wt)
+	var close: bool = _wander.position.distance_to(_lord.position) < 10.0
+	VillageProps.look_at(_wander_P, _wander, _lord.position + Vector3(0, 1.5, 0), 1.0 if close else 0.0)
+	if _wander_step > 0:
+		VillageProps.talk(_wander_P, _wt)
+	if _wander_fire:
+		_wander_fire.light_energy = lerpf(_wander_fire.light_energy, _flicker.randf_range(0.9, 1.5), 1.0 - exp(-12.0 * delta))
+
+
+## E로 말을 건다: 한 줄 인사(띠).
+func _wander_talk() -> void:
+	var W: Dictionary = FieldLayout.WANDERERS[_wander_id]
+	_reading = "wanderer"
+	_wander_step = 1
+	_hud.say(W.name, W.greet)
+
+
+## 다음 E: 인사 → 조건(맞으면 "데려갈 수 있다") → 조건이 맞으면 데려간다(Meta.recruit) → 끝.
+func _wander_next() -> void:
+	var W: Dictionary = FieldLayout.WANDERERS[_wander_id]
+	match _wander_step:
+		1:
+			_wander_step = 2
+			if meta.wanderer_ready(data):
+				_hud.say("%s · E로 데려간다" % W.name, W.ready)
+			else:
+				_hud.say("%s · %s" % [W.name, meta.wanderer_progress(data)], W.ask)
+		2:
+			if not meta.wanderer_ready(data):
+				_end_read()
+				return
+			var r: Dictionary = meta.recruit(data)
+			if not r.ok:
+				_end_read()
+				return
+			_wander_step = 3
+			_hud.say(W.name, W.join)
+			if rules.bonus_hp != meta.recruit_hp():   # 약초꾼: 들판 체력 +는 바로
+				rules.lord.hp += meta.recruit_hp() - rules.bonus_hp
+				rules.bonus_hp = meta.recruit_hp()
+			var t: String = "%s 마을로 간다 · %s" % [UiKit.josa(W.name, "이", "가"), W.gift]
+			if int(r.paid) > 0:
+				t += " · 조각 %d개를 냈다" % r.paid
+			if int(r.sword) > 0:
+				t += " 「%s」" % data.sword_by_id(int(r.sword)).display_name
+			_hud.toast(t)
+			_hud.flash(Color(1, 0.84, 0.42), 0.18, 0.8)
+			_sfx.play(&"thump", _wander.position, -6.0, 0.8)
+			_saved()
+		_:
+			_end_read()
 
 
 ## 고른 검을 칸 0에 쥔다(부러지지 않는다). 안 골랐으면 검집의 검, 0이면 맨손. 떨구거나 잃은 검이면 맨손.
@@ -494,13 +627,34 @@ func _on_pack_cleared(id: StringName) -> void:
 	_saved()
 
 
-## 들판 보스가 깨어 있는 동안만 화면 아래 가운데에 체력 막대를 그린다(쓰러뜨리거나 멀어져 돌아가면 사라진다).
+## 들판 보스나 곳마다 우두머리(32단계)가 깨어 있는 동안만 화면 아래 가운데에 체력 막대를 그린다(쓰러뜨리거나 멀어져 돌아가면 사라진다).
+## 둘 다 깨어 있으면 무덤 기사, 우두머리가 여럿이면 영주에게 가까운 것.
 func _boss_bar() -> void:
 	var b: Enemy = rules.field_boss
-	if b != null and rules.field_boss_state == Rules.BOSS_AWAKE and not b.dead:
+	if b == null or rules.field_boss_state != Rules.BOSS_AWAKE or b.dead:
+		b = rules.awake_chief()
+	if b != null:
 		_hud.set_boss(b.data.display_name, b.hp, b.max_hp)
 	elif _hud.boss_bar_shown():
 		_hud.set_boss("", 0.0, 1.0)
+
+
+## 우두머리가 깨어났다: 낮은 소리와 작은 흔들림(꾸밈). 이름은 체력 막대가 띄운다.
+func _on_chief_woke(_id: StringName, e: Enemy) -> void:
+	_camera.add_shake(0.2)
+	_sfx.play(&"thump", Grid.cells_to_world(e.pos), -4.0, 0.6)
+
+
+## 우두머리를 쓰러뜨렸다(32단계): 조각과, 처음이면 그 곳의 오픈월드 한정 검(Meta.chief_defeat)을 토스트로 알린다.
+func _on_chief_slain(id: StringName, e: Enemy) -> void:
+	var r: Dictionary = meta.chief_defeat(String(id))
+	_camera.add_shake(data.lord.shake_big * 2.0)
+	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
+	var t: String = "%s 쓰러뜨렸다. 조각 %d개" % [UiKit.josa(e.data.display_name, "을", "를"), r.shards]
+	if int(r.sword) > 0:
+		t += " · 들판의 검 「%s」" % data.sword_by_id(int(r.sword)).display_name
+	_hud.toast(t)
+	_saved()
 
 
 ## 무덤 기사를 쓰러뜨렸다: 조각과 운 부적(Meta.boss_defeat)을 토스트로 알린다.
@@ -514,7 +668,7 @@ func _on_boss_slain(_e: Enemy) -> void:
 
 ## 무덤 기사의 큰 일(휘두르기 내려침, 돌진)에 흔들림과 소리를 더한다(꾸밈).
 func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
-	if e.data.id != FieldLayout.BOSS_ID:
+	if e.data.id != FieldLayout.BOSS_ID and e.chief == &"":   # 우두머리(32단계)도 큰 일에 흔들린다
 		return
 	if act == &"swing" or act == &"charge_end":
 		_camera.add_shake(0.35)
@@ -538,6 +692,15 @@ func _on_down(_won: bool) -> void:
 func _end_read() -> void:
 	_reading = ""
 	_hud.say_end()
+	if _wander_step > 0:
+		var left: bool = _wander_step == 3
+		_wander_step = 0
+		if left:
+			_build_wanderer()   # 데려갔다: 들판에서 사라진다(마을에 선다)
+		elif not _wander_P.is_empty():
+			for f: Node3D in _wander_P.get("forearms", []):
+				if _wander_P.rest.has(f):
+					f.transform = _wander_P.rest[f]
 
 
 func _saved() -> void:

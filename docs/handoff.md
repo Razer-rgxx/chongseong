@@ -25,9 +25,9 @@
    ~/godot/Godot_v4.6.1-stable_linux.x86_64 --headless --path . --import >/dev/null 2>&1
    ~/godot/Godot_v4.6.1-stable_linux.x86_64 --headless --path . -s tests/run_all.gd 2>&1 | grep -E "통과|실패|SCRIPT ERROR"
    ```
-   지금 기대값: **`통과 1046, 실패 0`**. 다르면 무엇이 깨졌는지부터 본다.
+   지금 기대값: **`통과 1240, 실패 0`**(약 2분 30초). 다르면 무엇이 깨졌는지부터 본다.
 4. **읽기.** `CLAUDE.md`(규칙 전부, 기술 규칙이 매우 자세하다) → `docs/GDD.md`의 0절(인계 요약), 1절 표의 맨 위 몇 줄, 2.14(정하지 않은 것), 2.15(마을 밖·결투 결정), 3절(계획 체크리스트). 일할 단계의 설계서(`docs/outside.md`, `docs/duel.md` 등).
-5. 사용자에게 **한두 줄로** "읽었고, 테스트 1046 통과, 다음은 N단계"라고 말하고 사용자가 시킨 일을 한다.
+5. 사용자에게 **한두 줄로** "읽었고, 테스트 1240 통과, 다음은 N단계"라고 말하고 사용자가 시킨 일을 한다.
 
 ---
 
@@ -68,6 +68,11 @@
 - 웹판(웨일북용, https://razer-rgxx.github.io/chongseong/, `gh-pages` 가지)은 15단계 무렵 것이다. 사용자가 **결투는 웹판 안 한다**고 했다. 웹판을 다시 만들라는 말이 없으면 건드리지 않는다.
 
 ## 3. 지금 상태 (2026-11-19 밤)
+
+### 2026-11-20 아침까지 더한 것
+- 시작 화면 3D(해 질 녘 언덕, 금빛 검), 대사 창 `DialogueBox`, 30 점프(`Blockers`, `LegFold`), 31 어려운 무덤, 32 곳마다 우두머리(`Rules.chiefs`), 33 오픈월드 한정 검(301~310), 34 떠도는 사람·영입, 35 죽으면 검 떨굼(`Meta.dropped`·`lost`, 소울류), 36 들판 화면(`FieldHud` 나침반). 설계서 docs/field_life.md.
+- 큰 단계는 git 워크트리 두 개(`git worktree add /home/claude/wt-a -b <가지>`)에 opus 에이전트를 하나씩 붙여 동시에 만들고 합쳤다(Agent의 isolation 옵션은 막혀 있다). 에이전트에게 GDD·handoff·CLAUDE.md는 고치지 말라고 하고 합칠 때 직접 고친다. 사용자 5시간 한도에 걸리면 에이전트가 멈춘다: 풀린 뒤 SendMessage로 이어 가게 한다.
+- PC 연결(`mcp__remote-devices__*`)은 데스크톱 앱이 켜져 있을 때만 된다. 연결돼 있으면 `device_commit_files`로 `update.bundle`을 게임 폴더에 넣는다.
 
 ### 끝난 단계
 1~4, 6~24, 27~29단계. 5단계(손맛 맞추기)는 사용자가 PC에서 할 일이라 비어 있다. 25(소리)는 미룸, 26(균형)은 사람이 해 본 기록이 있어야 한다.

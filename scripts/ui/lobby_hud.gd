@@ -51,7 +51,7 @@ var _readout: Label
 var _gate_mode: bool = false
 var _gate_pick: int = 0
 var _hp_bar: ProgressBar
-## 들판 보스의 체력 막대(18단계): 화면 아래 가운데, 이름 한 줄과 막대.
+## 들판 보스·우두머리의 체력 막대(18·32단계): 화면 아래 가운데, 큰 이름 한 줄과 막대.
 var _boss_box: VBoxContainer
 var _boss_name: Label
 var _boss_bar: ProgressBar
@@ -170,28 +170,40 @@ func set_hp(hp: float, max_hp: float) -> void:
 	_hp_bar.value = maxf(0.0, hp)
 
 
-## 들판 보스의 체력 막대(18단계, 엘든 링식). 이름 한 줄 아래 가는 막대. name이 ""이면 감춘다.
+## 들판 보스·곳마다 우두머리의 체력 막대(18·32단계, 엘든 링식). 화면 아래 가운데에 또렷한 큰 이름 한 줄, 그 아래 양 끝이 사라지는 놋쇠 줄과 긴 막대.
+## name이 ""이면 감춘다. 이름이 바뀌면(다른 우두머리) 글을 바꾼다.
 func set_boss(boss_name: String, hp: float, max_hp: float) -> void:
 	if _boss_box == null:
 		if boss_name == "":
 			return
 		_boss_box = VBoxContainer.new()
 		_boss_box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-		_boss_box.offset_left = -270
-		_boss_box.offset_right = 270
-		_boss_box.offset_top = -96
-		_boss_box.offset_bottom = -56
-		_boss_box.add_theme_constant_override("separation", 4)
+		_boss_box.offset_left = -360
+		_boss_box.offset_right = 360
+		_boss_box.offset_top = -104
+		_boss_box.offset_bottom = -38
+		_boss_box.add_theme_constant_override("separation", 5)
 		_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_boss_name = UiKit.label("", 18, UiKit.TITLE)
+		_boss_name = UiKit.label("", 28, UiKit.TITLE)
 		_boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_boss_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 어두운 땅·밤하늘 위에서도 또렷하게: 검은 테두리와 그림자
+		_boss_name.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+		_boss_name.add_theme_constant_override("outline_size", 7)
+		_boss_name.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
+		_boss_name.add_theme_constant_override("shadow_offset_x", 0)
+		_boss_name.add_theme_constant_override("shadow_offset_y", 2)
+		_boss_name.add_theme_constant_override("shadow_outline_size", 12)
 		_boss_box.add_child(_boss_name)
+		var line := UiKit.rule(640.0, UiKit.LINE, 0.7)
+		line.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		_boss_box.add_child(line)
 		_boss_bar = ProgressBar.new()
 		_boss_bar.show_percentage = false
-		_boss_bar.custom_minimum_size = Vector2(540, 12)
+		_boss_bar.custom_minimum_size = Vector2(720, 14)
 		_boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var bg := UiKit.style(Color(UiKit.LINE, 0.55), 1, Color(0.02, 0.018, 0.015, 0.8))
-		var fill := UiKit.style(Color(0.55, 0.12, 0.08), 0, Color(0.55, 0.12, 0.08))
+		var bg := UiKit.style(Color(UiKit.LINE, 0.6), 1, Color(0.02, 0.018, 0.015, 0.85))
+		var fill := UiKit.style(Color(0.62, 0.13, 0.08), 0, Color(0.62, 0.13, 0.08))
 		for sb in [bg, fill]:
 			sb.set_content_margin_all(0)
 		_boss_bar.add_theme_stylebox_override("background", bg)
@@ -201,9 +213,14 @@ func set_boss(boss_name: String, hp: float, max_hp: float) -> void:
 	_boss_box.visible = boss_name != ""
 	if boss_name == "":
 		return
-	_boss_name.text = boss_name
+	if _boss_name.text != boss_name:
+		_boss_name.text = boss_name
 	_boss_bar.max_value = max_hp
 	_boss_bar.value = maxf(0.0, hp)
+
+
+func boss_bar_name() -> String:
+	return _boss_name.text if boss_bar_shown() else ""
 
 
 func boss_bar_shown() -> bool:
@@ -259,7 +276,7 @@ func _render_forge(msg: String) -> void:
 	UiKit.header(_forge_box, "대장간 · 검집 +%d" % meta.sheath_lv, close)
 	var cands := meta.sheath_candidates(data)
 	if cands.is_empty():
-		_forge_box.add_child(_wrap(UiKit.label("검집에는 언덕에서 뽑아 본 전설 이상의 검만 넣을 수 있다. 아직 없다.\n검집 강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
+		_forge_box.add_child(_wrap(UiKit.label("검집에는 찾아 본 전설 이상의 검만 넣을 수 있다(언덕에서 뽑았거나 들판에서 얻은 검). 아직 없다.\n검집 강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
 	else:
 		var pick := OptionButton.new()
 		pick.focus_mode = Control.FOCUS_NONE
@@ -288,6 +305,8 @@ func _render_forge(msg: String) -> void:
 		_forge_box.add_child(b)
 		var note: String = "실패하면 한 단계 내려간다." if meta.sheath_lv >= md.sheath_drop_from else "+%d부터는 실패하면 한 단계 내려간다." % md.sheath_drop_from
 		_forge_box.add_child(UiKit.label(note + " +5, +10에 처음 닿으면 각인이 붙는다.", 13, UiKit.MUTED))
+		if meta.has_recruit("smith"):
+			_forge_box.add_child(UiKit.label("떠돌이 대장장이가 거든다: 망치질 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_FORGE) * 100.0), 13, UiKit.MUTED))
 	else:
 		_forge_box.add_child(UiKit.label("끝까지 벼렸다.", 16, UiKit.TITLE))
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
@@ -335,7 +354,7 @@ func _render_shrine(msg: String) -> void:
 		c.queue_free()
 	var md := data.meta
 	UiKit.header(_shrine_box, "성소 · 축복", close, Color(0.8, 0.84, 0.88))
-	_shrine_box.add_child(UiKit.label("실패해도 내려가지 않는다.", 13, UiKit.MUTED))
+	_shrine_box.add_child(UiKit.label("실패해도 내려가지 않는다." + ("  길 잃은 순례자가 함께 빈다: 축복 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_BLESS) * 100.0) if meta.has_recruit("pilgrim") else ""), 13, UiKit.MUTED))
 	for i in md.bless_keys.size():
 		var key: String = md.bless_keys[i]
 		var lv: int = meta.bless_level(key)
@@ -408,10 +427,29 @@ func open_rack() -> void:
 			var sd := data.swords[i]
 			names.append(sd.display_name + ("" if int(meta.found.get(str(sd.id), 0)) < 2 else " ×%d" % int(meta.found[str(sd.id)])) if meta.has_found(sd.id) else "[color=#4d4740]???[/color]")
 		t += "  ·  ".join(names) + "\n\n"
+	t += _field_row()
 	_rack_text.text = t
 	var best: String = "없음" if meta.best == 0 else ("정상" if meta.best > data.run.zone_names.size() else "%d구역" % meta.best)
 	_rack_head.text = "도감 %d / %d  ·  최고 기록 %s  ·  오른 횟수 %d" % [meta.found.size(), data.swords.size(), best, meta.runs]
 	_rack.visible = true
+
+
+## 도감의 "들판의 검" 줄(33단계): 언덕에서는 뽑히지 않는 오픈월드 한정 검. 찾은 것은 제 등급 빛으로 쓴다.
+func _field_row() -> String:
+	var ids: PackedInt32Array = data.field_swords
+	if ids.is_empty():
+		return ""
+	var n: int = 0
+	var names: Array[String] = []
+	for i in ids:
+		var sd := data.swords[i]
+		if meta.has_found(sd.id):
+			n += 1
+			names.append("[color=#%s]%s[/color]" % [(data.grades.colors[sd.grade] as Color).to_html(false), sd.display_name])
+		else:
+			names.append("[color=#4d4740]???[/color]")
+	var t: String = "[b][color=#%s]들판의 검[/color][/b]  [color=#99917f]%d / %d · 언덕에서는 뽑히지 않는다[/color]\n" % [UiKit.TITLE.to_html(false), n, ids.size()]
+	return t + "  ·  ".join(names) + "\n"
 
 
 ## 수련장 위 가운데 줄("5초 피해 N"). 빈 글이면 숨긴다.
