@@ -25,9 +25,9 @@
    ~/godot/Godot_v4.6.1-stable_linux.x86_64 --headless --path . --import >/dev/null 2>&1
    ~/godot/Godot_v4.6.1-stable_linux.x86_64 --headless --path . -s tests/run_all.gd 2>&1 | grep -E "통과|실패|SCRIPT ERROR"
    ```
-   지금 기대값: **`통과 1041, 실패 0`**. 다르면 무엇이 깨졌는지부터 본다.
+   지금 기대값: **`통과 1046, 실패 0`**. 다르면 무엇이 깨졌는지부터 본다.
 4. **읽기.** `CLAUDE.md`(규칙 전부, 기술 규칙이 매우 자세하다) → `docs/GDD.md`의 0절(인계 요약), 1절 표의 맨 위 몇 줄, 2.14(정하지 않은 것), 2.15(마을 밖·결투 결정), 3절(계획 체크리스트). 일할 단계의 설계서(`docs/outside.md`, `docs/duel.md` 등).
-5. 사용자에게 **한두 줄로** "읽었고, 테스트 1041 통과, 다음은 N단계"라고 말하고 사용자가 시킨 일을 한다.
+5. 사용자에게 **한두 줄로** "읽었고, 테스트 1046 통과, 다음은 N단계"라고 말하고 사용자가 시킨 일을 한다.
 
 ---
 
@@ -57,9 +57,10 @@
   git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
   ```
   bundle은 `7163afa..geom-hill`로 만든다(7163afa는 GitHub에 있는 커밋이라 사용자 PC에도 있다). 매번 그때까지 전부 들어 있어서 최신 것 하나만 받으면 된다. **다른 기준(예: a5399b4)으로 만들지 말 것**: PC에 그 커밋이 없으면 pull이 실패한다.
+- 사용자의 터미널은 **PowerShell**이다(`&&`가 안 된다, `;`로 잇는다). Godot 폴더(바탕화면)에서 연 PowerShell에 붙여 넣는다.
 - 사용자에게는 **명령 한 줄**로 준다(파일을 풀거나 복사하게 하지 않는다). 사용자는 "왜 내가 푸냐, 전 클로드는 한 줄이면 됐다"고 했다:
   ```
-  cd C:\Users\user\Documents\chongseong && git stash && git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
+  cd C:\Users\user\Documents\chongseong; git stash; git pull C:\Users\user\Downloads\chongseong.bundle geom-hill
   ```
 - **GitHub로 올리기**(사용자 PC에서): `git push https://github.com/Razer-rgxx/chongseong.git HEAD:geom-hill`
 - PC에만 있고 git에 없는 것: Mixamo 기사 모델·동작(`assets/characters/`), 사운드 팩(`assets/sound/`), 뽑기 영상(`assets/video/`). 클라우드에서는 기본 도형·코드 소리로 돈다(정상).
@@ -87,7 +88,7 @@
 | 24 | 적 모델: 적은 **이미 다 모양이 있다**(망령 망토, 늑대, 새 적 5종 EnemyArt, 큰 적·방패병은 Mixamo 기사). 바꿔 끼울 자리만 만듦: `assets/characters/enemies/<적 id>.fbx`가 있으면 그것(`LordCharacter.enemy_path`·`char_path`) | assets/characters/README.md "적 모델" |
 | 27 | 시작 화면(시작·설정·끝내기), 설정 창(소리 크기·마우스 감도·키 11개, `user://settings.cfg`), 마을·언덕에서 F10, Windows 내보내기 설정 "Windows Desktop" | `scenes/title/`, `GameSettings`, `SettingsPanel` |
 | 28 | 새 지역 더: 들판 230×110칸, 버려진 채석장·불탄 마을·까마귀 고개(그린 곳 = 막힌 곳 표, 틈 셋), 무리 5·상자 4·비석 2·조각 후보 3 | `FieldLayout.QUARRY_*`·`HAMLET_*`·`PASS_*`, `FieldBuilder._quarry/_hamlet/_pass/new_land` |
-| 29 | 들판 낮밤과 다시 생기는 적: 시계(낮 240초·밤 150초, `Meta.field_clock`), 밤엔 덤빔 14칸·세기 구역 +1, 밤에만 서는 무리 4곳, 새벽마다 낮 무리 되살림, 밤 화면과 영주 횃불 | `Rules._step_field_clock`, `FieldLayout.NIGHT_PACKS`·`night_amount`, `field.gd._light`, docs/outside.md |
+| 29 | 들판 낮밤과 다시 생기는 적: 시계(낮 240초·밤 150초, `Meta.field_clock`), 밤엔 덤빔 14칸·세기 구역 +1·무리 적 피해 ×1.25(`FIELD_NIGHT_DAMAGE`), 밤에만 서는 무리 4곳, 새벽마다 낮 무리 되살림(영주 14칸 안의 무리는 그 새벽 건너뜀, `FIELD_DAWN_SAFE`), 밤 화면과 영주 횃불 | `Rules._step_field_clock`, `FieldLayout.NIGHT_PACKS`·`night_amount`, `field.gd._light`, docs/outside.md |
 
 커밋, 오래된 것부터: `dc94b8e` 계획 → `4db1432` 17 → `9a52bff` 18 → `9a44328` 인계서 → `a626e62` 19 → `fb87c71` 20 → `7344955` 결투 설계서 → `f3f4616` 21 → `a4000f6` 락스텝 결정 → `d82bf00` 22 → `a5399b4` 23 → (다음 세션) `ff9d1f3` 24 → `a68fe0e` 27 → 인계서 → (다음 세션) 28·29(아래 `git log`로 확인). 이 커밋들은 아직 GitHub에 없다(bundle로만 줬다).
 
@@ -149,6 +150,7 @@ author는 `git -c user.name=Claude -c user.email=noreply@anthropic.com commit ..
 - 작은 일(예: 23단계 조각 주기, 20줄)은 에이전트 없이 직접 고친다. 더 싸다.
 
 ### 화면 찍기
+- 들판: `scripts/debug/shots/shot_field.gd`. Xvfb로 돌리면 새 곳·틈·해질녘·밤·새벽을 찍고(한 장에 1분쯤, 다 합쳐 10분: 백그라운드로 돌리고 기다린다), `--headless`로 돌리면 START에서 상자·비석·무리·조각·곳마다 걸어서 닿는지 BFS만 본다(몇 분).
 - 앞 단계가 쓴 찍기·연기 스크립트: `scripts/debug/shots/shot_duel.gd`(결투 장면을 띄워 245틱 뒤 PNG 저장, 1P·2P 자동 입력), `scripts/debug/shots/lobby_smoke.gd`(마을에서 결투 말뚝 상호작용까지). 다른 장면은 이것을 고쳐 쓴다.
 - 돌리는 법: `xvfb-run -a ~/godot/Godot_v4.6.1-stable_linux.x86_64 --path . --rendering-driver opengl3 --rendering-method gl_compatibility -s scripts/debug/shots/shot_duel.gd` (Xvfb가 없으면 `apt-get install -y xvfb`).
 
