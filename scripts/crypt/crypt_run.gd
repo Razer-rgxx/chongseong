@@ -83,5 +83,6 @@ func _enter(id: StringName) -> void:
 
 
 ## 걷는 판 안으로 밀어 넣는다(닫힌 문 안과 벽 밖으로 못 나간다). 장면이 틱마다 영주의 자리에 건다.
-func push(p: Vector2) -> Vector2:
-	return CryptLayout.push_in(p, open_doors())
+## 무덤의 벽(1.5m)·관은 높은 막힘이라 공중(airborne)이어도 막는다(30단계).
+func push(p: Vector2, airborne: bool = false) -> Vector2:
+	return CryptLayout.push_in(p, open_doors(), airborne)

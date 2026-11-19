@@ -46,6 +46,7 @@ var meta: Meta
 var rules: Rules
 var _acc: float = 0.0
 var _want_dash: bool = false
+var _want_jump: bool = false
 var _lord: Node3D
 var _anvil_sword := Node3D.new()
 var _forge_light := OmniLight3D.new()
@@ -53,6 +54,9 @@ var _near: String = ""
 ## 영주가 들어갈 수 없는 곳(칸 단위). Rect2와 [가운데, 반지름] 원.
 var _rects: Array[Rect2] = []
 var _circles: Array = []
+## 낮은 막힘(30단계, 그린 높이 1m 이하: 수련장 울타리, 통, 궤짝, 장작더미). 공중이면 지나간다(Blockers).
+var _low_rects: Array[Rect2] = []
+var _low_circles: Array = []
 var _deco := RandomNumberGenerator.new()
 var _move_fx := MoveFx.new()
 var _dummies: Array[Node3D] = []
@@ -118,6 +122,7 @@ func _ready() -> void:
 	_move_fx.setup(rules)
 	rules.enemy_hit.connect(_on_dummy_hit)
 	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -4.0))
+	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
 	_apply_yard_sword()
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
 	_camera.yaw = 0.0
@@ -168,6 +173,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_capture(true)
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("jump"):
+		_want_jump = true
 	if event.is_action_pressed("pull"):
 		_interact()
 	if k and k.pressed and not k.echo:
@@ -187,6 +194,7 @@ func _physics_process(delta: float) -> void:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
+		inp.jump = _want_jump and _talker == &""
 		inp.attack = _talker == &"" and Input.is_action_pressed("attack") and _in_yard()
 		if _camera.third() and inp.attack:
 			inp.aim_valid = true
@@ -200,8 +208,9 @@ func _physics_process(delta: float) -> void:
 			inp.aim_valid = true
 			inp.aim = rules.lord.pos + inp.move
 		rules.step(inp)
-		rules.lord.pos = _push_out(rules.lord.pos)
+		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
 		_want_dash = false
+		_want_jump = false
 		_acc -= rules.dt
 		n += 1
 		_clock += rules.dt
@@ -386,7 +395,7 @@ func _build_forge() -> void:
 	_rects.append(Rect2(forge_at + Vector2(-1.85, -1.95), Vector2(3.7, 2.3)))
 	_circles.append([forge_at + Vector2(0.3, 1.3), 0.55])
 	_circles.append([forge_at + Vector2(-1.1, 0.8), 0.6])
-	_circles.append([forge_at + Vector2(-1.6, 1.1), 0.35])
+	_low_circles.append([forge_at + Vector2(-1.6, 1.1), 0.35])   # 물통(1m)
 	var furnace := _box(Vector3(1.6, 1.4, 1.2), VillageMaterials.get_mat("stone_wall", Color(0.2, 0.18, 0.17), 1.5, Color(0.6, 0.55, 0.5)))
 	furnace.position = at + Vector3(-2.2, 0.7, 1.6)
 	add_child(furnace)
@@ -574,17 +583,18 @@ func _build_houses() -> void:
 		VillageBuilder.lantern(self, Grid.cells_to_world(c), VillageBuilder.facing_to(Vector2(17, 12) - c), l[1])
 		_circles.append([c, 0.25])
 	# 집 둘레의 통, 상자, 건초, 장작
+	# 통(1m)·궤짝(0.95m 안)·장작더미(0.8m)는 낮은 막힘이라 점프로 넘는다(30단계). 건초(1.2m)는 높다.
 	for p in [Vector2(7.6, 11.6), Vector2(7.9, 12.2), Vector2(26.9, 21.0), Vector2(32.6, 11.0), Vector2(14.8, 20.6), Vector2(7.3, 17.3)]:
 		VillageBuilder.barrel(self, Grid.cells_to_world(p), _deco)
-		_circles.append([p, 0.3])
+		_low_circles.append([p, 0.3])
 	for p in [Vector2(8.3, 11.9), Vector2(25.6, 20.7), Vector2(15.0, 21.0), Vector2(33.0, 7.8)]:
 		VillageBuilder.crate(self, Grid.cells_to_world(p), _deco, _deco.randf_range(0.7, 0.95))
-		_circles.append([p, 0.4])
+		_low_circles.append([p, 0.4])
 	for p in [Vector2(33.0, 18.0)]:
 		VillageBuilder.hay(self, Grid.cells_to_world(p), _deco)
 		_circles.append([p, 0.45])
 	VillageBuilder.firewood(self, Grid.cells_to_world(Vector2(6.4, 7.0)), PI / 2.0)
-	_circles.append([Vector2(6.4, 7.0), 0.5])
+	_low_circles.append([Vector2(6.4, 7.0), 0.5])
 
 
 # ---------------------------------------------------------------- 15단계: 의뢰판 · 수련장 · 상인 · 주민
@@ -597,11 +607,12 @@ func _build_village_extras() -> void:
 		_circles.append([d, 0.35])
 		_dummy_enemies.append(rules.spawn_dummy(d))
 	var a := yard_area
-	_rects.append(Rect2(a.position.x, a.position.y - 0.1, a.size.x, 0.2))
-	_rects.append(Rect2(a.position.x, a.end.y - 0.1, a.size.x, 0.2))
-	_rects.append(Rect2(a.end.x - 0.1, a.position.y, 0.2, a.size.y))
-	_rects.append(Rect2(a.position.x - 0.1, a.position.y, 0.2, yard_gap.x - a.position.y))
-	_rects.append(Rect2(a.position.x - 0.1, yard_gap.y, 0.2, a.end.y - yard_gap.y))
+	# 수련장 울타리(1m)는 낮은 막힘(30단계)
+	_low_rects.append(Rect2(a.position.x, a.position.y - 0.1, a.size.x, 0.2))
+	_low_rects.append(Rect2(a.position.x, a.end.y - 0.1, a.size.x, 0.2))
+	_low_rects.append(Rect2(a.end.x - 0.1, a.position.y, 0.2, a.size.y))
+	_low_rects.append(Rect2(a.position.x - 0.1, a.position.y, 0.2, yard_gap.x - a.position.y))
+	_low_rects.append(Rect2(a.position.x - 0.1, yard_gap.y, 0.2, a.end.y - yard_gap.y))
 	_rects.append(Rect2(yard_rack_at - Vector2(0.9, 0.2), Vector2(1.8, 0.4)))
 	VillageProps.duel_post(self, Grid.cells_to_world(duel_at))
 	_circles.append([duel_at, 0.4])
@@ -766,31 +777,9 @@ func _talker_cell() -> Vector2:
 	return VILLAGERS[_talker][0]
 
 
-## 영주를 막힌 곳 밖으로 민다(가장 가까운 가장자리로).
-func _push_out(p: Vector2) -> Vector2:
-	var r: float = 0.3
-	for c in _circles:
-		var d: Vector2 = p - c[0]
-		var min_d: float = c[1] + r
-		if d.length() < min_d:
-			p = c[0] + (d.normalized() if d.length() > 0.001 else Vector2.DOWN) * min_d
-	for rect in _rects:
-		var g := rect.grow(r)
-		if g.has_point(p):
-			var left: float = p.x - g.position.x
-			var right: float = g.end.x - p.x
-			var up: float = p.y - g.position.y
-			var down: float = g.end.y - p.y
-			var m: float = minf(minf(left, right), minf(up, down))
-			if m == left:
-				p.x = g.position.x
-			elif m == right:
-				p.x = g.end.x
-			elif m == up:
-				p.y = g.position.y
-			else:
-				p.y = g.end.y
-	return p
+## 영주를 막힌 곳 밖으로 민다(Blockers, 가장 가까운 가장자리로). 공중이면 낮은 막힘은 지나간다.
+func _push_out(p: Vector2, airborne: bool = false) -> Vector2:
+	return Blockers.push_out(p, _rects, _circles, _low_rects, _low_circles, airborne)
 
 
 static func _box(size: Vector3, m: Material) -> MeshInstance3D:

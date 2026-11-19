@@ -11,7 +11,7 @@ extends Node3D
 ## 모양과 재질은 MoveArt(아트팀), 흙먼지·흙덩이·불똥은 PullFx의 것을 쓴다. 꾸밈용 랜덤은 이 노드의 것(규칙 rng와 따로).
 ## 이 노드는 top_level이고 원점에 있어서 자식의 위치가 곧 세계 좌표다.
 
-const SIGNALS: Array[StringName] = [&"move_started", &"move_area", &"projectile_spawned", &"projectile_ended"]
+const SIGNALS: Array[StringName] = [&"move_started", &"move_area", &"projectile_spawned", &"projectile_ended", &"lord_landed"]
 ## 동시에 살아 있는 알갱이 노드의 최대 수(소용돌이·연속 찌르기가 자주 터진다). 넘치면 알갱이만 거른다.
 const MAX_PARTICLES: int = 24
 ## 동시에 살아 있는 효과 묶음의 최대 수. 넘치면 오래된 것부터 지운다.
@@ -37,6 +37,8 @@ const SPIN_SPEED: float = 26.0
 @export var mark_fade: float = 0.4
 
 var rules: Rules = null
+## 땅 높이(m)를 돌려주는 함수(x, z). 들판은 FieldBuilder.walk_height를 넣는다(EnemyFx.height_of와 같다). 없으면 HillBuilder.height.
+var height_of: Callable = Callable()
 ## 속성이 없을 때의 빛 색. main이 쥔 칼에 맞춰 넣는다(LordView의 SlashFx 색과 같게).
 var tint: Color = MoveArt.STEEL
 
@@ -118,11 +120,18 @@ func setup(r: Rules) -> void:
 		&"move_area": Callable(self, "on_move_area"),
 		&"projectile_spawned": Callable(self, "on_projectile_spawned"),
 		&"projectile_ended": Callable(self, "on_projectile_ended"),
+		&"lord_landed": Callable(self, "on_landed"),
 	}
 	for s in SIGNALS:
 		var c: Callable = handlers[s]
 		if r.has_signal(s) and not r.is_connected(s, c):
 			r.connect(s, c)
+
+
+## 걸어 다니는 점프(30단계)에서 내려앉았다: 발밑에 작은 흙먼지(PullFx의 것).
+func on_landed(at: Vector2) -> void:
+	_build()
+	_pull_fx._dust(_ground(at, 0.0), 7, 1.0, 0.26)
 
 
 ## 남은 효과를 모두 지운다(판이 끝날 때, 갤러리에서 다음 동작 전).
@@ -1045,7 +1054,7 @@ func _cache_room() -> void:
 ## 칸 위치의 땅 위 lift m(세계 좌표).
 func _ground(cells: Vector2, lift: float) -> Vector3:
 	var w: Vector3 = Grid.cells_to_world(cells)
-	w.y = HillBuilder.height(w.x, w.z) + lift
+	w.y = (float(height_of.call(w.x, w.z)) if height_of.is_valid() else HillBuilder.height(w.x, w.z)) + lift
 	return w
 
 

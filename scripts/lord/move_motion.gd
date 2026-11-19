@@ -402,6 +402,40 @@ static func apply(model: Node3D, pose_now: Dictionary, yaw: float, y: float) -> 
 	model.scale = Vector3(1.0, float(pose_now.get("scale_y", 1.0)), 1.0)
 
 
+# ---------------------------------------------------------------- 걸어 다니는 점프(30단계)
+
+## 점프하는 몸(화면만, 규칙은 높이 LordState.air_height만 정한다). 웅크렸다 펴며 솟고 → 공중에서 다리를 접고 → 펴서 내려앉으며 무릎을 굽혔다 편다.
+## 솟을 때 펴는 구간(뜬 시간의 비율), 다리 접기(시작, 다 접음, 펴기 시작, 다 폄: 비율), 내려앉은 뒤 무릎을 굽혔다 펴는 시간(초).
+const HOP_PUSH: float = 0.18
+const HOP_TUCK: Vector4 = Vector4(0.16, 0.4, 0.62, 0.92)
+const HOP_LAND: float = 0.26
+## 솟기 전 웅크림(bend), 내려앉을 때 굽힘의 가장 깊은 때(HOP_LAND의 비율), 공중과 내려앉을 때 앞으로 숙이는 정도(라디안).
+const HOP_CROUCH: float = 0.6
+const HOP_LAND_PEAK: float = 0.22
+const HOP_PITCH: float = 0.12
+const HOP_LAND_PITCH: float = 0.16
+
+
+## u = 뜬 뒤 지난 비율(0~1, 땅이면 음수), land = 내려앉은 뒤 지난 초(아니면 음수).
+## 돌려주는 것: bend(0~1, 선 채로 무릎 굽힘: 솟기 직전과 내려앉은 뒤), tuck(0~1, 공중에서 다리 접기), pitch(앞으로 숙이기, 라디안).
+## LordView가 기사 모델이면 다리(LordCharacter.set_legs)와 몸 내리기(bend_drop)로, 기본 도형이면 눌림(scale_y)으로 바꾼다.
+static func hop_pose(u: float, land: float) -> Dictionary:
+	var bend: float = 0.0
+	var tuck: float = 0.0
+	var pitch: float = 0.0
+	if u >= 0.0:
+		var k: float = clampf(u, 0.0, 1.0)
+		bend = HOP_CROUCH * (1.0 - smoothstep(0.0, HOP_PUSH, k))
+		tuck = smoothstep(HOP_TUCK.x, HOP_TUCK.y, k) * (1.0 - 0.8 * smoothstep(HOP_TUCK.z, HOP_TUCK.w, k))
+		pitch = HOP_PITCH * sin(k * PI)
+	if land >= 0.0 and land < HOP_LAND:
+		var t: float = land / HOP_LAND
+		var g: float = smoothstep(0.0, HOP_LAND_PEAK, t) * (1.0 - smoothstep(HOP_LAND_PEAK + 0.08, 1.0, t))
+		bend = maxf(bend, g)
+		pitch += HOP_LAND_PITCH * g
+	return {"bend": bend, "tuck": tuck, "pitch": pitch}
+
+
 # ---------------------------------------------------------------- 안쪽
 
 static func _blank(move: StringName, info: Dictionary) -> Dictionary:

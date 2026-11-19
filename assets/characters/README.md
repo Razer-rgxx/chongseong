@@ -11,6 +11,7 @@ Mixamo(Adobe)에서 받은 모델과 동작을 둔다. Mixamo 약관상 원본 �
 
 - 모델이 없으면 기본 도형 영주가 나온다.
 - 동작은 파일 이름의 낱말로 고른다: idle, run, roll, impact/hit, death/dying, pull, slash/attack(이름에 great가 있으면 대검 베기). 베기는 여러 개 넣으면 번갈아 튼다. 없는 동작은 서 있기로 대신한다.
+- 점프(30단계, Space): 이름에 `hop`이 있는 동작을 걸어 다니는 점프에 쓴다(Mixamo 검색어 jump · hop, Without Skin, In Place). `jump`는 도약 내려찍기 낱말이라 받은 파일 이름에서 빼고 `hop`을 넣는다(예: `Jump.fbx` → `Hop.fbx`). 없으면 뛰기 전 동작을 멈춰 두고 다리를 코드로 접는다.
 - Godot이 FBX를 읽으면서 `paladin_0.png` 같은 텍스처를 옆에 뽑아 둔다. 이것도 올리지 않는다.
 
 ## 동작별로 받으면 좋은 것

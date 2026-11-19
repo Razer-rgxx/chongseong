@@ -4,6 +4,8 @@ extends RefCounted
 ## 땅·풀·나무·바위·하늘은 HillBuilder의 것을 쓰고, 나머지(길·개울·망루·옛 싸움터·목책)는 기본 도형이다.
 ## 같은 모양이 많은 것은 MultiMesh로, 바위와 작은 소품은 visibility range로 멀리서 그리지 않는다.
 ## 길이는 m. 칸 좌표는 FieldLayout 쪽(1칸 = 2m).
+## 막힘(build가 돌려준다)은 그린 것과 같은 표에서 나온다. 그린 높이가 Blockers.JUMP_CLEAR(1.0m) 이하면 낮은 막힘(low_rects·low_circles,
+## 공중에서 넘는다, 30단계): 불탄 마을의 울타리와 우물 둘레, 성채·불탄 마을 벽의 무너진 낮은 조각, 검은 숲의 쓰러진 거목, 발치의 꺼진 화톳불.
 
 const DECK_Y: float = 0.35
 const WATER_Y: float = -0.7
@@ -111,20 +113,22 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	var rects: Array[Rect2] = []
 	rects.append_array(FieldLayout.BORDER_RECTS)
 	var circles: Array = []
+	var low_rects: Array[Rect2] = []
+	var low_circles: Array = []
 	_terrain(parent)
 	_water(parent)
 	_road(parent)
 	_bridge(parent, rects)
 	_tower(parent, rects)
-	_keep(parent, rects)
+	_keep(parent, rects, low_rects)
 	_east_ridge(parent, circles)
 	_east_ridge(parent, circles, 337.0, 23)
 	_quarry(parent, rects)
-	_hamlet(parent, rects)
+	_hamlet(parent, rects, low_rects)
 	_pass(parent, rects)
 	_old_field(parent, rng, circles)
-	_grove(parent, rng, circles)
-	_foot(parent, circles)
+	_grove(parent, rng, circles, low_circles)
+	_foot(parent, circles, low_circles)
 	_crypt_gate(parent, rects)
 	_palisade(parent)
 	_far_hill(parent)
@@ -133,7 +137,35 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_reeds(parent, rng)
 	_marsh(parent, circles)
 	_grass(parent, rng)
-	return {"rects": rects, "circles": circles}
+	return {"rects": rects, "circles": circles, "low_rects": low_rects, "low_circles": low_circles}
+
+
+## 벽 한 줄(칸 표 rect)을 n조각으로 나눈 k번째 조각(칸 Rect2).
+static func _seg_rect(w: Rect2, along_x: bool, k: int, n: int) -> Rect2:
+	if along_x:
+		var sx: float = w.size.x / n
+		return Rect2(w.position.x + k * sx, w.position.y, sx, w.size.y)
+	var sy: float = w.size.y / n
+	return Rect2(w.position.x, w.position.y + k * sy, w.size.x, sy)
+
+
+## 벽 한 줄의 막힘: 조각마다 그린 높이(땅 위 m)가 낮으면 낮은 막힘, 아니면 높은 막힘. 이웃한 같은 쪽 조각은 하나로 합친다
+## (무너진 곳이 없는 벽은 표의 rect 그대로 들어간다).
+static func _wall_blockers(w: Rect2, shown: PackedFloat32Array, rects: Array[Rect2], low_rects: Array[Rect2]) -> void:
+	var along_x: bool = w.size.x >= w.size.y
+	var n: int = shown.size()
+	var k: int = 0
+	while k < n:
+		var low: bool = Blockers.is_low(shown[k])
+		var e: int = k
+		while e + 1 < n and Blockers.is_low(shown[e + 1]) == low:
+			e += 1
+		var r: Rect2 = w if k == 0 and e == n - 1 else _seg_rect(w, along_x, k, n).merge(_seg_rect(w, along_x, e, n))
+		if low:
+			low_rects.append(r)
+		else:
+			rects.append(r)
+		k = e + 1
 
 
 static func _mat(key: String, c: Color, rough: float = 1.0, metal: float = 0.0, glow: float = 0.0) -> StandardMaterial3D:
@@ -328,9 +360,10 @@ static func _bridge(parent: Node3D, rects: Array[Rect2]) -> void:
 	var st: Material = _stone()
 	_box(parent, Vector3(4.4, 0.5, 13.5), Vector3(bx, DECK_Y - 0.25, bz), st)
 	for s in [-1.0, 1.0]:
-		_box(parent, Vector3(0.35, 0.7, 12.0), Vector3(bx + 2.05 * s, DECK_Y + 0.35, bz), st)
-		_box(parent, Vector3(0.6, 1.2, 0.6), Vector3(bx + 2.05 * s, DECK_Y + 0.6, bz - 6.0), st)
-		_box(parent, Vector3(0.6, 1.2, 0.6), Vector3(bx + 2.05 * s, DECK_Y + 0.6, bz + 6.0), st)
+		# 난간은 1.1m(점프로 못 넘는 높은 막힘: 넘으면 다리 판에서 개울 바닥으로 뚝 떨어져 보인다, 30단계)
+		_box(parent, Vector3(0.35, 1.1, 12.0), Vector3(bx + 2.05 * s, DECK_Y + 0.55, bz), st)
+		_box(parent, Vector3(0.6, 1.5, 0.6), Vector3(bx + 2.05 * s, DECK_Y + 0.75, bz - 6.0), st)
+		_box(parent, Vector3(0.6, 1.5, 0.6), Vector3(bx + 2.05 * s, DECK_Y + 0.75, bz + 6.0), st)
 		_box(parent, Vector3(0.9, 2.2, 0.9), Vector3(bx + 1.6 * s, -0.6, bz + 5.0 * s), st)
 		var cx: float = (bx + 2.05 * s) / Grid.CELL
 		rects.append(Rect2(cx - 0.12, (bz - 5.6) / Grid.CELL, 0.24, 11.2 / Grid.CELL))
@@ -376,8 +409,8 @@ static func _tower(parent: Node3D, rects: Array[Rect2]) -> void:
 # ---------------------------------------------------------------- 무너진 성채 (20단계)
 
 ## 무너진 성벽(KEEP_WALLS의 돌 상자 줄, 높이가 들쭉날쭉하고 군데군데 낮게 무너졌다)과 반쯤 남은 탑(KEEP_TOWER).
-## 그린 곳이 곧 막힌 곳이다(표 하나). 글자 없음.
-static func _keep(parent: Node3D, rects: Array[Rect2]) -> void:
+## 그린 곳이 곧 막힌 곳이다(표 하나). 무너진 낮은 조각(땅 위 1m 이하)은 낮은 막힘이라 점프로 넘는다(30단계). 글자 없음.
+static func _keep(parent: Node3D, rects: Array[Rect2], low_rects: Array[Rect2]) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20
 	var st: Material = _stone()
@@ -387,6 +420,7 @@ static func _keep(parent: Node3D, rects: Array[Rect2]) -> void:
 		var thick: float = (w.size.y if along_x else w.size.x) * Grid.CELL
 		var n: int = maxi(int(length / 2.4), 1)
 		var seg: float = length / n
+		var shown := PackedFloat32Array()
 		for k in n:
 			var h: float = rng.randf_range(1.4, 4.4)
 			if rng.randf() < 0.3:
@@ -396,7 +430,8 @@ static func _keep(parent: Node3D, rects: Array[Rect2]) -> void:
 			var cz: float = (w.position.y + w.size.y / 2.0) * Grid.CELL if along_x else (w.position.y * Grid.CELL + along)
 			var size: Vector3 = Vector3(seg * 1.04, h, thick) if along_x else Vector3(thick, h, seg * 1.04)
 			_box(parent, size, Vector3(cx, height(cx, cz) + h / 2.0 - 0.3, cz), st, Vector3(0.0, rng.randf_range(-0.04, 0.04), 0.0), 200.0)
-		rects.append(w)
+			shown.append(h - 0.3)   # 땅에 0.3m 묻혀 있다
+		_wall_blockers(w, shown, rects, low_rects)
 		# 벽 곁에 떨어진 돌
 		for k in 6:
 			var s: float = rng.randf_range(0.4, 1.0)
@@ -555,7 +590,7 @@ static func _old_field(parent: Node3D, rng: RandomNumberGenerator, circles: Arra
 
 # ---------------------------------------------------------------- 검은 숲 가장자리
 
-static func _grove(parent: Node3D, rng: RandomNumberGenerator, circles: Array) -> void:
+static func _grove(parent: Node3D, rng: RandomNumberGenerator, circles: Array, low_circles: Array) -> void:
 	var area: Rect2 = FieldLayout.AREAS[&"grove"]
 	var by_v: Array = [[], [], [], []]
 	var tries: int = 0
@@ -577,28 +612,28 @@ static func _grove(parent: Node3D, rng: RandomNumberGenerator, circles: Array) -
 		xs.assign(by_v[v])
 		if not xs.is_empty():
 			HillBuilder._multi(parent, HillBuilder.bare_tree(v), xs, true, HillBuilder.bark()).visibility_range_end = 150.0
-	# 쓰러진 거목: 줄지은 둥근 막힘
+	# 쓰러진 거목: 땅에 반쯤 묻혀 누운 둥치(땅 위 1m 안), 줄지은 둥근 낮은 막힘이라 점프로 넘는다(30단계)
 	var a := Vector2(14, 34)
 	var e := Vector2(26, 38)
 	var pa: Vector3 = at_cell(a)
 	var pe: Vector3 = at_cell(e)
 	var mid: Vector3 = (pa + pe) / 2.0
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.7
-	cm.bottom_radius = 0.95
+	cm.top_radius = 0.5
+	cm.bottom_radius = 0.62
 	cm.height = pa.distance_to(pe)
 	var mi := MeshInstance3D.new()
 	mi.mesh = cm
 	mi.material_override = HillBuilder.bark()
-	mi.position = mid + Vector3(0, 0.6, 0)
+	mi.position = mid + Vector3(0, 0.32, 0)
 	var dir: Vector3 = (pe - pa).normalized()
 	mi.basis = Basis(Quaternion(Vector3.UP, dir))
 	parent.add_child(mi)
-	for k in 7:
-		circles.append([a.lerp(e, float(k) / 6.0), 0.8])
+	for k in 13:
+		low_circles.append([a.lerp(e, float(k) / 12.0), 0.45])
 	for k in 5:
 		var rb := Vector3(rng.randf_range(-1, 1), 0.5, rng.randf_range(-1, 1))
-		_box(parent, Vector3(0.18, 0.18, 2.2), pa + Vector3(0, 0.9, 0) + rb, _mat("dead_wood", Color(0.12, 0.1, 0.08)), Vector3(0.3, rng.randf() * TAU, 0.4))
+		_box(parent, Vector3(0.18, 0.18, 2.2), pa + Vector3(0, 0.12, 0) + rb, _mat("dead_wood", Color(0.12, 0.1, 0.08)), Vector3(0.3, rng.randf() * TAU, 0.4))
 
 
 # ---------------------------------------------------------------- 무덤 입구 (19단계)
@@ -635,7 +670,7 @@ static func _crypt_gate(parent: Node3D, rects: Array[Rect2]) -> void:
 
 # ---------------------------------------------------------------- 언덕 발치
 
-static func _foot(parent: Node3D, circles: Array) -> void:
+static func _foot(parent: Node3D, circles: Array, low_circles: Array) -> void:
 	var st: Material = _stone()
 	var cx: float = 55.0 * Grid.CELL
 	for i in 9:
@@ -668,7 +703,7 @@ static func _foot(parent: Node3D, circles: Array) -> void:
 	parent.add_child(am)
 	for k in 3:
 		_box(parent, Vector3(0.12, 0.12, 1.1), fc + Vector3(0, 0.25, 0), _wood(), Vector3(0, k * 1.0, 0.1))
-	circles.append([Vector2(fc.x, fc.z) / Grid.CELL, 1.0])
+	low_circles.append([Vector2(fc.x, fc.z) / Grid.CELL, 1.0])   # 돌 둘레는 0.35m: 낮은 막힘
 
 
 # ---------------------------------------------------------------- 마을 목책과 문
@@ -1070,7 +1105,8 @@ static func _quarry(parent: Node3D, rects: Array[Rect2]) -> void:
 
 
 ## 불탄 마을: 지붕 없이 그을린 집 벽(HAMLET_WALLS, 군데군데 낮게 무너짐), 우물, 무너진 울타리, 재와 숯 들보. 글자 없음.
-static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
+## 30단계: 무너진 낮은 벽 조각·우물 둘레·울타리(모두 땅 위 1m 안)는 낮은 막힘, 우물의 부러진 두레박 기둥(HAMLET_WELL_POST)은 높은 막힘.
+static func _hamlet(parent: Node3D, rects: Array[Rect2], low_rects: Array[Rect2]) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 29
 	var ch: Material = _char_mat()
@@ -1080,6 +1116,7 @@ static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
 		var thick: float = (w.size.y if along_x else w.size.x) * Grid.CELL
 		var n: int = maxi(int(length / 1.4), 1)
 		var seg: float = length / n
+		var shown := PackedFloat32Array()
 		for k in n:
 			var h: float = rng.randf_range(1.6, 3.2)
 			if rng.randf() < 0.3:
@@ -1089,7 +1126,8 @@ static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
 			var cz: float = (w.position.y + w.size.y / 2.0) * Grid.CELL if along_x else (w.position.y * Grid.CELL + along)
 			var size: Vector3 = Vector3(seg * 1.04, h, thick) if along_x else Vector3(thick, h, seg * 1.04)
 			_box(parent, size, Vector3(cx, height(cx, cz) + h / 2.0 - 0.2, cz), ch, Vector3(0.0, rng.randf_range(-0.03, 0.03), 0.0), 220.0)
-		rects.append(w)
+			shown.append(h - 0.2)   # 땅에 0.2m 묻혀 있다
+		_wall_blockers(w, shown, rects, low_rects)
 	# 집마다 타다 남은 들보와 재 무더기
 	var ash: Material = _mat("ash", Color(0.06, 0.055, 0.05))
 	for hz in [Rect2(174, 45, 7, 5), Rect2(198, 45, 6, 5), Rect2(212, 45, 7, 5), Rect2(176, 66, 7, 6), Rect2(200, 67, 6, 6), Rect2(214, 66, 7, 6)]:
@@ -1108,9 +1146,11 @@ static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
 		var a: float = k * TAU / 8.0
 		_box(parent, Vector3(0.9, 0.9, 0.5), Vector3(wc.x + cos(a) * 1.3, wb + 0.4, wc.y + sin(a) * 1.3), st, Vector3(0, -a + PI / 2.0, 0))
 	_box(parent, Vector3(2.0, 0.04, 2.0), Vector3(wc.x, wb + 0.1, wc.y), _mat("ash", Color(0.06, 0.055, 0.05)))
-	_box(parent, Vector3(0.2, 2.6, 0.2), Vector3(wc.x + 1.3, wb + 1.3, wc.y), _wood())
-	_box(parent, Vector3(1.8, 0.16, 0.16), Vector3(wc.x + 0.5, wb + 2.5, wc.y), _wood(), Vector3(0.0, 0.0, 0.35))
-	rects.append(well)
+	var post: Vector2 = FieldLayout.HAMLET_WELL_POST.get_center() * Grid.CELL
+	_box(parent, Vector3(0.2, 2.6, 0.2), Vector3(post.x, wb + 1.3, post.y), _wood())
+	_box(parent, Vector3(1.8, 0.16, 0.16), Vector3(post.x - 0.8, wb + 2.5, post.y), _wood(), Vector3(0.0, 0.0, 0.35))
+	low_rects.append(well)   # 돌 둘레는 땅 위 0.85m
+	rects.append(FieldLayout.HAMLET_WELL_POST)
 	# 무너진 울타리: 기둥과 부러진 가로대
 	var wd: Material = _wood()
 	for f in FieldLayout.HAMLET_FENCES:
@@ -1121,12 +1161,12 @@ static func _hamlet(parent: Node3D, rects: Array[Rect2]) -> void:
 			var t: float = float(k) / n
 			var x: float = (f.position.x + (f.size.x * t if along_x else f.size.x / 2.0)) * Grid.CELL
 			var z: float = (f.position.y + (f.size.y / 2.0 if along_x else f.size.y * t)) * Grid.CELL
-			var h: float = rng.randf_range(0.5, 1.4)
+			var h: float = rng.randf_range(0.5, 1.0)   # 땅 위 1m 안(낮은 막힘)
 			_box(parent, Vector3(0.18, h, 0.18), Vector3(x, height(x, z) + h / 2.0 - 0.1, z), wd, Vector3(rng.randf_range(-0.2, 0.2), 0.0, rng.randf_range(-0.2, 0.2)), 200.0)
 		var mx: float = (f.get_center().x) * Grid.CELL
 		var mz: float = (f.get_center().y) * Grid.CELL
-		_box(parent, Vector3(length * 0.7, 0.1, 0.1) if along_x else Vector3(0.1, 0.1, length * 0.7), Vector3(mx, height(mx, mz) + 0.8, mz), wd, Vector3(0.0, 0.0, rng.randf_range(-0.15, 0.15)), 200.0)
-		rects.append(f)
+		_box(parent, Vector3(length * 0.7, 0.1, 0.1) if along_x else Vector3(0.1, 0.1, length * 0.7), Vector3(mx, height(mx, mz) + 0.55, mz), wd, Vector3(0.0, 0.0, rng.randf_range(-0.15, 0.15) * 0.3), 200.0)
+		low_rects.append(f)
 
 
 ## 까마귀 고개: 양쪽 돌 벼랑(PASS_CLIFFS, 땅은 new_land가 오르막으로 만든다), 길 가의 돌과 마른 나무.

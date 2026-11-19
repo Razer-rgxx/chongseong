@@ -5,6 +5,8 @@ extends Node3D
 ## 모델은 자식 "Model" 씬(scenes/lord/lord_model.tscn)이다. 모델을 바꿔 끼울 때 칼은 "Model/Hand/Blade"에 두면 된다.
 ## 쥔 검의 형태에 따라 칼날 길이와 두께가, 등급에 따라 코등이 색이 바뀐다.
 ## assets/characters/lord/paladin.fbx가 있으면 기본 도형 대신 그 기사(LordCharacter)를 세우고 동작을 고른다.
+## 걸어 다니는 점프(30단계): 규칙의 공중 시간(LordState.air)으로 몸을 포물선으로 띄우고, MoveMotion.hop_pose로 웅크림 → 다리 접기 →
+## 내려앉으며 무릎 굽힘을 얹는다. 기사 모델은 hop 동작 파일이 있으면 그것을, 없으면 다리를 코드로 굽힌다(LegFold). 기본 도형은 눌린다.
 
 @export var ghost_color: Color = Color(0.5, 0.7, 1.0, 0.35)
 @export var ghost_life: float = 0.2
@@ -38,6 +40,10 @@ extends Node3D
 ## 줄이 적에게 닿을 때까지의 시간(초).
 @export var hook_rope_shoot: float = 0.07
 @export var rope_color: Color = Color(0.5, 0.48, 0.45)
+@export_group("점프")
+## 기본 도형 영주가 무릎 굽힘(bend)·다리 접기(tuck)에서 눌리는 정도(scale_y에서 뺀다).
+@export var hop_squash_bend: float = 0.17
+@export var hop_squash_tuck: float = 0.09
 @export_group("뽑기")
 ## 뽑는 동안 영주의 몸(화면만)을 손잡이에서 이만큼(m)까지 당겨 세운다. 규칙의 뽑기 거리는 1.1칸(2.2m)까지라 팔이 닿게.
 @export var pull_stand: float = 1.6
@@ -87,6 +93,12 @@ var _pull := PullMotion.rest()
 var _pull_at := Vector3.ZERO
 var _pull_has_at: bool = false
 var _pull_hid: bool = false
+## 점프: 이번 화면의 높이(m), 몸 자세(MoveMotion.hop_pose), 지난 화면에 공중이었는지, 내려앉은 뒤 지난 초(-1이면 아님), hop 동작을 트는 중인지.
+var _jump_y: float = 0.0
+var _hop: Dictionary = {"bend": 0.0, "tuck": 0.0, "pitch": 0.0}
+var _was_air: bool = false
+var _land_t: float = -1.0
+var _hop_anim: bool = false
 
 
 func setup(r: Rules) -> void:
@@ -195,8 +207,9 @@ func draw(alpha: float, delta: float) -> void:
 		rel = -dir * L.swing_arc / 2.0 + dir * L.swing_arc * minf(1.0, k * 1.6)
 	if _hand:
 		_hand.rotation.y = -rel
+	_step_jump(L, alpha, delta)
 	if character:
-		character.set_frozen(rules.freeze > 0 or _paused())
+		character.set_frozen(rules.freeze > 0 or _paused() or _air_frozen(L))
 		_step_then()
 		_animate(L, delta)
 		_turn(L, delta)
@@ -215,7 +228,8 @@ func draw(alpha: float, delta: float) -> void:
 		_yaw_now = lerp_angle(_yaw_now, want, 1.0 - exp(-turn_fast * delta)) if character else want
 	_pull_sword(pulling)
 	pose = PullMotion.add(pose, PullMotion.pose(_pull, {"pulling": pulling, "steps": rules.pull_steps}, delta, character))
-	MoveMotion.apply(_model, pose, _yaw_now, _air)
+	pose = PullMotion.add(pose, _jump_pose())
+	MoveMotion.apply(_model, pose, _yaw_now, _air + _jump_y)
 	for i in range(_ghosts.size() - 1, -1, -1):
 		var g := _ghosts[i]
 		var m := g.material_override as StandardMaterial3D
@@ -362,7 +376,7 @@ func _animate(L: LordState, delta: float) -> void:
 			_one_shot("roll", roll_speed, roll_hold)
 	elif _hurt and _plan.is_empty() and L.dash <= 0.0:
 		_one_shot("hit", hit_speed)
-	elif _busy <= 0.0:
+	elif _busy <= 0.0 and not L.airborne():   # 공중에서는 뛰기 전 동작을 그대로 둔다(hop이 없으면 멈춰 두고 다리를 접는다)
 		if rules.pull_hilt != null:
 			_loop("pull")
 		elif L.moving:
@@ -398,6 +412,73 @@ func _turn(L: LordState, delta: float) -> void:
 		target = _yaw(L.move_dir.angle())
 	var k: float = 1.0 - exp(-(turn_fast if fast else turn_speed) * delta)
 	_yaw_now = lerp_angle(_yaw_now, target, k)
+
+
+# ---------------------------------------------------------------- 걸어 다니는 점프(30단계)
+
+## 규칙의 공중 시간을 틱 사이로 이어 높이와 자세를 정한다. 뛰는 순간(hop 동작이 있으면 튼다)과 내려앉는 순간을 알아챈다.
+func _step_jump(L: LordState, alpha: float, delta: float) -> void:
+	var D: LordData = rules.data.lord
+	var aloft: bool = L.airborne()
+	if aloft and not _was_air:
+		_land_t = -1.0
+		_start_hop()
+	elif not aloft and _was_air:
+		_land_t = 0.0
+	_was_air = aloft
+	if _hop_anim and (character == null or _state != "hop"):
+		_hop_anim = false   # hop 동작이 끝났거나 맞기 같은 다른 동작으로 바뀌었다
+	if _land_t >= 0.0:
+		_land_t += delta
+		if _land_t > MoveMotion.HOP_LAND:
+			_land_t = -1.0
+	var u: float = -1.0
+	if aloft and D.jump_time > 0.0:
+		var left: float = lerpf(L.prev_air if L.prev_air > 0.0 else D.jump_time, L.air, alpha)
+		u = 1.0 - left / D.jump_time
+	if L.hp <= 0.0:   # 공중에서 쓰러지면 내려온다(규칙은 멈춘다)
+		_jump_y = move_toward(_jump_y, 0.0, delta * 6.0)
+		_hop = MoveMotion.hop_pose(-1.0, -1.0)
+		return
+	_jump_y = lerpf(LordState.air_height(L.prev_air, D), LordState.air_height(L.air, D), alpha)
+	_hop = MoveMotion.hop_pose(u, _land_t)
+
+
+## 뛰는 순간: 기사 모델에 hop 동작이 있으면 발이 땅을 떠난 구간(hop_window)을 뜬 시간에 맞춰 튼다.
+func _start_hop() -> void:
+	_hop_anim = false
+	if character == null or not character.has("hop") or rules.pull_hilt != null:
+		return
+	var w: Vector2 = character.hop_window
+	var T: float = rules.data.lord.jump_time
+	if w.x >= 0.0 and w.y > w.x and T > 0.0:
+		_one_shot("hop", (w.y - w.x) / T, -1.0, w.x)
+	else:
+		_one_shot("hop", 1.0)
+	_plan = {}
+	_hop_anim = true
+
+
+## hop 동작이 없는 기사 모델은 공중에서 뛰기 전 동작을 멈춰 두고 다리만 접는다(뛰던 다리가 허공을 젓지 않게).
+func _air_frozen(L: LordState) -> bool:
+	return L.airborne() and not _hop_anim
+
+
+## 점프 자세를 모델에 얹을 몫(PullMotion.add 모양). 기사 모델은 다리를 굽히고 무릎 굽힘만큼 몸을 내린다(발이 땅에 붙게), 기본 도형은 눌린다.
+func _jump_pose() -> Dictionary:
+	var bend: float = float(_hop.bend)
+	var tuck: float = float(_hop.tuck)
+	var out: Dictionary = {"pitch": float(_hop.pitch)}
+	if character:
+		if _hop_anim:
+			character.set_legs(0.0, 0.0)
+			out["pitch"] = 0.0
+		else:
+			character.set_legs(tuck, bend)
+			out["crouch"] = character.bend_drop(bend)
+	else:
+		out["scale_y"] = 1.0 - hop_squash_bend * bend - hop_squash_tuck * tuck
+	return out
 
 
 # ---------------------------------------------------------------- 갈고리

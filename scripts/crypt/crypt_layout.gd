@@ -86,8 +86,9 @@ static func walkable(open_doors: Dictionary) -> Array[Rect2]:
 	return out
 
 
-## 걷는 판 밖에 있으면 가장 가까운 걸을 수 있는 곳으로 밀어 넣고, 관(둥근 막힘)에서 밀어낸다.
-static func push_in(p: Vector2, open_doors: Dictionary) -> Vector2:
+## 걷는 판 밖에 있으면 가장 가까운 걸을 수 있는 곳으로 밀어 넣고, 관(둥근 막힘, Blockers)에서 밀어낸다.
+## 벽(CryptBuilder.WALL_H 1.5m)과 관(땅 위 1.2m)은 모두 높은 막힘이라 공중이어도 막는다. 낮은 막힘은 없다(돌무더기는 막힘이 아닌 꾸밈).
+static func push_in(p: Vector2, open_doors: Dictionary, airborne: bool = false) -> Vector2:
 	var best: Vector2 = p
 	var best_d: float = INF
 	for r in walkable(open_doors):
@@ -100,13 +101,15 @@ static func push_in(p: Vector2, open_doors: Dictionary) -> Vector2:
 			if d == 0.0:
 				break
 	p = best
+	return Blockers.push_out(p, [], coffin_circles(), [], [], airborne, BODY)
+
+
+## 관의 둥근 막힘([가운데, 반지름], Blockers 모양).
+static func coffin_circles() -> Array:
+	var out: Array = []
 	for id in ROOM_ORDER:
-		var c: Vector2 = ROOMS[id].coffin
-		var off: Vector2 = p - c
-		var min_d: float = COFFIN_RADIUS + BODY
-		if off.length() < min_d:
-			p = c + (off.normalized() if off.length() > 0.001 else Vector2.DOWN) * min_d
-	return p
+		out.append([ROOMS[id].coffin, COFFIN_RADIUS])
+	return out
 
 
 ## 방의 가운데(무리·무덤 주인 자리).

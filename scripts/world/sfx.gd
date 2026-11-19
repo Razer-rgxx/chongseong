@@ -16,6 +16,7 @@ const SOUND_DIR: String = "res://assets/sound/"
 @export var gains: Dictionary = {
 	&"swish": -2.0, &"swish_big": 0.0, &"dash": -4.0, &"hit": 0.0, &"hit_big": 2.0,
 	&"hit_flesh": -3.0, &"hit_heavy": -4.0, &"thump": -2.0, &"anvil": 0.0, &"draw": -2.0, &"break": 0.0, &"hurt": -2.0, &"grunt": -6.0,
+	&"land": -3.0,
 }
 
 var _streams: Dictionary = {}   # 이름 -> Array[AudioStream]
@@ -35,6 +36,7 @@ func _ready() -> void:
 		&"anvil": [92.0, 36.0, 0.4, 0.6, 0.25, 700.0], &"draw": [150.0, 80.0, 0.16, 0.3, 0.35, 2600.0],
 		&"break": [220.0, 60.0, 0.28, 0.3, 0.6, 3200.0], &"hurt": [150.0, 70.0, 0.15, 0.5, 0.2, 1200.0],
 		&"night": [70.0, 40.0, 1.2, 0.5, 0.15, 600.0],
+		&"land": [85.0, 42.0, 0.11, 0.35, 0.4, 900.0],   # 점프하고 내려앉는 발소리(30단계): 짧게 내려가는 쿵과 흙 잡음
 	}
 	for name in made:
 		var files := _load_dir(str(name))

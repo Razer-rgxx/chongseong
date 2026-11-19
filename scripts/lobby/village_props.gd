@@ -44,8 +44,8 @@ static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vecto
 			# 서쪽(마당 들머리)의 틈
 			if i == 3 and p.y > gap.x and p.y < gap.y:
 				continue
-			VillageBuilder.box(parent, Vector3(0.12, 1.2, 0.12), Grid.cells_to_world(p) + Vector3(0, 0.6, 0), wood)
-		for h in [0.45, 0.9]:
+			VillageBuilder.box(parent, Vector3(0.12, 1.0, 0.12), Grid.cells_to_world(p) + Vector3(0, 0.5, 0), wood)   # 1m: 점프로 넘는다(30단계)
+		for h in [0.4, 0.82]:
 			var from := Grid.cells_to_world(a)
 			var to := Grid.cells_to_world(c)
 			var mid := (from + to) / 2.0

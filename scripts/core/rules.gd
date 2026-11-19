@@ -34,6 +34,9 @@ signal slots_changed()
 signal sword_broke(slot: int, sword: Sword)
 signal lord_swung(big: bool)
 signal lord_dashed()
+## 걸어 다니는 점프(30단계): 뛰었다 / 내려앉았다(at은 내려앉은 자리, 칸). 화면이 몸을 띄우고 흙먼지와 발소리를 낸다.
+signal lord_jumped()
+signal lord_landed(at: Vector2)
 ## 갈고리를 걸었다(날아가기 시작).
 signal lord_hooked(target: Enemy)
 signal lord_hurt(damage: float)
@@ -391,6 +394,7 @@ func step(input: LordInput = null) -> void:
 		return
 	tick += 1
 	lord.prev_pos = lord.pos
+	lord.prev_air = lord.air
 	for e in enemies:
 		e.prev_pos = e.pos
 	for p in projectiles:
@@ -805,6 +809,12 @@ func _step_lord(input: LordInput) -> void:
 	L.hook_cooldown -= dt
 	L.combo_timer -= dt
 	L.move_lock -= dt
+	# 걸어 다니는 점프(30단계): 공중 시간이 다 되면 내려앉는다(장면이 이 틱 뒤 낮은 막힘 안이면 밀어낸다)
+	if L.air > 0.0:
+		L.air -= dt
+		if L.air <= 0.0:
+			L.air = 0.0
+			lord_landed.emit(L.pos)
 	# 돌격병에 받혀 밀려나는 중
 	if L.push.length_squared() > 0.0001:
 		L.pos = (L.pos + L.push * dt).clamp(Vector2(0.5, 0.5), Vector2(Grid.size) - Vector2(0.5, 0.5))
@@ -813,7 +823,7 @@ func _step_lord(input: LordInput) -> void:
 		L.push = Vector2.ZERO
 	if input and input.swap_to >= 0:
 		swap(input.swap_to)
-	if input and input.pull:
+	if input and input.pull and L.air <= 0.0:
 		_try_pull()
 		if pull_hilt != null:
 			L.moving = false
@@ -826,7 +836,12 @@ func _step_lord(input: LordInput) -> void:
 		L.move_dir = mv.normalized()
 	# 발도·지진·반격 자세처럼 멈추는 동작과 영주를 옮기는 동작(돌진베기, 도약 …) 동안은 걷지도, 돌진·갈고리도 못 한다
 	var busy: bool = L.move_lock > 0.0 or moves.steering()
-	if input and input.dash and not busy and powers.dash_charges > 0 and L.dash <= 0.0:
+	# 점프: 땅에서만(두 번 뛰기 없음), 구르기·갈고리·좌클릭 동작 중에는 안 뛴다. 결투는 점프를 쓰지 않는다.
+	if input and input.jump and not duel and L.air <= 0.0 and not busy and L.dash <= 0.0 and L.hook <= 0.0 and L.move == &"" and L.swing <= 0.0:
+		L.air = D.jump_time
+		lord_jumped.emit()
+	var aloft: bool = L.air > 0.0
+	if input and input.dash and not busy and not aloft and powers.dash_charges > 0 and L.dash <= 0.0:
 		powers.dash_charges -= 1
 		if powers.dash_recharge <= 0.0:
 			powers.dash_recharge = powers.dash_cooldown()
@@ -836,7 +851,7 @@ func _step_lord(input: LordInput) -> void:
 		L.dash_dir = L.move_dir if L.moving else Vector2.from_angle(L.face)
 		powers.on_dash()
 		lord_dashed.emit()
-	if input and input.hook and not busy and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
+	if input and input.hook and not busy and not aloft and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
 		_try_hook(input)
 	if L.hook > 0.0:
 		_step_hook()
@@ -861,7 +876,7 @@ func _step_lord(input: LordInput) -> void:
 			L.face = (input.aim - L.pos).angle()
 		elif L.moving:
 			L.face = mv.angle()
-	if input and input.attack and (phase == Phase.NIGHT or yard) and L.cooldown <= 0.0 and L.dash <= 0.0 and not busy:
+	if input and input.attack and (phase == Phase.NIGHT or yard) and L.cooldown <= 0.0 and L.dash <= 0.0 and not busy and not aloft:
 		moves.attack(input)
 
 
@@ -2097,6 +2112,7 @@ func state_hash() -> int:
 		parts.append(p.pos)
 	parts.append(tokens.cooling)
 	parts.append(lord.push)
+	parts.append(lord.air)
 	parts.append(callers_out)
 	parts.append_array([goal, rule, next_goal, next_rule, night_total, beacon_hp, beacon_lost, hunt_out, hunt_killed, siege, siege_left, _ember_t, goal_shards])
 	for f in embers:
@@ -2272,6 +2288,8 @@ func _begin_round() -> void:
 		L.hook = 0.0
 		L.hook_target = null
 		L.hook_cooldown = 0.0
+		L.air = 0.0
+		L.prev_air = 0.0
 		moves.clear()
 		powers.dash_charges = 1
 		powers.dash_recharge = 0.0

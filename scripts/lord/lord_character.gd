@@ -15,7 +15,8 @@ const KEYWORDS: Array = [
 	# 좌클릭 동작용(MoveMotion이 있으면 쓴다, assets/characters/README.md "동작별로 받으면 좋은 것"). 앞에 둬서 idle·run보다 먼저 본다.
 	# slash·attack이 든 이름은 _key_for가 먼저 베기로 읽으니, 받은 파일 이름에서 그 낱말을 빼고 이 낱말을 넣는다.
 	["block", "block"], ["parry", "block"], ["stab", "stab"], ["thrust", "stab"], ["spin", "spin"],
-	["leap", "leap"], ["jump", "leap"], ["draw", "draw"], ["throw", "throw"], ["slam", "slam"], ["dodge", "dodge"],
+	# 걸어 다니는 점프(30단계): hop. jump는 도약 내려찍기 낱말이라 hop을 먼저 본다.
+	["hop", "hop"], ["leap", "leap"], ["jump", "leap"], ["draw", "draw"], ["throw", "throw"], ["slam", "slam"], ["dodge", "dodge"],
 	["idle", "idle"], ["walk", "walk"], ["run", "run"], ["roll", "roll"], ["impact", "hit"], ["hit", "hit"],
 	["death", "death"], ["dying", "death"], ["pull", "pull"],
 ]
@@ -40,6 +41,12 @@ static var _contact_cache: Dictionary = {}
 var last_from: float = 0.0
 ## 구르기 동작에서 실제로 몸이 굴러가는 구간(초). 엉덩이 높이로 찾는다. 못 찾으면 (-1, -1).
 var roll_window: Vector2 = Vector2(-1.0, -1.0)
+## 점프(hop) 동작에서 발이 땅을 떠나 있는 구간(초). 엉덩이가 선 높이보다 솟은 때로 찾는다. 못 찾으면 (-1, -1).
+var hop_window: Vector2 = Vector2(-1.0, -1.0)
+static var _hop_cache: Vector2 = Vector2(-1.0, -1.0)
+## hop 동작이 없을 때 다리를 코드로 굽힌다(30단계).
+var _legs: LegFold = null
+var _leg_len: float = -1.0
 var _body: Node3D
 var _skel: Skeleton3D
 var _player: AnimationPlayer
@@ -80,6 +87,8 @@ func _ready() -> void:
 	_skel.add_child(_hand)
 	_grip.transform = _grip_transform()
 	_hand.add_child(_grip)
+	_legs = LegFold.new()
+	_skel.add_child(_legs)
 	if _contact_cache.is_empty():
 		_find_contacts()
 	play("idle")
@@ -156,6 +165,7 @@ func _load_anims() -> void:
 	if _lib_cache:
 		anims = _anims_cache
 		roll_window = _roll_cache
+		hop_window = _hop_cache
 		_player.add_animation_library("lord", _lib_cache)
 		return
 	var lib := AnimationLibrary.new()
@@ -175,6 +185,9 @@ func _load_anims() -> void:
 			a = a.duplicate(true)
 			if key == "roll":
 				roll_window = _low_window(a)
+			if key == "hop":
+				hop_window = _high_window(a)
+				_flatten_rise(a)   # 솟는 높이는 규칙(LordState.air_height)이 정한다: 동작의 엉덩이 솟음은 지운다
 			_in_place(a)
 			a.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(key) else Animation.LOOP_NONE
 			if key == "slash":
@@ -189,6 +202,7 @@ func _load_anims() -> void:
 	_lib_cache = lib
 	_anims_cache = anims
 	_roll_cache = roll_window
+	_hop_cache = hop_window
 
 
 static func _key_for(name: String) -> String:
@@ -229,6 +243,37 @@ static func _low_window(a: Animation) -> Vector2:
 		if first >= 0.0:
 			return Vector2(maxf(0.0, first - 0.15), minf(a.length, last + 0.1))
 	return Vector2(-1.0, -1.0)
+
+
+## 엉덩이가 선 높이보다 조금(3%) 솟은 구간 = 발이 땅을 떠난 구간(hop). 못 찾으면 (-1, -1).
+static func _high_window(a: Animation) -> Vector2:
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_POSITION_3D or not str(a.track_get_path(t)).ends_with("mixamorig_Hips"):
+			continue
+		var stand: float = (a.track_get_key_value(t, 0) as Vector3).y
+		var first: float = -1.0
+		var last: float = -1.0
+		for k in a.track_get_key_count(t):
+			if (a.track_get_key_value(t, k) as Vector3).y > stand * 1.03:
+				var time: float = a.track_get_key_time(t, k)
+				if first < 0.0:
+					first = time
+				last = time
+		if first >= 0.0 and last > first:
+			return Vector2(first, last)
+	return Vector2(-1.0, -1.0)
+
+
+## 엉덩이가 선 높이보다 솟는 것을 지운다(웅크려 낮아지는 것은 둔다).
+static func _flatten_rise(a: Animation) -> void:
+	for t in a.get_track_count():
+		if a.track_get_type(t) != Animation.TYPE_POSITION_3D or not str(a.track_get_path(t)).ends_with("mixamorig_Hips"):
+			continue
+		var stand: float = (a.track_get_key_value(t, 0) as Vector3).y
+		for k in a.track_get_key_count(t):
+			var v: Vector3 = a.track_get_key_value(t, k)
+			if v.y > stand:
+				a.track_set_key_value(t, k, Vector3(v.x, stand, v.z))
 
 
 ## 엉덩이가 앞뒤·좌우로 움직이는 것을 지워 제자리 동작으로 만든다(위아래는 둔다).
@@ -368,6 +413,39 @@ func recolor(mul: Color, glow: Color = Color.BLACK, glow_energy: float = 0.0) ->
 			mi.set_surface_override_material(i, m)
 			out.append(m)
 	return out
+
+
+## 점프(30단계): hop 동작이 없으면 다리를 코드로 굽힌다(LegFold). tuck = 공중에서 접기, bend = 선 채로 무릎 굽힘(0~1).
+func set_legs(tuck: float, bend: float) -> void:
+	if _legs:
+		_legs.tuck = tuck
+		_legs.bend = bend
+
+
+## 무릎을 bend만큼 굽혔을 때 엉덩이가 내려가는 높이(m, 발이 땅에 붙어 있게 LordView가 몸을 이만큼 내린다).
+func bend_drop(bend: float) -> float:
+	if bend <= 0.0:
+		return 0.0
+	return _leg_length() * (1.0 - cos(LegFold.BEND_THIGH * bend))
+
+
+
+## 허벅지 + 정강이 길이(m, 이 노드 기준). 쉬는 자세에서 한 번 잰다. 뼈가 없으면 0.85.
+func _leg_length() -> float:
+	if _leg_len >= 0.0:
+		return _leg_len
+	_leg_len = 0.85
+	var ids: Array[int] = []
+	for n in LegFold.LEGS[0]:
+		ids.append(_skel.find_bone(n))
+	if ids.has(-1) or not is_inside_tree():
+		return _leg_len
+	var to_me: Transform3D = global_transform.affine_inverse() * _skel.global_transform
+	var a: Vector3 = to_me * _skel.get_bone_global_rest(ids[0]).origin
+	var b: Vector3 = to_me * _skel.get_bone_global_rest(ids[1]).origin
+	var c: Vector3 = to_me * _skel.get_bone_global_rest(ids[2]).origin
+	_leg_len = a.distance_to(b) + b.distance_to(c)
+	return _leg_len
 
 
 ## 히트스톱 동안 동작을 멈춘다.

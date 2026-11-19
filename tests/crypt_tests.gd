@@ -326,7 +326,7 @@ func _entrance() -> void:
 	var root := Node3D.new()
 	var blockers: Dictionary = FieldBuilder.build(root, Environment.new())
 	var rects: Array = blockers.rects
-	var circles: Array = blockers.circles
+	var circles: Array = blockers.circles + blockers.low_circles
 	var in_rect: bool = false
 	for r in rects:
 		if (r as Rect2).grow(0.3).has_point(FieldLayout.CRYPT_DOOR) or (r as Rect2).grow(0.3).has_point(FieldLayout.CRYPT_WAKE):

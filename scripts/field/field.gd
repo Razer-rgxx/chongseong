@@ -19,10 +19,14 @@ var meta: Meta
 var rules: Rules
 var _acc: float = 0.0
 var _want_dash: bool = false
+var _want_jump: bool = false
 var _lord: Node3D
 var _near: String = ""
 var _rects: Array[Rect2] = []
 var _circles: Array = []
+## 낮은 막힘(30단계): 공중이면 지나간다(Blockers).
+var _low_rects: Array[Rect2] = []
+var _low_circles: Array = []
 var _props: Dictionary = {}
 var _area: StringName = &""
 var _shown: Dictionary = {}
@@ -80,6 +84,8 @@ func _ready() -> void:
 	var blockers: Dictionary = FieldBuilder.build(self, env)
 	_rects.assign(blockers.rects)
 	_circles = blockers.circles
+	_low_rects.assign(blockers.low_rects)
+	_low_circles = blockers.low_circles
 	HillBuilder.setup(Vector2(FieldLayout.SIZE) * Grid.CELL)   # 적의 몸이 들판을 싸움터 안으로 본다(비탈에서 올라오지 않는다)
 	_build_props()
 	add_child(_creatures)
@@ -92,6 +98,7 @@ func _ready() -> void:
 	add_child(_pfx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
+	_move_fx.height_of = FieldBuilder.walk_height   # 땅 자국·흙먼지(내려앉기 포함)가 들판의 땅 위에
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)
 	_enemy_fx.height_of = FieldBuilder.walk_height   # 땅의 빛·먼지가 들판의 땅 위에 뜬다
@@ -100,6 +107,7 @@ func _ready() -> void:
 	rules.lord_dashed.connect(func() -> void:
 		_sfx.play(&"dash", _lord.position, -6.0)
 		_camera.kick(4.0))
+	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
 	rules.lord_hooked.connect(func(_e: Enemy) -> void:
 		_sfx.play(&"draw", _lord.position, -2.0, 1.25)
 		_camera.kick(10.0))
@@ -152,6 +160,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_capture(true)
 	if event.is_action_pressed("dash"):
 		_want_dash = true
+	if event.is_action_pressed("jump"):
+		_want_jump = true
 	if event.is_action_pressed("attack"):
 		_want_attack = true
 	if event.is_action_pressed("hook"):
@@ -173,6 +183,7 @@ func _physics_process(delta: float) -> void:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
+		inp.jump = _want_jump
 		inp.attack = Input.is_action_pressed("attack") or _want_attack
 		inp.hook = _want_hook
 		if _camera.third():
@@ -188,8 +199,9 @@ func _physics_process(delta: float) -> void:
 				inp.aim_valid = true
 				inp.aim = Grid.world_to_cells(g)
 		rules.step(inp)
-		rules.lord.pos = _push_out(rules.lord.pos)
+		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
 		_want_dash = false
+		_want_jump = false
 		_want_attack = false
 		_want_hook = false
 		_acc -= rules.dt
@@ -514,27 +526,6 @@ func _leave(path: String) -> void:
 	get_tree().change_scene_to_file(path)
 
 
-func _push_out(p: Vector2) -> Vector2:
-	var r: float = 0.3
-	for c in _circles:
-		var d: Vector2 = p - c[0]
-		var min_d: float = c[1] + r
-		if d.length() < min_d:
-			p = c[0] + (d.normalized() if d.length() > 0.001 else Vector2.DOWN) * min_d
-	for rect in _rects:
-		var g := rect.grow(r)
-		if g.has_point(p):
-			var left: float = p.x - g.position.x
-			var right: float = g.end.x - p.x
-			var up: float = p.y - g.position.y
-			var down: float = g.end.y - p.y
-			var m: float = minf(minf(left, right), minf(up, down))
-			if m == left:
-				p.x = g.position.x
-			elif m == right:
-				p.x = g.end.x
-			elif m == up:
-				p.y = g.position.y
-			else:
-				p.y = g.end.y
-	return p
+## 막힌 곳에서 밀어낸다(Blockers). 공중이면 낮은 막힘(울타리·무너진 낮은 벽 …)은 지나간다.
+func _push_out(p: Vector2, airborne: bool = false) -> Vector2:
+	return Blockers.push_out(p, _rects, _circles, _low_rects, _low_circles, airborne)
