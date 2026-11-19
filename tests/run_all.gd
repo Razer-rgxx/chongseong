@@ -87,6 +87,11 @@ func _init() -> void:
 	_test_pull_timing()
 	_test_pull_timing_miss()
 	_test_pull_timing_replay()
+	_test_village_quests()
+	_test_village_merchant()
+	_test_village_talk()
+	_test_village_yard()
+	_test_village_save()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -221,7 +226,7 @@ func _test_data() -> void:
 	check(unknown.is_empty(), "방식의 동작이 모두 표에 있다 %s" % [unknown])
 	check(d.patterns[0].moves == PackedStringArray(["sweep"]) and d.pattern_for(null) == d.patterns[0], "맨손은 횡베기 하나뿐인 0번 방식")
 	check(d.grades.odds.size() == 6 and d.grades.odds[2] == 40.0 and d.grades.odds[5] == 50000.0, "등급 확률 1/6, 1/40 … 1/50000")
-	check(d.enemies.size() == 9 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 9종(11단계 새 적 5종 포함)")
+	check(d.enemies.size() == 10 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 10종(새 적 5종과 허수아비 포함)")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
 	var s := Sword.new(d.sword_by_name("붉은 이삭"), d)
 	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(150.0 * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 195, 무리 베기 34")
@@ -3540,3 +3545,199 @@ func _test_pull_timing_replay() -> void:
 		hashes.append(r.state_hash())
 		logs.append(text[0])
 	check(hashes[0] == hashes[1] and logs[0] == logs[1] and logs[0].contains("w") and logs[0].contains("s"), "타이밍: 같은 시드·같은 누름이면 결과가 같다(state_hash)")
+
+
+# ---------------------------------------------------------------- 15단계: 마을
+
+func _test_village_quests() -> void:
+	var V := d.village
+	check(V.quests.size() >= 20 and V.goods.size() == 5 and V.villagers.size() == 5, "마을: 표(의뢰·물건 5·주민 5)")
+	var m := Meta.new()
+	m.rng.seed = 5
+	m.fill_board(d)
+	check(m.quest_board.size() == 3 and m.quest_active == -1, "의뢰판: 3장")
+	var kinds: Array = []
+	for i in m.quest_board:
+		kinds.append(Meta._kind_key(V.quests[i]))
+	check(kinds.size() == 3 and kinds[0] != kinds[1] and kinds[1] != kinds[2] and kinds[0] != kinds[2], "의뢰판: 종류가 겹치지 않는다")
+	for i in m.quest_board:
+		check(V.quests[i].min_best <= m.best, "의뢰판: 못 가 본 구역의 의뢰는 안 붙는다")
+	check(m.take_quest(1) and m.quest_active == 1 and not m.take_quest(0), "의뢰: 하나만 맡는다")
+	# 셈
+	var q := QuestData.new()
+	q.kind = &"kill_kind"
+	q.target = &"wolf"
+	q.n = 2
+	var st := {"kills": 5, "kills_by_kind": {&"wolf": 2}, "zones": 3, "elites": 1, "pulled_by_grade": [4, 3, 2, 1, 0, 0], "perfect": 2, "goals_done": {&"hunt": 1}, "events_used": 4}
+	check(Meta.quest_count(q, st) == 2, "의뢰 셈: 종류 처치")
+	q.kind = &"pull_grade"
+	q.grade = 2
+	check(Meta.quest_count(q, st) == 3, "의뢰 셈: 등급 이상 뽑기")
+	q.kind = &"goal"
+	q.target = &"hunt"
+	check(Meta.quest_count(q, st) == 1, "의뢰 셈: 목표")
+	# 판이 끝나면 이루었는지 보고 보상, 못 이루면 그대로
+	var r := Rules.new(d, 3, m)
+	var qa: QuestData = V.quests[m.quest_board[m.quest_active]]
+	var board_before: Array[int] = m.quest_board.duplicate()
+	r.run_stats = {"kills": 0, "kills_by_kind": {}, "zones": 0, "elites": 0, "pulled_by_grade": [0, 0, 0, 0, 0, 0], "perfect": 0, "goals_done": {}, "events_used": 0}
+	var s0: int = m.shards
+	var rec := m.record_run(r, d.meta)
+	check(not rec.quest_done and m.quest_active == 1 and m.quest_board[1] == board_before[1], "의뢰: 못 이루면 그대로 남는다")
+	check(m.shards == s0 + rec.total and m.quest_board.size() == 3, "의뢰: 실패해도 판은 3장")
+	var r2 := Rules.new(d, 4, m)
+	qa = V.quests[m.quest_board[m.quest_active]]
+	r2.run_stats = {"kills": 9999, "kills_by_kind": {qa.target: 9999}, "zones": 99, "elites": 99, "pulled_by_grade": [99, 99, 99, 99, 99, 99], "perfect": 99, "goals_done": {qa.target: 99}, "events_used": 99}
+	var s1: int = m.shards
+	var old_i: int = m.quest_board[1]
+	var rec2 := m.record_run(r2, d.meta)
+	check(rec2.quest_done and rec2.quest_reward == qa.reward and m.shards == s1 + rec2.total and m.quest_active == -1, "의뢰: 이루면 조각을 받고 맡은 것이 비워진다")
+	check(m.quest_board.size() == 3, "의뢰: 새 의뢰가 붙는다")
+	# Rules가 판 동안 센다
+	var rr := Rules.new(d, 11)
+	rr.debug_god = true
+	for t in 3000:
+		rr.step(_inp(Vector2.ZERO, true))
+		if rr.phase == Rules.Phase.DAY and rr.zone == 0 and rr.tick == 5:
+			rr.start_night()
+	check(rr.run_stats.kills == rr.kills, "run_stats: 처치 수가 kills와 같다")
+	var kk: int = 0
+	for k in rr.run_stats.kills_by_kind:
+		kk += int(rr.run_stats.kills_by_kind[k])
+	check(kk == rr.kills, "run_stats: 종류별 합이 처치 수")
+	# 같은 시드와 입력이면 같다
+	var h: Array[int] = []
+	for i in 2:
+		var x := Rules.new(d, 21)
+		x.debug_god = true
+		for t in 900:
+			x.step(_inp(Vector2.ZERO, true))
+			if t == 3:
+				x.start_night()
+		h.append(x.state_hash())
+	check(h[0] == h[1], "run_stats: 같은 시드면 state_hash가 같다")
+
+
+func _test_village_merchant() -> void:
+	var m := Meta.new()
+	m.rng.seed = 9
+	m.refresh_stock(d)
+	check(m.stock.size() == 3, "상인: 물건 3개")
+	var u: Dictionary = {}
+	for id in m.stock:
+		u[id] = true
+	check(u.size() == 3, "상인: 물건이 겹치지 않는다")
+	var id: StringName = m.stock[0]
+	var g := d.village.goods_by_id(id)
+	m.shards = g.price - 1
+	check(m.buy(d, id) != "" and m.pack.is_empty(), "상인: 조각이 모자라면 못 산다")
+	m.shards = g.price + 100
+	check(m.buy(d, id) == "" and m.pack == [id] and m.shards == 100, "상인: 사면 조각이 나간다")
+	check(m.buy(d, id) != "", "상인: 같은 물건은 한 판에 하나")
+	check(m.buy(d, &"nothing") != "", "상인: 좌판에 없으면 못 산다")
+	# pack 적용
+	var m2 := Meta.new()
+	m2.pack = [&"ticket", &"bread", &"note"] as Array[StringName]
+	var r := Rules.new(d, 2, m2)
+	check(r.free_pulls == d.run.free_pulls_start + 1 if "free_pulls_start" in d.run else r.free_pulls >= 1, "물건: 뽑기 표는 공짜 뽑기 +1")
+	check(r.max_hp() == d.lord.hp + 15.0 and m2.pack.is_empty(), "물건: 말린 빵은 최대 체력 +15, 쓰고 나면 비운다")
+	check(r.hilts.all(func(h: Hilt) -> bool: return h.revealed), "물건: 점쟁이 쪽지는 조짐이 참으로 보인다")
+	var base := Rules.new(d, 2)
+	var m3 := Meta.new()
+	m3.pack = [&"charm"] as Array[StringName]
+	var rc := Rules.new(d, 2, m3)
+	check(is_equal_approx(rc.luck(), base.luck() * 1.2), "물건: 운 부적은 1구역 낮 운 ×1.2")
+	rc.zone = d.village.charm_zones
+	base.zone = d.village.charm_zones
+	check(is_equal_approx(rc.luck(), base.luck()), "물건: 운 부적은 3구역부터 듣지 않는다")
+	var m4 := Meta.new()
+	m4.pack = [&"whetstone"] as Array[StringName]
+	var rw := Rules.new(d, 2, m4)
+	var rb := Rules.new(d, 2, Meta.new())
+	_pull_once(rw)
+	_pull_once(rb)
+	var sw: Sword = rw.slots[0]
+	var sb: Sword = rb.slots[0]
+	check(sw != null and sb != null and sw.data.id == sb.data.id and (not sw.breakable() or sw.max_durability == roundf(sb.max_durability * 1.2)), "물건: 숫돌은 처음 쥔 검 최대 내구 +20%")
+	var rw2 := Rules.new(d, 2, Meta.new())
+	check(rw2.free_pulls == base.free_pulls and rw2.max_hp() == d.lord.hp, "물건: 안 산 판은 그대로")
+
+
+func _test_village_talk() -> void:
+	var m := Meta.new()
+	var first: Array[String] = m.talk(d, &"gatekeeper")
+	check(not first.is_empty() and first.size() <= 3, "주민: 첫 말")
+	var seen: Array = []
+	for i in 8:
+		var l := m.talk(d, &"gatekeeper")
+		for t in l:
+			seen.append(t)
+	var v := d.village.villager(&"gatekeeper")
+	check(seen.has(v.lines[0]) or first.has(v.lines[0]), "주민: 조건 없는 줄은 들을 수 있다")
+	check(not (first + seen).has(v.lines[4]), "주민: 정상에 오르기 전에는 정상의 말이 없다")
+	m.best = d.run.zone_names.size() + 1
+	m.runs = 9
+	check(m.cond_ok("top", 0, d) and m.cond_ok("runs", 3, d) and m.cond_ok("best", 5, d), "주민: 조건(정상, 판 수, 구역)")
+	check(not m.cond_ok("quest", 0, d), "주민: 의뢰를 안 맡았으면 의뢰 조건이 거짓")
+	m.fill_board(d)
+	m.take_quest(0)
+	check(m.cond_ok("quest", 0, d), "주민: 의뢰를 맡으면 의뢰 조건이 참")
+	var again: Array[String] = []
+	for i in 6:
+		again.append_array(m.talk(d, &"gatekeeper"))
+	check(again.has(v.lines[4]), "주민: 조건이 맞으면 새 말을 들려준다")
+	check(m.talk(d, &"nobody").is_empty(), "주민: 없는 사람은 말이 없다")
+
+
+func _test_village_yard() -> void:
+	var r := Rules.new(d, 1)
+	r.hilts.clear()
+	r.yard = true
+	var dm := r.spawn_dummy(Vector2(10, 10))
+	r.lord.pos = Vector2(9, 10)
+	r.lord.face = 0.0
+	var inp := _inp(Vector2.ZERO, true)
+	inp.aim_valid = true
+	inp.aim = Vector2(10, 10)
+	var hits: Array[float] = [0.0]
+	r.enemy_hit.connect(func(_e: Enemy, dmg: float, _b: bool) -> void: hits[0] += dmg)
+	for t in 120:
+		r.step(inp)
+	check(hits[0] > 0.0, "수련장: 낮에도 좌클릭이 허수아비를 때린다")
+	check(dm.pos == Vector2(10, 10) and not dm.dead and dm.hp >= 1.0 and r.kills == 0 and r.run_stats.kills == 0, "수련장: 허수아비는 움직이지 않고 쓰러지지 않고 처치로 세지 않는다")
+	dm.hp = dm.max_hp - 500.0
+	for t in 100:
+		r.step()
+	check(dm.hp == dm.max_hp, "수련장: 3초 안 맞으면 체력이 다 찬다")
+	var r2 := Rules.new(d, 1)
+	r2.hilts.clear()
+	var dm2 := r2.spawn_dummy(Vector2(10, 10))
+	r2.lord.pos = Vector2(9, 10)
+	for t in 60:
+		r2.step(inp)
+	check(dm2.hp == dm2.max_hp, "수련장: 수련장이 아니면(낮) 좌클릭이 먹지 않는다")
+	check(r.enemies.size() == 1 and dm.damage == 0.0, "수련장: 허수아비는 때리지 않는다")
+
+
+func _test_village_save() -> void:
+	var path: String = "user://test_village_save.json"
+	var m := Meta.new()
+	m.rng.seed = 3
+	m.fill_board(d)
+	m.fill_stock(d)
+	m.take_quest(2)
+	m.shards = 500
+	m.buy(d, m.stock[0])
+	m.talk(d, &"elder")
+	m.save(path)
+	var m2 := Meta.load_or_new(path)
+	check(m2.quest_board == m.quest_board and m2.quest_active == 2 and m2.stock == m.stock and m2.pack == m.pack and m2.heard == m.heard, "저장: 의뢰판·상인·산 물건·들은 말이 남는다")
+	# 옛 저장(마을 항목 없음)도 읽는다
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shards": 7, "best": 2, "runs": 1}))
+	f.close()
+	var m3 := Meta.load_or_new(path)
+	check(m3.shards == 7 and m3.quest_board.is_empty() and m3.quest_active == -1 and m3.pack.is_empty(), "저장: 옛 저장 파일도 읽는다")
+	m3.fill_board(d)
+	check(m3.quest_board.size() == 3, "저장: 옛 저장에도 의뢰판이 채워진다")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

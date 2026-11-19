@@ -148,6 +148,13 @@ var enemy_projectiles: Array[Projectile] = []
 var callers_out: int = 0
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
+## 마을 수련장(15단계): 켜면 낮에도 좌클릭이 먹고, 허수아비(still)가 규칙의 적으로 선다.
+var yard: bool = false
+## 이번 판에 센 것(의뢰판이 본다, docs/village.md 15.1).
+var run_stats: Dictionary = {"kills": 0, "kills_by_kind": {}, "zones": 0, "elites": 0, "pulled_by_grade": [0, 0, 0, 0, 0, 0], "perfect": 0, "goals_done": {}, "events_used": 0}
+## 떠돌이 상인에게서 산 것 중 아직 안 쓴 것(Meta.pack을 시작할 때 읽고 비운다).
+var pack: Array[StringName] = []
+var _whetstone: bool = false
 var debug_grade: int = -1
 var _spawn_t: float = 0.0
 var _next_id: int = 1
@@ -232,6 +239,43 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 		if s:
 			slots[0] = s
 			active = 0
+		_apply_pack()
+
+
+## 산 물건을 쓴다(처음 한 번). 물건 값은 data/village.tres.
+func _apply_pack() -> void:
+	pack.clear()
+	for id in meta.pack:
+		pack.append(StringName(id))
+	meta.pack.clear()
+	var V := data.village
+	for id in pack:
+		var g := V.goods_by_id(id)
+		if g == null:
+			continue
+		match id:
+			&"ticket":
+				free_pulls = mini(data.run.max_free_pulls, free_pulls + int(g.value))
+			&"whetstone":
+				_whetstone = true
+			&"bread":
+				lord.hp = max_hp()
+			&"note":
+				for h in hilts:
+					h.revealed = true
+	if _whetstone and slots[active] != null:
+		_whet(slots[active])
+
+
+func _whet(s: Sword) -> void:
+	_whetstone = false
+	if s.breakable():
+		s.max_durability = roundf(s.max_durability * (1.0 + data.village.goods_by_id(&"whetstone").value))
+		s.durability = s.max_durability
+
+
+func has_pack(id: StringName) -> bool:
+	return pack.has(id)
 
 
 func _bless(key: String) -> float:
@@ -239,7 +283,7 @@ func _bless(key: String) -> float:
 
 
 func max_hp() -> float:
-	return data.lord.hp + _bless("hp")
+	return data.lord.hp + _bless("hp") + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
 
 
 func pull_cost() -> float:
@@ -268,7 +312,7 @@ func pattern() -> PatternData:
 
 
 func luck() -> float:
-	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult() * day_luck
+	return data.run.zone_luck[mini(zone, data.run.zone_luck.size() - 1)] * (1.0 + _bless("luck")) * powers.luck_mult() * day_luck * _charm()
 
 
 func step(input: LordInput = null) -> void:
@@ -296,6 +340,8 @@ func step(input: LordInput = null) -> void:
 		return
 	_step_lord(input)
 	moves.tick(dt)
+	if yard:
+		_step_yard()
 	if phase == Phase.NIGHT:
 		_step_night()
 		if phase == Phase.NIGHT:
@@ -408,7 +454,10 @@ func _end_night() -> void:
 	if siege >= 0:
 		siege = -1
 		siege_side.emit(-1)
+	if reward.ok and goal != &"survive":
+		run_stats.goals_done[goal] = int(run_stats.goals_done.get(goal, 0)) + 1
 	if last_zone():
+		run_stats.zones = zone_count()
 		phase = Phase.OVER
 		won = true
 		run_ended.emit(true)
@@ -419,6 +468,7 @@ func _end_night() -> void:
 	free_pulls = mini(data.run.max_free_pulls, free_pulls + int(reward.free))
 	goal_shards += int(reward.shards)
 	zone += 1
+	run_stats.zones = zone
 	var before: float = lord.hp
 	lord.hp = minf(max_hp(), lord.hp + heal_at_dawn() * float(reward.heal_k))
 	reward["heal"] = lord.hp - before
@@ -436,6 +486,13 @@ func roll_grade(p_luck: float) -> int:
 		if rng.randf() < p_luck / odds[g]:
 			return g
 	return 0
+
+
+## 운 부적: 1~charm_zones구역 낮의 운.
+func _charm() -> float:
+	if pack.has(&"charm") and zone < data.village.charm_zones:
+		return data.village.goods_by_id(&"charm").value
+	return 1.0
 
 
 func nearest_hilt(reach: float) -> Hilt:
@@ -562,6 +619,7 @@ func _step_pull(input: LordInput = null) -> void:
 	if pull_goods > 0:
 		lord.hp = minf(max_hp(), lord.hp + R.pull_good_refund * pull_goods)
 	pulls += 1
+	run_stats.pulled_by_grade[pull_grade] += 1
 	best_grade = maxi(best_grade, pull_grade)
 	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
 	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
@@ -595,6 +653,7 @@ func _judge_press(at: float) -> void:
 	pull_good.emit(pull_hilt, k)
 	if pull_goods == pull_grade and pull_grade >= data.run.pull_perfect_min:
 		pull_all_good = true
+		run_stats.perfect += 1
 		pull_perfect.emit(pull_hilt)
 
 
@@ -611,6 +670,8 @@ func _open_window() -> void:
 
 
 func _receive(s: Sword) -> void:
+	if _whetstone:
+		_whet(s)
 	for k in 2:
 		if slots[k] == null:
 			slots[k] = s
@@ -722,7 +783,7 @@ func _step_lord(input: LordInput) -> void:
 			L.face = (input.aim - L.pos).angle()
 		elif L.moving:
 			L.face = mv.angle()
-	if input and input.attack and phase == Phase.NIGHT and L.cooldown <= 0.0 and L.dash <= 0.0 and not busy:
+	if input and input.attack and (phase == Phase.NIGHT or yard) and L.cooldown <= 0.0 and L.dash <= 0.0 and not busy:
 		moves.attack(input)
 
 
@@ -842,15 +903,22 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 	knock = res[1]
 	powers.on_damage(e, damage)
 	e.hp -= damage
+	e.idle_t = 0.0
+	if e.data.refill_after > 0.0:
+		e.hp = maxf(e.hp, 1.0)
 	e.push += knock * e.data.knockback_mult * data.lord.knock_speed
 	if not dot:
 		enemy_hit.emit(e, damage, big)
 	if e.hp <= 0.0:
 		e.dead = true
 		tokens.release(e, true)
-		kills += 1
+		if not e.data.still:
+			kills += 1
+			run_stats.kills += 1
+			run_stats.kills_by_kind[e.data.id] = int(run_stats.kills_by_kind.get(e.data.id, 0)) + 1
 		if e.elite:
 			elites_killed += 1
+			run_stats.elites += 1
 			free_pulls = mini(data.run.max_free_pulls, free_pulls + 1)
 		if e.hunt:
 			hunt_killed = true
@@ -1085,6 +1153,22 @@ func _step_enemies() -> void:
 			alive.append(e)
 	enemies = alive
 	tokens.deal(dt)
+
+
+## 수련장: 허수아비는 서 있기만 한다. 넉백은 받지 않고, refill_after초 안 맞으면 체력이 찬다.
+func _step_yard() -> void:
+	for e in enemies:
+		if e.dead:
+			continue
+		e.push = Vector2.ZERO
+		e.idle_t += dt
+		if e.data.refill_after > 0.0 and e.idle_t >= e.data.refill_after:
+			e.hp = e.max_hp
+
+
+## 허수아비를 세운다(수련장).
+func spawn_dummy(p: Vector2) -> Enemy:
+	return spawn_at(&"dummy", p)
 
 
 ## 정예: 체력과 피해가 몇 배, 몸이 크다. 쓰러뜨리면 공짜 뽑기.
@@ -1511,6 +1595,7 @@ func _use_event(ev: DayEvent) -> void:
 				h.revealed = true
 			result = {"cost": R.seer_cost}
 	ev.used = true
+	run_stats.events_used += 1
 	event_used.emit(ev, result)
 	event_gone.emit(ev)
 	if ev.kind == &"seer":
@@ -1637,5 +1722,6 @@ func state_hash() -> int:
 		if h.cursed:
 			parts.append_array([h.id, h.gone])
 		parts.append_array([h.omen, h.shown_omen, h.revealed])
+	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
 	return hash(str(parts))

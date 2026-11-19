@@ -11,6 +11,8 @@ var unarmed: FormData
 var meta: MetaData
 ## 각인과 고유 능력의 정해진 수치.
 var powers: PowerTable
+## 마을 컨텐츠(15단계): 의뢰, 상인, 주민.
+var village: VillageData
 ## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
 var forms: Array[FormData] = []
 ## 파일 이름 순서(001 … 300).
@@ -35,6 +37,7 @@ static func load_default() -> GameData:
 	d.unarmed = load(DIR + "unarmed.tres") as FormData
 	d.meta = load(DIR + "meta.tres") as MetaData
 	d.powers = load(DIR + "powers.tres") as PowerTable if ResourceLoader.exists(DIR + "powers.tres") else PowerTable.new()
+	d.village = load(DIR + "village.tres") as VillageData
 	for path in _tres_in(DIR + "forms/"):
 		d.forms.append(load(path) as FormData)
 	for path in _tres_in(DIR + "inscriptions/"):

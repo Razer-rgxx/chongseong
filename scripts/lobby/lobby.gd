@@ -15,9 +15,25 @@ const RUN_PATH: String = "res://scenes/world/main.tscn"
 @export var rack_at: Vector2 = Vector2(9.0, 15.0)
 @export var gate_at: Vector2 = Vector2(17.0, 2.5)
 @export var reach: float = 2.0
+## 15단계(docs/village.md): 의뢰판, 수련장(울타리 칸 rect, 서쪽 틈의 y 범위, 허수아비, 검 걸이), 상인의 수레와 상인.
+@export var board_at: Vector2 = Vector2(21.5, 5.2)
+@export var yard_area: Rect2 = Rect2(24.0, 14.5, 5.0, 3.5)
+@export var yard_gap: Vector2 = Vector2(15.5, 17.0)
+@export var yard_dummies: Array[Vector2] = [Vector2(28.0, 15.3), Vector2(28.0, 16.3), Vector2(28.0, 17.3)]
+@export var yard_rack_at: Vector2 = Vector2(25.4, 14.9)
+@export var cart_at: Vector2 = Vector2(13.4, 9.7)
+@export var merchant_at: Vector2 = Vector2(14.7, 10.4)
+## 주민: id → [칸 자리, 바라볼 방향].
+const VILLAGERS: Dictionary = {
+	&"gatekeeper": [Vector2(19.4, 3.7), Vector2(-1, 1)],
+	&"elder": [Vector2(19.6, 13.6), Vector2(1, 0.3)],
+	&"drunk": [Vector2(21.0, 15.0), Vector2(0, -1)],
+	&"herbalist": [Vector2(6.6, 13.5), Vector2(1, 0)],
+	&"apprentice": [Vector2(11.9, 9.7), Vector2(-1, 0.4)],
+}
 
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
-const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "언덕으로 오른다"}
+const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "언덕으로 오른다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다"}
 @export var max_ticks_per_frame: int = 8
 
 var data: GameData
@@ -33,6 +49,20 @@ var _near: String = ""
 var _rects: Array[Rect2] = []
 var _circles: Array = []
 var _deco := RandomNumberGenerator.new()
+var _move_fx := MoveFx.new()
+var _dummies: Array[Node3D] = []
+var _dummy_enemies: Array[Enemy] = []
+var _wobble: Array[float] = [0.0, 0.0, 0.0]
+var _wobble_dir: Array[Vector3] = [Vector3.RIGHT, Vector3.RIGHT, Vector3.RIGHT]
+## 수련장 피해 기록: [시각(초), 피해].
+var _yard_hits: Array = []
+var _clock: float = 0.0
+var _vt: float = 0.0
+## 주민 id → {P, root}. 상인은 &"merchant".
+var _folk: Dictionary = {}
+var _talker: StringName = &""
+var _talk_lines: Array[String] = []
+var _talk_i: int = 0
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -47,6 +77,10 @@ func _ready() -> void:
 	meta.save()
 	rules = Rules.new(data, 1)
 	rules.hilts.clear()
+	rules.yard = true
+	meta.fill_board(data)
+	meta.fill_stock(data)
+	meta.save()
 	rules.lord.pos = Vector2(17.0, 13.0)
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
@@ -59,6 +93,7 @@ func _ready() -> void:
 	_build_rack()
 	_build_gate()
 	_build_houses()
+	_build_village_extras()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -67,6 +102,14 @@ func _ready() -> void:
 	_hud.forge_hit.connect(_on_hammer)
 	_hud.forge_done.connect(_on_forged)
 	_hud.closed.connect(func() -> void: _capture(true))
+	_hud.quest_taken.connect(func(_i: int) -> void: _sfx.play(&"thump", Grid.cells_to_world(board_at, 1.0), -4.0))
+	_hud.bought.connect(func(_id: StringName) -> void: _sfx.play(&"thump", Grid.cells_to_world(merchant_at, 1.0), -6.0))
+	_hud.yard_sword_picked.connect(_on_yard_sword)
+	add_child(_move_fx)
+	_move_fx.setup(rules)
+	rules.enemy_hit.connect(_on_dummy_hit)
+	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -4.0))
+	_apply_yard_sword()
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
 	_camera.yaw = 0.0
 	_camera.snap()
@@ -114,7 +157,16 @@ func _physics_process(delta: float) -> void:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
-		if _camera.third() and inp.move.length() > 0.1:
+		inp.attack = _talker == &"" and Input.is_action_pressed("attack") and _in_yard()
+		if _camera.third() and inp.attack:
+			inp.aim_valid = true
+			inp.aim = rules.lord.pos + _camera.forward_cells() * 3.0
+		elif not _camera.third() and inp.attack:
+			var g: Variant = _camera.ground_point(get_viewport().get_mouse_position())
+			if g != null:
+				inp.aim_valid = true
+				inp.aim = Grid.world_to_cells(g)
+		elif _camera.third() and inp.move.length() > 0.1:
 			inp.aim_valid = true
 			inp.aim = rules.lord.pos + inp.move
 		rules.step(inp)
@@ -122,6 +174,7 @@ func _physics_process(delta: float) -> void:
 		_want_dash = false
 		_acc -= rules.dt
 		n += 1
+		_clock += rules.dt
 	if n == max_ticks_per_frame:
 		_acc = 0.0
 
@@ -132,16 +185,47 @@ func _process(delta: float) -> void:
 	_camera.target = _lord.position
 	var p: Vector2 = rules.lord.pos
 	_near = ""
-	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0)}
+	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0),
+		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at}
+	for id in VILLAGERS:
+		spots["v_" + id] = VILLAGERS[id][0]
+	var best_d: float = reach
 	for key in spots:
-		if p.distance_to(spots[key]) < reach:
+		var d: float = p.distance_to(spots[key])
+		if d < best_d:
+			best_d = d
 			_near = key
-	_hud.set_prompt("E", PROMPTS.get(_near, ""))
+	if _talker != &"" and (p.distance_to(_talker_cell()) > reach * 1.8):
+		_end_talk()
+	if _talker != &"":
+		_hud.set_prompt("", "")
+	elif _near.begins_with("v_"):
+		_hud.set_prompt("E", "%s에게 말을 건다" % data.village.villager(StringName(_near.substr(2))).display_name)
+	else:
+		_hud.set_prompt("E", PROMPTS.get(_near, ""))
+	_move_fx.draw(alpha)
+	_animate_village(delta)
 	_forge_light.light_energy = lerpf(_forge_light.light_energy, 1.6, delta * 3.0)
 
 
 func _interact() -> void:
+	if _talker != &"":
+		_talk_i += 1
+		if _talk_i >= _talk_lines.size():
+			_end_talk()
+		else:
+			_hud.say(_talk_name(), _talk_lines[_talk_i])
+		return
+	if _near.begins_with("v_"):
+		_start_talk(StringName(_near.substr(2)))
+		return
 	match _near:
+		"board":
+			_hud.open_board()
+		"yard_rack":
+			_hud.open_yard_rack()
+		"merchant":
+			_hud.open_shop()
 		"forge":
 			_hud.open_forge()
 		"shrine":
@@ -225,8 +309,6 @@ func _build_trees() -> void:
 	for c in [Vector2(1.8, 12.5), Vector2(32.3, 9.0), Vector2(32.4, 16.8), Vector2(26.8, 4.0), Vector2(13.3, 4.4), Vector2(1.8, 20.4), Vector2(32.4, 20.6)]:
 		VillageBuilder.tree(self, Grid.cells_to_world(c), _deco, _deco.randf() < 0.5)
 		_circles.append([c, 0.5])
-	VillageBuilder.dead_tree(self, Grid.cells_to_world(Vector2(26.0, 16.6)), _deco)
-	_circles.append([Vector2(26.0, 16.6), 0.4])
 	var size := Vector2(Grid.size) * Grid.CELL
 	var mid_x: float = size.x / 2.0
 	var placed: int = 0
@@ -468,11 +550,139 @@ func _build_houses() -> void:
 	for p in [Vector2(8.3, 11.9), Vector2(25.6, 20.7), Vector2(15.0, 21.0), Vector2(33.0, 7.8)]:
 		VillageBuilder.crate(self, Grid.cells_to_world(p), _deco, _deco.randf_range(0.7, 0.95))
 		_circles.append([p, 0.4])
-	for p in [Vector2(26.2, 17.6), Vector2(27.2, 17.2), Vector2(33.0, 18.0)]:
+	for p in [Vector2(33.0, 18.0)]:
 		VillageBuilder.hay(self, Grid.cells_to_world(p), _deco)
 		_circles.append([p, 0.45])
 	VillageBuilder.firewood(self, Grid.cells_to_world(Vector2(6.4, 7.0)), PI / 2.0)
 	_circles.append([Vector2(6.4, 7.0), 0.5])
+
+
+# ---------------------------------------------------------------- 15단계: 의뢰판 · 수련장 · 상인 · 주민
+
+func _build_village_extras() -> void:
+	VillageProps.board(self, Grid.cells_to_world(board_at), 0.0, _deco)
+	_rects.append(Rect2(board_at + Vector2(-0.75, -0.2), Vector2(1.5, 0.45)))
+	_dummies = VillageProps.yard(self, yard_area, yard_gap, yard_dummies, yard_rack_at, _deco)
+	for d in yard_dummies:
+		_circles.append([d, 0.35])
+		_dummy_enemies.append(rules.spawn_dummy(d))
+	var a := yard_area
+	_rects.append(Rect2(a.position.x, a.position.y - 0.1, a.size.x, 0.2))
+	_rects.append(Rect2(a.position.x, a.end.y - 0.1, a.size.x, 0.2))
+	_rects.append(Rect2(a.end.x - 0.1, a.position.y, 0.2, a.size.y))
+	_rects.append(Rect2(a.position.x - 0.1, a.position.y, 0.2, yard_gap.x - a.position.y))
+	_rects.append(Rect2(a.position.x - 0.1, yard_gap.y, 0.2, a.end.y - yard_gap.y))
+	_rects.append(Rect2(yard_rack_at - Vector2(0.9, 0.2), Vector2(1.8, 0.4)))
+	VillageProps.cart(self, Grid.cells_to_world(cart_at), VillageBuilder.facing_to(Vector2(1, 0)))
+	_rects.append(Rect2(cart_at - Vector2(0.6, 0.7), Vector2(1.2, 2.0)))
+	_add_folk(&"merchant", merchant_at, Vector2(1, 0))
+	for id in VILLAGERS:
+		_add_folk(id, VILLAGERS[id][0], VILLAGERS[id][1])
+
+
+func _add_folk(id: StringName, cell: Vector2, dir: Vector2) -> void:
+	var holder := VillageBuilder.place(self, Grid.cells_to_world(cell), VillageBuilder.facing_to(dir) + PI)
+	_folk[id] = {"P": VillageProps.villager(id, holder), "root": holder}
+	_circles.append([cell, 0.4])
+
+
+func _animate_village(delta: float) -> void:
+	_vt += delta
+	var eye: Vector3 = _lord.position + Vector3(0, 1.5, 0)
+	for id in _folk:
+		var f: Dictionary = _folk[id]
+		var root: Node3D = f.root
+		EventArt.breathe(f.P, _vt)
+		var close: bool = root.position.distance_to(_lord.position) < 8.0
+		VillageProps.look_at(f.P, root, eye, 1.0 if close else 0.0)
+		if id == _talker:
+			VillageProps.talk(f.P, _vt)
+	for i in _dummies.size():
+		_wobble[i] = maxf(0.0, _wobble[i] - delta * 1.6)
+		VillageProps.dummy_wobble(_dummies[i], _wobble_dir[i], _wobble[i])
+	# 수련장 위 줄: 최근 N초 피해 합(마지막으로 때린 뒤 몇 초 지나면 사라진다)
+	var win: float = data.village.yard_window
+	var sum: float = 0.0
+	var last: float = -999.0
+	for h in _yard_hits:
+		last = maxf(last, h[0])
+		if _clock - h[0] <= win:
+			sum += h[1]
+	_hud.set_readout("%d초 피해 %d" % [roundi(win), roundi(sum)] if _clock - last < win + 3.0 else "")
+
+
+func _in_yard() -> bool:
+	return yard_area.grow(-0.2).has_point(rules.lord.pos)
+
+
+## 수련장에서 쥘 검: 고른 검이 없으면 검집의 검. 부러지지 않는다.
+func _apply_yard_sword() -> void:
+	if meta.yard_sword < 0:
+		meta.yard_sword = meta.sheath_id
+	var s: Sword = meta.yard_sword_made(data)
+	rules.slots[0] = s
+	rules.active = 0
+	rules.lord.combo = 0
+	_lord.set_sword(s, data.grades)
+	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
+	if s != null and rules.moves != null:
+		rules.moves.clear()
+
+
+func _on_yard_sword(id: int) -> void:
+	meta.yard_sword = id
+	_apply_yard_sword()
+
+
+func _on_dummy_hit(e: Enemy, damage: float, big: bool) -> void:
+	var i: int = _dummy_enemies.find(e)
+	if i < 0:
+		return
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	var d: Vector3 = at - _lord.position
+	d.y = 0.0
+	_wobble_dir[i] = d.normalized() if d.length() > 0.01 else Vector3.RIGHT
+	_wobble[i] = 1.0
+	_yard_hits.append([_clock, damage])
+	if _yard_hits.size() > 400:
+		_yard_hits = _yard_hits.slice(200)
+	var t := FloatText.new()
+	t.text = str(roundi(damage))
+	t.font_size = 52 if big else 34
+	t.modulate = Color(1, 0.86, 0.45) if big else Color.WHITE
+	add_child(t)
+	t.global_position = at + Vector3(0, 2.2, 0)
+	_sfx.play(&"hit_big" if big else &"hit", at + Vector3(0, 1.0, 0), -4.0)
+
+
+func _start_talk(id: StringName) -> void:
+	var lines := meta.talk(data, id)
+	if lines.is_empty():
+		return
+	meta.save()
+	_talker = id
+	_talk_lines = lines
+	_talk_i = 0
+	_hud.say(_talk_name(), lines[0])
+
+
+func _end_talk() -> void:
+	if _talker != &"" and _folk.has(_talker):
+		var P: Dictionary = _folk[_talker].P
+		for f: Node3D in P.get("forearms", []):
+			if P.rest.has(f):
+				f.transform = P.rest[f]
+	_talker = &""
+	_hud.say_end()
+
+
+func _talk_name() -> String:
+	var v := data.village.villager(_talker)
+	return v.display_name if v else ""
+
+
+func _talker_cell() -> Vector2:
+	return VILLAGERS[_talker][0]
 
 
 ## 영주를 막힌 곳 밖으로 민다(가장 가까운 가장자리로).

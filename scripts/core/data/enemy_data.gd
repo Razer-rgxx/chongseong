@@ -79,3 +79,9 @@ extends Resource
 @export var summon_time: float = 1.0
 @export var summon_radius: float = 1.6
 @export var summon_max: int = 15
+
+@export_group("수련장(15단계, docs/village.md)")
+## 움직이지도 때리지도 않는다(허수아비). 넉백도 받지 않는다.
+@export var still: bool = false
+## 0보다 크면 이만큼(초) 안 맞으면 체력이 다 차고, 쓰러지지 않는다(체력이 1 밑으로 내려가지 않는다).
+@export var refill_after: float = 0.0

@@ -19,6 +19,16 @@ var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
 var runs: int = 0
+## 의뢰판(15단계): 붙은 의뢰(VillageData.quests의 번호) 3장, 맡은 장(-1 없음).
+var quest_board: Array[int] = []
+var quest_active: int = -1
+## 떠돌이 상인의 좌판(물건 id)과 다음 판에 쓸 산 물건. 같은 물건은 한 판에 하나.
+var stock: Array[StringName] = []
+var pack: Array[StringName] = []
+## 주민이 한 말: 주민 id → 들은 줄 번호들.
+var heard: Dictionary = {}
+## 수련장에서 마을을 떠나면 내려놓는 검(검 걸이에서 고른 SwordData.id, 저장하지 않는다).
+var yard_sword: int = -1
 var rng := RandomNumberGenerator.new()
 
 
@@ -44,7 +54,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -63,6 +73,23 @@ func from_dict(d: Dictionary) -> void:
 		found[str(k)] = int(f[k])
 	best = int(d.get("best", 0))
 	runs = int(d.get("runs", 0))
+	quest_board = []
+	for q in d.get("quest_board", []):
+		quest_board.append(int(q))
+	quest_active = int(d.get("quest_active", -1))
+	stock = []
+	for g in d.get("stock", []):
+		stock.append(StringName(g))
+	pack = []
+	for g in d.get("pack", []):
+		pack.append(StringName(g))
+	heard = {}
+	var hd: Dictionary = d.get("heard", {})
+	for k in hd:
+		var arr: Array = []
+		for v in hd[k]:
+			arr.append(int(v))
+		heard[str(k)] = arr
 
 
 func note_found(id: int) -> void:
@@ -205,6 +232,270 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	var r := run_shards(rules, md)
 	shards += r.total
+	# 의뢰: 맡은 것을 이루었으면 조각을 주고, 판이 끝날 때마다 안 맡은 것 하나를 바꾼다
+	r["quest_done"] = false
+	r["quest_reward"] = 0
+	r["quest_text"] = ""
+	var V := rules.data.village
+	if quest_active >= 0 and quest_active < quest_board.size():
+		var q: QuestData = V.quests[quest_board[quest_active]]
+		r.quest_text = quest_text(q)
+		if quest_count(q, rules.run_stats) >= q.n:
+			r.quest_done = true
+			r.quest_reward = q.reward
+			shards += q.reward
+			r.total += q.reward
+			quest_board[quest_active] = _pick_quest(V, rules.data, true)
+			quest_active = -1
+	refresh_board(rules.data)
+	refresh_stock(rules.data)
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
 	runs += 1
 	return r
+
+
+# ---------------------------------------------------------------- 의뢰판 (docs/village.md 15.1)
+
+## 이번 판의 stats에서 그 의뢰가 센 값.
+static func quest_count(q: QuestData, st: Dictionary) -> int:
+	match q.kind:
+		&"kill":
+			return int(st.get("kills", 0))
+		&"kill_kind":
+			return int(st.get("kills_by_kind", {}).get(q.target, 0))
+		&"zones":
+			return int(st.get("zones", 0))
+		&"elites":
+			return int(st.get("elites", 0))
+		&"pull_grade":
+			var n: int = 0
+			var arr: Array = st.get("pulled_by_grade", [])
+			for g in range(q.grade, arr.size()):
+				n += int(arr[g])
+			return n
+		&"perfect":
+			return int(st.get("perfect", 0))
+		&"goal":
+			return int(st.get("goals_done", {}).get(q.target, 0))
+		&"events":
+			return int(st.get("events_used", 0))
+	return 0
+
+
+## 의뢰 한 줄의 말.
+static func quest_text(q: QuestData) -> String:
+	match q.kind:
+		&"kill":
+			return "한 판에 적 %d마리 쓰러뜨리기" % q.n
+		&"kill_kind":
+			return "한 판에 %s %d마리 쓰러뜨리기" % [KIND_NAMES.get(q.target, str(q.target)), q.n]
+		&"zones":
+			return "한 판에 %d구역 넘기" % q.n
+		&"elites":
+			return "한 판에 정예 %d 쓰러뜨리기" % q.n
+		&"pull_grade":
+			return "한 판에 %s 이상 %d자루 뽑기" % [GRADE_NAMES[clampi(q.grade, 0, 5)], q.n]
+		&"perfect":
+			return "한 판에 모두 제대로 당기기 %d번" % q.n
+		&"goal":
+			return "한 판에 %s 목표 %d번 이루기" % [GOAL_NAMES.get(q.target, str(q.target)), q.n]
+		&"events":
+			return "한 판에 낮 사건 %d번 쓰기" % q.n
+	return ""
+
+
+const KIND_NAMES: Dictionary = {&"wraith": "망령", &"wolf": "늑대", &"giant": "거인", &"archer": "활잡이", &"shield": "방패병", &"charger": "돌격병", &"bomber": "자폭병", &"caller": "부르는 자"}
+const GOAL_NAMES: Dictionary = {&"hunt": "사냥", &"defend": "봉화 지키기", &"siege": "포위"}
+const GRADE_NAMES: PackedStringArray = ["흔함", "귀함", "전설", "신화", "초월", "무한"]
+
+
+## 붙일 수 있는 의뢰(가장 높이 오른 구역이 모자라지 않고, 판에 안 붙은 종류).
+func _pick_quest(V: VillageData, game: GameData, replacing: bool = false) -> int:
+	var used_kinds: Array = []
+	for i in quest_board:
+		if i >= 0:
+			used_kinds.append(_kind_key(V.quests[i]))
+	var open: Array[int] = []
+	var open_any: Array[int] = []
+	for i in V.quests.size():
+		var q := V.quests[i]
+		if best < q.min_best or quest_board.has(i):
+			continue
+		open_any.append(i)
+		if not used_kinds.has(_kind_key(q)):
+			open.append(i)
+	var pool: Array[int] = open if not open.is_empty() else open_any
+	if pool.is_empty():
+		return 0
+	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+static func _kind_key(q: QuestData) -> String:
+	return "%s:%s" % [q.kind, q.target if q.kind == &"kill_kind" or q.kind == &"goal" else ""]
+
+
+## 의뢰판을 채운다(처음, 또는 저장에 없을 때).
+func fill_board(game: GameData) -> void:
+	var V := game.village
+	quest_board = quest_board.filter(func(i: int) -> bool: return i >= 0 and i < V.quests.size())
+	if quest_active >= quest_board.size():
+		quest_active = -1
+	while quest_board.size() < V.board_size:
+		quest_board.append(_pick_quest(V, game))
+
+
+## 판이 끝날 때마다 안 맡은 것 하나를 바꾼다.
+func refresh_board(game: GameData) -> void:
+	fill_board(game)
+	var free: Array[int] = []
+	for i in quest_board.size():
+		if i != quest_active:
+			free.append(i)
+	if free.is_empty():
+		return
+	var k: int = free[rng.randi_range(0, free.size() - 1)]
+	var old: int = quest_board[k]
+	quest_board[k] = -1
+	var n: int = _pick_quest(game.village, game)
+	quest_board[k] = n if n != old or game.village.quests.size() < 4 else old
+
+
+func take_quest(i: int) -> bool:
+	if quest_active >= 0 or i < 0 or i >= quest_board.size():
+		return false
+	quest_active = i
+	return true
+
+
+## 의뢰를 내려놓는다(맡은 것만).
+func drop_quest() -> void:
+	quest_active = -1
+
+
+# ---------------------------------------------------------------- 떠돌이 상인 (15.4)
+
+func refresh_stock(game: GameData) -> void:
+	var V := game.village
+	var ids: Array[StringName] = []
+	for g in V.goods:
+		ids.append(g.id)
+	stock = []
+	while stock.size() < mini(V.stock_size, ids.size()):
+		var k: int = rng.randi_range(0, ids.size() - 1)
+		stock.append(ids[k])
+		ids.remove_at(k)
+
+
+func fill_stock(game: GameData) -> void:
+	stock = stock.filter(func(g: StringName) -> bool: return game.village.goods_by_id(g) != null)
+	if stock.is_empty():
+		refresh_stock(game)
+
+
+## 물건을 산다. 같은 물건은 한 판에 하나, 조각이 모자라면 못 산다. 이유("" 이면 샀다).
+func buy(game: GameData, id: StringName) -> String:
+	var g := game.village.goods_by_id(id)
+	if g == null or not stock.has(id):
+		return "그런 물건은 없다"
+	if pack.has(id):
+		return "이미 샀다"
+	if shards < g.price:
+		return "조각이 모자란다"
+	shards -= g.price
+	pack.append(id)
+	return ""
+
+
+# ---------------------------------------------------------------- 주민 (15.3)
+
+func cond_ok(cond: String, n: int, game: GameData) -> bool:
+	match cond:
+		"":
+			return true
+		"runs":
+			return runs >= n
+		"best":
+			return best >= n
+		"legend":
+			for s in game.swords:
+				if s.grade >= 2 and has_found(s.id):
+					return true
+			return false
+		"top":
+			return best > game.run.zone_names.size()
+		"quest":
+			return quest_active >= 0
+	return false
+
+
+## 그 주민의 다음 말: 조건이 맞는 줄 중 아직 안 들은 것부터, 다 들었으면 처음부터 다시. 줄 번호를 돌려준다(-1이면 말이 없다).
+func next_line(game: GameData, id: StringName) -> int:
+	var v := game.village.villager(id)
+	if v == null:
+		return -1
+	var ok: Array[int] = []
+	for i in v.lines.size():
+		if cond_ok(v.cond[i], v.cond_n[i], game):
+			ok.append(i)
+	if ok.is_empty():
+		return -1
+	var heard_i: Array = heard.get(str(id), [])
+	for i in ok:
+		if not heard_i.has(i):
+			return i
+	return ok[0]
+
+
+## 말을 건다: 오늘 할 말 한 줄들(안 들은 줄이면 그 줄 하나 + 이어지는 안 들은 줄이 없으면 끝). 듣는다고 기록한다.
+func talk(game: GameData, id: StringName) -> Array[String]:
+	var v := game.village.villager(id)
+	var out: Array[String] = []
+	var i: int = next_line(game, id)
+	if i < 0:
+		return out
+	out.append(v.lines[i])
+	var h: Array = heard.get(str(id), [])
+	if not h.has(i):
+		h.append(i)
+	heard[str(id)] = h
+	# 다음 줄이 안 들은 줄이면 이어서 한 번 더(2~4줄 이야기)
+	var j: int = next_line(game, id)
+	while j >= 0 and not h.has(j) and out.size() < 3:
+		out.append(v.lines[j])
+		h.append(j)
+		j = next_line(game, id)
+	return out
+
+
+# ---------------------------------------------------------------- 수련장 검 걸이 (15.2)
+
+## 걸이에서 고를 수 있는 검: 검집의 검과 도감에서 찾은 검(찾은 것 중 낮은 등급 판).
+func yard_swords(game: GameData) -> Array[int]:
+	var out: Array[int] = []
+	if sheath_id >= 0:
+		out.append(sheath_id)
+	var ids: Array[int] = []
+	for s in game.swords:
+		if has_found(s.id) and not out.has(s.id):
+			ids.append(s.id)
+	ids.sort_custom(func(a: int, b: int) -> bool:
+		var ga: int = game.sword_by_id(a).grade
+		var gb: int = game.sword_by_id(b).grade
+		return ga > gb or (ga == gb and a < b))
+	out.append_array(ids)
+	return out
+
+
+## 수련장에서 쥘 검(검집의 검이면 검집 강화를 입는다). 없으면 null(맨손). 부러지지 않는다.
+func yard_sword_made(game: GameData) -> Sword:
+	if yard_sword <= 0:
+		return null
+	var d := game.sword_by_id(yard_sword)
+	if d == null:
+		return null
+	var s := Sword.new(d, game)
+	if yard_sword == sheath_id:
+		s.apply_sheath(sheath_lv, sheath_ins, game)
+	s.max_durability = -1.0
+	s.durability = -1.0
+	return s

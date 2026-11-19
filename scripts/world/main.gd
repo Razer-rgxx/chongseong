@@ -106,6 +106,7 @@ func _ready() -> void:
 	meta.fix_sheath(data)
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
 	rules = Rules.new(data, s, meta)
+	meta.save()   # 산 물건은 이 판에서 쓰였다(Meta.pack은 Rules가 비운다)
 	_build_world()
 	_setup_console()
 	_lord = LORD_SCENE.instantiate()
@@ -577,6 +578,15 @@ func _on_boss(e: Enemy) -> void:
 	_hud.toast("우두머리 %s이(가) 올라온다. 쓰러뜨리면 새벽이 온다." % e.data.display_name)
 
 
+## 판이 끝났을 때 의뢰 한 줄(맡은 의뢰가 없으면 빈 글).
+func _quest_line(r: Dictionary) -> String:
+	if r.quest_text == "":
+		return ""
+	if r.quest_done:
+		return "\n의뢰 완료 · %s · 조각 +%d" % [r.quest_text, r.quest_reward]
+	return "\n의뢰 실패 · %s (다시 도전할 수 있다)" % r.quest_text
+
+
 func _on_end(won: bool) -> void:
 	var best: String = data.grades.names[rules.best_grade] if rules.best_grade >= 0 else "없음"
 	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
@@ -587,7 +597,7 @@ func _on_end(won: bool) -> void:
 	_clear_night_view()
 	_clear_event_view()
 	_hud.set_goal("")
-	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")])
+	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")] + _quest_line(r))
 	_capture(false)
 
 

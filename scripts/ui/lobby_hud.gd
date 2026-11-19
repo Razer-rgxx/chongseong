@@ -7,6 +7,10 @@ extends CanvasLayer
 signal forge_hit(step: int)
 signal forge_done(result: Dictionary, big: bool)
 signal closed()
+## 15단계: 의뢰를 맡았다(판의 번호), 물건을 샀다(id), 수련장 검을 골랐다(SwordData.id).
+signal quest_taken(i: int)
+signal bought(id: StringName)
+signal yard_sword_picked(id: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -28,6 +32,15 @@ var _rack_text: RichTextLabel
 var _msg: Label
 var _busy: bool = false
 var _rack_head: Label
+var _board: Control
+var _board_box: VBoxContainer
+var _shop: Control
+var _shop_box: VBoxContainer
+var _yard: Control
+var _yard_box: VBoxContainer
+var _yard_pick: Label
+var _readout: Label
+var _say: Band
 
 
 ## 마을이 _ready에서 부른다(이 창의 _ready가 먼저 돈다).
@@ -54,11 +67,18 @@ func _ready() -> void:
 	sb.add_child(_shards)
 	_toast = Band.make(self, 96.0, 980.0, 50.0, 18)
 	_prompt = Band.make(self, -110.0, 640.0, 50.0, 19)
+	_say = Band.make(self, -110.0, 1040.0, 100.0, 19)
 	_title = AreaTitle.make(self)
 	_forge = _layer()
 	_forge_box = UiKit.center_panel(_forge)
 	_shrine = _layer()
 	_shrine_box = UiKit.center_panel(_shrine)
+	_board = _layer()
+	_board_box = UiKit.center_panel(_board)
+	_shop = _layer()
+	_shop_box = UiKit.center_panel(_shop)
+	_yard = _layer()
+	_yard_box = UiKit.center_panel(_yard)
 	_rack = _layer()
 	var rb := UiKit.center_panel(_rack)
 	UiKit.header(rb, "검 진열대", close)
@@ -70,6 +90,12 @@ func _ready() -> void:
 	_rack_text = UiKit.rich(14, 800)
 	scroll.add_child(_rack_text)
 	rb.add_child(scroll)
+	_readout = UiKit.label("", 20, UiKit.TITLE)
+	_readout.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_readout.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_readout.offset_top = 150
+	_readout.visible = false
+	add_child(_readout)
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -78,7 +104,7 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _rack.visible
+	return _forge.visible or _shrine.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible
 
 
 func close() -> void:
@@ -87,6 +113,9 @@ func close() -> void:
 	_forge.visible = false
 	_shrine.visible = false
 	_rack.visible = false
+	_board.visible = false
+	_shop.visible = false
+	_yard.visible = false
 	closed.emit()
 
 
@@ -100,6 +129,20 @@ func set_prompt(key: String, t: String) -> void:
 		_prompt.hide_band()
 	else:
 		_prompt.show_key(key, t)
+
+
+## 주민의 말 한 줄(띠, E로 다음). 한 줄이 길면 가운데에서 끊는다.
+func say(who: String, text: String) -> void:
+	var t: String = text
+	if t.length() > 42:
+		var cut: int = t.find(" ", 34)
+		if cut > 0:
+			t = t.substr(0, cut) + "\n" + t.substr(cut + 1)
+	_say.show_key("E", "%s\n%s" % [who, t])
+
+
+func say_end() -> void:
+	_say.hide_band()
 
 
 func area_title(t: String) -> void:
@@ -282,6 +325,129 @@ func open_rack() -> void:
 	var best: String = "없음" if meta.best == 0 else ("정상" if meta.best > data.run.zone_names.size() else "%d구역" % meta.best)
 	_rack_head.text = "도감 %d / %d  ·  최고 기록 %s  ·  오른 횟수 %d" % [meta.found.size(), data.swords.size(), best, meta.runs]
 	_rack.visible = true
+
+
+## 수련장 위 가운데 줄("5초 피해 N"). 빈 글이면 숨긴다.
+func set_readout(t: String) -> void:
+	_readout.text = t
+	_readout.visible = t != ""
+
+
+# ---------------------------------------------------------------- 의뢰판 · 상인 · 검 걸이 (15단계)
+
+func open_board() -> void:
+	_board.visible = true
+	_render_board("")
+
+
+func _render_board(msg: String) -> void:
+	for c in _board_box.get_children():
+		c.queue_free()
+	UiKit.header(_board_box, "의뢰판", close)
+	_board_box.add_child(_wrap(UiKit.label("하나만 맡을 수 있다. 다음 판에서 센다. 이루면 조각을 받고, 못 이루면 그대로 남는다.", 14, UiKit.MUTED)))
+	for i in meta.quest_board.size():
+		var q: QuestData = data.village.quests[meta.quest_board[i]]
+		var on: bool = i == meta.quest_active
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", UiKit.style(UiKit.TITLE if on else Color(UiKit.LINE, 0.4), 2 if on else 1))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		var t := UiKit.label("%s\n조각 +%d" % [Meta.quest_text(q), q.reward], 17, UiKit.TEXT)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		t.custom_minimum_size = Vector2(430, 0)
+		row.add_child(t)
+		var b := UiKit.button("맡는 중" if on else "맡는다", func() -> void:
+			if meta.take_quest(i):
+				meta.save()
+				quest_taken.emit(i)
+				_render_board("의뢰를 맡았다."), 40.0)
+		b.disabled = on or meta.quest_active >= 0
+		b.custom_minimum_size = Vector2(110, 40)
+		row.add_child(b)
+		card.add_child(row)
+		_board_box.add_child(card)
+	if meta.quest_active >= 0:
+		_board_box.add_child(UiKit.button("맡은 의뢰를 내려놓는다", func() -> void:
+			meta.drop_quest()
+			meta.save()
+			_render_board("의뢰를 내려놓았다."), 34.0))
+	_board_box.add_child(UiKit.label(msg, 17, UiKit.TITLE))
+
+
+func open_shop() -> void:
+	_shop.visible = true
+	_render_shop("")
+
+
+func _render_shop(msg: String) -> void:
+	for c in _shop_box.get_children():
+		c.queue_free()
+	UiKit.header(_shop_box, "떠돌이 상인", close)
+	_shop_box.add_child(_wrap(UiKit.label("산 것은 다음 판 하나에만 쓰인다. 판이 끝날 때마다 물건이 바뀐다.", 14, UiKit.MUTED)))
+	for id in meta.stock:
+		var g := data.village.goods_by_id(id)
+		var have: bool = meta.pack.has(id)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 16)
+		var t := UiKit.label("%s\n%s" % [g.display_name, g.text], 16, UiKit.MUTED if have else UiKit.TEXT)
+		t.custom_minimum_size = Vector2(470, 0)
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(t)
+		var b := UiKit.button("산 것" if have else "조각 %d" % g.price, func() -> void:
+			var why: String = meta.buy(data, id)
+			if why == "":
+				meta.save()
+				refresh_top()
+				bought.emit(id)
+				_render_shop("%s을(를) 샀다." % g.display_name)
+			else:
+				_render_shop(why), 40.0)
+		b.disabled = have
+		b.custom_minimum_size = Vector2(120, 40)
+		row.add_child(b)
+		_shop_box.add_child(row)
+	_shop_box.add_child(UiKit.label(msg, 17, UiKit.TITLE))
+
+
+## 수련장 검 걸이: 검집의 검과 도감에서 찾은 검 중 하나를 고른다.
+func open_yard_rack() -> void:
+	_yard.visible = true
+	_render_yard_rack()
+
+
+func _render_yard_rack() -> void:
+	for c in _yard_box.get_children():
+		c.queue_free()
+	UiKit.header(_yard_box, "수련장 검 걸이", close)
+	_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다. 울타리 안에서 좌클릭으로 허수아비를 친다.", 14, UiKit.MUTED)))
+	var ids := meta.yard_swords(data)
+	if ids.is_empty():
+		_yard_box.add_child(UiKit.label("걸어 둘 검이 없다. 언덕에서 뽑아 와야 한다.", 16, UiKit.TEXT))
+		return
+	var pick := OptionButton.new()
+	pick.focus_mode = Control.FOCUS_NONE
+	pick.custom_minimum_size = Vector2(520, 36)
+	pick.add_item("맨손", 0)
+	for id in ids:
+		var d := data.sword_by_id(id)
+		pick.add_item("%s%s · %s (%s)" % ["[검집] " if id == meta.sheath_id else "", data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name], id)
+		if id == meta.yard_sword:
+			pick.select(pick.item_count - 1)
+	pick.item_selected.connect(func(i: int) -> void:
+		var id: int = pick.get_item_id(i)
+		yard_sword_picked.emit(id)
+		_render_yard_rack())
+	_yard_box.add_child(pick)
+	if meta.yard_sword > 0:
+		var s: Sword = meta.yard_sword_made(data)
+		if s:
+			var card := PanelContainer.new()
+			card.add_theme_stylebox_override("panel", UiKit.style(data.grades.colors[s.grade], 2))
+			var r := UiKit.rich(15, 520)
+			r.text = SwordCard.bbcode(s, data)
+			card.add_child(r)
+			_yard_box.add_child(card)
 
 
 func _layer() -> Control:

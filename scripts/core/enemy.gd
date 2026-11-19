@@ -19,6 +19,8 @@ var radius: float
 var elite: bool = false
 var cooldown: float = 0.0
 var dead: bool = false
+## 허수아비: 마지막으로 맞은 뒤 지난 시간(초). refill_after가 지나면 체력이 찬다.
+var idle_t: float = 0.0
 
 # ---- 행동(11단계, Foes, docs/content.md). 화면은 읽기만 한다.
 ## 지금 하는 일(aim, shoot, block, guard_break, wind, charge, charge_end, fuse, explode, call_wind, call). &""이면 걷기다.
