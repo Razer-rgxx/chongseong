@@ -1381,6 +1381,7 @@ func spawn_pack(id: StringName, def: Dictionary = {}) -> Array[Enemy]:
 	var a0: float = rng.randf() * TAU
 	var keep_zone: int = zone
 	zone = spawn_z
+	var elite_kind: StringName = StringName(P.get("elite", &""))   # 지하 무덤(31단계): 그 종류의 첫 적이 정예
 	for i in kinds.size():
 		var at: Vector2 = home + Vector2.from_angle(a0 + TAU * i / kinds.size()) * wander * (0.35 + 0.35 * rng.randf())
 		var e := spawn_at(kinds[i], at)
@@ -1388,6 +1389,9 @@ func spawn_pack(id: StringName, def: Dictionary = {}) -> Array[Enemy]:
 		e.home = at
 		e.wander_to = at
 		e.wander_t = rng.randf_range(FieldLayout.PACK_WANDER_WAIT.x, FieldLayout.PACK_WANDER_WAIT.y)
+		if elite_kind != &"" and kinds[i] == elite_kind:
+			make_elite(e)
+			elite_kind = &""
 		out.append(e)
 	zone = keep_zone
 	packs[id] = {"home": home, "wander": wander, "zone": pz, "state": PACK_IDLE, "spawned": out.size(), "cleared": false, "night": night_pack}
@@ -1603,12 +1607,19 @@ func _spawn_elite() -> Enemy:
 	elif rng.randf() < 0.5:
 		kind = &"wolf"
 	var e := _spawn(kind)
+	make_elite(e)
+	return e
+
+
+## 정예로 만든다: 체력 elite_hp배(다 찬다), 피해 elite_damage배, 몸 elite_size배(data/run.tres). 화면(EnemyView)은 금빛 몸·빛·발밑 고리.
+## 쓰러뜨리면 elites_killed를 세고 공짜 뽑기(언덕). 언덕 밤의 정예와 지하 무덤 방마다의 정예(31단계)가 같이 쓴다.
+func make_elite(e: Enemy) -> void:
+	var R := data.run
 	e.elite = true
 	e.max_hp *= R.elite_hp
 	e.hp = e.max_hp
 	e.damage *= R.elite_damage
 	e.radius *= R.elite_size
-	return e
 
 
 # ---------------------------------------------------------------- 밤의 목표와 구역 규칙(12단계)

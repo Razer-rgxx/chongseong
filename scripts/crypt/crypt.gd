@@ -215,10 +215,18 @@ func _interact() -> void:
 		if int(r.shards) > 0:
 			CryptBuilder.open_coffin(_coffins[id])
 			_sfx.play(&"thump", _coffins[id].position, -3.0, 0.7)
-			_hud.toast("돌 관에서 조각 %d개%s" % [r.shards, ", 운 부적" if r.charm else ""])
-			if r.charm:
+			_hud.toast("돌 관에서 조각 %d개%s%s" % [r.shards, ", 운 부적" if r.charm else "", _sword_note(int(r.sword))])
+			if r.charm or int(r.sword) >= 0:
 				_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
 			_saved()
+
+
+## 큰 관에서 얻은 오픈월드 한정 검의 이름(알림 끝에 붙인다). 없으면 "".
+func _sword_note(id: int) -> String:
+	if id < 0:
+		return ""
+	var sd := load(CryptLayout.big_coffin_sword_path()) as SwordData
+	return ", 검 「%s」" % sd.display_name if sd != null else ""
 
 
 ## 고른 검을 칸 0에 쥔다(부러지지 않는다, 들판과 같다). 안 골랐으면 검집의 검, 0이면 맨손.
