@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 303
+display_name = "무릎 꿇은 산"
+grade = 2
+form = 2
+attack = 85
+inscriptions = PackedStringArray("거인 베기")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "언덕에 오르지 못한 거인이 발치에 무릎을 꿇었다. 그는 일어나지 않았고 칼만 남았다."
+field_only = true

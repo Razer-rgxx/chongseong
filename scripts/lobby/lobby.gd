@@ -477,26 +477,24 @@ func _build_rack() -> void:
 		VillageBuilder.box(self, Vector3(0.14, 2.6, 0.14), at + Vector3(-0.4, 1.3, z), VillageBuilder.timber())
 	VillageBuilder.box(self, Vector3(1.8, 0.12, 5.6), at + Vector3(0.1, 2.6, 0), VillageBuilder.roof(), Vector3(0, 0, -0.35))
 	_rects.append(Rect2(rack_at - Vector2(0.4, 1.3), Vector2(0.7, 2.6)))
-	# 도감에서 찾은 등급마다 한 자루씩 세워 둔다(등급 색)
-	var shown: int = 0
+	# 도감에서 찾은 등급마다 한 자루씩 세워 둔다(등급 색). 오픈월드 한정 검(33단계)을 찾았으면 끝에 한 자루 더
+	var show: Array[SwordData] = []
 	for g in data.grades.names.size():
-		var any := false
 		for i in data.swords_by_grade[g]:
 			if meta.has_found(data.swords[i].id):
-				any = true
+				show.append(data.swords[i])
 				break
-		if not any:
-			continue
-		var first: SwordData = null
-		for i in data.swords_by_grade[g]:
-			if meta.has_found(data.swords[i].id):
-				first = data.swords[i]
-				break
-		var m := SwordModel.make(data.forms[first.form], g, first.id, data.grades.colors[g])
-		m.position = at + Vector3(0, 0.5, -2.0 + shown * 0.8)
+	for i in data.field_swords:
+		if meta.has_found(data.swords[i].id):
+			show.append(data.swords[i])
+			break
+	var gap: float = minf(0.8, 4.0 / maxf(1.0, float(show.size() - 1)))
+	for k in show.size():
+		var sd: SwordData = show[k]
+		var m := SwordModel.make(data.forms[sd.form], sd.grade, sd.id, data.grades.colors[sd.grade])
+		m.position = at + Vector3(0, 0.5, -2.0 + k * gap)
 		m.rotation.x = 0.12
 		add_child(m)
-		shown += 1
 
 
 func _build_gate() -> void:

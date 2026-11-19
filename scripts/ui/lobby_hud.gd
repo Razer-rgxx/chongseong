@@ -263,7 +263,7 @@ func _render_forge(msg: String) -> void:
 	UiKit.header(_forge_box, "대장간 · 검집 +%d" % meta.sheath_lv, close)
 	var cands := meta.sheath_candidates(data)
 	if cands.is_empty():
-		_forge_box.add_child(_wrap(UiKit.label("검집에는 언덕에서 뽑아 본 전설 이상의 검만 넣을 수 있다. 아직 없다.\n검집 강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
+		_forge_box.add_child(_wrap(UiKit.label("검집에는 찾아 본 전설 이상의 검만 넣을 수 있다(언덕에서 뽑았거나 들판에서 얻은 검). 아직 없다.\n검집 강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
 	else:
 		var pick := OptionButton.new()
 		pick.focus_mode = Control.FOCUS_NONE
@@ -412,10 +412,29 @@ func open_rack() -> void:
 			var sd := data.swords[i]
 			names.append(sd.display_name + ("" if int(meta.found.get(str(sd.id), 0)) < 2 else " ×%d" % int(meta.found[str(sd.id)])) if meta.has_found(sd.id) else "[color=#4d4740]???[/color]")
 		t += "  ·  ".join(names) + "\n\n"
+	t += _field_row()
 	_rack_text.text = t
 	var best: String = "없음" if meta.best == 0 else ("정상" if meta.best > data.run.zone_names.size() else "%d구역" % meta.best)
 	_rack_head.text = "도감 %d / %d  ·  최고 기록 %s  ·  오른 횟수 %d" % [meta.found.size(), data.swords.size(), best, meta.runs]
 	_rack.visible = true
+
+
+## 도감의 "들판의 검" 줄(33단계): 언덕에서는 뽑히지 않는 오픈월드 한정 검. 찾은 것은 제 등급 빛으로 쓴다.
+func _field_row() -> String:
+	var ids: PackedInt32Array = data.field_swords
+	if ids.is_empty():
+		return ""
+	var n: int = 0
+	var names: Array[String] = []
+	for i in ids:
+		var sd := data.swords[i]
+		if meta.has_found(sd.id):
+			n += 1
+			names.append("[color=#%s]%s[/color]" % [(data.grades.colors[sd.grade] as Color).to_html(false), sd.display_name])
+		else:
+			names.append("[color=#4d4740]???[/color]")
+	var t: String = "[b][color=#%s]들판의 검[/color][/b]  [color=#99917f]%d / %d · 언덕에서는 뽑히지 않는다[/color]\n" % [UiKit.TITLE.to_html(false), n, ids.size()]
+	return t + "  ·  ".join(names) + "\n"
 
 
 ## 수련장 위 가운데 줄("5초 피해 N"). 빈 글이면 숨긴다.

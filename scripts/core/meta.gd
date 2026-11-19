@@ -14,7 +14,7 @@ var sheath_peak: int = 0
 var sheath_ins: PackedStringArray = PackedStringArray()
 ## 축복 키 → 단계
 var bless: Dictionary = {}
-## 뽑아 본 검: SwordData.id(문자열) → 횟수
+## 뽑아 본(들판에서 얻은 것도) 검: SwordData.id(문자열) → 횟수
 var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
@@ -172,7 +172,7 @@ func bless_value(md: MetaData, key: String) -> float:
 
 # ---------------------------------------------------------------- 검집
 
-## 검집에 넣을 수 있는 검(뽑아 본 전설 이상), 높은 등급부터.
+## 검집에 넣을 수 있는 검(찾아 본 전설 이상, 오픈월드 한정 검도), 높은 등급부터.
 func sheath_candidates(game: GameData) -> Array[int]:
 	var out: Array[int] = []
 	for s in game.swords:

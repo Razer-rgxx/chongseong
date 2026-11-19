@@ -17,10 +17,12 @@ var village: VillageData
 var duel: DuelData
 ## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
 var forms: Array[FormData] = []
-## 파일 이름 순서(001 … 300).
+## 파일 이름 순서(001 … 310).
 var swords: Array[SwordData] = []
-## 등급마다 그 등급 검의 swords 번호.
+## 등급마다 그 등급 검의 swords 번호. 언덕에서 뽑히는 후보라 오픈월드 한정 검(field_only)은 들지 않는다.
 var swords_by_grade: Array[PackedInt32Array] = []
+## 오픈월드 한정 검(33단계)의 swords 번호(id 순서).
+var field_swords: PackedInt32Array = PackedInt32Array()
 ## 각인 이름 → InscriptionData
 var inscriptions: Dictionary = {}
 ## id → EnemyData
@@ -61,12 +63,15 @@ static func load_default() -> GameData:
 		d.swords_by_grade.append(PackedInt32Array())
 	for path in _tres_in(DIR + "swords/"):
 		var s := load(path) as SwordData
-		d.swords_by_grade[s.grade].append(d.swords.size())
+		if s.field_only:
+			d.field_swords.append(d.swords.size())
+		else:
+			d.swords_by_grade[s.grade].append(d.swords.size())
 		d.swords.append(s)
 	return d
 
 
-## SwordData.id는 1부터 300까지이고 swords 순서와 같다.
+## SwordData.id는 1부터 310까지이고 swords 순서와 같다.
 func sword_by_id(id: int) -> SwordData:
 	if id >= 1 and id <= swords.size() and swords[id - 1].id == id:
 		return swords[id - 1]
@@ -96,6 +101,12 @@ func pattern_by_name(n: String) -> PatternData:
 
 func move(id: StringName) -> MoveData:
 	return moves.get(id) as MoveData
+
+
+## 오픈월드 한정 검인지(모르는 id면 false).
+func is_field_sword(id: int) -> bool:
+	var s := sword_by_id(id)
+	return s != null and s.field_only
 
 
 func sword_by_name(n: String) -> SwordData:

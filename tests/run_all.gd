@@ -98,6 +98,7 @@ func _init() -> void:
 	(load("res://tests/field_region_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_night_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/crypt_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/field_sword_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/settings_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/duel_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/net_tests.gd") as GDScript).call("run", d, check)
@@ -206,15 +207,16 @@ func _test_grid() -> void:
 
 
 func _test_data() -> void:
-	check(d.swords.size() == 300, "검 300종 (지금 %d)" % d.swords.size())
+	check(d.swords.size() == 310, "검 310종(언덕 300 + 오픈월드 한정 10) (지금 %d)" % d.swords.size())
 	var per: Array[int] = []
 	for g in 6:
 		per.append(d.swords_by_grade[g].size())
-	check(per == [82, 70, 55, 40, 40, 13], "등급별 검 수 %s" % [per])
+	check(per == [82, 70, 55, 40, 40, 13], "언덕에서 뽑히는 등급별 검 수 %s(오픈월드 한정 검은 빠진다)" % [per])
+	check(d.field_swords.size() == 10, "오픈월드 한정 검 10자루(%d)" % d.field_swords.size())
 	var names := {}
 	for s in d.swords:
 		names[s.display_name] = true
-	check(names.size() == 300, "검 이름이 겹치지 않는다")
+	check(names.size() == 310, "검 이름이 겹치지 않는다")
 	var missing: Array[String] = []
 	for s in d.swords:
 		for k in s.inscriptions:

@@ -699,8 +699,7 @@ func _step_pull(input: LordInput = null) -> void:
 	pulls += 1
 	run_stats.pulled_by_grade[pull_grade] += 1
 	best_grade = maxi(best_grade, pull_grade)
-	var list: PackedInt32Array = data.swords_by_grade[pull_grade]
-	var s := Sword.new(data.swords[list[rng.randi_range(0, list.size() - 1)]], data)
+	var s := Sword.new(pick_sword(pull_grade), data)
 	powers.on_pulled(s)
 	# 모두 제대로 당겼다: 최대 내구 +10%(반올림, 적어도 1). 언덕의 첫 검 뒤, 저주의 절반 앞
 	if pull_all_good and s.breakable():
@@ -711,6 +710,12 @@ func _step_pull(input: LordInput = null) -> void:
 		_cursed_pulled(h, s)
 	sword_pulled.emit(s)
 	_receive(s)
+
+
+## 그 등급에서 뽑힐 검 하나(rng). 후보는 GameData.swords_by_grade라 오픈월드 한정 검(33단계, field_only)은 나오지 않는다.
+func pick_sword(grade: int) -> SwordData:
+	var list: PackedInt32Array = data.swords_by_grade[grade]
+	return data.swords[list[rng.randi_range(0, list.size() - 1)]]
 
 
 ## 뽑는 동안 누른 것을 판정한다(at: 눌린 때, pull_t의 시계). 지금 창의 버팀을 한 번만 판정한다.

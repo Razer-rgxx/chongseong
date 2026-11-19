@@ -1,6 +1,7 @@
 class_name SwordData
 extends Resource
-## 검 한 종류. data/swords/에 300개가 있다. 시험판 표(prototype/game_reference.js의 SW)에서 옮겼다.
+## 검 한 종류. data/swords/에 310개가 있다. 001~300은 시험판 표(prototype/game_reference.js의 SW)에서 옮겼고,
+## 301~310은 오픈월드 한정 검(33단계, docs/field_life.md)이다.
 
 @export var id: int = 0
 @export var display_name: String = ""
@@ -19,3 +20,6 @@ extends Resource
 ## 부러지지 않는 검(내구가 없다).
 @export var unbreakable: bool = false
 @export_multiline var story: String = ""
+## 오픈월드 한정 검(33단계): 언덕의 뽑기·대장장이·상인 어디서도 나오지 않고, 들판의 우두머리·무덤 큰 관·몰락한 기사에게서만 얻는다.
+## attack은 손으로 정한다(scripts/debug/build_attacks.gd가 건드리지 않는다).
+@export var field_only: bool = false
