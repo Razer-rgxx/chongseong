@@ -29,6 +29,12 @@ var pack: Array[StringName] = []
 var heard: Dictionary = {}
 ## 수련장에서 마을을 떠나면 내려놓는 검(검 걸이에서 고른 SwordData.id, 저장하지 않는다).
 var yard_sword: int = -1
+## 들판(16단계): 연 유품 상자와 읽은 비석(id → 1), 비석 보상을 받았는지, 지금 떠 있는 흩어진 조각(후보 번호).
+var field_found: Dictionary = {}
+var lore_read: Dictionary = {}
+var lore_paid: bool = false
+var glints: Array[int] = []
+var glints_ready: bool = false
 var rng := RandomNumberGenerator.new()
 
 
@@ -54,7 +60,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -90,6 +96,17 @@ func from_dict(d: Dictionary) -> void:
 		for v in hd[k]:
 			arr.append(int(v))
 		heard[str(k)] = arr
+	field_found = {}
+	for k in d.get("field_found", {}):
+		field_found[str(k)] = 1
+	lore_read = {}
+	for k in d.get("lore_read", {}):
+		lore_read[str(k)] = 1
+	lore_paid = bool(d.get("lore_paid", false))
+	glints = []
+	for g in d.get("glints", []):
+		glints.append(int(g))
+	glints_ready = bool(d.get("glints_ready", false))
 
 
 func note_found(id: int) -> void:
@@ -249,9 +266,61 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 			quest_active = -1
 	refresh_board(rules.data)
 	refresh_stock(rules.data)
+	roll_glints()
 	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
 	runs += 1
 	return r
+
+
+# ---------------------------------------------------------------- 들판 (docs/village.md 16.2)
+
+## 유품 상자를 연다. 처음이면 조각을 받고 그 수를, 이미 열었으면 0을 돌려준다.
+func field_open(id: String, amount: int) -> int:
+	if field_found.has(id):
+		return 0
+	field_found[id] = 1
+	shards += amount
+	return amount
+
+
+## 흩어진 조각 자리를 새로 뽑는다(판이 끝날 때마다).
+func roll_glints() -> void:
+	var pool: Array[int] = []
+	for i in FieldLayout.GLINTS.size():
+		pool.append(i)
+	glints = []
+	for _k in mini(FieldLayout.GLINT_ACTIVE, pool.size()):
+		var j: int = rng.randi() % pool.size()
+		glints.append(pool[j])
+		pool.remove_at(j)
+	glints.sort()
+	glints_ready = true
+
+
+func ensure_glints() -> void:
+	if not glints_ready:
+		roll_glints()
+
+
+## 흩어진 조각을 줍는다. 줍은 수(2~5)를 돌려주고 없는 자리면 0.
+func take_glint(i: int) -> int:
+	var at: int = glints.find(i)
+	if at < 0:
+		return 0
+	glints.remove_at(at)
+	var n: int = rng.randi_range(FieldLayout.GLINT_MIN, FieldLayout.GLINT_MAX)
+	shards += n
+	return n
+
+
+## 비석을 읽는다. 여섯 개를 다 읽은 그 순간에만 보상 조각 수를, 아니면 0을 돌려준다(한 번뿐).
+func read_stone(id: String) -> int:
+	lore_read[id] = 1
+	if not lore_paid and lore_read.size() >= FieldLayout.STONES.size():
+		lore_paid = true
+		shards += FieldLayout.LORE_REWARD
+		return FieldLayout.LORE_REWARD
+	return 0
 
 
 # ---------------------------------------------------------------- 의뢰판 (docs/village.md 15.1)

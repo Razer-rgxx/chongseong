@@ -7,7 +7,7 @@ extends Node3D
 ## (마을은 판이 아니라 꾸밈이라 규칙 밖, 화면 쪽에서 밀어낸다).
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
-const RUN_PATH: String = "res://scenes/world/main.tscn"
+const FIELD_PATH: String = "res://scenes/field/field.tscn"
 
 ## 들를 곳(칸 좌표). 마을 크기는 언덕 싸움터와 같다(RunData.arena_size).
 @export var forge_at: Vector2 = Vector2(9.5, 8.0)
@@ -33,7 +33,7 @@ const VILLAGERS: Dictionary = {
 }
 
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
-const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "언덕으로 오른다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다"}
+const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다"}
 @export var max_ticks_per_frame: int = 8
 
 var data: GameData
@@ -234,7 +234,7 @@ func _interact() -> void:
 			_hud.open_rack()
 		"gate":
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-			get_tree().change_scene_to_file(RUN_PATH)
+			get_tree().change_scene_to_file(FIELD_PATH)
 			return
 		_:
 			return

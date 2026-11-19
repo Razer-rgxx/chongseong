@@ -129,3 +129,10 @@
 - 주민: `Meta.talk`은 조건이 맞는 줄 중 안 들은 것부터 최대 3줄을 한 번에 돌려주고(`heard`에 저장), 다 들었으면 처음 줄부터 다시 한다. 띠에서 E로 한 줄씩 넘기고, 멀어지면 끝난다.
 - 검 걸이: 걸이 목록은 검집의 검 + 도감에서 찾은 모든 검(높은 등급부터)이고 맨손도 고른다. 고른 검(`Meta.yard_sword`, 저장 안 함)은 부러지지 않는 검으로 마을 Rules 칸 0에 쥔다.
 - 저장: `quest_board`, `quest_active`, `stock`, `pack`, `heard`가 `hill_save.json`에 더해졌다. 없으면 기본값이라 옛 저장도 읽는다.
+
+16단계(2026-11-19):
+- 들판은 `Rules`를 마을처럼 돌리되 `Rules.new` 뒤에 `Grid.size = FieldLayout.SIZE`(110×110)로 바꿔 영주를 가둔다. 좌클릭 입력은 안 넘긴다. 막힌 곳은 `FieldBuilder.build`가 돌려준 칸 단위 rects·circles(`FieldLayout.BORDER_RECTS` 둘레·목책, 망루, 수레, 쓰러진 거목, 돌다리 난간, 나무 둥치)를 화면 쪽 `_push_out`으로 민다. 영주는 `FieldBuilder.walk_height`(돌다리 위는 다리 판 높이)에 그린다.
+- 자리와 보상은 `data/field.tres` 대신 `FieldLayout` 한 파일에 상수로 뒀다(상자 조각 10~40, 흩어진 조각 2~5, 비석 보상 30, 비석 글, 곳 이름). 늘리거나 바꿀 때 거기만 고친다.
+- `Meta`: `field_found`(연 상자), `lore_read`, `lore_paid`, `glints`(떠 있는 후보 번호), `glints_ready`. 상자는 `field_open`, 조각은 `take_glint`(`Meta.rng`로 2~5), 비석은 `read_stone`(여섯 번째에 30, 한 번뿐). 자리는 `record_run`이 끝에서 `roll_glints`로 4곳을 새로 뽑고, 처음 들어오는 저장은 `ensure_glints`가 뽑는다. 옛 저장은 기본값이라 읽힌다.
+- 마을 북문(E) → 들판 `START`. 들판 남문 → 마을, 북쪽 길머리 → `scenes/world/main.tscn`. 곳 이름은 들어설 때 곳마다 한 번(`AreaTitle`). 비석은 `LobbyHud.say` 띠, 얻은 조각은 토스트.
+- 모양은 기본 도형이다. 땅·풀·전나무·마른 나무·바위·하늘은 `HillBuilder`의 것(풀 노드 이름 `Grass`라 `WebQuality`가 줄인다). 개울과 길은 따로 만든 띠·판, 같은 모양이 많은 것은 MultiMesh, 바위와 풀·갈대·나무는 visibility range. 갤러리 장면, `FieldFx`(먼지·꽃가루 꾸밈), 소리는 만들지 않았다. 짐승(`FieldCreatures`)은 도형 몇 개와 코드 움직임뿐이다.

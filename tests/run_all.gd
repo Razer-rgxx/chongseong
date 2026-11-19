@@ -92,6 +92,7 @@ func _init() -> void:
 	_test_village_talk()
 	_test_village_yard()
 	_test_village_save()
+	_test_field_meta()
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -3740,4 +3741,51 @@ func _test_village_save() -> void:
 	check(m3.shards == 7 and m3.quest_board.is_empty() and m3.quest_active == -1 and m3.pack.is_empty(), "저장: 옛 저장 파일도 읽는다")
 	m3.fill_board(d)
 	check(m3.quest_board.size() == 3, "저장: 옛 저장에도 의뢰판이 채워진다")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func _test_field_meta() -> void:
+	var m := Meta.new()
+	m.rng.seed = 5
+	check(m.field_open("cache_1", 20) == 20 and m.shards == 20, "들판: 유품 상자는 처음에 조각을 준다")
+	check(m.field_open("cache_1", 20) == 0 and m.shards == 20, "들판: 유품 상자는 한 번뿐")
+	m.ensure_glints()
+	check(m.glints.size() == FieldLayout.GLINT_ACTIVE and m.glints.size() == m.glints.duplicate().size(), "들판: 흩어진 조각이 4곳 생긴다")
+	var seen := {}
+	for g in m.glints:
+		seen[g] = 1
+	check(seen.size() == m.glints.size(), "들판: 흩어진 조각 자리는 겹치지 않는다")
+	var first: Array[int] = m.glints.duplicate()
+	var before: int = m.shards
+	var got: int = m.take_glint(first[0])
+	check(got >= FieldLayout.GLINT_MIN and got <= FieldLayout.GLINT_MAX and m.shards == before + got and m.glints.size() == 3, "들판: 흩어진 조각은 2~5개를 주고 사라진다")
+	check(m.take_glint(first[0]) == 0, "들판: 주운 조각은 다시 못 줍는다")
+	var changed: bool = false
+	for _k in 12:
+		m.roll_glints()
+		if m.glints != first:
+			changed = true
+	check(changed and m.glints.size() == 4, "들판: 판이 끝나면 조각 자리가 다시 뽑힌다")
+	var m2 := Meta.new()
+	m2.shards = 0
+	var pays: int = 0
+	var ids: Array = FieldLayout.STONES.keys()
+	for i in ids.size():
+		pays += m2.read_stone(ids[i])
+		if i < ids.size() - 1:
+			check(pays == 0, "들판: 비석을 다 읽기 전에는 보상이 없다")
+	check(pays == FieldLayout.LORE_REWARD and m2.shards == 30, "들판: 비석 여섯 개를 다 읽으면 조각 30")
+	check(m2.read_stone(ids[0]) == 0 and m2.shards == 30, "들판: 비석 보상은 한 번뿐")
+	var path: String = "user://test_field_save.json"
+	m2.field_open("cache_3", 25)
+	m2.roll_glints()
+	m2.save(path)
+	var m3 := Meta.load_or_new(path)
+	check(m3.field_found == m2.field_found and m3.lore_read.size() == 6 and m3.lore_paid and m3.glints == m2.glints and m3.glints_ready and m3.shards == m2.shards, "들판: 저장하고 읽어도 그대로")
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shards": 9}))
+	f.close()
+	var m4 := Meta.load_or_new(path)
+	m4.ensure_glints()
+	check(m4.shards == 9 and m4.field_found.is_empty() and not m4.lore_paid and m4.glints.size() == 4, "들판: 옛 저장도 읽고 조각 자리를 새로 뽑는다")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
