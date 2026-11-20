@@ -62,6 +62,7 @@ func _all() -> void:
 	check.call(FieldHud.drop_note(game, -1, 0) == "", "떨군 검: 맨손이고 잃은 것도 없으면 말이 없다")
 	check.call(FieldHud.drop_note(game, a, b).contains("영영 잃었다"), "떨군 검: 잃었으면 그렇게 말한다")
 	_log_tests()
+	_memory_tests()
 
 
 ## 검의 기록(2026-11-20): 뽑기·벤 적·부러짐·완벽한 뽑기가 쌓이고 저장된다.
@@ -81,3 +82,25 @@ func _log_tests() -> void:
 	check.call(m2.kills_of(id) == 2 and m2.log_line(id) == m.log_line(id), "검의 기록: 저장·읽기")
 	m.log_kill(0)
 	check.call(not m.sword_log.has("0"), "검의 기록: 맨손은 안 센다")
+
+
+## 검의 기억(2026-11-20): 1000·2500·5000·7500·10000마리에서 이름과 피해 배수.
+func _memory_tests() -> void:
+	var m := Meta.new()
+	var sd: SwordData = game.swords[0]
+	var id: int = sd.id
+	check.call(m.memory_title(sd) == sd.display_name and m.memory_tier(id) == 0, "검의 기억: 처음엔 이름 그대로")
+	var crossed: Array[int] = []
+	for i in 10000:
+		var t: int = m.log_kill(id)
+		if t > 0:
+			crossed.append(t)
+	check.call(crossed == [1, 2, 3, 4, 5], "검의 기억: 다섯 단계를 한 번씩 넘는다")
+	check.call(m.memory_tier(id) == 5 and m.memory_next(id) == 0, "검의 기억: 10000마리면 마지막 단계")
+	check.call(is_equal_approx(float(m.memory_table()[id]), float(Meta.MEMORY[4][2])), "검의 기억: 피해 배수 표")
+	m.sword_log[str(id)]["k"] = 2500
+	check.call(m.memory_title(sd).contains("추억이 담긴 검") and m.memory_title(sd).begins_with(sd.display_name), "검의 기억: 2500마리 이름")
+	check.call(Meta.josa("검", "과", "와") == "과" and Meta.josa("서리", "과", "와") == "와", "검의 기억: 조사")
+	var r := Rules.new(game, 7, m)
+	var s := Sword.new(sd, game)
+	check.call(is_equal_approx(r.memory_mult(s), float(Meta.MEMORY[1][2])), "검의 기억: 규칙이 피해 배수를 받는다")

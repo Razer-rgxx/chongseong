@@ -233,10 +233,75 @@ func log_pull(id: int, perfect: bool) -> void:
 
 
 ## 이 검으로 적을 쓰러뜨렸다(언덕·들판·무덤).
-func log_kill(id: int) -> void:
-	if id > 0:
-		var e := _log(id)
-		e["k"] = int(e["k"]) + 1
+## 벤 적을 세고, 이번에 새 기억 단계(MEMORY)를 넘었으면 그 단계 번호(1~)를 돌려준다(아니면 0).
+func log_kill(id: int) -> int:
+	if id <= 0:
+		return 0
+	var e := _log(id)
+	var before: int = memory_tier(id)
+	e["k"] = int(e["k"]) + 1
+	var after: int = memory_tier(id)
+	return after if after > before else 0
+
+
+# ---------------------------------------------------------------- 검의 기억 (2026-11-20 사용자: "1000~10000마리 잡으면 ○○와의 추억이 담긴 검, ○○의 검의 사념")
+
+## 한 검으로 벤 적 수에 따라 검이 이름을 얻는다. [벤 적, 이름 꼴({n} = 검 이름, {과} 등은 조사), 그 검으로 벨 때 피해 배수].
+## 피해 배수는 그 검을 쥐고 나갈 때(판·들판·무덤 시작) Rules.memory로 넘어간다(판 도중에 넘으면 다음부터).
+const MEMORY: Array = [
+	[1000, "손에 익은 {n}", 1.02],
+	[2500, "{n}{과}의 추억이 담긴 검", 1.04],
+	[5000, "{n}의 검의 사념", 1.06],
+	[7500, "이름을 부르면 대답하는 {n}", 1.08],
+	[10000, "{n}, 영주의 반쪽", 1.10],
+]
+
+
+## 지금 기억 단계(0 = 아직 없음, 1~5).
+func memory_tier(id: int) -> int:
+	var k: int = kills_of(id)
+	var t: int = 0
+	for i in MEMORY.size():
+		if k >= int(MEMORY[i][0]):
+			t = i + 1
+	return t
+
+
+## 기억 단계가 있으면 그 이름, 없으면 검 이름 그대로.
+func memory_title(d: SwordData, id: int = -1) -> String:
+	if d == null:
+		return "?"
+	var t: int = memory_tier(id if id > 0 else d.id)
+	if t == 0:
+		return d.display_name
+	var n: String = d.display_name
+	return String(MEMORY[t - 1][1]).replace("{n}", n).replace("{과}", josa(n, "과", "와"))
+
+
+## 다음 단계까지 남은 적 수(마지막 단계면 0).
+func memory_next(id: int) -> int:
+	var t: int = memory_tier(id)
+	return 0 if t >= MEMORY.size() else int(MEMORY[t][0]) - kills_of(id)
+
+
+## 검 번호 → 피해 배수(기억이 있는 검만). Rules.memory에 넣는다.
+func memory_table() -> Dictionary:
+	var out: Dictionary = {}
+	for k in sword_log:
+		var t: int = memory_tier(int(k))
+		if t > 0:
+			out[int(k)] = float(MEMORY[t - 1][2])
+	return out
+
+
+## 받침이 있으면 with_final, 없으면 without(예: josa("검", "과", "와") = "과"). 한글이 아니면 without.
+static func josa(word: String, with_final: String, without: String) -> String:
+	if word.is_empty():
+		return without
+	var c: int = word.unicode_at(word.length() - 1)
+	if c < 0xAC00 or c > 0xD7A3:
+		return without
+	return with_final if (c - 0xAC00) % 28 != 0 else without
 
 
 func log_break(id: int) -> void:

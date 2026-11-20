@@ -300,6 +300,8 @@ var cursed_night: bool = false
 var _pull_cursed: bool = false
 ## 떠돌이 약초꾼을 영입했으면(34단계, Meta.recruit_hp) 최대 체력에 더한다. 판은 Meta에서 받고, 들판은 장면이 넣는다.
 var bonus_hp: float = 0.0
+## 검의 기억(Meta.memory_table): 검 번호 → 그 검으로 벨 때 피해 배수. 시작할 때 Meta에서 받는다.
+var memory: Dictionary = {}
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -307,6 +309,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	meta = p_meta
 	if meta:
 		bonus_hp = meta.recruit_hp()
+		memory = meta.memory_table()
 	seed_value = p_seed
 	rng.seed = p_seed
 	dt = 1.0 / float(data.run.tick_rate)
@@ -388,6 +391,11 @@ func zone_count() -> int:
 
 func last_zone() -> bool:
 	return zone == zone_count() - 1
+
+
+## 검의 기억에 따른 피해 배수(없으면 1).
+func memory_mult(s: Sword) -> float:
+	return float(memory.get(s.data.id, 1.0)) if s and s.data else 1.0
 
 
 func current() -> Sword:

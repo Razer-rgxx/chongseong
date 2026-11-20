@@ -130,7 +130,7 @@ func _process(_delta: float) -> void:
 		_held.text = "맨손"
 		_held_dot.color = Color(0.6, 0.58, 0.55)
 	else:
-		_held.text = "%s · %s" % [data.grades.names[s.grade], s.data.display_name]
+		_held.text = "%s · %s" % [data.grades.names[s.grade], meta.memory_title(s.data)]
 		_held_dot.color = data.grades.colors[s.grade]
 	_dial.queue_redraw()
 	_compass.queue_redraw()

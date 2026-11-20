@@ -450,7 +450,9 @@ func _my_swords() -> String:
 				continue
 			var col: String = data.grades.colors[sd.grade].to_html(false)
 			var mark: String = "  [color=#c8b27a]· 검집[/color]" if ids[i] == meta.sheath_id else ""
-			t += "  [color=#%s]%s[/color]%s  [color=#99917f]%s[/color]\n" % [col, sd.display_name, mark, meta.log_line(ids[i])]
+			var nxt: int = meta.memory_next(ids[i])
+			var nl: String = ("  ·  다음 기억까지 %d" % nxt) if nxt > 0 else ""
+			t += "  [color=#%s]%s[/color]%s  [color=#99917f]%s%s[/color]\n" % [col, meta.memory_title(sd), mark, meta.log_line(ids[i]), nl]
 		t += "\n"
 	if not meta.lost.is_empty():
 		t += "[b][color=#8a3b30]잃은 검[/color][/b]\n"

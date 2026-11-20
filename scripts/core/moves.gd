@@ -115,7 +115,7 @@ func _new_run(m: MoveData, step: int, steps: int, big: bool, st: Dictionary, ele
 	run.element = element
 	run.sword = r.current()
 	run.st = st
-	run.base = r.powers.swing_damage(st.dmg, big)
+	run.base = r.powers.swing_damage(st.dmg, big) * r.memory_mult(run.sword)   # 검의 기억
 	run.knock = D.knockback * F.knockback * r.powers.knock_mult()
 	run.at = r.lord.pos
 	run.face = r.lord.face

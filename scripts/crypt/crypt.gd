@@ -50,6 +50,7 @@ func _ready() -> void:
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
 	Grid.size = CryptLayout.SIZE
+	rules.memory = meta.memory_table()
 	rules.bonus_hp = meta.recruit_hp()   # 34단계: 떠돌이 약초꾼(들판과 같다)
 	rules.start_field()
 	rules.lord.pos = CryptLayout.START
@@ -333,7 +334,7 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 
 func _on_enemy_died(e: Enemy) -> void:
 	if _held_id > 0:
-		meta.log_kill(_held_id)   # 검의 기록
+		_memory_toast(data.sword_by_id(_held_id), meta.log_kill(_held_id))   # 검의 기록
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	if e.act != &"explode":
 		if e.data.wraith:
@@ -380,3 +381,11 @@ func _leave() -> void:
 	Meta.wake_at_crypt = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(FIELD_PATH)
+
+
+## 검의 기억 단계를 넘었다: 한 줄과 낮은 울림(올라가는 소리 없음). 피해 배수는 다음에 쥐고 나갈 때부터.
+func _memory_toast(d: SwordData, tier: int) -> void:
+	if tier <= 0 or d == null:
+		return
+	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])
+	_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -6.0, 0.7)

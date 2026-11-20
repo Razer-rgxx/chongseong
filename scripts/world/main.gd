@@ -850,7 +850,7 @@ func _enemy_parts(e: Enemy) -> Dictionary:
 
 func _on_enemy_died(e: Enemy) -> void:
 	if rules.current():
-		meta.log_kill(rules.current().data.id)   # 검의 기록: 쥔 검이 벤 것으로 센다
+		_memory_toast(rules.current().data, meta.log_kill(rules.current().data.id))   # 검의 기록: 쥔 검이 벤 것으로 센다
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	# 터진 자폭병은 EnemyFx가 폭발을 그린다
 	if e.act == &"explode":
@@ -1124,3 +1124,11 @@ func _set_light(night: bool, instant: bool = false) -> void:
 func _build_world() -> void:
 	HillBuilder.build(self, _env.environment, data.forms)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
+
+
+## 검의 기억 단계를 넘었다: 한 줄과 낮은 울림(올라가는 소리 없음). 피해 배수는 다음에 쥐고 나갈 때부터.
+func _memory_toast(d: SwordData, tier: int) -> void:
+	if tier <= 0 or d == null:
+		return
+	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])
+	_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -6.0, 0.7)
