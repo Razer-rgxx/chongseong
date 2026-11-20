@@ -44,7 +44,7 @@
 - 시작 화면(27단계)은 `scenes/title/title.tscn`(시작 → 마을, 설정, 끝내기)이다. 설정은 `GameSettings`(static, `user://settings.cfg`: 소리 크기·마우스 감도 배수·키의 첫 입력)와 창 `SettingsPanel`(마을·언덕에서 F10, 트리를 멈춘다). 장면은 `GameSettings.ensure()`로 처음 한 번 적용하고(camera_rig·title), 감도는 `camera_rig`가 `GameSettings.mouse()`를 곱한다. Windows 내보내기 설정은 `export_presets.cfg`의 "Windows Desktop"(build/windows/geom_hill.exe).
 - 그 다음 장면은 마을(`scenes/lobby/lobby.tscn`)이고 언덕은 `scenes/world/main.tscn`이다. 장면을 바꿀 때는 `change_scene_to_file`을 쓰고, 둘 다 저장 파일에서 Meta를 다시 읽는다(자동 로드 없음).
 - 카메라(`camera_rig.gd`)는 3인칭이 기본이고 V로 쿼터뷰와 바꾼다. 3인칭에서는 이동 입력을 카메라 기준으로 돌려(`relative_move`) 넘기고, 카메라가 보는 쪽을 겨눈다. 모션 블러는 카메라에 붙은 화면 판(`motion_blur.gdshader`)이고, 가까운 것(`blur_mask_near` m 안)은 번지지 않는다. `motion_blur`를 0으로 하면 끈다.
-- 영주와 적의 움직임과 부딪힘은 물리 엔진이 아니라 규칙이 계산한다. 화면 노드는 Node3D이고, 규칙의 위치(prev_pos → pos)를 틱 사이로 이어 그린다. 싸움터에는 장애물이 없어서 적은 영주에게 곧장 온다(길찾기가 필요해지면 그때 넣는다).
+- 영주와 적의 움직임과 부딪힘은 물리 엔진이 아니라 규칙이 계산한다. 화면 노드는 Node3D이고, 규칙의 위치(prev_pos → pos)를 틱 사이로 이어 그린다. 언덕 싸움터에는 장애물이 없어서 적은 영주에게 곧장 온다. 들판·무덤은 37단계부터 장면이 막힘 표를 `Rules.set_blockers`로 넘기고(`scripts/core/nav.gd`: 0.5칸 격자 두 장, 영주 쪽 흐름장 6틱마다 45칸), 곧은 선이 막혔을 때만 흐름장을 따라 돌아온다. 틱 끝에 적도 `Blockers.push_out`으로 막힘 밖으로 민다.
 - 위치가 있는 소리(타격, 휘두름, 뽑기, 부러짐)는 AudioStreamPlayer3D(`Sfx`)로 낸다. 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리는 쓰지 않는다(사용자가 싫어한다).
 - 규칙 단위 테스트를 `tests/`에 둔다. 애드온 없이 `extends SceneTree` 스크립트로 쓰고 `godot --headless --path . -s tests/run_all.gd`로 돌린다. 규칙을 바꾸면 테스트도 같이 고친다.
 - GDScript 람다는 바깥 지역 변수를 값으로 가져간다. 신호를 세는 테스트는 `Array`에 넣어 센다.
