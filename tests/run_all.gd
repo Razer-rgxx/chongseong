@@ -109,6 +109,7 @@ func _init() -> void:
 	(load("res://tests/jump_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/pathing_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_map_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/horse_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 

@@ -7,6 +7,8 @@ extends Node3D
 ## assets/characters/lord/paladin.fbx가 있으면 기본 도형 대신 그 기사(LordCharacter)를 세우고 동작을 고른다.
 ## 걸어 다니는 점프(30단계): 규칙의 공중 시간(LordState.air)으로 몸을 포물선으로 띄우고, MoveMotion.hop_pose로 웅크림 → 다리 접기 →
 ## 내려앉으며 무릎 굽힘을 얹는다. 기사 모델은 hop 동작 파일이 있으면 그것을, 없으면 다리를 코드로 굽힌다(LegFold). 기본 도형은 눌린다.
+## 말(39단계): 탔으면(LordState.riding) 들판이 넣어 준 HorseView의 안장 높이에 앉힌다. 기사 모델은 서 있기 동작 위에 다리를 벌려 굽히고(LegFold.ride),
+## 기본 도형은 낮고 좁게 줄여 올라앉고 다리 둘(넓적다리·정강이·장화)을 말 양옆에 단다. 말이 앞뒤로 기울면 같이 기운다. 탄 채 공중은 말 도약의 높이.
 
 @export var ghost_color: Color = Color(0.5, 0.7, 1.0, 0.35)
 @export var ghost_life: float = 0.2
@@ -44,6 +46,12 @@ extends Node3D
 ## 기본 도형 영주가 무릎 굽힘(bend)·다리 접기(tuck)에서 눌리는 정도(scale_y에서 뺀다).
 @export var hop_squash_bend: float = 0.17
 @export var hop_squash_tuck: float = 0.09
+@export_group("말")
+## 기본 도형이 말 위에 앉을 때 위아래·옆으로 줄이는 배수, 안장에 묻히는 깊이(m), 타고 내리는 데 걸리는 시간(초).
+@export var ride_squash: float = 0.56
+@export var ride_slim: float = 0.62
+@export var ride_sink: float = 0.06
+@export var ride_blend: float = 0.18
 @export_group("뽑기")
 ## 뽑는 동안 영주의 몸(화면만)을 손잡이에서 이만큼(m)까지 당겨 세운다. 규칙의 뽑기 거리는 1.1칸(2.2m)까지라 팔이 닿게.
 @export var pull_stand: float = 1.6
@@ -99,6 +107,10 @@ var _hop: Dictionary = {"bend": 0.0, "tuck": 0.0, "pitch": 0.0}
 var _was_air: bool = false
 var _land_t: float = -1.0
 var _hop_anim: bool = false
+## 39단계 말: 들판이 넣는다(없으면 탈 일이 없다). 탄 정도(0~1, 타고 내릴 때 부드럽게), 기본 도형의 말 탄 다리.
+var horse_view: HorseView = null
+var _ride_k: float = 0.0
+var _ride_legs: Node3D = null
 
 
 func setup(r: Rules) -> void:
@@ -208,6 +220,8 @@ func draw(alpha: float, delta: float) -> void:
 	if _hand:
 		_hand.rotation.y = -rel
 	_step_jump(L, alpha, delta)
+	var riding: bool = L.riding and horse_view != null
+	_ride_k = move_toward(_ride_k, 1.0 if riding else 0.0, delta / maxf(ride_blend, 0.01))
 	if character:
 		character.set_frozen(rules.freeze > 0 or _paused() or _air_frozen(L))
 		_step_then()
@@ -229,7 +243,8 @@ func draw(alpha: float, delta: float) -> void:
 	_pull_sword(pulling)
 	pose = PullMotion.add(pose, PullMotion.pose(_pull, {"pulling": pulling, "steps": rules.pull_steps}, delta, character))
 	pose = PullMotion.add(pose, _jump_pose())
-	MoveMotion.apply(_model, pose, _yaw_now, _air + _jump_y)
+	var seat: float = _ride_pose(pose)
+	MoveMotion.apply(_model, pose, _yaw_now, _air + _jump_y + seat)
 	for i in range(_ghosts.size() - 1, -1, -1):
 		var g := _ghosts[i]
 		var m := g.material_override as StandardMaterial3D
@@ -374,8 +389,10 @@ func _animate(L: LordState, delta: float) -> void:
 			_one_shot("roll", (w.y - w.x) / roll_time, roll_time, w.x)
 		else:
 			_one_shot("roll", roll_speed, roll_hold)
-	elif _hurt and _plan.is_empty() and L.dash <= 0.0:
+	elif _hurt and _plan.is_empty() and L.dash <= 0.0 and not L.riding:
 		_one_shot("hit", hit_speed)
+	elif _busy <= 0.0 and L.riding:   # 39단계: 말 위에서는 서 있기 동작(다리는 LegFold.ride가 굽힌다)
+		_loop("idle")
 	elif _busy <= 0.0 and not L.airborne():   # 공중에서는 뛰기 전 동작을 그대로 둔다(hop이 없으면 멈춰 두고 다리를 접는다)
 		if rules.pull_hilt != null:
 			_loop("pull")
@@ -420,6 +437,13 @@ func _turn(L: LordState, delta: float) -> void:
 func _step_jump(L: LordState, alpha: float, delta: float) -> void:
 	var D: LordData = rules.data.lord
 	var aloft: bool = L.airborne()
+	if L.riding:   # 39단계: 말 도약(HorseData.leap_*)은 몸을 웅크리지 않고 말과 같이 뜬다
+		var Hd: HorseData = rules.data.horse
+		_was_air = aloft
+		_land_t = -1.0
+		_hop = MoveMotion.hop_pose(-1.0, -1.0)
+		_jump_y = lerpf(LordState.arc(L.prev_air, Hd.leap_time, Hd.leap_height), LordState.arc(L.air, Hd.leap_time, Hd.leap_height), alpha)
+		return
 	if aloft and not _was_air:
 		_land_t = -1.0
 		_start_hop()
@@ -470,7 +494,10 @@ func _jump_pose() -> Dictionary:
 	var tuck: float = float(_hop.tuck)
 	var out: Dictionary = {"pitch": float(_hop.pitch)}
 	if character:
-		if _hop_anim:
+		character.set_ride(_ride_k)
+		if _ride_k > 0.0:
+			character.set_legs(0.0, 0.0)
+		elif _hop_anim:
 			character.set_legs(0.0, 0.0)
 			out["pitch"] = 0.0
 		else:
@@ -479,6 +506,71 @@ func _jump_pose() -> Dictionary:
 	else:
 		out["scale_y"] = 1.0 - hop_squash_bend * bend - hop_squash_tuck * tuck
 	return out
+
+
+# ---------------------------------------------------------------- 말(39단계)
+
+## 말 위 자세: 안장 높이(땅 위 m, 돌려준다)와 말의 기울기를 pose에 얹는다. 기본 도형은 줄여 앉히고 다리 둘을 말 양옆에 단다.
+func _ride_pose(pose: Dictionary) -> float:
+	if _ride_k <= 0.0 or horse_view == null:
+		if _ride_legs:
+			_ride_legs.visible = false
+		return 0.0
+	var k: float = smoothstep(0.0, 1.0, _ride_k)
+	var seat: float = horse_view.seat_height()
+	pose["pitch"] = float(pose.get("pitch", 0.0)) - horse_view.seat_pitch() * k
+	if character:
+		return (seat - character.seat_drop()) * k
+	pose["scale_y"] = float(pose.get("scale_y", 1.0)) * lerpf(1.0, ride_squash, k)
+	pose["scale_xz"] = lerpf(1.0, ride_slim, k)
+	if _ride_legs == null:
+		_make_ride_legs()
+	_ride_legs.visible = _ride_k > 0.5
+	_ride_legs.position = Vector3(0.0, seat - ride_sink + _jump_y, 0.0)
+	_ride_legs.rotation = Vector3(horse_view.seat_pitch(), horse_view.seat_yaw(), 0.0)
+	return (seat - ride_sink) * k
+
+
+## 기본 도형의 말 탄 다리: 엉덩이에서 앞아래로 넓적다리, 무릎에서 뒤아래로 정강이, 등자에 걸친 장화(말 몸통 양옆).
+func _make_ride_legs() -> void:
+	_ride_legs = Node3D.new()
+	_ride_legs.name = "RideLegs"
+	add_child(_ride_legs)
+	var cloth := StandardMaterial3D.new()
+	cloth.albedo_color = Color(0.12, 0.11, 0.13)
+	cloth.roughness = 0.9
+	var boot := StandardMaterial3D.new()
+	boot.albedo_color = Color(0.07, 0.05, 0.035)
+	boot.roughness = 0.6
+	for side in [-1.0, 1.0]:
+		var hip := Vector3(0.15 * side, 0.12, 0.02)
+		var knee := Vector3(0.36 * side, -0.06, -0.3)
+		var ankle := Vector3(0.39 * side, -0.52, -0.1)
+		_limb(hip, knee, 0.11, cloth)
+		_limb(knee, ankle, 0.085, cloth)
+		var b := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.11, 0.1, 0.26)
+		b.mesh = bm
+		b.material_override = boot
+		b.position = ankle + Vector3(0.0, -0.04, -0.06)
+		_ride_legs.add_child(b)
+
+
+## 반지름 r의 둥근 막대로 a와 b를 잇는다(_ride_legs 기준).
+func _limb(a: Vector3, b: Vector3, r: float, m: Material) -> void:
+	var c := CapsuleMesh.new()
+	c.radius = r
+	c.height = a.distance_to(b) + 2.0 * r
+	c.radial_segments = 10
+	c.rings = 3
+	var mi := MeshInstance3D.new()
+	mi.mesh = c
+	mi.material_override = m
+	var y: Vector3 = (b - a).normalized()
+	var x: Vector3 = y.cross(Vector3.BACK if absf(y.z) < 0.9 else Vector3.RIGHT).normalized()
+	mi.transform = Transform3D(Basis(x, y, x.cross(y).normalized()), (a + b) * 0.5)
+	_ride_legs.add_child(mi)
 
 
 # ---------------------------------------------------------------- 갈고리

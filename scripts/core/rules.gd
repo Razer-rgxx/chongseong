@@ -39,6 +39,11 @@ signal lord_jumped()
 signal lord_landed(at: Vector2)
 ## 갈고리를 걸었다(날아가기 시작).
 signal lord_hooked(target: Enemy)
+## 39단계 말: 불렀다(달려오기 시작), 곁에 다 왔다, 탔다, 내렸다(fell: 맞아서 떨어졌다).
+signal horse_called()
+signal horse_arrived()
+signal horse_mounted()
+signal horse_dismounted(fell: bool)
 signal lord_hurt(damage: float)
 signal enemy_spawned(enemy: Enemy)
 signal enemy_hit(enemy: Enemy, damage: float, big: bool)
@@ -183,6 +188,9 @@ var enemy_projectiles: Array[Projectile] = []
 var callers_out: int = 0
 ## 관리용: 영주가 다치지 않는다 / 다음 뽑기 등급을 고정한다(-1이면 굴린다).
 var debug_god: bool = false
+## 39단계 말(docs/open_world2.md): 들판 장면만 allow_horse를 켠다(마을·언덕·무덤·결투에는 말이 없다). 말의 상태는 horse, 탄 상태는 lord.riding.
+var allow_horse: bool = false
+var horse := Horse.new()
 ## 1대1 결투(21단계, docs/duel.md). 켜면 낮밤·뽑기·적이 없고 영주 둘이 서로 벤다. 각인과 고유 능력은 듣지 않는다(Powers.off).
 var duel: bool = false
 var duel_phase: int = DUEL_READY
@@ -419,6 +427,7 @@ func step(input: LordInput = null) -> void:
 	tick += 1
 	lord.prev_pos = lord.pos
 	lord.prev_air = lord.air
+	horse.prev_pos = horse.pos
 	for e in enemies:
 		e.prev_pos = e.pos
 	for p in projectiles:
@@ -442,6 +451,7 @@ func step(input: LordInput = null) -> void:
 	if yard:
 		_step_yard()
 	if field:
+		_step_horse()
 		_step_field()
 		if phase == Phase.NIGHT:
 			_step_enemies()
@@ -857,6 +867,9 @@ func _step_lord(input: LordInput) -> void:
 		L.push = Vector2.ZERO
 	if input and input.swap_to >= 0:
 		swap(input.swap_to)
+	if L.riding:   # 39단계: 말을 탄 채(걷기·구르기·갈고리·뽑기 대신 말)
+		_step_ride(input)
+		return
 	if input and input.pull and L.air <= 0.0:
 		_try_pull()
 		if pull_hilt != null:
@@ -1085,6 +1098,8 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	if not duel:
 		freeze = maxi(freeze, roundi(data.lord.hitstop_hurt / dt))   # 맞은 순간 짧게 멈춘다(2026-11-20 히트스톱)
 	lord_hurt.emit(d)
+	if L.riding:   # 39단계: 탄 채 맞으면 떨어진다(때린 쪽 반대로 밀리고 짧게 휘청)
+		dismount(true, attacker.pos if attacker != null else Vector2.INF)
 	if L.hp <= 0.0 and not powers.save_from_death():
 		lord_died()
 
@@ -1657,6 +1672,167 @@ func _step_pack_idle(e: Enemy, k: float) -> void:
 	if len_w > 0.1:
 		e.face = w / len_w
 		e.pos += e.face * minf(len_w, sp * FieldLayout.PACK_WANDER_SPEED * dt)
+
+
+# ---------------------------------------------------------------- 말 (39단계, docs/open_world2.md)
+
+## 덤비는 무리·깨어 있는 우두머리·깨어 있는 무덤 기사가 있는가(그동안은 말을 못 부른다).
+func horse_fight() -> bool:
+	for id in packs:
+		var p: Dictionary = packs[id]
+		if int(p.state) == PACK_ENGAGED and not bool(p.cleared) and pack_alive(id) > 0:
+			return true
+	if field_boss != null and field_boss_state == BOSS_AWAKE and not field_boss.dead:
+		return true
+	for id in chiefs:
+		if int(chiefs[id].state) == BOSS_AWAKE and not (chiefs[id].e as Enemy).dead:
+			return true
+	return false
+
+
+## 말을 부른다(H, 틱 사이에 부른다). 되면 &"", 아니면 까닭: &"not_here"(들판 밖·결투), &"fight"(덤비는 적), &"riding"(이미 탔다).
+## from: 말이 나타날 자리(칸, 장면이 막힘을 피해 고른다). INF면 영주 뒤 call_from칸. 말이 이미 곁(call_from칸 안)에 있으면 거기서 달려온다.
+func call_horse(from: Vector2 = Vector2.INF) -> StringName:
+	var H := data.horse
+	if not allow_horse or duel or not field or phase == Phase.OVER:
+		return &"not_here"
+	if lord.riding:
+		return &"riding"
+	if horse_fight():
+		return &"fight"
+	if horse.state == Horse.AWAY or horse.pos.distance_to(lord.pos) > H.call_from:
+		var at: Vector2 = from
+		if at == Vector2.INF:
+			at = lord.pos - Vector2.from_angle(lord.face) * H.call_from
+		horse.pos = _clamp_cells(at)
+		horse.prev_pos = horse.pos
+		horse.speed = 0.0
+		horse.face = (lord.pos - horse.pos).angle()
+	horse.state = Horse.COMING
+	horse.come_t = 0.0
+	horse_called.emit()
+	return &""
+
+
+## 말 곁(mount_reach칸 안)이고 말이 서 있거나 다가오는 중인가.
+func horse_near() -> bool:
+	return horse.waiting() and lord.pos.distance_to(horse.pos) <= data.horse.mount_reach
+
+
+## 말에 탄다(E, 틱 사이에). 말 곁이고 땅에서 다른 동작 중이 아닐 때만. 영주는 말 자리로, 보는 쪽은 말이 보는 쪽.
+func mount() -> bool:
+	var L := lord
+	if L.riding or not horse_near() or L.airborne() or L.dash > 0.0 or L.hook > 0.0 or L.move != &"" or L.move_lock > 0.0 or phase == Phase.OVER or pull_hilt != null:
+		return false
+	L.riding = true
+	L.pos = horse.pos
+	L.ride_vel = Vector2.ZERO
+	L.face = horse.face
+	L.move_dir = Vector2.from_angle(horse.face)
+	L.push = Vector2.ZERO
+	L.combo = 0
+	horse.state = Horse.RIDDEN
+	horse.speed = 0.0
+	horse_mounted.emit()
+	return true
+
+
+## 내린다(H·E, 틱 사이에). 말은 그 자리에 서고(달리던 빠르기에서 coast_time에 걸쳐 선다), 영주는 말의 왼쪽(dismount_side칸)에 선다.
+## fell: 맞아서 떨어졌다. 그러면 from(때린 자리, INF면 말이 달리던 반대쪽) 반대로 fall_push만큼 밀리고 fall_stagger초 휘청인다(걷지도 베지도 못한다).
+func dismount(fell: bool = false, from: Vector2 = Vector2.INF) -> bool:
+	var L := lord
+	var H := data.horse
+	if not L.riding:
+		return false
+	L.riding = false
+	horse.state = Horse.STANDING
+	horse.pos = L.pos
+	horse.speed = L.ride_vel.length()
+	L.ride_vel = Vector2.ZERO
+	L.air = 0.0   # 도약 중에 떨어지면 바로 땅
+	L.pos = _clamp_cells(L.pos + Vector2.from_angle(horse.face - PI / 2.0) * H.dismount_side)
+	if fell:
+		var away: Vector2 = L.pos - from if from != Vector2.INF else -Vector2.from_angle(horse.face)
+		away = away.normalized() if away.length() > 0.001 else -Vector2.from_angle(horse.face)
+		L.push = away * H.fall_push
+		L.move_lock = maxf(L.move_lock, H.fall_stagger)
+	horse_dismounted.emit(fell)
+	return true
+
+
+## 탄 채 한 틱(_step_lord가 부른다): 걷기 대신 말의 빠르기(speed_mult배)로 달리고 방향은 turn_rate만큼만 돈다(서 있으면 turn_still).
+## 크게 돌면 늦추고, 다 달리기까지 accel_time, 서기까지 stop_time. 점프 키는 말 도약(공중 leap_time, 낮은 막힘을 넘는다), 좌클릭은 말 위 베기(맨손이면 없음).
+## 구르기·갈고리·뽑기는 없다. 휘청이는 동안(move_lock)은 입력을 안 받는다.
+func _step_ride(input: LordInput) -> void:
+	var L := lord
+	var D := data.lord
+	var H := data.horse
+	var mv: Vector2 = input.move if input else Vector2.ZERO
+	if mv.length() > 1.0:
+		mv = mv.normalized()
+	var top: float = D.speed * H.speed_mult
+	var cur: float = L.ride_vel.length()
+	var dir: Vector2 = L.ride_vel / cur if cur > 0.001 else Vector2.from_angle(horse.face)
+	var want: float = 0.0
+	if mv.length() > 0.1 and L.move_lock <= 0.0:
+		var rate: float = lerpf(H.turn_still, H.turn_rate, clampf(cur / maxf(top, 0.01), 0.0, 1.0))
+		var a: float = dir.angle()
+		dir = Vector2.from_angle(a + clampf(angle_difference(a, mv.angle()), -rate * dt, rate * dt))
+		var off: float = absf(angle_difference(dir.angle(), mv.angle()))
+		want = top * mv.length() * lerpf(1.0, H.turn_slow, smoothstep(0.3, 2.0, off))
+	var acc: float = top / maxf(H.accel_time if want > cur else H.stop_time, 0.01)
+	cur = move_toward(cur, want, acc * dt)
+	L.ride_vel = dir * cur
+	L.pos = _clamp_cells(L.pos + L.ride_vel * dt)
+	L.moving = cur > 0.3
+	L.move_dir = dir
+	horse.face = dir.angle()
+	horse.speed = cur
+	if input and input.attack and input.aim_valid and L.pos.distance_to(input.aim) > 0.05:
+		L.face = (input.aim - L.pos).angle()
+	elif L.moving:
+		L.face = horse.face
+	var aloft: bool = L.air > 0.0
+	if input and input.jump and not aloft and L.move_lock <= 0.0:
+		L.air = H.leap_time
+		lord_jumped.emit()
+		aloft = true
+	if input and input.attack and phase == Phase.NIGHT and L.cooldown <= 0.0 and not aloft and L.move_lock <= 0.0 and current() != null:
+		moves.ride_attack(input)
+
+
+## 말 한 틱(들판에서, _step_lord 뒤): 탔으면 영주를 따르고, 오는 중이면 영주 곁(다가온 쪽 call_side칸)으로 달려와 늦추며 서고,
+## 서 있으면 남은 빠르기로 몇 걸음 더 가다 선다. come_max초 안에 못 오면 곁에 바로 선다.
+func _step_horse() -> void:
+	var h := horse
+	var H := data.horse
+	var top: float = data.lord.speed * H.speed_mult
+	match h.state:
+		Horse.RIDDEN:
+			h.pos = lord.pos
+		Horse.COMING:
+			h.come_t += dt
+			var from_me: Vector2 = h.pos - lord.pos
+			var side: Vector2 = from_me.normalized() if from_me.length() > 0.001 else Vector2.from_angle(lord.face + PI / 2.0)
+			var target: Vector2 = _clamp_cells(lord.pos + side * H.call_side)
+			var to: Vector2 = target - h.pos
+			var dist: float = to.length()
+			if dist <= H.arrive_eps or h.come_t >= H.come_max:
+				if dist > H.arrive_eps:
+					h.pos = target
+				h.state = Horse.STANDING
+				h.speed = 0.0
+				horse_arrived.emit()
+				return
+			var want: float = minf(top, dist * H.arrive_brake)
+			h.speed = move_toward(h.speed, want, top / maxf(H.accel_time, 0.01) * dt)
+			var a: float = h.face
+			h.face = a + clampf(angle_difference(a, to.angle()), -H.turn_still * dt, H.turn_still * dt)
+			h.pos = _clamp_cells(h.pos + Vector2.from_angle(h.face) * minf(h.speed * dt, dist))
+		Horse.STANDING:
+			if h.speed > 0.0:
+				h.speed = move_toward(h.speed, 0.0, top / maxf(H.coast_time, 0.01) * dt)
+				h.pos = _clamp_cells(h.pos + Vector2.from_angle(h.face) * h.speed * dt)
 
 
 # ---------------------------------------------------------------- 들판 보스 (18단계)
@@ -2400,6 +2576,7 @@ func state_hash() -> int:
 	parts.append(tokens.cooling)
 	parts.append(lord.push)
 	parts.append(lord.air)
+	parts.append_array([lord.riding, lord.ride_vel, horse.state, horse.pos, horse.face, horse.speed, horse.come_t])
 	parts.append(callers_out)
 	parts.append_array([goal, rule, next_goal, next_rule, night_total, beacon_hp, beacon_lost, hunt_out, hunt_killed, siege, siege_left, _ember_t, goal_shards])
 	for f in embers:
@@ -2456,6 +2633,7 @@ func state_hash() -> int:
 ## 낮밤·뽑기·적은 없고, 좌클릭은 상대 영주를 맞힌다. 각인과 고유 능력은 듣지 않는다. 틱은 step_duel로 돌린다.
 func start_duel(sword_a: Sword, sword_b: Sword) -> void:
 	duel = true
+	allow_horse = false   # 39단계: 결투에는 말이 없다
 	phase = Phase.NIGHT
 	hilts.clear()
 	altar = null

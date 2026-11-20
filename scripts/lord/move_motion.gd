@@ -399,7 +399,8 @@ static func apply(model: Node3D, pose_now: Dictionary, yaw: float, y: float) -> 
 	var push: float = float(pose_now.get("push", 0.0))
 	model.rotation = Vector3(-float(pose_now.get("pitch", 0.0)), yaw + float(pose_now.get("yaw", 0.0)), 0.0)
 	model.position = Vector3(-sin(yaw) * push, y + float(pose_now.get("y", 0.0)) - float(pose_now.get("crouch", 0.0)), -cos(yaw) * push)
-	model.scale = Vector3(1.0, float(pose_now.get("scale_y", 1.0)), 1.0)
+	var sxz: float = float(pose_now.get("scale_xz", 1.0))
+	model.scale = Vector3(sxz, float(pose_now.get("scale_y", 1.0)), sxz)
 
 
 # ---------------------------------------------------------------- 걸어 다니는 점프(30단계)

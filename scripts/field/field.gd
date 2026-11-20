@@ -8,6 +8,8 @@ extends Node3D
 ## 떠도는 사람(34단계): 아직 영입하지 않은 사람 하나가 후보 자리에 서 있다(Meta.wanderer). E로 말을 걸고, 조건이 맞으면 E로 데려간다(마을에 선다).
 ## 날이 밝으면 다른 사람(또는 같은 사람이 다른 자리)으로 바뀐다.
 ## 들판 지도(38단계): M으로 지도 창(FieldMap, 게임을 멈춘다)을 연다. 걸으면 영주 둘레가 밝혀진다(FieldLayout.SEEN_TICKS틱마다 Meta.see_field).
+## 말(39단계): H로 부르면(덤비는 적이 없을 때, 휘파람) 막힘을 피한 자리에서 달려와 곁에 선다(HorseView). 곁에서 E로 타고, 탄 채 H나 E로 내린다.
+## 탄 채 맞으면 떨어진다(규칙). 탄 동안 카메라는 조금 멀고 높게, 발굽 소리와 흙먼지. 말은 들판에만 있고 저장하지 않는다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -69,6 +71,7 @@ var _wander_step: int = 0
 var _wt: float = 0.0
 var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
 var _seen_t: int = 0   ## 38단계: 다음 밝힘까지 남은 틱
+var _horse: HorseView   ## 39단계 말의 몸
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -92,6 +95,7 @@ func _ready() -> void:
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
 	rules.spawn_chiefs(meta.chiefs_down)   # 32단계 곳마다 우두머리: 이번 판에 쓰러뜨린 것은 안 선다
+	rules.allow_horse = true   # 39단계: 말은 들판에서만
 	rules.lord.pos = FieldLayout.START
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
@@ -124,6 +128,15 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
+	_horse = HorseView.new()
+	_horse.setup(rules)
+	_horse.height_of = FieldBuilder.walk_height
+	add_child(_horse)
+	_horse.footfall.connect(func(at: Vector3, k: float) -> void: _sfx.play(&"hoof", at, lerpf(-15.0, -4.0, k), lerpf(1.1, 0.92, k)))
+	_lord.horse_view = _horse
+	var H: HorseData = data.horse
+	_camera.ride_far = H.camera_far
+	_camera.ride_up = H.camera_up
 	_lord.torch.light_energy = FieldLayout.FIELD_TORCH_DAY   # 밤이 오면 _light가 켠다
 	add_child(_fx)
 	_pfx.setup(rules)
@@ -140,6 +153,9 @@ func _ready() -> void:
 		_sfx.play(&"dash", _lord.position, -6.0)
 		_camera.kick(4.0))
 	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
+	rules.horse_called.connect(func() -> void: _sfx.play(&"whistle", _lord.position + Vector3(0, 1.6, 0), -2.0))
+	rules.horse_mounted.connect(func() -> void: _sfx.play(&"thump", _lord.position, -12.0, 1.4))
+	rules.horse_dismounted.connect(_on_dismounted)
 	rules.lord_hooked.connect(func(_e: Enemy) -> void:
 		_sfx.play(&"draw", _lord.position, -2.0, 1.25)
 		_camera.kick(10.0))
@@ -205,6 +221,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_interact()
 	if event.is_action_pressed("map") and not _over:
 		open_map()
+	if event.is_action_pressed("horse"):
+		horse_key()
 	if k and k.pressed and not k.echo:
 		if k.physical_keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -236,7 +254,9 @@ func _physics_process(delta: float) -> void:
 				inp.aim_valid = true
 				inp.aim = Grid.world_to_cells(g)
 		rules.step(inp)
-		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
+		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne(), data.horse.body_r if rules.lord.riding else Blockers.BODY)
+		if rules.horse.waiting():   # 39단계: 내린 말도 나무·벽을 뚫지 않는다
+			rules.horse.pos = _push_out(rules.horse.pos, false, data.horse.body_r)
 		_seen_t -= 1
 		if _seen_t <= 0:
 			_seen_t = FieldLayout.SEEN_TICKS
@@ -253,6 +273,8 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
+	_horse.draw(alpha, delta)   # 39단계: 말 먼저(영주가 안장 높이를 읽는다)
+	_camera.ride = move_toward(_camera.ride, 1.0 if rules.lord.riding else 0.0, delta / maxf(data.horse.camera_blend, 0.01))
 	_lord.draw(alpha, delta)
 	_lord.position.y = FieldBuilder.walk_height(_lord.position.x, _lord.position.z)
 	_camera.target = _lord.position
@@ -272,6 +294,9 @@ func _process(delta: float) -> void:
 			_shown[a] = true
 			_hud.area_title(FieldLayout.AREA_NAMES[a])
 	_near = ""
+	if rules.lord.riding:   # 39단계: 탄 채로는 들를 곳 안내를 내린다(E는 내리기)
+		_hud.set_prompt("E", "")
+		return
 	var best_d: float = reach
 	var spots: Dictionary = _spots()
 	for key in spots:
@@ -351,15 +376,78 @@ func open_map() -> FieldMap:
 		return null
 	meta.see_field(rules.lord.pos)
 	_saved()
-	var m := FieldMap.make(_hud, data, meta, rules, _circles)
+	var m := FieldMap.make(_hud, data, meta, rules, _circles, rules.horse.pos if rules.horse.waiting() and not rules.lord.riding else Vector2.INF)
 	m.open()
 	return m
+
+
+# ---------------------------------------------------------------- 말 (39단계)
+
+## H: 탔으면 내리고, 아니면 부른다. 덤비는 적이 있으면 띠로 알린다(규칙이 막는다).
+func horse_key() -> void:
+	if _over:
+		return
+	if rules.lord.riding:
+		rules.dismount()
+		return
+	var why: StringName = rules.call_horse(_horse_from())
+	if why == &"fight":
+		_hud.toast("덤벼드는 적이 있어 말을 부를 수 없다")
+
+
+## 말이 나타날 자리: 영주 뒤에서 좌우로 30°씩 돌려 가며 call_from칸(못 찾으면 절반, 1/4) 떨어진 들판 안에서,
+## 그 자리에서 영주까지 곧은 길에 막힘(낮은 것도: 오는 말은 뛰지 않는다)이 없는 곳. 없으면 INF(규칙이 영주 뒤에 세우고, 막혀서 못 오면 곁에 선다).
+func _horse_from() -> Vector2:
+	var H: HorseData = data.horse
+	var me: Vector2 = rules.lord.pos
+	var near_rects: Array = []
+	var near_circles: Array = []
+	var span: float = H.call_from + 3.0
+	for list in [_rects, _low_rects]:
+		for r: Rect2 in list:
+			if r.grow(span).has_point(me):
+				near_rects.append(r)
+	for list in [_circles, _low_circles]:
+		for c in list:
+			if (c[0] as Vector2).distance_to(me) < span + float(c[1]):
+				near_circles.append(c)
+	var inside := Rect2(Vector2(4, 4), Vector2(FieldLayout.SIZE) - Vector2(8, 8))
+	for dist in [H.call_from, H.call_from * 0.5, H.call_from * 0.25]:
+		for k in 12:
+			var turn: float = floorf((k + 1) / 2.0) * (PI / 6.0) * (1.0 if k % 2 == 0 else -1.0)
+			var p: Vector2 = me - Vector2.from_angle(rules.lord.face + turn) * float(dist)
+			if inside.has_point(p) and _line_clear(p, me, H.body_r, near_rects, near_circles):
+				return p
+	return Vector2.INF
+
+
+func _line_clear(a: Vector2, b: Vector2, r: float, rects: Array, circles: Array) -> bool:
+	var n: int = maxi(1, ceili(a.distance_to(b) / 0.5))
+	for i in n + 1:
+		var q: Vector2 = a.lerp(b, float(i) / n)
+		if q.distance_to(b) < 1.2:
+			break
+		if Blockers.inside(q, rects, circles, [], [], false, r):
+			return false
+	return true
+
+
+## 내렸다: 떨어졌으면(맞아서) 흔들림과 쿵 소리, 그냥 내렸으면 작은 발소리.
+func _on_dismounted(fell: bool) -> void:
+	if fell:
+		_camera.add_shake(0.35)
+		_sfx.play(&"thump", _lord.position, -3.0, 0.85)
+		_sfx.play(&"land", _lord.position, -2.0)
+	else:
+		_sfx.play(&"land", _lord.position, -8.0)
 
 
 func _spots() -> Dictionary:
 	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD, "crypt": FieldLayout.CRYPT_DOOR}
 	if not meta.dropped.is_empty():
 		s["dropped"] = meta.dropped_at()
+	if rules.horse.waiting():
+		s["horse"] = rules.horse.pos
 	if _wander != null:
 		s["wanderer"] = _wander_at
 	for id in FieldLayout.CACHES:
@@ -381,6 +469,8 @@ func _prompt(key: String) -> String:
 		return "지하 무덤으로 내려간다"
 	if key == "dropped":
 		return "떨군 검을 줍는다"
+	if key == "horse":
+		return "말에 오른다"
 	if key == "wanderer":
 		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
 	if key.begins_with("cache"):
@@ -392,6 +482,9 @@ func _prompt(key: String) -> String:
 
 func _interact() -> void:
 	if _over:
+		return
+	if rules.lord.riding:   # 39단계: 탄 채 E는 내리기
+		rules.dismount()
 		return
 	if _reading == "wanderer":
 		_wander_next()
@@ -412,6 +505,8 @@ func _interact() -> void:
 		_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -4.0, 1.3)
 		_hud.toast("떨군 검을 되찾았다: %s" % (d.display_name if d else "?"))
 		_saved()
+	elif _near == "horse":
+		rules.mount()
 	elif _near == "wanderer":
 		_wander_talk()
 	elif _near == "crypt":
@@ -744,9 +839,9 @@ func _leave(path: String) -> void:
 	get_tree().change_scene_to_file(path)
 
 
-## 막힌 곳에서 밀어낸다(Blockers). 공중이면 낮은 막힘(울타리·무너진 낮은 벽 …)은 지나간다.
-func _push_out(p: Vector2, airborne: bool = false) -> Vector2:
-	return Blockers.push_out(p, _rects, _circles, _low_rects, _low_circles, airborne)
+## 막힌 곳에서 밀어낸다(Blockers). 공중이면 낮은 막힘(울타리·무너진 낮은 벽 …)은 지나간다. r: 몸 반지름(칸, 말은 HorseData.body_r).
+func _push_out(p: Vector2, airborne: bool = false, r: float = Blockers.BODY) -> Vector2:
+	return Blockers.push_out(p, _rects, _circles, _low_rects, _low_circles, airborne, r)
 
 
 # ---------------------------------------------------------------- 떨군 검 (2026-11-20)

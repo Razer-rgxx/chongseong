@@ -9,7 +9,7 @@ const PATH: String = "user://settings.cfg"
 const ACTIONS: Array = [
 	["move_up", "앞으로"], ["move_down", "뒤로"], ["move_left", "왼쪽"], ["move_right", "오른쪽"],
 	["attack", "베기"], ["hook", "갈고리"], ["dash", "구르기"], ["jump", "점프"], ["pull", "뽑기 · 들르기"],
-	["swap", "검 바꾸기"], ["discard", "버리기"], ["start_night", "밤 부르기"], ["map", "지도"],
+	["swap", "검 바꾸기"], ["discard", "버리기"], ["start_night", "밤 부르기"], ["map", "지도"], ["horse", "말 부르기"],
 ]
 
 static var volume: float = 0.8

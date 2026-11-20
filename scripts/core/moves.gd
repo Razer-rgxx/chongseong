@@ -97,6 +97,36 @@ func attack(input: LordInput) -> void:
 	r.lord_swung.emit(big)
 
 
+## 39단계 말 위 베기: 좌클릭은 한 가지뿐이다. 기본 동작 횡베기(sweep)를 쥔 검의 수치(Powers.stats)로, 사거리 × HorseData.slash_reach,
+## 부채꼴 slash_arc_deg도, 피해 × slash_damage로 넓게 한 번 벤다(달리며 지나가는 적을 벤다). 연타·마무리·방식의 다른 동작은 없다.
+## 속성은 쥔 검의 방식을 따른다. 맨손이면 Rules가 부르지 않는다. 화면에는 sweep로 알린다(info.ride = true).
+func ride_attack(_input: LordInput) -> void:
+	var L := r.lord
+	var D := r.data.lord
+	var H := r.data.horse
+	var m: MoveData = r.data.move(&"sweep")
+	var st: Dictionary = r.powers.stats()
+	var reach: float = st.reach * H.slash_reach
+	var arc: float = deg_to_rad(H.slash_arc_deg)
+	L.combo = 0
+	L.combo_timer = 0.0
+	L.big = false
+	L.swing = D.swing_time
+	L.swing_arc = arc
+	L.swing_reach = minf(reach, 12.0)
+	L.cooldown = maxf(D.cooldown / maxf(0.05, st.spd) * m.cooldown * H.slash_cooldown, busy_time(m))
+	if r.powers.before_swing():
+		r.lord_swung.emit(true)
+		return
+	var run := _new_run(m, 1, 1, false, st, pattern().element)
+	run.base *= H.slash_damage
+	var a := _arc_raw(run, L.pos, run.face, reach, minf(arc, TAU), m.damage)
+	a["main"] = true
+	_started(run, a, {"ride": true})
+	_fire(run, a)
+	r.lord_swung.emit(false)
+
+
 ## 동작이 이어지는 동안(초). 이보다 빨리 다음 좌클릭을 받지 않는다.
 static func busy_time(m: MoveData) -> float:
 	return maxf(maxf(m.lock, m.delay), maxf(m.go_after + m.go_time, (m.hits - 1) * m.interval))

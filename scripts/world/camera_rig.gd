@@ -42,6 +42,10 @@ var follow_boost: float = 0.0
 ## 시야각을 잠깐 넓히는 값(도). 줄어들며 원래대로 돌아온다.
 var fov_kick: float = 0.0
 @export var fov_kick_decay: float = 18.0
+## 39단계 말: 탄 정도(0~1, 장면이 HorseData.camera_blend초에 걸쳐 바꾼다). 탔으면 거리 × ride_far, 보는 점이 ride_up m 높아진다.
+var ride: float = 0.0
+var ride_far: float = 1.35
+var ride_up: float = 0.9
 
 var target: Vector3 = Vector3.ZERO
 var zoom: float = 1.0
@@ -120,12 +124,12 @@ func _process(delta: float) -> void:
 	if mode == Mode.THIRD:
 		var back := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
 		var right := Vector3(cos(yaw), 0.0, -sin(yaw))
-		var pivot: Vector3 = _focus + Vector3(0.0, look_height, 0.0) + right * shoulder
-		global_position = pivot + back * (third_distance / zoom) + sh * 0.4
+		var pivot: Vector3 = _focus + Vector3(0.0, look_height + ride_up * ride, 0.0) + right * shoulder
+		global_position = pivot + back * (third_distance * lerpf(1.0, ride_far, ride) / zoom) + sh * 0.4
 		look_at(pivot + sh * 0.4, Vector3.UP)
 	else:
 		var p: float = deg_to_rad(pitch_deg)
-		var off: Vector3 = Vector3(0.0, sin(p), cos(p)) * (distance / zoom)
+		var off: Vector3 = Vector3(0.0, sin(p), cos(p)) * (distance * lerpf(1.0, ride_far, ride) / zoom)
 		global_position = _focus + off + sh
 		look_at(_focus + sh, Vector3.UP)
 	fov_kick = maxf(0.0, fov_kick - delta * fov_kick_decay)

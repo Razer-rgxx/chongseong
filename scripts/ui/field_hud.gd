@@ -1,7 +1,8 @@
 class_name FieldHud
 extends Control
 ## 들판 화면(2026-11-20 사용자: "오픈월드 UI 살짝 추가"). 들판에서만 LobbyHud 위에 얹는다. 규칙은 읽기만 한다.
-## - 위 가운데: 나침반 띠(엘든 링식). 보는 방향 ±90°에 동·서·남·북 눈금, 표시: 떨군 검(붉은 마름모), 떠도는 사람(주황), 마을 북문, 언덕길, 무덤 입구.
+## - 위 가운데: 나침반 띠(엘든 링식). 보는 방향 ±90°에 동·서·남·북 눈금, 표시: 떨군 검(붉은 마름모), 떠도는 사람(주황), 마을 북문, 언덕길, 무덤 입구,
+##   말(39단계, 내려 있을 때 흰 잿빛).
 ## - 왼쪽 위: 지금 있는 곳 이름(작게, 놋쇠빛)과 그 아래 낮밤 반원(해·달이 반원을 따라 지난다).
 ## - 왼쪽 아래(체력 막대 위): 쥔 검 이름과 등급 빛(맨손이면 "맨손").
 ## 세계(3D)에 글자를 띄우지 않는다. 나침반 글자는 화면 글자다.
@@ -14,6 +15,7 @@ const MARK_GATE := Color(0.85, 0.78, 0.6)
 const MARK_DROP := Color(1.0, 0.32, 0.22)
 const MARK_PLACE := Color(0.62, 0.6, 0.56)
 const MARK_WANDER := Color(1.0, 0.62, 0.3)   ## 떠도는 사람(모닥불 빛)
+const MARK_HORSE := Color(0.84, 0.8, 0.72)   ## 39단계 말(내려 있을 때)
 
 var data: GameData
 var meta: Meta
@@ -187,6 +189,8 @@ func _draw_compass() -> void:
 	_mark(FieldLayout.CRYPT_DOOR, me, heading, w, h, MARK_PLACE, 3.0)
 	if meta.wanderer != "" and meta.wanderer_at >= 0 and meta.wanderer_at < FieldLayout.WANDERER_SPOTS.size():
 		_mark(FieldLayout.WANDERER_SPOTS[meta.wanderer_at].at, me, heading, w, h, MARK_WANDER, 4.0)
+	if rules.horse.waiting() and not rules.lord.riding:
+		_mark(rules.horse.pos, me, heading, w, h, MARK_HORSE, 4.0)
 	if not meta.dropped.is_empty():
 		_mark(meta.dropped_at(), me, heading, w, h, MARK_DROP, 6.0)
 	# 보는 방향

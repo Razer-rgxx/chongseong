@@ -6,7 +6,7 @@ extends Control
 ## 길(FieldLayout.ROAD)·돌다리·성채와 불탄 마을의 벽·채석장과 고개의 벼랑·망루·무덤 입구·목책은 FieldLayout의 표, 나무는 장면의 막힘 원(작은 것),
 ## 둘레의 숲 띠는 BORDER_RECTS. 곳 이름(FieldLayout.MAP_LABELS)은 화면 글자다(지도 창은 화면이라 괜찮다, 세계에는 글자 없음).
 ## 가 본 곳(Meta.field_seen)만 밝혀지고 나머지는 먹구름이 덮는다. 표시(markers)는 영주(보는 쪽 화살), 마을 북문·언덕길·무덤 입구, 떨군 검(늘),
-## 떠도는 사람·우두머리·무덤 기사·유품 상자(본 곳에 있을 때만, 잡은 것·연 것은 흐리게).
+## 떠도는 사람·우두머리·무덤 기사·유품 상자(본 곳에 있을 때만, 잡은 것·연 것은 흐리게), 말(39단계, 내려 있을 때 편자).
 ## 휠로 확대·축소(커서 밑 자리를 붙잡고), 왼쪽 단추로 끌어서 옮긴다. 규칙은 읽기만 한다.
 
 signal closed
@@ -43,12 +43,14 @@ const CACHE_C := Color(0.86, 0.72, 0.42)
 ## 범례 줄(표시 종류, 이름).
 const LEGEND: Array = [
 	[&"lord", "영주"], [&"gate", "마을 북문"], [&"trail", "언덕길"], [&"crypt", "지하 무덤"], [&"dropped", "떨군 검"],
-	[&"wanderer", "떠도는 사람"], [&"chief", "우두머리"], [&"cache", "유품"],
+	[&"wanderer", "떠도는 사람"], [&"chief", "우두머리"], [&"cache", "유품"], [&"horse", "말"],
 ]
 
 var data: GameData
 var meta: Meta
 var rules: Rules
+## 39단계: 내려 있을 때 말이 선 자리(칸). INF면 없음.
+var horse_at: Vector2 = Vector2.INF
 ## 나무 둥치 자리(칸).
 var trees: PackedVector2Array = PackedVector2Array()
 
@@ -68,12 +70,13 @@ var _was_mouse: Input.MouseMode = Input.MOUSE_MODE_VISIBLE
 
 
 ## 장면이 M에서 부른다. circles: 장면의 막힘 원([칸 자리, 반지름], 작은 것이 나무).
-static func make(parent: Node, d: GameData, m: Meta, r: Rules, circles: Array) -> FieldMap:
+static func make(parent: Node, d: GameData, m: Meta, r: Rules, circles: Array, horse: Vector2 = Vector2.INF) -> FieldMap:
 	var f := FieldMap.new()
 	f.name = "FieldMap"
 	f.data = d
 	f.meta = m
 	f.rules = r
+	f.horse_at = horse
 	f.trees = tree_spots(circles)
 	parent.add_child(f)
 	return f
@@ -89,8 +92,8 @@ static func tree_spots(circles: Array) -> PackedVector2Array:
 
 
 ## 지도에 놓을 표시(영주 빼고): [{kind, at(칸), faded}]. 마을 북문·언덕길·무덤 입구·떨군 검은 늘, 떠도는 사람·우두머리·무덤 기사·유품 상자는
-## 그 자리를 본 때만(잡은 우두머리·무덤 기사와 연 상자는 흐리게).
-static func markers(m: Meta) -> Array[Dictionary]:
+## 그 자리를 본 때만(잡은 우두머리·무덤 기사와 연 상자는 흐리게), 말은 horse가 INF가 아닐 때(39단계, 내려 있을 때).
+static func markers(m: Meta, horse: Vector2 = Vector2.INF) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for id in FieldLayout.CACHES:
 		var at: Vector2 = FieldLayout.CACHES[id][0]
@@ -109,6 +112,8 @@ static func markers(m: Meta) -> Array[Dictionary]:
 		var at: Vector2 = FieldLayout.WANDERER_SPOTS[m.wanderer_at].at
 		if m.seen_at(at):
 			out.append({"kind": &"wanderer", "at": at, "faded": false, "id": m.wanderer})
+	if horse != Vector2.INF:
+		out.append({"kind": &"horse", "at": horse, "faded": false})
 	if not m.dropped.is_empty():
 		out.append({"kind": &"dropped", "at": m.dropped_at(), "faded": false})
 	return out
@@ -438,7 +443,7 @@ func _draw_map() -> void:
 	v.draw_rect(fr.grow(3.0), Color(BRASS, 0.22), false, 1.0)
 	v.draw_rect(fr, Color(BRASS, 0.55), false, 1.5)
 	_draw_labels(v)
-	for mk in markers(meta):
+	for mk in markers(meta, horse_at):
 		draw_marker(v, mk.kind, to_px(mk.at), _icon_size(), bool(mk.faded))
 	draw_marker(v, &"lord", to_px(rules.lord.pos), _icon_size() * 1.45, false, rules.lord.face)
 
@@ -658,6 +663,14 @@ static func draw_marker(ci: CanvasItem, kind: StringName, p: Vector2, s: float, 
 			ci.draw_colored_polygon(d, FieldHud.MARK_DROP)
 			d.append(d[0])
 			ci.draw_polyline(d, Color(0.3, 0.05, 0.03), 1.0, true)
+		&"horse":
+			# 말: 편자(아래가 열린 굽은 쇠와 못 자리)
+			var rr: float = s * 0.6
+			ci.draw_arc(p + Vector2(1.2, 1.2), rr, PI * 0.8, PI * 2.2, 18, shadow, 4.4, true)
+			ci.draw_arc(p, rr, PI * 0.8, PI * 2.2, 18, Color(FieldHud.MARK_HORSE, a), 2.6, true)
+			for k in 4:
+				var ang: float = PI * (0.95 + 0.3 * k + (0.1 if k >= 2 else 0.0))
+				ci.draw_circle(p + Vector2(cos(ang), sin(ang)) * rr, 0.8, Color(0.12, 0.1, 0.08, a))
 
 
 ## 범례: 표시와 이름을 한 줄로, 오른쪽 끝에 다루는 법.

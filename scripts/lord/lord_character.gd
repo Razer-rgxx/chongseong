@@ -422,6 +422,17 @@ func set_legs(tuck: float, bend: float) -> void:
 		_legs.bend = bend
 
 
+## 39단계 말 위: 앉은 다리(LegFold.ride, 0~1). 동작은 서 있기 그대로 두고 다리만 코드로 굽힌다.
+func set_ride(k: float) -> void:
+	if _legs:
+		_legs.ride = k
+
+
+## 39단계 말 위: 선 자세에서 엉덩이(골반 아래)가 땅에서 얼마나 높은가(m). 안장 높이에서 이만큼 빼면 앉는 높이다.
+func seat_drop() -> float:
+	return _leg_length() + 0.02
+
+
 ## 무릎을 bend만큼 굽혔을 때 엉덩이가 내려가는 높이(m, 발이 땅에 붙어 있게 LordView가 몸을 이만큼 내린다).
 func bend_drop(bend: float) -> float:
 	if bend <= 0.0:

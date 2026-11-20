@@ -43,6 +43,9 @@ var parry: float = 0.0
 var air: float = 0.0
 ## 지난 틱의 air(화면이 틱 사이 높이를 이어 그린다. Rules.step이 prev_pos와 같이 적는다).
 var prev_air: float = 0.0
+## 39단계 말: 탔는지와 말이 달리는 속도(칸/초, 방향 바꾸기가 느리다). 탄 채 공중(air)은 말 도약(HorseData.leap_time).
+var riding: bool = false
+var ride_vel: Vector2 = Vector2.ZERO
 
 
 func airborne() -> bool:
@@ -51,7 +54,12 @@ func airborne() -> bool:
 
 ## 공중에 left초 남았을 때의 높이(m, 칸이 아니다). 뜬 순간과 내려앉는 순간이 0이고 가운데가 jump_height인 포물선.
 static func air_height(left: float, D: LordData) -> float:
-	if left <= 0.0 or D.jump_time <= 0.0:
+	return arc(left, D.jump_time, D.jump_height)
+
+
+## 공중에 left초 남았을 때 높이(m): 뜬 시간 total, 가장 높은 곳 peak인 포물선(점프와 39단계 말 도약이 같이 쓴다).
+static func arc(left: float, total: float, peak: float) -> float:
+	if left <= 0.0 or total <= 0.0:
 		return 0.0
-	var u: float = clampf(1.0 - left / D.jump_time, 0.0, 1.0)
-	return 4.0 * D.jump_height * u * (1.0 - u)
+	var u: float = clampf(1.0 - left / total, 0.0, 1.0)
+	return 4.0 * peak * u * (1.0 - u)

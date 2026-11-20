@@ -95,6 +95,10 @@ map={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":77)]
 }
+horse={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":72)]
+}
 
 [editor_plugins]
 
