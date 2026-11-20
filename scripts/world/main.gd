@@ -303,6 +303,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		match k.physical_keycode:
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			KEY_R:
+				if rules.fate_reroll():
+					_hud.toast("운명 베기: 다시 뽑았다")
 			KEY_F1:
 				_hud.toggle_help()
 			KEY_V:

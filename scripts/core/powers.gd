@@ -4,6 +4,7 @@ extends RefCounted
 ## 시험판(prototype/game_reference.js)의 규칙을 옮겼다. 정해진 수치는 data/powers.tres(PowerTable).
 ## 고유 능력은 검 이름으로 찾는다. using(이름)은 지금 쥔 검, holding(이름)은 두 칸 중 어디든.
 ## 랜덤은 Rules.rng만 쓴다.
+## 7단계 남은 8종(아군·벽·날아가는 칼·다시 뽑기)은 Uniques(scripts/core/uniques.gd)가 만든다. 정한 것은 그 파일 머리에.
 
 ## 고유 능력이 규칙에 들어간 검(이름). 표의 unique_ready와 같아야 한다(테스트가 본다).
 const READY: PackedStringArray = [
@@ -14,6 +15,7 @@ const READY: PackedStringArray = [
 	"영원한 파수", "두 번째 기회", "새벽 나팔", "피의 왕좌", "쌍칼 서약", "언덕", "첫 번째 왕", "언덕의 첫 검",
 	"모든 검의 어머니", "이름을 잃은 검", "마지막 장례", "겨울의 끝", "늪지기", "대화재", "피의 강", "망각",
 	"꺾인 깃발",
+	"망자들의 왕관", "무덤 파수", "천 명의 기사", "그림자 왕", "쇠말뚝", "언덕을 쌓은 검", "되돌아오는 칼", "운명 베기",
 ]
 
 var r: Rules
@@ -56,11 +58,14 @@ var pending: Array[Dictionary] = []
 var zones: Array[Dictionary] = []
 var _dash_hit: Dictionary = {}
 var _snapshot: Dictionary = {}
+## 아군·벽·날아가는 칼·운명 베기(Uniques).
+var U: Uniques
 
 
 func _init(rules: Rules) -> void:
 	r = rules
 	T = rules.data.powers
+	U = Uniques.new(self)
 
 
 # ---------------------------------------------------------------- 묻기
@@ -211,6 +216,7 @@ func knock_mult() -> float:
 ## 벤 뒤에 따라오는 것들(메아리, 언덕의 심장, 폭풍, 떨어진 검). hit: 이번에 벤 적들.
 func after_swing(hit: Array[Enemy], st: Dictionary, dmg: float, big: bool) -> void:
 	var L := r.lord
+	U.on_swing(dmg, st, big)
 	ice_spear = false
 	if using("메아리 계곡"):
 		pending.append({"kind": "echo", "t": T.u("메아리 계곡", "delay"), "pos": L.pos, "face": L.face, "reach": st.reach, "arc": st.arc, "dmg": dmg, "big": big})
@@ -336,6 +342,7 @@ func on_damage(e: Enemy, d: float) -> void:
 
 func on_kill(e: Enemy) -> void:
 	night_kills += 1
+	U.on_kill(e)
 	heal(ins("사냥"))
 	var s := r.current()
 	if s and s.breakable():
@@ -430,6 +437,7 @@ func max_charges() -> int:
 
 func on_dash() -> void:
 	_dash_hit.clear()
+	U.on_dash()
 	if using("모래시계"):
 		for e in r.enemies:
 			if e.pos.distance_to(r.lord.pos) < T.u("모래시계", "radius"):
@@ -455,6 +463,7 @@ func dash_tick() -> void:
 
 func on_night_start() -> void:
 	night_used.clear()
+	U.on_night_start()
 	night_kills = 0
 	shield = 0.0
 	undying = 0.0
@@ -514,7 +523,9 @@ func tick(dt: float) -> void:
 			dash_charges += 1
 			dash_recharge = dash_cooldown()
 	if r.phase != Rules.Phase.NIGHT:
+		U.clear()
 		return
+	U.tick(dt)
 	if using("굶주린 칼"):
 		starve += dt
 		if starve > T.u("굶주린 칼", "starve") and L.hp > 1.0:
@@ -597,6 +608,7 @@ func enemy_tick(e: Enemy, dt: float) -> float:
 ## 낮에 뽑은 검에 붙는 것(언덕의 첫 검, 모든 검의 어머니). 이 판의 각인 기록(언덕).
 func on_pulled(s: Sword) -> void:
 	luck3 = false
+	U.last_pulled = s
 	if holding("언덕의 첫 검") and s.breakable():
 		s.max_durability = roundf(s.max_durability * (1.0 + T.u("언덕의 첫 검", "dur")))
 		s.durability = s.max_durability
