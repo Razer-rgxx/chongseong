@@ -1,20 +1,29 @@
 extends SceneTree
 ## assets/ui/theme.tres를 만든다: godot --headless --path . -s scripts/debug/build_theme.gd
-## 글꼴(Noto Serif KR, 본문 600·굵게 800), 따뜻한 글자색, 모서리 없는 버튼(놋쇠빛 테두리).
-## 굵기는 숫자 태그(2003265652 = wght)로 줘야 먹는다.
+## 글꼴(송명 Song Myung, 굵게는 획을 부풀림), 따뜻한 글자색, 모서리 없는 버튼(놋쇠빛 테두리).
+## 송명에 없는 글자(기호, 드문 한글)는 Noto Serif KR(본문 600·굵게 800)로 대신 그린다.
+## Noto의 굵기는 숫자 태그(2003265652 = wght)로 줘야 먹는다.
 
 const WGHT: int = 2003265652
 const LINE := Color(0.66, 0.56, 0.38)
 
 
 func _init() -> void:
-	var ff: FontFile = load("res://assets/ui/fonts/NotoSerifKR-subset.ttf")
+	var noto: FontFile = load("res://assets/ui/fonts/NotoSerifKR-subset.ttf")
+	var song: FontFile = load("res://assets/ui/fonts/SongMyung-Regular.ttf")
+	var noto_body := FontVariation.new()
+	noto_body.base_font = noto
+	noto_body.variation_opentype = {WGHT: 600}
+	var noto_bold := FontVariation.new()
+	noto_bold.base_font = noto
+	noto_bold.variation_opentype = {WGHT: 800}
 	var body := FontVariation.new()
-	body.base_font = ff
-	body.variation_opentype = {WGHT: 600}
+	body.base_font = song
+	body.fallbacks = [noto_body]
 	var bold := FontVariation.new()
-	bold.base_font = ff
-	bold.variation_opentype = {WGHT: 800}
+	bold.base_font = song
+	bold.variation_embolden = 0.6
+	bold.fallbacks = [noto_bold]
 	var t := Theme.new()
 	t.default_font = body
 	t.set_color("font_color", "Label", Color(0.87, 0.84, 0.78))

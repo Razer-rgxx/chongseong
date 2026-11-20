@@ -19,5 +19,13 @@ itch.io의 무료 팩에서 골라 다듬은 소리(모노 44.1kHz, 앞의 빈 �
 | anvil | 망치질, 숫돌 제단 | Gravity Sound, Weapon_Clash_* |
 | draw | 검을 뽑아 듦 | Gravity Sound, Equip_* |
 | break | 검이 부러짐 | Gravity Sound, Drop_Weapon_* |
+| enemy_block | 적이 칼로 막음 | Gravity Sound, Weapon_Clash_7·8·9 |
+| enemy_break | 적의 자세가 무너짐 | Gravity Sound, Flail_1·2·3 |
+| enemy_arrow_cut | 날아오는 화살을 벰 | Gravity Sound, Light_Swing_Weapon_3·4·8 |
+| smith_use | 대장장이를 씀(망치질) | Hove Audio, Sword Collisions/Base Metal 03·06 |
 
-밤이 오는 소리(night)는 아직 코드로 만든 소리다.
+새 넷(enemy_*, smith_use)은 앞의 빈 곳을 자르고 뒤를 빨리 줄여 쇠 울림이 종소리처럼 남지 않게 했다(모노 44.1kHz).
+
+나머지(night, land, enemy_bow·arrow_hit·arrow_ground·hoof·skid·fuse·boom·call, 밤 사건 소리들)는 아직 코드로 만든 소리다.
+
+주의: 파일은 `assets/sound/<이름>/` 바로 아래에 있어야 한다. `assets/sound/sound/<이름>/`처럼 한 단계 더 들어가면 못 찾고 코드 소리를 낸다(2026-11-20에 그래서 옮겼다).
