@@ -1,7 +1,8 @@
 class_name Blockers
 extends RefCounted
 ## 장면의 막힌 곳에서 영주를 밀어낸다(30단계에서 들판·마을·무덤의 _push_out을 하나로 모았다). 노드에 기대지 않는 정적 함수뿐이다.
-## 규칙(Rules)은 막힘을 모르고(싸움터에는 장애물이 없다), 장면이 틱마다 rules.step 뒤에 영주의 자리에 건다. 적은 지금처럼 막힘을 무시한다.
+## 영주는 장면이 틱마다 rules.step 뒤에 건다. 적은 37단계부터 Rules가 같은 표(Rules.set_blockers → Nav)로 돌아서 오고 Nav.push가 이 함수로 밀어낸다
+## (적은 뛰지 않아 낮은 막힘도 막힘). 언덕 싸움터에는 막힘이 없다.
 ##
 ## 막힘 표: rects는 칸 단위 Rect2, circles는 [가운데(칸 Vector2), 반지름(칸)]. 그린 것과 막힘은 같은 표에서 나온다.
 ## 낮은 막힘(low_rects, low_circles)은 그린 높이가 JUMP_CLEAR m 이하인 것(울타리, 무너진 낮은 벽, 쓰러진 통나무, 우물 둘레 …)이다.

@@ -44,8 +44,31 @@ func wait_range(e: Enemy) -> float:
 
 
 ## 표를 받을 수 있는지: 비틀거림·방패 깨짐·쏜 뒤처럼 다른 일을 하는 동안은 받지 않는다(표를 묶어 두지 않게).
+## 막힘을 돌아오는 중(37단계, Enemy.detour)에도 받지 않는다(벽 너머에서 표를 묶어 두지 않게).
 func can_take_token(e: Enemy) -> bool:
-	return e.act == &"" or e.act == &"block"
+	return (e.act == &"" or e.act == &"block") and not e.detour
+
+
+## 걷는 빠르기 배수(무덤 기사형이 빨라지면 rage_mult, 아니면 1). 막힘을 돌아올 때 Rules가 쓴다.
+func pace(e: Enemy) -> float:
+	return _rate(e)
+
+
+## 막힘을 돌아오는 중(37단계, Rules._detour가 흐름장으로 걷는다)의 행동. true면 여기서 맡았다(걷지 않는다).
+## 하던 돌진과 멈춘 일(겨눔·휘두르기 예고·심지 …)은 이어 가고, 부르기(부르는 자, 기사형)는 한다.
+## 겨누기·머리 낮추기·휘두르기·심지는 곧게 보일 때만(step) 시작한다(벽 너머로 쏘거나 베지 않게).
+func detour(e: Enemy, _k: float, dt: float) -> bool:
+	if e.act == &"charge":
+		_step_charge(e, dt)
+		return true
+	if HOLD.has(e.act):
+		return true
+	match e.data.acts():
+		&"caller":
+			return _try_call(e)
+		&"grave_knight", &"crypt_lord":
+			return _try_knight_call(e)
+	return false
 
 
 ## 때릴 수 있는지: 표를 들었거나 표 없이 덤비는 밤(표 수 0).
@@ -278,7 +301,7 @@ func _charger(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 		e.act_dir = to / d
 		e.face = e.act_dir
 		e.act_from = e.pos
-		var length: float = _lane(e.pos, e.act_dir, D.charge_length)
+		var length: float = _lane(e.pos, e.act_dir, D.charge_length, e.radius)
 		e.act_to = e.pos + e.act_dir * length
 		_begin(e, &"wind", D.wind_time)
 		r.enemy_act.emit(e, &"wind", {"from": e.pos, "dir": e.act_dir, "length": length, "time": D.wind_time, "width": e.radius * 2.0})
@@ -293,7 +316,7 @@ func _start_charge(e: Enemy) -> void:
 	var D := e.data
 	# 머리를 낮추는 동안 밀렸으면 지금 자리에서 같은 쪽으로
 	e.act_from = e.pos
-	var length: float = _lane(e.pos, e.act_dir, D.charge_length)
+	var length: float = _lane(e.pos, e.act_dir, D.charge_length, e.radius)
 	e.act_to = e.pos + e.act_dir * length
 	if length < 0.05:
 		_end_charge(e, false)
@@ -335,7 +358,10 @@ func _end_charge(e: Enemy, hit: bool) -> void:
 
 
 ## from에서 dir로 length칸 가되 싸움터 안(가장자리 0.5칸)에서 멈추는 길이. 싸움터 밖에서 시작하면 그대로.
-func _lane(from: Vector2, dir: Vector2, length: float) -> float:
+## 막힘이 있으면(37단계) 반지름 rad인 몸이 막힘 앞에서 멈추는 길이로 줄인다.
+func _lane(from: Vector2, dir: Vector2, length: float, rad: float = 0.0) -> float:
+	if r.nav != null:
+		length = r.nav.run_len(from, dir, length, Nav.class_of(rad))
 	var lo := Vector2(0.5, 0.5)
 	var hi := Vector2(Grid.size) - Vector2(0.5, 0.5)
 	if from.x < lo.x or from.y < lo.y or from.x > hi.x or from.y > hi.y:
@@ -394,16 +420,34 @@ func explode(e: Enemy) -> void:
 
 func _caller(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 	var D := e.data
-	if e.cooldown <= 0.0 and D.summon_count > 0 and e.summoned < D.summon_max and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
-		var n: int = D.summon_count
-		var a0: float = r.rng.randf() * TAU
-		e.act_spots = PackedVector2Array()
-		for i in n:
-			e.act_spots.append(_clamp(e.pos + Vector2.from_angle(a0 + TAU * i / n) * D.summon_radius, 1.0))
-		_begin(e, &"call_wind", D.summon_time)
-		r.enemy_act.emit(e, &"call_wind", {"at": e.pos, "radius": D.summon_radius, "time": D.summon_time})
+	if _try_call(e):
 		return
 	_keep(e, to, d, D.keep_near, D.keep_far, D.speed * k, dt)
+
+
+## 부르는 자: 쿨다운이 끝났고 더 부를 수 있으면 불러내기를 시작한다(call_wind).
+func _try_call(e: Enemy) -> bool:
+	var D := e.data
+	if e.cooldown <= 0.0 and D.summon_count > 0 and e.summoned < D.summon_max and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
+		_aim_spots(e)
+		_begin(e, &"call_wind", D.summon_time)
+		r.enemy_act.emit(e, &"call_wind", {"at": e.pos, "radius": D.summon_radius, "time": D.summon_time})
+		return true
+	return false
+
+
+## 불러낼 자리(e.act_spots): 둘레 summon_radius에 고르게(첫 각은 rng). 막힘이 있으면(37단계) 부른 자에서 곧게 갈 수 있는 데까지만.
+func _aim_spots(e: Enemy) -> void:
+	var D := e.data
+	var n: int = D.summon_count
+	var a0: float = r.rng.randf() * TAU
+	e.act_spots = PackedVector2Array()
+	var cls: int = Nav.class_of(r.data.enemies[D.summon_kind].radius) if r.nav != null and r.data.enemies.has(D.summon_kind) else 0
+	for i in n:
+		var at: Vector2 = _clamp(e.pos + Vector2.from_angle(a0 + TAU * i / n) * D.summon_radius, 1.0)
+		if r.nav != null:
+			at = r.nav.reach(e.pos, at, cls)
+		e.act_spots.append(at)
 
 
 func _call(e: Enemy) -> void:
@@ -469,16 +513,7 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 	var rate: float = _rate(e)
 	if d < 0.001:
 		return
-	# 부르기: 체력이 summon_below 밑으로 내려오면 한 번, summon_again(0보다 크면) 밑으로 내려오면 한 번 더(summoned가 summon_max에 닿을 때까지 못 부른 만큼만)
-	if D.summon_count > 0 and e.summoned < D.summon_max and e.hp <= e.max_hp * _summon_below(e) and e.cooldown <= 0.0 \
-			and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
-		var n: int = D.summon_count
-		var a0: float = r.rng.randf() * TAU
-		e.act_spots = PackedVector2Array()
-		for i in n:
-			e.act_spots.append(_clamp(e.pos + Vector2.from_angle(a0 + TAU * i / n) * D.summon_radius, 1.0))
-		_begin(e, &"call_wind", D.summon_time)
-		r.enemy_act.emit(e, &"call_wind", {"at": e.pos, "radius": D.summon_radius, "time": D.summon_time / rate})
+	if _try_knight_call(e):
 		return
 	if e.cooldown <= 0.0:
 		if d <= D.swing_range:
@@ -492,7 +527,7 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 				e.act_dir = to / d
 				e.face = e.act_dir
 				e.act_from = e.pos
-				var length: float = _lane(e.pos, e.act_dir, D.charge_length)
+				var length: float = _lane(e.pos, e.act_dir, D.charge_length, e.radius)
 				e.act_to = e.pos + e.act_dir * length
 				_begin(e, &"wind", D.wind_time)
 				r.enemy_act.emit(e, &"wind", {"from": e.pos, "dir": e.act_dir, "length": length, "time": D.wind_time / rate, "width": e.radius * 2.0})
@@ -500,6 +535,18 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 			e.cooldown = D.charge_retry   # 이번엔 안 달린다: 조금 더 다가가 다시 고른다
 	if d > D.swing_range * 0.85:
 		e.pos += to / d * D.speed * k * rate * dt
+
+
+## 기사형의 부르기: 체력이 summon_below 밑으로 내려오면 한 번, summon_again(0보다 크면) 밑으로 내려오면 한 번 더(summoned가 summon_max에 닿을 때까지 못 부른 만큼만).
+func _try_knight_call(e: Enemy) -> bool:
+	var D := e.data
+	if D.summon_count > 0 and e.summoned < D.summon_max and e.hp <= e.max_hp * _summon_below(e) and e.cooldown <= 0.0 \
+			and _alive() < r.data.run.max_enemies and _inside(e.pos, 1.0):
+		_aim_spots(e)
+		_begin(e, &"call_wind", D.summon_time)
+		r.enemy_act.emit(e, &"call_wind", {"at": e.pos, "radius": D.summon_radius, "time": D.summon_time / _rate(e)})
+		return true
+	return false
 
 
 ## 예고가 끝났다: 앞 swing_arc° 부채꼴 안에 영주가 있으면 벤다(구르는 중이면 지나간다).

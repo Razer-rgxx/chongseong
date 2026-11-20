@@ -18,6 +18,15 @@ var spawned: Dictionary = {}
 func _init(r: Rules, m: Meta) -> void:
 	rules = r
 	meta = m
+	# 37단계: 규칙도 무덤의 벽·문·관을 안다(적이 벽을 뚫지 않고, 문이 닫히면 방 안만 걷는다). 영주의 push와 같은 표(CryptLayout).
+	var rooms: Array[Rect2] = []
+	for id in CryptLayout.ROOM_ORDER:
+		rooms.append(CryptLayout.ROOMS[id].rect)
+	var walks: Dictionary = {}
+	for d in CryptLayout.DOORS:
+		walks[d] = CryptLayout.DOORS[d].walk
+	rules.set_blockers([], CryptLayout.coffin_circles(), [], [], rooms, walks, Vector2(CryptLayout.SIZE))
+	rules.set_open_gates(open_doors())
 
 
 ## 그 방을 쓰러뜨렸는가: 저장된 것이거나, 이번에 무리를 다 쓰러뜨렸거나, 무덤 주인이 쓰러졌다.
@@ -62,13 +71,15 @@ func step() -> void:
 	if now != &"" and now != room:
 		room = now
 		_enter(now)
-	elif now == &"" and room != &"":
-		# 방 가장자리(들어선 곳 밖)에 나서면 그 방을 벗어난 것이다. 문은 쓰러뜨린 방에서만 열려 있으니 닫힌 방에서는 일어나지 않는다.
+	elif now == &"" and room != &"" and not (CryptLayout.ROOMS[room].rect as Rect2).has_point(rules.lord.pos):
+		# 방 밖(문 복도)으로 나서면 그 방을 벗어난 것이다. 문은 쓰러뜨린 방에서만 열려 있으니 닫힌 방에서는 일어나지 않는다.
+		# (37단계: 전에는 방 가장자리 1.5칸에 물러서기만 해도 벗어난 것으로 쳐서 싸우는 중에 문이 열렸다. 방 안이면 그대로 들어서 있다)
 		room = &""
 	for id in CryptLayout.ROOM_ORDER:
 		if spawned.has(id) and not meta.crypt_cleared.has(String(id)) and cleared(id):
 			meta.crypt_clear(String(id))
 			room_cleared.emit(id)
+	rules.set_open_gates(open_doors())   # 37단계: 닫힌 문은 적에게도 막힘(바뀔 때만 다시 굽는다)
 
 
 func _enter(id: StringName) -> void:

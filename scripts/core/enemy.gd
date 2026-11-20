@@ -38,6 +38,10 @@ var seat: int = -1
 ## 이 적을 불러낸 적의 id(0이면 불려 온 적이 아니다). 들판 보스가 돌아가면 불려 온 적이 사라진다.
 var caller: int = 0
 
+## 적 길찾기(37단계): 이번 틱에 영주와의 곧은 선이 막혀 흐름장을 따라 돌아오는 중(Rules._plan_paths가 틱마다 정한다, 규칙만 쓴다).
+## 돌아오는 동안은 표를 새로 받지 않고 겨누기·돌진·휘두르기·심지를 시작하지 않는다.
+var detour: bool = false
+
 # ---- 행동(11단계, Foes, docs/content.md). 화면은 읽기만 한다.
 ## 지금 하는 일(aim, shoot, block, guard_break, wind, charge, charge_end, fuse, explode, call_wind, call). &""이면 걷기다.
 var act: StringName = &""

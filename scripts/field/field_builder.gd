@@ -106,7 +106,9 @@ static func at_cell(c: Vector2, lift: float = 0.0) -> Vector3:
 
 # ---------------------------------------------------------------- 짓기
 
-static func build(parent: Node3D, env: Environment) -> Dictionary:
+## decor가 거짓이면 막힘을 내지 않는 꾸밈(땅·물·길·먼 언덕·목책·바위·갈대·풀·동쪽 띠)을 짓지 않는다(blockers()).
+## 그것들은 막힘을 내는 것들과 같은 랜덤을 앞서 쓰지 않으므로(각자 시드이거나 숲 뒤에 쓴다) 막힘 표는 똑같다(테스트가 본다).
+static func build(parent: Node3D, env: Environment, decor: bool = true) -> Dictionary:
 	setup()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 16
@@ -115,14 +117,16 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	var circles: Array = []
 	var low_rects: Array[Rect2] = []
 	var low_circles: Array = []
-	_terrain(parent)
-	_water(parent)
-	_road(parent)
+	if decor:
+		_terrain(parent)
+		_water(parent)
+		_road(parent)
 	_bridge(parent, rects)
 	_tower(parent, rects)
 	_keep(parent, rects, low_rects)
-	_east_ridge(parent, circles)
-	_east_ridge(parent, circles, 337.0, 23)
+	if decor:
+		_east_ridge(parent, circles)
+		_east_ridge(parent, circles, 337.0, 23)
 	_quarry(parent, rects)
 	_hamlet(parent, rects, low_rects)
 	_pass(parent, rects)
@@ -130,14 +134,26 @@ static func build(parent: Node3D, env: Environment) -> Dictionary:
 	_grove(parent, rng, circles, low_circles)
 	_foot(parent, circles, low_circles)
 	_crypt_gate(parent, rects)
-	_palisade(parent)
-	_far_hill(parent)
+	if decor:
+		_palisade(parent)
+		_far_hill(parent)
 	_forest(parent, rng, circles)
-	_rocks(parent, rng)
-	_reeds(parent, rng)
+	if decor:
+		_rocks(parent, rng)
+		_reeds(parent, rng)
 	_marsh(parent, circles)
-	_grass(parent, rng)
+	if decor:
+		_grass(parent, rng)
 	return {"rects": rects, "circles": circles, "low_rects": low_rects, "low_circles": low_circles}
+
+
+## 막힘 표만(37단계): 장면과 같은 짓기를 보이지 않는 노드에 하고(꾸밈은 건너뛴다) 표만 돌려준다. 시드가 모두 정해져 있어 늘 같은 표다.
+## 규칙 테스트가 장면과 같은 표로 Rules.set_blockers를 부를 때 쓴다.
+static func blockers() -> Dictionary:
+	var root := Node3D.new()
+	var b: Dictionary = build(root, null, false)
+	root.free()
+	return b
 
 
 ## 벽 한 줄(칸 표 rect)을 n조각으로 나눈 k번째 조각(칸 Rect2).

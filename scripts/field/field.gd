@@ -112,6 +112,7 @@ func _ready() -> void:
 	_circles = blockers.circles
 	_low_rects.assign(blockers.low_rects)
 	_low_circles = blockers.low_circles
+	rules.set_blockers(blockers.rects, blockers.circles, blockers.low_rects, blockers.low_circles)   # 37단계: 적도 같은 표로 막힘을 돌아온다
 	HillBuilder.setup(Vector2(FieldLayout.SIZE) * Grid.CELL)   # 적의 몸이 들판을 싸움터 안으로 본다(비탈에서 올라오지 않는다)
 	_build_props()
 	_build_wanderer()

@@ -221,6 +221,9 @@ var field_boss_zone: int = FieldLayout.BOSS_ZONE
 ## 곳마다 우두머리(32단계): FieldLayout.CHIEFS의 id → {e: Enemy, state: BOSS_*, home: 제자리, zone: 불려 오는 적의 세기 구역(1부터)}.
 ## 들판 보스(field_boss)와 같은 틀(깨어남 CHIEF_WAKE, 놓아줌 CHIEF_LEASH, 돌아가면 체력이 참)을 여럿으로. 무리(packs)와 따로 센다.
 var chiefs: Dictionary = {}
+## 적 길찾기(37단계, docs/open_world2.md): 장면이 쓰는 막힘 표(set_blockers)를 구운 격자와 흐름장. null이면 막힘이 없다
+## (언덕 싸움터·결투·수련장: 적은 예전처럼 곧장 온다). 있으면 적은 막힘을 돌아서 오고, 틱 끝에 막힘 밖으로 밀린다.
+var nav: Nav = null
 const BOSS_SLEEP: int = 0
 const BOSS_AWAKE: int = 1
 const BOSS_RETURNING: int = 2
@@ -1198,9 +1201,12 @@ func spawn_at(kind: StringName, p: Vector2) -> Enemy:
 
 ## 표를 가진 적(Tokens)과 언덕지기는 영주에게 곧장 다가가 닿으면 때린다. 표 없는 적은 기다림 거리 둘레를 돈다.
 ## 서로 겹치지 않게 밀어내고, 틱 끝에 표를 나눠 준다.
+## 막힘이 있으면(nav, 37단계) 영주와의 곧은 선이 막힌 적은 흐름장을 따라 돌아오고(_detour), 틱 끝에 모든 적을 막힘 밖으로 민다.
 func _step_enemies() -> void:
 	var keep: float = pow(data.lord.knock_keep, dt)
 	var reach: float = data.run.enemy_reach
+	if nav != null:
+		_plan_paths()
 	for e in enemies.duplicate():
 		if e.dead:
 			continue
@@ -1242,6 +1248,13 @@ func _step_enemies() -> void:
 		var target: Vector2 = foe.pos if foe else (beacon_pos if burn_it else lord.pos)
 		var to: Vector2 = target - e.pos
 		var d: float = to.length()
+		# 37단계: 영주와의 곧은 선이 막혔으면(_plan_paths) 흐름장을 따라 돌아온다. 흐름장이 닿지 않았으면 곧장(막힘은 틱 끝에 밀어낸다)
+		if e.detour:
+			var way: Vector2 = nav.flow_step(Nav.class_of(e.radius), e.pos) if foe == null and not burn_it else Vector2.INF
+			if way != Vector2.INF:
+				_detour(e, way, d, k)
+				continue
+			e.detour = false
 		if d > 0.001:
 			foes.turn(e, to / d, dt)
 		e.cooldown -= dt
@@ -1279,12 +1292,107 @@ func _step_enemies() -> void:
 				a.pos -= p
 				b.pos += p
 	_keep_off_beacon()
+	if nav != null:
+		for e in enemies:
+			if not e.dead:
+				e.pos = nav.push(e.pos, e.radius)   # 37단계: 낮은 막힘도 적에게는 막힘(적은 뛰지 않는다)
 	var alive: Array[Enemy] = []
 	for e in enemies:
 		if not e.dead:
 			alive.append(e)
 	enemies = alive
 	tokens.deal(dt)
+
+
+# ---------------------------------------------------------------- 적 길찾기 (37단계)
+
+## 장면이 쓰는 막힘 표를 준다(칸 단위). 들판은 FieldBuilder.build의 표, 무덤은 CryptRun이 방(walk)·문(gates: id → 열렸을 때 걷는 곳)·관을 준다.
+## area는 판의 칸 수(안 주면 지금 Grid.size). 장면과 규칙이 같은 표를 쓰므로 결정성은 그대로다. 빈 표면 막힘이 없는 것과 같다.
+func set_blockers(rects: Array, circles: Array, low_rects: Array = [], low_circles: Array = [], walk: Array = [], gates: Dictionary = {}, area: Vector2 = Vector2.ZERO) -> void:
+	nav = Nav.new(area if area != Vector2.ZERO else Vector2(Grid.size), rects, circles, low_rects, low_circles, walk, gates)
+
+
+## 무덤의 문(set_blockers의 gates)을 연다/닫는다(open: id → 아무 값). CryptRun이 틱마다 부른다(바뀔 때만 다시 굽는다).
+func set_open_gates(open: Dictionary) -> void:
+	if nav != null:
+		nav.set_open(open)
+
+
+## 영주에게 덤비는 중인 적인가(_step_enemies에서 서성임·잠·돌아감·망각으로 빠지지 않는 적).
+func _chasing(e: Enemy) -> bool:
+	if e.dead or e.confused > 0.0 or e.data.still:
+		return false
+	if field and e.pack != &"" and int(packs[e.pack].state) != PACK_ENGAGED:
+		return false
+	if field and e == field_boss and field_boss_state != BOSS_AWAKE:
+		return false
+	if field and e.chief != &"" and chiefs.has(e.chief) and int(chiefs[e.chief].state) != BOSS_AWAKE:
+		return false
+	return not at_beacon(e)
+
+
+## 틱 처음: 덤비는 적마다 영주와의 곧은 선(몸만큼 넓힌 격자, 영주 앞 닿는 거리는 빼고)을 보고, 막힌 적은 detour를 켠다.
+## 막힌 적이 있으면 몸 크기별 영주 쪽 흐름장을 (때가 됐으면) 다시 채운다.
+func _plan_paths() -> void:
+	var want: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
+	var reach: float = data.run.enemy_reach
+	for e in enemies:
+		e.detour = false
+		if not _chasing(e):
+			continue
+		var cls: int = Nav.class_of(e.radius)
+		var to: Vector2 = lord.pos - e.pos
+		var dd: float = to.length()
+		var stop: float = e.radius + reach
+		if dd <= stop or nav.clear(e.pos, e.pos + to * ((dd - stop) / dd), cls):
+			continue
+		e.detour = true
+		var c: int = nav.free_cell(e.pos, cls)
+		if c >= 0:
+			want[cls].append(c)
+	for cls in want.size():
+		if not want[cls].is_empty():
+			nav.update_flow(cls, lord.pos, tick, want[cls])
+
+
+## 막힘을 돌아오는 적의 한 틱: way(흐름장이 고른 다음 자리) 쪽으로 몸을 돌려 걷는다. 표는 그대로 들되(멀어지면 Tokens가 내려놓는다)
+## 새로 받지 않고(Foes.can_take_token), 하던 돌진·멈춘 일·부르기는 Foes.detour가 맡는다. 겨누기·돌진·휘두르기·심지는 곧게 보일 때만 시작한다.
+func _detour(e: Enemy, way: Vector2, d: float, k: float) -> void:
+	var to_w: Vector2 = way - e.pos
+	var dw: float = to_w.length()
+	if dw > 0.001:
+		foes.turn(e, to_w / dw, dt)
+	e.cooldown -= dt
+	if tokens.cost(e) > 0:
+		tokens.hold(e, d, dt)
+	if foes.detour(e, k, dt):
+		return
+	if dw > 0.001:
+		e.pos += to_w / dw * minf(e.data.speed * k * foes.pace(e) * dt, dw)
+
+
+## 제자리로 돌아가는 적이 이번 틱에 걸어갈 자리: goal(제자리)까지 곧게 보이면 goal, 아니면 flow_home(무리·우두머리의 제자리) 쪽 흐름장의 다음 자리.
+func _home_way(e: Enemy, goal: Vector2, flow_home: Vector2) -> Vector2:
+	var cls: int = Nav.class_of(e.radius)
+	if nav.clear(e.pos, goal, cls):
+		return goal
+	var w: Vector2 = nav.home_step(cls, flow_home, e.pos, tick)
+	return goal if w == Vector2.INF else w
+
+
+## 돌아가는 적이 step_len칸 걷는다(막혔으면 흐름장을 따라, _home_way). 다음 자리를 넘어가지 않는다.
+func _walk_home(e: Enemy, goal: Vector2, flow_home: Vector2, step_len: float) -> void:
+	var way: Vector2 = _home_way(e, goal, flow_home)
+	var to: Vector2 = way - e.pos
+	if way == goal:   # 곧게 보인다: 막힘이 없을 때와 똑같이 걷는다
+		e.face = to.normalized()
+		e.pos += e.face * step_len
+		return
+	var len_to: float = to.length()
+	if len_to <= 0.0001:
+		return
+	e.face = to / len_to
+	e.pos += e.face * minf(step_len, len_to)
 
 
 ## 수련장: 허수아비는 서 있기만 한다. 넉백은 받지 않고, refill_after초 안 맞으면 체력이 찬다.
@@ -1511,6 +1619,8 @@ func _step_pack_idle(e: Enemy, k: float) -> void:
 		if to.length() <= maxf(step_len, 0.05):
 			e.pos = e.home
 			e.hp = e.max_hp
+		elif nav != null:
+			_walk_home(e, e.home, p.home, step_len)   # 37단계: 막혔으면 무리 제자리 쪽 흐름장으로 돌아간다
 		else:
 			e.face = to.normalized()
 			e.pos += e.face * step_len
@@ -1612,6 +1722,8 @@ func _step_boss_idle(e: Enemy, k: float) -> void:
 	var step_len: float = sp * dt
 	if to.length() <= maxf(step_len, 0.05):
 		e.pos = field_boss_home
+	elif nav != null:
+		_walk_home(e, field_boss_home, field_boss_home, step_len)
 	else:
 		e.face = to.normalized()
 		e.pos += e.face * step_len
@@ -1729,6 +1841,8 @@ func _step_chief_idle(e: Enemy, k: float) -> void:
 	var to: Vector2 = home - e.pos
 	if to.length() <= maxf(step_len, 0.05):
 		e.pos = home
+	elif nav != null:
+		_walk_home(e, home, home, step_len)
 	else:
 		e.face = to.normalized()
 		e.pos += e.face * step_len
