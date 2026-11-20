@@ -334,6 +334,21 @@ const NIGHT_PACKS: Dictionary = {
 }
 
 
+## ---- 들판 지도(38단계, docs/open_world2.md). M으로 여는 지도 창(FieldMap)과 가 본 곳(Meta.field_seen).
+## 밝힘 격자 한 칸은 들판 SEEN_CELL칸이고 격자는 SEEN_SIZE(들판 크기를 덮는다, 58 × 28 = 1624비트). 걸으면 영주 둘레 SEEN_RADIUS칸에 닿는 격자 칸이
+## 밝혀진다. 장면(field.gd)은 SEEN_TICKS틱마다 영주 자리로 밝힌다.
+const SEEN_CELL: int = 4
+const SEEN_SIZE: Vector2i = Vector2i(58, 28)
+const SEEN_RADIUS: float = 18.0
+const SEEN_TICKS: int = 10
+## 지도 위 곳 이름을 쓰는 자리(칸). 이름은 그 자리가 밝혀졌을 때만 보인다. 언덕길·개울가는 곳 칸이 넓어 길·물가 위에 둔다.
+const MAP_LABELS: Dictionary = {
+	&"road": Vector2(42, 95), &"brook": Vector2(24, 64), &"old_field": Vector2(84, 89), &"watchtower": Vector2(90, 47.5),
+	&"grove": Vector2(17, 46), &"foot": Vector2(44, 9), &"keep": Vector2(134, 30), &"marsh": Vector2(139, 80),
+	&"quarry": Vector2(198, 27), &"hamlet": Vector2(200, 60), &"pass": Vector2(200, 87),
+}
+
+
 ## 시계(초)로 본 밤의 정도 0(낮)~1(밤)(화면용). 해질녘은 해가 지는 때(FIELD_DAY)를 가운데로 FIELD_TWILIGHT초에 걸쳐 어두워지고,
 ## 새벽은 날이 밝는 때(한 바퀴 끝, 시계 0)에 끝나도록 그 앞 FIELD_TWILIGHT초에 걸쳐 밝아진다. 그래서 시계 0(아침)은 늘 0이다.
 static func night_amount(clock: float) -> float:
