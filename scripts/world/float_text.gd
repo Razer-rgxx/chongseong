@@ -13,8 +13,8 @@ var _t: float = 0.0
 func _ready() -> void:
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	no_depth_test = true
-	outline_size = 10
-	outline_modulate = Color(0, 0, 0, 0.8)
+	outline_size = 4   # 굵은 검은 테두리는 싸 보여서 얇고 어두운 갈색으로
+	outline_modulate = Color(0.06, 0.03, 0.02, 0.55)
 	pixel_size = 0.01
 
 

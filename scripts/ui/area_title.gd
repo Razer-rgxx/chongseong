@@ -33,10 +33,7 @@ func _build() -> void:
 	add_child(box)
 	_label = UiKit.label("", 46, UiKit.TITLE)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	_label.add_theme_constant_override("shadow_offset_x", 0)
-	_label.add_theme_constant_override("shadow_offset_y", 2)
-	_label.add_theme_constant_override("shadow_outline_size", 10)
+	UiKit.soft_shadow(_label, 0.6)
 	box.add_child(_label)
 	var r := UiKit.rule(560.0, UiKit.LINE, 0.8)
 	r.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

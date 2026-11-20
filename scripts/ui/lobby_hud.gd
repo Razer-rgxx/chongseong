@@ -187,13 +187,7 @@ func set_boss(boss_name: String, hp: float, max_hp: float) -> void:
 		_boss_name = UiKit.label("", 28, UiKit.TITLE)
 		_boss_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_boss_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# 어두운 땅·밤하늘 위에서도 또렷하게: 검은 테두리와 그림자
-		_boss_name.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
-		_boss_name.add_theme_constant_override("outline_size", 7)
-		_boss_name.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
-		_boss_name.add_theme_constant_override("shadow_offset_x", 0)
-		_boss_name.add_theme_constant_override("shadow_offset_y", 2)
-		_boss_name.add_theme_constant_override("shadow_outline_size", 12)
+		UiKit.soft_shadow(_boss_name, 0.65)   # 테두리 대신 옅은 그림자(아래 어두운 띠가 받쳐 준다)
 		_boss_box.add_child(_boss_name)
 		var line := UiKit.rule(640.0, UiKit.LINE, 0.7)
 		line.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

@@ -97,86 +97,109 @@ func _hero(data: GameData) -> void:
 		add_child(o)
 
 
-## 검 둘레에서 천천히 오르는 불씨(작고 따뜻한 점, 위로 사라진다).
+## 검 둘레에서 오르는 불씨. 대부분 아주 작고 몇 개만 크다. 더해 그리기(빛나 보인다), 바람 쪽으로 기울며
+## 맴돌고, 살아 있는 동안 깜빡이다 작아지며 꺼진다. 색은 개마다 검붉은빛~누런빛.
 func _embers() -> void:
 	var p := CPUParticles3D.new()
-	p.amount = 70
-	p.lifetime = 7.0
-	p.preprocess = 7.0
-	p.position = HERO_AT + Vector3(0.0, 0.2, 0.0)
+	p.amount = 46
+	p.lifetime = 6.5
+	p.preprocess = 6.5
+	p.randomness = 0.7
+	p.position = HERO_AT + Vector3(0.0, 0.1, 0.0)
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	p.emission_sphere_radius = 5.0
-	p.direction = Vector3(0.2, 1.0, 0.0)
-	p.spread = 25.0
-	p.gravity = Vector3(0.12, 0.18, 0.0)
+	p.emission_sphere_radius = 3.2
+	p.direction = Vector3(0.3, 1.0, 0.0)
+	p.spread = 22.0
+	p.gravity = Vector3(0.28, 0.2, 0.05)
 	p.initial_velocity_min = 0.15
-	p.initial_velocity_max = 0.45
-	p.scale_amount_min = 0.5
-	p.scale_amount_max = 1.2
-	var fade := Gradient.new()
-	fade.offsets = PackedFloat32Array([0.0, 0.15, 0.7, 1.0])
-	fade.colors = PackedColorArray([Color(1, 0.6, 0.25, 0), Color(1, 0.6, 0.25, 1), Color(1, 0.4, 0.15, 0.8), Color(0.6, 0.2, 0.1, 0)])
-	p.color_ramp = fade
+	p.initial_velocity_max = 0.55
+	p.tangential_accel_min = -0.5
+	p.tangential_accel_max = 0.5
+	p.damping_min = 0.02
+	p.damping_max = 0.08
+	p.scale_amount_min = 0.35
+	p.scale_amount_max = 1.7
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.2))
+	grow.add_point(Vector2(0.08, 1.0))
+	grow.add_point(Vector2(0.65, 0.75))
+	grow.add_point(Vector2(1.0, 0.0))
+	p.scale_amount_curve = grow
+	var hue := Gradient.new()
+	hue.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	hue.colors = PackedColorArray([Color(0.85, 0.22, 0.05), Color(1.0, 0.5, 0.14), Color(1.0, 0.78, 0.42)])
+	p.color_initial_ramp = hue
+	var life := Gradient.new()   # 흰색에 알파만: 켜졌다가 두어 번 깜빡이고 꺼진다
+	life.offsets = PackedFloat32Array([0.0, 0.06, 0.42, 0.5, 0.58, 0.8, 0.86, 1.0])
+	life.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0.45), Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.6), Color(1, 1, 1, 0.25), Color(1, 1, 1, 0)])
+	p.color_ramp = life
 	var q := QuadMesh.new()
-	q.size = Vector2(0.03, 0.03)
+	q.size = Vector2(0.05, 0.05)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_texture = _dot()   # 네모가 아니라 가운데가 진한 둥근 점
-	m.emission_enabled = true
-	m.emission = Color(1.0, 0.5, 0.2)
-	m.emission_energy_multiplier = 2.5
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.albedo_texture = _dot(0.18)
+	m.albedo_color = Color(1.6, 1.6, 1.6)   # 더해 그릴 때 가운데가 하얗게 타오르게
 	q.material = m
 	p.mesh = q
 	add_child(p)
 
 
-## 가운데가 진하고 가장자리로 사라지는 둥근 점(불씨 알갱이).
-static func _dot() -> GradientTexture2D:
+## 가운데가 진하고 가장자리로 사라지는 둥근 점. core가 작을수록 또렷한 알갱이, 클수록 흐릿한 솜.
+static func _dot(core: float = 0.35) -> GradientTexture2D:
 	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
-	g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.6), Color(1, 1, 1, 0)])
+	g.offsets = PackedFloat32Array([0.0, core, 1.0])
+	g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.55), Color(1, 1, 1, 0)])
 	var t := GradientTexture2D.new()
 	t.gradient = g
 	t.fill = GradientTexture2D.FILL_RADIAL
 	t.fill_from = Vector2(0.5, 0.5)
 	t.fill_to = Vector2(1.0, 0.5)
-	t.width = 32
-	t.height = 32
+	t.width = 64
+	t.height = 64
 	return t
 
 
-## 바람에 옆으로 날리는 재(회색, 넓게 흩어져 화면을 가로지른다).
+## 바람에 천천히 떠가는 재. 네모 알갱이가 빠르게 지나가면 화면 잡음처럼 보여서,
+## 흐릿한 둥근 송이를 적게, 느리게, 맴돌며 가라앉게 한다. 카메라 가까이 큰 송이 몇 개는 초점이 나간 듯 크게 흐리다.
 func _ash() -> void:
+	_ash_layer(HERO_AT + Vector3(-8.0, 3.0, -2.0), Vector3(6.0, 3.5, 12.0), 55, 0.06, 0.32, 0.45)
+	_ash_layer(HERO_AT + Vector3(CAM_SIDE - 4.0, CAM_H, CAM_R - 3.0), Vector3(3.0, 1.5, 1.5), 7, 0.22, 0.12, 0.85)
+
+
+func _ash_layer(at: Vector3, box: Vector3, amount: int, size: float, alpha: float, core: float) -> void:
 	var p := CPUParticles3D.new()
-	p.amount = 120
-	p.lifetime = 9.0
-	p.preprocess = 9.0
-	p.position = HERO_AT + Vector3(-10.0, 3.0, 0.0)
+	p.amount = amount
+	p.lifetime = 14.0
+	p.preprocess = 14.0
+	p.randomness = 0.8
+	p.position = at
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(4.0, 3.0, 14.0)
-	p.direction = Vector3(1.0, -0.1, 0.15)
-	p.spread = 15.0
-	p.gravity = Vector3(0.0, -0.05, 0.0)
-	p.initial_velocity_min = 1.2
-	p.initial_velocity_max = 2.4
-	p.angular_velocity_min = -90.0
-	p.angular_velocity_max = 90.0
-	p.scale_amount_min = 0.6
-	p.scale_amount_max = 1.4
+	p.emission_box_extents = box
+	p.direction = Vector3(1.0, -0.2, 0.12)
+	p.spread = 18.0
+	p.gravity = Vector3(0.05, -0.07, 0.0)
+	p.initial_velocity_min = 0.3
+	p.initial_velocity_max = 0.75
+	p.tangential_accel_min = -0.15
+	p.tangential_accel_max = 0.15
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.6
 	var fade := Gradient.new()
-	fade.offsets = PackedFloat32Array([0.0, 0.2, 0.8, 1.0])
-	fade.colors = PackedColorArray([Color(0.5, 0.47, 0.44, 0), Color(0.5, 0.47, 0.44, 0.7), Color(0.4, 0.38, 0.36, 0.6), Color(0.4, 0.38, 0.36, 0)])
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 0.75, 1.0])
+	fade.colors = PackedColorArray([Color(0.3, 0.28, 0.26, 0), Color(0.3, 0.28, 0.26, alpha), Color(0.24, 0.22, 0.21, alpha * 0.8), Color(0.24, 0.22, 0.21, 0)])
 	p.color_ramp = fade
 	var q := QuadMesh.new()
-	q.size = Vector2(0.03, 0.02)
+	q.size = Vector2(size, size)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_texture = _dot(core)
 	q.material = m
 	p.mesh = q
 	add_child(p)
@@ -227,7 +250,7 @@ func _build_ui() -> void:
 	# 위아래를 조금 더 어둡게(글자가 하늘과 땅에서 잘 읽히게)
 	for top in [true, false]:
 		var g := Gradient.new()
-		g.colors = PackedColorArray([Color(0, 0, 0, 0.55), Color(0, 0, 0, 0.0)])
+		g.colors = PackedColorArray([Color(0, 0, 0, 0.55 if top else 0.72), Color(0, 0, 0, 0.0)])
 		var tex := GradientTexture2D.new()
 		tex.gradient = g
 		tex.fill_from = Vector2(0.5, 0.0 if top else 1.0)
@@ -238,11 +261,12 @@ func _build_ui() -> void:
 		band.stretch_mode = TextureRect.STRETCH_SCALE
 		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		band.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE if top else Control.PRESET_BOTTOM_WIDE)
-		band.custom_minimum_size = Vector2(0, 260)
+		var h: float = 260.0 if top else 380.0
+		band.custom_minimum_size = Vector2(0, h)
 		if top:
-			band.offset_bottom = 260
+			band.offset_bottom = h
 		else:
-			band.offset_top = -260
+			band.offset_top = -h
 		root.add_child(band)
 	# 제목: 화면 위쪽 1/4, 글자 사이를 띄우고 아래에 가는 줄
 	var head := VBoxContainer.new()
@@ -256,10 +280,7 @@ func _build_ui() -> void:
 	root.add_child(head)
 	var t := UiKit.label("검 의   언 덕", 76, UiKit.TITLE)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	t.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
-	t.add_theme_constant_override("shadow_offset_x", 0)
-	t.add_theme_constant_override("shadow_offset_y", 3)
-	t.add_theme_constant_override("shadow_outline_size", 10)
+	UiKit.soft_shadow(t, 0.6)
 	head.add_child(t)
 	var rule := UiKit.rule(520, UiKit.LINE, 0.8)
 	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -267,15 +288,12 @@ func _build_ui() -> void:
 	_title = head
 	# "아무 키나 누르세요"(깜빡임) → 누르면 메뉴
 	_prompt = UiKit.label("아무 키나 누르세요", 22, UiKit.TEXT)
-	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_prompt.add_theme_constant_override("outline_size", 6)
+	UiKit.soft_shadow(_prompt)
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_prompt.anchor_top = 0.86
 	_prompt.anchor_bottom = 0.86
 	_prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_prompt.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-	_prompt.add_theme_constant_override("shadow_outline_size", 8)
 	root.add_child(_prompt)
 	_menu = VBoxContainer.new()
 	_menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
@@ -311,13 +329,10 @@ func _menu_button(text: String, f: Callable) -> Button:
 	var b := UiKit.button(text, f, 44)
 	b.custom_minimum_size = Vector2(360, 44)
 	b.add_theme_font_size_override("font_size", 26)
-	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	b.add_theme_constant_override("outline_size", 6)
 	b.add_theme_color_override("font_color", UiKit.TEXT)
 	b.add_theme_color_override("font_hover_color", UiKit.TITLE)
 	b.add_theme_color_override("font_pressed_color", UiKit.TITLE)
-	b.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-	b.add_theme_constant_override("shadow_outline_size", 8)
+	UiKit.soft_shadow(b, 0.7)   # 테두리 없이: 아래쪽 어두운 띠가 글자를 받쳐 준다
 	var empty := StyleBoxEmpty.new()
 	var bar := StyleBoxTexture.new()
 	bar.texture = UiKit.fade_texture(Color(0.0, 0.0, 0.0), 0.7, 0.3)

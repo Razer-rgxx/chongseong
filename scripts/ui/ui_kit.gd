@@ -33,6 +33,16 @@ static func label(t: String, size: int, col: Color = TEXT) -> Label:
 	return l
 
 
+## 글자 둘레의 검은 테두리 대신, 아래로 살짝 떨어진 옅은 그림자. 테두리는 싸 보여서 쓰지 않는다.
+## 밝은 바닥 위라 잘 안 읽히면 테두리를 두르지 말고 뒤에 어두운 띠를 깐다.
+static func soft_shadow(l: Control, a: float = 0.55) -> void:
+	l.add_theme_constant_override("outline_size", 0)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, a))
+	l.add_theme_constant_override("shadow_offset_x", 0)
+	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.add_theme_constant_override("shadow_outline_size", 1)
+
+
 static func rich(size: int = 15, width: float = 360.0) -> RichTextLabel:
 	var r := RichTextLabel.new()
 	r.bbcode_enabled = true

@@ -76,8 +76,7 @@ func _build() -> void:
 	tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(tl)
 	_area = UiKit.label("", 18, UiKit.TITLE)
-	_area.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	_area.add_theme_constant_override("outline_size", 5)
+	UiKit.soft_shadow(_area, 0.7)
 	tl.add_child(_area)
 	var rule := UiKit.rule(150.0, UiKit.LINE, 0.45)
 	tl.add_child(rule)
@@ -103,8 +102,7 @@ func _build() -> void:
 	_held_dot.pivot_offset = Vector2(4, 4)
 	bl.add_child(_held_dot)
 	_held = UiKit.label("", 16, UiKit.TEXT)
-	_held.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_held.add_theme_constant_override("outline_size", 5)
+	UiKit.soft_shadow(_held, 0.75)
 	bl.add_child(_held)
 	# 위 가운데: 나침반
 	_compass = Control.new()
