@@ -11,6 +11,6 @@ form = 0
 attack = 125
 inscriptions = PackedStringArray("날랜 발", "잔상")
 unique_text = "돌진하면 칼이 앞으로 날아갔다 돌아오며 길 위의 적을 벤다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "몇 번을 던져 버려도 아침이면 칼집에 돌아와 있었다."

@@ -136,6 +136,7 @@ func _fall(at: Vector3, radius: float) -> void:
 func _process(_delta: float) -> void:
 	if rules == null:
 		return
+	_sync_uniques()
 	var zones: Array[Dictionary] = rules.powers.zones
 	while _zone_views.size() < zones.size():
 		var m := MeshInstance3D.new()
@@ -209,3 +210,118 @@ func _flames() -> CPUParticles3D:
 	g.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
 	p.color_ramp = g
 	return p
+
+
+# ---------------------------------------------------------------- 아군·벽·날아가는 칼 (Uniques)
+
+var _ally_views: Array[Node3D] = []
+var _wall_views: Array[Node3D] = []
+var _blade_views: Array[Node3D] = []
+var _ghost_mat: StandardMaterial3D
+
+
+func _ghost() -> StandardMaterial3D:
+	if _ghost_mat == null:
+		_ghost_mat = StandardMaterial3D.new()
+		_ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ghost_mat.albedo_color = Color(0.4, 0.62, 1.0, 0.55)
+		_ghost_mat.emission_enabled = true
+		_ghost_mat.emission = Color(0.3, 0.5, 1.0)
+		_ghost_mat.emission_energy_multiplier = 1.5
+	return _ghost_mat
+
+
+## 아군 하나: 푸르스름한 몸(캡슐)과 머리, 손에 칼 하나. 기사는 조금 크다.
+func _make_ally() -> Node3D:
+	var n := Node3D.new()
+	var body := MeshInstance3D.new()
+	var cm := CapsuleMesh.new()
+	cm.radius = 0.32
+	cm.height = 1.5
+	body.mesh = cm
+	body.material_override = _ghost()
+	body.position.y = 0.8
+	n.add_child(body)
+	var head := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.24
+	sm.height = 0.48
+	head.mesh = sm
+	head.material_override = _ghost()
+	head.position.y = 1.75
+	n.add_child(head)
+	var blade := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.08, 0.08, 1.1)
+	blade.mesh = bm
+	blade.material_override = _ghost()
+	blade.position = Vector3(0.4, 1.0, -0.5)
+	n.add_child(blade)
+	add_child(n)
+	return n
+
+
+## 벽 하나: 선분을 따라 늘어선 땅에 꽂힌 검들(쇠말뚝은 하나).
+func _make_wall(w: Dictionary) -> Node3D:
+	var n := Node3D.new()
+	var span: float = w.a.distance_to(w.b)
+	var count: int = maxi(1, int(ceil(span / 0.7)) + 1) if span > 0.01 else 1
+	for i in count:
+		var t: float = 0.5 if count == 1 else float(i) / float(count - 1)
+		var s := SwordModel.make(rules.data.forms[2], 3 if w.kind == &"stake" else 2, 31 + i, Color(0.8, 0.88, 1.0))
+		s.rotation = Vector3(PI, 0.4 * float(i), 0.0)
+		s.scale = Vector3.ONE * (2.2 if w.kind == &"stake" else 1.6)
+		s.position = Grid.cells_to_world(w.a.lerp(w.b, t), 0.0) - Grid.cells_to_world(w.a, 0.0) + Vector3(0, 1.6, 0)
+		n.add_child(s)
+	add_child(n)
+	return n
+
+
+func _make_blade() -> Node3D:
+	var s := SwordModel.make(rules.data.forms[2], 3, 7, Color(0.85, 0.93, 1.0))
+	var n := Node3D.new()
+	n.add_child(s)
+	add_child(n)
+	return n
+
+
+func _sync_uniques() -> void:
+	var U: Uniques = rules.powers.U
+	_sync_pool(_ally_views, U.allies.size(), _make_ally)
+	for i in U.allies.size():
+		var a: Dictionary = U.allies[i]
+		var v := _ally_views[i]
+		v.position = Grid.cells_to_world(a.pos, 0.0)
+		v.rotation.y = -a.face + PI / 2.0
+		v.scale = Vector3.ONE * (1.15 if a.kind == &"knight" else 1.0)
+		v.rotation.x = 0.0
+	# 벽은 개수가 같아도 내용이 바뀌므로 만든 벽의 키를 기억한다
+	while _wall_views.size() > U.walls.size():
+		_wall_views.pop_back().queue_free()
+	for i in U.walls.size():
+		var w: Dictionary = U.walls[i]
+		if i < _wall_views.size() and _wall_views[i].get_meta("key", "") != str([w.a, w.b]):
+			_wall_views[i].queue_free()
+			_wall_views[i] = _make_wall(w)
+			_wall_views[i].set_meta("key", str([w.a, w.b]))
+		elif i >= _wall_views.size():
+			var v := _make_wall(w)
+			v.set_meta("key", str([w.a, w.b]))
+			_wall_views.append(v)
+		_wall_views[i].position = Grid.cells_to_world(w.a, 0.0)
+		_wall_views[i].scale.y = clampf(w.t / 0.3, 0.05, 1.0) if w.t < 0.3 else 1.0
+	_sync_pool(_blade_views, U.blades.size(), _make_blade)
+	for i in U.blades.size():
+		var b: Dictionary = U.blades[i]
+		var v := _blade_views[i]
+		v.position = Grid.cells_to_world(b.pos, 1.0)
+		v.rotation.y = -b.dir.angle() + PI / 2.0
+		v.rotation.z = Time.get_ticks_msec() * 0.03
+
+
+func _sync_pool(pool: Array[Node3D], n: int, make: Callable) -> void:
+	while pool.size() < n:
+		pool.append(make.call())
+	while pool.size() > n:
+		pool.pop_back().queue_free()

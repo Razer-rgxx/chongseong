@@ -740,6 +740,11 @@ func _step_pull(input: LordInput = null) -> void:
 	_receive(s)
 
 
+## 운명 베기: 낮에 뽑은 검을 다시 뽑는다(Uniques.fate_reroll). 된 일이면 true.
+func fate_reroll() -> bool:
+	return powers.U.fate_reroll()
+
+
 ## 그 등급에서 뽑힐 검 하나(rng). 후보는 GameData.swords_by_grade라 오픈월드 한정 검(33단계, field_only)은 나오지 않는다.
 func pick_sword(grade: int) -> SwordData:
 	var list: PackedInt32Array = data.swords_by_grade[grade]
@@ -1306,6 +1311,9 @@ func _step_enemies() -> void:
 				a.pos -= p
 				b.pos += p
 	_keep_off_beacon()
+	for e in enemies:
+		if not e.dead:
+			powers.U.push(e)   # 쇠말뚝·언덕을 쌓은 검의 벽
 	if nav != null:
 		for e in enemies:
 			if not e.dead:
@@ -2430,6 +2438,7 @@ func state_hash() -> int:
 			parts.append_array([id, chiefs[id].state, chiefs[id].home, (chiefs[id].e as Enemy).id])
 		for e in enemies:
 			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
+	parts.append_array(powers.U.hash_parts())
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
 	if duel:
 		parts.append_array([duel_phase, duel_timer, duel_left, duel_round, duel_wins[0], duel_wins[1], duel_winner, cur_seat])

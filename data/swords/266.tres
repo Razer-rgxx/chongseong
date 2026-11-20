@@ -11,6 +11,6 @@ form = 2
 attack = 134
 inscriptions = PackedStringArray("밀쳐내기", "막기")
 unique_text = "큰 베기 자리에 검 그림자가 꽂혀 4초 동안 적이 지나가지 못한다."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "성벽이 무너진 날, 이 검 하나가 성문을 대신했다."

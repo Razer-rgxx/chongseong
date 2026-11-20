@@ -11,6 +11,6 @@ form = 0
 attack = 144
 inscriptions = PackedStringArray("행운", "가벼운 손")
 unique_text = "낮에 뽑은 검이 마음에 안 들면 이 검의 내구 30을 써서 다시 뽑는다 (낮마다 3번)."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "운명이 마음에 들지 않으면 베어 버리라고, 주인은 말했다."

@@ -11,6 +11,6 @@ form = 1
 attack = 143
 inscriptions = PackedStringArray("망령 베기", "사냥")
 unique_text = "쓰러뜨린 적이 모두 내 편 망령으로 일어난다 (최대 8)."
-unique_ready = false
+unique_ready = true
 unbreakable = false
 story = "이 검 앞에서는 죽은 자도 무릎을 꿇는다."
