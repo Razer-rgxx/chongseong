@@ -13,6 +13,8 @@ var sheath_id: int = -1
 var dropped: Dictionary = {}
 ## 잃은 검(번호 문자열 → 1). 검 걸이·북문·검집에서 빠진다. 언덕에서 다시 뽑으면(note_found) 되찾는다.
 var lost: Dictionary = {}
+## 검마다 쌓이는 기록(2026-11-20: "내 검"이 되게). 번호 문자열 → {"k": 벤 적, "b": 부러진 횟수, "p": 완벽한 뽑기, "r": 처음 뽑은 판 번호}.
+var sword_log: Dictionary = {}
 var sheath_lv: int = 0
 ## 가장 높이 올랐던 단계(각인은 처음 닿을 때만 붙는다).
 var sheath_peak: int = 0
@@ -99,7 +101,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -109,6 +111,13 @@ func from_dict(d: Dictionary) -> void:
 	dropped = {}
 	if dr is Dictionary and (dr as Dictionary).has("id"):
 		dropped = {"id": int(dr["id"]), "x": float(dr.get("x", 0.0)), "y": float(dr.get("y", 0.0))}
+	sword_log = {}
+	var sl: Variant = d.get("sword_log", {})
+	if sl is Dictionary:
+		for k in sl:
+			var e: Variant = sl[k]
+			if e is Dictionary:
+				sword_log[str(k)] = {"k": int(e.get("k", 0)), "b": int(e.get("b", 0)), "p": int(e.get("p", 0)), "r": int(e.get("r", 0))}
 	lost = {}
 	var lo: Variant = d.get("lost", {})
 	if lo is Dictionary:
@@ -203,6 +212,56 @@ func record_duel(winner: int) -> void:
 func note_found(id: int) -> void:
 	found[str(id)] = int(found.get(str(id), 0)) + 1
 	lost.erase(str(id))   # 잃었던 검을 다시 뽑으면 되찾는다
+
+
+# ---------------------------------------------------------------- 검의 기록 (2026-11-20)
+
+func _log(id: int) -> Dictionary:
+	var k: String = str(id)
+	if not sword_log.has(k):
+		sword_log[k] = {"k": 0, "b": 0, "p": 0, "r": runs + 1}
+	return sword_log[k]
+
+
+## 뽑았다(처음이면 몇 번째 판에 뽑았는지 남는다). perfect: 완벽한 뽑기였다.
+func log_pull(id: int, perfect: bool) -> void:
+	if id <= 0:
+		return
+	var e := _log(id)
+	if perfect:
+		e["p"] = int(e["p"]) + 1
+
+
+## 이 검으로 적을 쓰러뜨렸다(언덕·들판·무덤).
+func log_kill(id: int) -> void:
+	if id > 0:
+		var e := _log(id)
+		e["k"] = int(e["k"]) + 1
+
+
+func log_break(id: int) -> void:
+	if id > 0:
+		var e := _log(id)
+		e["b"] = int(e["b"]) + 1
+
+
+func kills_of(id: int) -> int:
+	return int(sword_log.get(str(id), {}).get("k", 0))
+
+
+## 기록 한 줄("벤 적 120 · 부러짐 3 · 완벽한 뽑기 2 · 7번째 판에 처음 뽑음"). 기록이 없으면 "".
+func log_line(id: int) -> String:
+	if not sword_log.has(str(id)):
+		return ""
+	var e: Dictionary = sword_log[str(id)]
+	var parts: Array[String] = ["벤 적 %d" % int(e["k"])]
+	if int(e["b"]) > 0:
+		parts.append("부러짐 %d" % int(e["b"]))
+	if int(e["p"]) > 0:
+		parts.append("완벽한 뽑기 %d" % int(e["p"]))
+	if int(e["r"]) > 0:
+		parts.append("%d번째 판에 처음 뽑음" % int(e["r"]))
+	return " · ".join(parts)
 
 
 # ---------------------------------------------------------------- 떨군 검 (2026-11-20)

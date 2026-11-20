@@ -40,6 +40,8 @@ const EVENT_NEWS: Dictionary = {&"smith": "떠돌이 대장장이가 머문다",
 @export var torch_energy: float = 2.6
 @export var light_change_time: float = 1.5
 
+## 다음에 뽑히는 검이 완벽한 뽑기였는가(검의 기록).
+var _perfect_pull: bool = false
 var data: GameData
 var rules: Rules
 var meta: Meta
@@ -671,6 +673,7 @@ func _on_pull_good(h: Hilt, st: int) -> void:
 
 ## 버팀을 모두 제대로 당겼다: 더 센 불똥·빛·충격파. 뽑은 뒤 이름 알림에 내구가 늘었다고 붙인다.
 func _on_pull_perfect(h: Hilt) -> void:
+	_perfect_pull = true
 	var at: Vector3 = Grid.cells_to_world(h.pos)
 	_timing_fx[rules.pull_judged % 2].on_perfect(at)
 	_sfx.play(&"hit_big", at, -5.0, 0.7)
@@ -689,6 +692,8 @@ func _on_pulled(s: Sword) -> void:
 	for fx in _timing_fx:
 		fx.clear()
 	meta.note_found(s.data.id)
+	meta.log_pull(s.data.id, _perfect_pull)
+	_perfect_pull = false
 	meta.save()
 	var c: Color = data.grades.colors[s.grade]
 	_sfx.play(&"draw", _lord.position, -4.0)
@@ -763,6 +768,7 @@ func _on_altar_used(kind: String, text: String) -> void:
 
 
 func _on_broke(_k: int, s: Sword) -> void:
+	meta.log_break(s.data.id)
 	_sfx.play(&"break", _lord.position, 0.0)
 	_camera.add_shake(0.3)
 	_hud.toast(s.data.display_name + "이(가) 부러졌다." + ("" if rules.current() else " 이제 맨손이야."))
@@ -843,6 +849,8 @@ func _enemy_parts(e: Enemy) -> Dictionary:
 
 
 func _on_enemy_died(e: Enemy) -> void:
+	if rules.current():
+		meta.log_kill(rules.current().data.id)   # 검의 기록: 쥔 검이 벤 것으로 센다
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	# 터진 자폭병은 EnemyFx가 폭발을 그린다
 	if e.act == &"explode":

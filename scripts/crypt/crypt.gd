@@ -332,6 +332,8 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 
 
 func _on_enemy_died(e: Enemy) -> void:
+	if _held_id > 0:
+		meta.log_kill(_held_id)   # 검의 기록
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	if e.act != &"explode":
 		if e.data.wraith:
@@ -359,7 +361,7 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 ## 영주가 쓰러졌다: 쥔 검을 들판의 무덤 입구 앞에 떨구고(먼저 떨군 검은 잃는다) 그 앞에서 깬다(쓰러뜨린 방과 연 관은 Meta에 남아 있다).
 func _on_down(_won: bool) -> void:
 	_over = true
-	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, FieldLayout.CRYPT_WAKE + FieldLayout.CRYPT_DROP_OFFSET), _held_id)
+	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, FieldLayout.CRYPT_WAKE + FieldLayout.CRYPT_DROP_OFFSET), _held_id, meta)
 	meta.save()
 	Meta.wake_at_crypt = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

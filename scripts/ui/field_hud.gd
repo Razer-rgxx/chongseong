@@ -43,15 +43,16 @@ static func make(parent: Node, d: GameData, m: Meta, r: Rules, cam: Camera3D) ->
 	return h
 
 
-## 쓰러졌을 때 깨어나며 띄울 말. gone: 이번에 잃은 검(-1이면 없음), held: 떨군 검(0이면 맨손).
-static func drop_note(d: GameData, gone: int, held: int) -> String:
+## 쓰러졌을 때 깨어나며 띄울 말. gone: 이번에 잃은 검(-1이면 없음), held: 떨군 검(0이면 맨손). m이 있으면 잃은 검이 벤 적 수를 덧붙인다.
+static func drop_note(d: GameData, gone: int, held: int, m: Meta = null) -> String:
 	var parts: Array[String] = []
 	if held > 0:
 		var s: SwordData = d.sword_by_id(held)
 		parts.append("%s을(를) 쓰러진 자리에 떨궜다" % (s.display_name if s else "검"))
 	if gone > 0:
 		var g: SwordData = d.sword_by_id(gone)
-		parts.append("먼저 떨군 %s은(는) 영영 잃었다" % (g.display_name if g else "검"))
+		var k: int = m.kills_of(gone) if m else 0
+		parts.append("먼저 떨군 %s은(는) 영영 잃었다%s" % [g.display_name if g else "검", (" (함께 벤 적 %d)" % k) if k > 0 else ""])
 	if parts.is_empty():
 		return ""
 	return ". ".join(parts) + "."

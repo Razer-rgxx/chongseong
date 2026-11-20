@@ -414,7 +414,7 @@ func _forge_bless(key: String) -> void:
 # ---------------------------------------------------------------- 진열대(도감)
 
 func open_rack() -> void:
-	var t: String = ""
+	var t: String = _my_swords()
 	for g in data.grades.names.size():
 		var ids: PackedInt32Array = data.swords_by_grade[g]
 		var n: int = 0
@@ -432,6 +432,36 @@ func open_rack() -> void:
 	var best: String = "없음" if meta.best == 0 else ("정상" if meta.best > data.run.zone_names.size() else "%d구역" % meta.best)
 	_rack_head.text = "도감 %d / %d  ·  최고 기록 %s  ·  오른 횟수 %d" % [meta.found.size(), data.swords.size(), best, meta.runs]
 	_rack.visible = true
+
+
+## 도감 맨 위 "내 검"(2026-11-20): 가장 많이 벤 검 다섯과 그 기록, 그리고 잃은 검(묘비처럼). 기록이 없으면 빈 줄.
+func _my_swords() -> String:
+	var ids: Array[int] = []
+	for k in meta.sword_log:
+		if meta.kills_of(int(k)) > 0 and not meta.lost.has(str(k)):
+			ids.append(int(k))
+	ids.sort_custom(func(a: int, b: int) -> bool: return meta.kills_of(a) > meta.kills_of(b))
+	var t: String = ""
+	if not ids.is_empty():
+		t += "[b][color=#c8b27a]내 검[/color][/b]\n"
+		for i in mini(5, ids.size()):
+			var sd: SwordData = data.sword_by_id(ids[i])
+			if sd == null:
+				continue
+			var col: String = data.grades.colors[sd.grade].to_html(false)
+			var mark: String = "  [color=#c8b27a]· 검집[/color]" if ids[i] == meta.sheath_id else ""
+			t += "  [color=#%s]%s[/color]%s  [color=#99917f]%s[/color]\n" % [col, sd.display_name, mark, meta.log_line(ids[i])]
+		t += "\n"
+	if not meta.lost.is_empty():
+		t += "[b][color=#8a3b30]잃은 검[/color][/b]\n"
+		for k in meta.lost:
+			var ld: SwordData = data.sword_by_id(int(k))
+			if ld == null:
+				continue
+			var line: String = meta.log_line(int(k))
+			t += "  [color=#6b625a]%s[/color]  [color=#5a524a]%s[/color]\n" % [ld.display_name, line if line != "" else "기록 없음"]
+		t += "\n"
+	return t
 
 
 ## 도감의 "들판의 검" 줄(33단계): 언덕에서는 뽑히지 않는 오픈월드 한정 검. 찾은 것은 제 등급 빛으로 쓴다.

@@ -629,6 +629,8 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 
 
 func _on_enemy_died(e: Enemy) -> void:
+	if _held_id > 0:
+		meta.log_kill(_held_id)   # 검의 기록
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	at.y = FieldBuilder.walk_height(at.x, at.z)
 	if e.act != &"explode":
@@ -700,7 +702,7 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 ## 영주가 쓰러졌다: 쥔 검을 이 자리에 떨구고(먼저 떨군 검이 있으면 그것은 잃는다) 마을 북문 앞에서 깬다(record_run을 부르지 않는다).
 func _on_down(_won: bool) -> void:
 	_over = true
-	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, rules.lord.pos), _held_id)
+	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, rules.lord.pos), _held_id, meta)
 	Meta.carry_sword = -1
 	meta.field_clock = rules.field_clock
 	meta.save()

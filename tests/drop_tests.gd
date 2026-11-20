@@ -61,3 +61,23 @@ func _all() -> void:
 	# 깨어날 때의 말
 	check.call(FieldHud.drop_note(game, -1, 0) == "", "떨군 검: 맨손이고 잃은 것도 없으면 말이 없다")
 	check.call(FieldHud.drop_note(game, a, b).contains("영영 잃었다"), "떨군 검: 잃었으면 그렇게 말한다")
+	_log_tests()
+
+
+## 검의 기록(2026-11-20): 뽑기·벤 적·부러짐·완벽한 뽑기가 쌓이고 저장된다.
+func _log_tests() -> void:
+	var m := Meta.new()
+	m.runs = 6
+	var id: int = game.swords[0].id
+	check.call(m.log_line(id) == "", "검의 기록: 처음엔 없다")
+	m.log_pull(id, true)
+	m.log_kill(id)
+	m.log_kill(id)
+	m.log_break(id)
+	check.call(m.kills_of(id) == 2, "검의 기록: 벤 적을 센다")
+	check.call(m.log_line(id).contains("부러짐 1") and m.log_line(id).contains("완벽한 뽑기 1") and m.log_line(id).contains("7번째 판"), "검의 기록: 한 줄")
+	var m2 := Meta.new()
+	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+	check.call(m2.kills_of(id) == 2 and m2.log_line(id) == m.log_line(id), "검의 기록: 저장·읽기")
+	m.log_kill(0)
+	check.call(not m.sword_log.has("0"), "검의 기록: 맨손은 안 센다")
