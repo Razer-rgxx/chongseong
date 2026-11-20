@@ -14,8 +14,8 @@
 | Overcast Soil (Pure Sky), Kloppenheim 02 (Pure Sky) (하늘 HDRI, 2K) | Sergej Majboroda, Greg Zaal, Jarod Guest / Poly Haven | CC0 | https://polyhaven.com/a/overcast_soil_puresky · https://polyhaven.com/a/kloppenheim_02_puresky | 언덕의 낮·밤 하늘, 마을의 저녁 하늘 |
 | Paladin J Nordstrom (캐릭터) | Adobe Mixamo | Mixamo 이용 약관(게임에 써도 되고, 원본 파일만 따로 나눠 주면 안 됨) | https://www.mixamo.com | 영주, 거인과 언덕지기(어둡게 칠하고 키움) (저장소에는 없음) |
 | 적 캐릭터들(고르는 대로, assets/characters/README.md "적 모델") | Adobe Mixamo | Mixamo 이용 약관 | https://www.mixamo.com | 적 모델(24단계, 넣은 것만) (저장소에는 없음) |
-| 송명 Song Myung (글꼴) | JIKJI SOFT | SIL OFL 1.1 | https://fonts.google.com/specimen/Song+Myung | 모든 글자(UI, 표지판, 피해 숫자) |
-| Noto Serif KR (글꼴, 쓰는 글자만 남김) | Google / Adobe | SIL OFL 1.1 | https://fonts.google.com/noto/specimen/Noto+Serif+KR | 송명에 없는 기호와 드문 한글 |
+| 던파 연단된 칼날 DNF Forged Blade (글꼴, Medium·Bold, 고치지 않음) | (주)넥슨코리아 | 넥슨 서체 라이선스(무료, 상업·임베딩 가능, 수정 재배포 금지; `assets/ui/fonts/LICENSE-DNF.txt`) | https://df.nexon.com/data/font/dnfforgedblade | 모든 글자(UI, 제목, 피해 숫자) |
+| Noto Serif KR (글꼴, 쓰는 글자만 남김) | Google / Adobe | SIL OFL 1.1 | https://fonts.google.com/noto/specimen/Noto+Serif+KR | 던파 글꼴에 없는 기호(›, ≈ 등) |
 | Medieval Melee Weapon SFX (소리, 다듬음) | Gravity Sound | itch.io 무료 배포, 팩 안에 약관 문구 없음(팔기 전에 작가에게 확인) | https://gravity-sound.itch.io/medieval-melee-weapon-sfx | 휘두르기, 망치질, 뽑기, 부러짐 (저장소에는 없음) |
 | Sword Combat Sound Effects Pack Free Version (소리, 다듬음) | Hove Audio | itch.io 무료 배포(Royalty Free 표시, 작가가 출처 표기는 안 해도 된다고 함) | https://hoveaudio.itch.io/sword-combat-sound-effects-pack-free-version | 베기, 구르기, 기합, 맞는 소리 (저장소에는 없음) |
 | GD-Sync 1.0.2 (멀티플레이 플러그인, 소스 그대로) | GD-Sync | 소스 형태 재배포 허용(저작권·면책 문구 유지, 이름을 홍보에 쓰지 않음). BSD-2가 아니라 비슷한 자체 글이다: `addons/GD-Sync/LICENSE` | https://github.com/GD-Sync/GD-Sync · https://www.gd-sync.com | 온라인 결투 매칭과 입력 전달(22단계, `scripts/net/gdsync_link.gd`). 키는 저장소에 없다 |

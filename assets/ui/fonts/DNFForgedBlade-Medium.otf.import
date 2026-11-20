@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://xpq82pt7v00c"
-path="res://.godot/imported/SongMyung-Regular.ttf-450775c85e19f3e04ab927c21745d854.fontdata"
+uid="uid://7b4427m8kgio"
+path="res://.godot/imported/DNFForgedBlade-Medium.otf-ef8d7729d8a1f556205139bcd00db3b1.fontdata"
 
 [deps]
 
-source_file="res://assets/ui/fonts/SongMyung-Regular.ttf"
-dest_files=["res://.godot/imported/SongMyung-Regular.ttf-450775c85e19f3e04ab927c21745d854.fontdata"]
+source_file="res://assets/ui/fonts/DNFForgedBlade-Medium.otf"
+dest_files=["res://.godot/imported/DNFForgedBlade-Medium.otf-ef8d7729d8a1f556205139bcd00db3b1.fontdata"]
 
 [params]
 

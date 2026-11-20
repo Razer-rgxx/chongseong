@@ -28,6 +28,8 @@ static func label(t: String, size: int, col: Color = TEXT) -> Label:
 	l.text = t
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
+	if col == TITLE:
+		l.theme_type_variation = &"HeaderLabel"   # 제목·이름은 굵은 글꼴(theme.tres)
 	return l
 
 

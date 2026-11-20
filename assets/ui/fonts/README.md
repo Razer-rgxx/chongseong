@@ -1,6 +1,6 @@
 # 글꼴
 
-**2026-11-20부터 기본 글꼴은 송명(`SongMyung-Regular.ttf`, SIL OFL 1.1, `OFL-SongMyung.txt`)이다.** 오래된 활자 같은 명조라 어두운 분위기에 맞는다. 굵기가 하나뿐이라 굵은 글씨는 FontVariation의 `variation_embolden`(0.6)으로 획을 부풀린다. 송명에는 한글 2350자와 기본 글자만 있어서, 없는 글자(`·`, `›`, 화살표, `「」` 등)는 아래 Noto Serif KR로 대신 그린다(`fallbacks`). 원본: https://github.com/google/fonts/tree/main/ofl/songmyung
+**2026-11-20부터 기본 글꼴은 넥슨의 「던파 연단된 칼날」이다** (`DNFForgedBlade-Medium.otf` 본문, `DNFForgedBlade-Bold.otf` 굵게·제목). 칼싸움 게임용 부리 글꼴이다. 라이선스(`LICENSE-DNF.txt`)가 파일 수정 재배포를 막으므로 **자르기(subset)·변환을 하지 않고 받은 그대로** 둔다. 놋쇠빛 제목 글자(`UiKit.label(..., UiKit.TITLE)`)는 테마 변형 `HeaderLabel`로 Bold를 쓴다. 던파 글꼴에 없는 글자(`›`, `≈` 등)는 아래 Noto Serif KR로 대신 그린다(`fallbacks`).
 
 아래는 대신 그리는 글꼴 이야기다.
 
