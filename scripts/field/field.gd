@@ -7,6 +7,7 @@ extends Node3D
 ## 날이 밝으면 Meta.packs_cleared를 비운다(Rules가 쓰러뜨린 낮 무리를 다시 세운다).
 ## 떠도는 사람(34단계): 아직 영입하지 않은 사람 하나가 후보 자리에 서 있다(Meta.wanderer). E로 말을 걸고, 조건이 맞으면 E로 데려간다(마을에 선다).
 ## 날이 밝으면 다른 사람(또는 같은 사람이 다른 자리)으로 바뀐다.
+## 들판 지도(38단계): M으로 지도 창(FieldMap, 게임을 멈춘다)을 연다. 걸으면 영주 둘레가 밝혀진다(FieldLayout.SEEN_TICKS틱마다 Meta.see_field).
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
@@ -67,6 +68,7 @@ var _wander_id: String = ""
 var _wander_step: int = 0
 var _wt: float = 0.0
 var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
+var _seen_t: int = 0   ## 38단계: 다음 밝힘까지 남은 틱
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -94,6 +96,7 @@ func _ready() -> void:
 		Meta.wake_at_crypt = false
 		rules.lord.pos = FieldLayout.CRYPT_WAKE
 	rules.lord.prev_pos = rules.lord.pos
+	meta.see_field(rules.lord.pos)   # 38단계: 깬 자리 둘레는 처음부터 보인다
 	_hud.setup(data, meta)
 	_build_dropped()
 	_field_hud = FieldHud.make(_hud, data, meta, rules, _camera)
@@ -156,6 +159,7 @@ func _ready() -> void:
 	_light(0.0, true)
 	_capture(true)
 	WebQuality.apply(self, env, _sun, _camera)   # 웹판에서만 가볍게
+	FieldMap.prepare()   # 38단계: 지도의 땅 그림(세션에 한 번, 첫 M이 멈칫하지 않게)
 
 
 func _build_props() -> void:
@@ -197,6 +201,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_want_hook = true
 	if event.is_action_pressed("pull"):
 		_interact()
+	if event.is_action_pressed("map") and not _over:
+		open_map()
 	if k and k.pressed and not k.echo:
 		if k.physical_keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -229,6 +235,10 @@ func _physics_process(delta: float) -> void:
 				inp.aim = Grid.world_to_cells(g)
 		rules.step(inp)
 		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
+		_seen_t -= 1
+		if _seen_t <= 0:
+			_seen_t = FieldLayout.SEEN_TICKS
+			meta.see_field(rules.lord.pos)
 		_want_dash = false
 		_want_jump = false
 		_want_attack = false
@@ -331,6 +341,17 @@ func _on_dawn() -> void:
 	_build_wanderer()
 	_hud.toast("날이 밝는다")
 	_saved()
+
+
+## 38단계: 들판 지도 창을 연다(게임을 멈춘다, M·Esc로 닫는다). 여는 김에 가 본 곳을 저장한다.
+func open_map() -> FieldMap:
+	if _hud.get_node_or_null("FieldMap"):
+		return null
+	meta.see_field(rules.lord.pos)
+	_saved()
+	var m := FieldMap.make(_hud, data, meta, rules, _circles)
+	m.open()
+	return m
 
 
 func _spots() -> Dictionary:

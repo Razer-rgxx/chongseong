@@ -55,6 +55,8 @@ var chiefs_down: Dictionary = {}
 var recruits: Array[String] = []
 var wanderer: String = ""
 var wanderer_at: int = -1
+## 들판 지도(38단계): 가 본 곳. FieldLayout.SEEN_SIZE 격자의 비트(한 칸 = 들판 SEEN_CELL칸, j * 너비 + i 번째 비트). 저장은 base64, 옛 저장은 아무것도 안 본 상태.
+var field_seen: PackedByteArray = PackedByteArray()
 ## 지하 무덤(19단계): 이번 판에 쓰러뜨린 방 id(→ 1)와 연 관 id(→ 1). 판이 끝날 때(record_run) 비운다. 옛 저장은 빈 값으로 읽힌다.
 var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
@@ -76,6 +78,7 @@ var rng := RandomNumberGenerator.new()
 
 func _init() -> void:
 	rng.randomize()
+	field_seen = Meta.empty_seen()
 
 
 static func load_or_new(path: String = SAVE_PATH) -> Meta:
@@ -96,7 +99,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -181,6 +184,12 @@ func from_dict(d: Dictionary) -> void:
 		crypt_opened[str(k)] = 1
 	duel_wins = int(d.get("duel_wins", 0))
 	duel_losses = int(d.get("duel_losses", 0))
+	field_seen = Meta.empty_seen()
+	var fs: Variant = d.get("field_seen", "")
+	if fs is String and fs != "":
+		var raw: PackedByteArray = Marshalls.base64_to_raw(fs)
+		if raw.size() == field_seen.size():   # 격자 크기가 다르면(모르는 모양) 안 본 것으로
+			field_seen = raw
 
 
 ## 결투가 끝났다(winner: 0은 1P가 이김, 1은 2P가 이김, 그 밖은 비김). 1P를 나로 센다.
@@ -458,6 +467,59 @@ func chief_defeat(id: String) -> Dictionary:
 		r.sword = int(FieldLayout.CHIEFS[id].sword)
 		note_found(r.sword)
 	return r
+
+
+# ---------------------------------------------------------------- 들판 지도 (38단계)
+
+## 아무것도 안 본 밝힘 격자(비트 SEEN_SIZE.x × SEEN_SIZE.y개, 모두 0).
+static func empty_seen() -> PackedByteArray:
+	var b := PackedByteArray()
+	b.resize(ceili(FieldLayout.SEEN_SIZE.x * FieldLayout.SEEN_SIZE.y / 8.0))
+	b.fill(0)
+	return b
+
+
+## 밝힘 격자 칸 (i, j)를 봤는가. 격자 밖은 false.
+func seen_cell(i: int, j: int) -> bool:
+	if i < 0 or j < 0 or i >= FieldLayout.SEEN_SIZE.x or j >= FieldLayout.SEEN_SIZE.y:
+		return false
+	var k: int = j * FieldLayout.SEEN_SIZE.x + i
+	return field_seen[k >> 3] & (1 << (k & 7)) != 0
+
+
+## 들판 칸 c가 든 밝힘 칸을 봤는가.
+func seen_at(c: Vector2) -> bool:
+	return seen_cell(floori(c.x / FieldLayout.SEEN_CELL), floori(c.y / FieldLayout.SEEN_CELL))
+
+
+## 영주가 at(들판 칸)에 있다: 둘레 radius칸 원에 닿는 밝힘 칸을 모두 밝힌다. 새로 밝힌 칸 수를 돌려준다(0이면 바뀐 것 없음).
+func see_field(at: Vector2, radius: float = FieldLayout.SEEN_RADIUS) -> int:
+	var C: float = float(FieldLayout.SEEN_CELL)
+	var i0: int = maxi(0, floori((at.x - radius) / C))
+	var i1: int = mini(FieldLayout.SEEN_SIZE.x - 1, floori((at.x + radius) / C))
+	var j0: int = maxi(0, floori((at.y - radius) / C))
+	var j1: int = mini(FieldLayout.SEEN_SIZE.y - 1, floori((at.y + radius) / C))
+	var n: int = 0
+	for j in range(j0, j1 + 1):
+		for i in range(i0, i1 + 1):
+			var near := Vector2(clampf(at.x, i * C, (i + 1) * C), clampf(at.y, j * C, (j + 1) * C))   # 칸에서 영주에게 가장 가까운 점
+			if near.distance_to(at) > radius:
+				continue
+			var k: int = j * FieldLayout.SEEN_SIZE.x + i
+			var bit: int = 1 << (k & 7)
+			if field_seen[k >> 3] & bit == 0:
+				field_seen[k >> 3] |= bit
+				n += 1
+	return n
+
+
+## 본 밝힘 칸 수(지도 머리에 "가 본 곳 n%").
+func seen_count() -> int:
+	var n: int = 0
+	for k in FieldLayout.SEEN_SIZE.x * FieldLayout.SEEN_SIZE.y:
+		if field_seen[k >> 3] & (1 << (k & 7)) != 0:
+			n += 1
+	return n
 
 
 # ---------------------------------------------------------------- 떠도는 사람과 영입 (34단계)
