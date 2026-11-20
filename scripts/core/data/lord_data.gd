@@ -26,8 +26,11 @@ extends Resource
 ## 넉백을 속도로 바꾸는 배수와 줄어드는 정도(1초에 남는 비율).
 @export var knock_speed: float = 14.0
 @export var knock_keep: float = 0.001
-@export var hitstop: float = 0.035
-@export var hitstop_big: float = 0.07
+@export var hitstop: float = 0.066        ## 벤 순간 멈춤(30Hz에서 2틱). 2026-11-20: 0.035(1틱)는 거의 안 느껴져 올림
+@export var hitstop_big: float = 0.133    ## 큰 베기(4틱)
+@export var hitstop_kill: float = 0.1     ## 그 베기로 적이 쓰러졌을 때(3틱)
+@export var hitstop_elite_kill: float = 0.23  ## 정예·우두머리·보스를 쓰러뜨렸을 때(7틱)
+@export var hitstop_hurt: float = 0.066   ## 영주가 맞았을 때(2틱, 결투에서는 없음)
 ## 휘두르는 모습이 남는 시간.
 @export var swing_time: float = 0.2
 ## 이만큼 가까운 적은 부채꼴 밖이어도 맞는다(크기에 더하는 칸).

@@ -753,7 +753,16 @@ func _deal(run: MoveRun, hits: Array[Enemy], a: Dictionary) -> void:
 		if not run.hits.has(e):
 			run.hits.append(e)
 	var minor: bool = bool(a.get("minor", false))
-	r.freeze = maxi(r.freeze, roundi((D.hitstop_big if run.big and not minor else D.hitstop) / r.dt))
+	var stop: float = D.hitstop_big if run.big and not minor else D.hitstop
+	if r.duel:
+		stop = r.data.duel.hitstop_big if run.big and not minor else r.data.duel.hitstop
+	if not minor and not r.duel:   # 결투는 예전 히트스톱 그대로(두 사람의 리듬이 바뀌지 않게)
+		for e in hits:
+			if e.dead:
+				# 쓰러뜨린 베기는 더 길게 멈춘다. 정예·보스(우두머리 포함)는 가장 길게
+				var big_foe: bool = e.elite or e.chief != &"" or (e.data != null and e.data.boss)
+				stop = maxf(stop, D.hitstop_elite_kill if big_foe else D.hitstop_kill)
+	r.freeze = maxi(r.freeze, roundi(stop / r.dt))
 	_wear(run)
 
 

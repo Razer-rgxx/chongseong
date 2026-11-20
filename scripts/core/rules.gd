@@ -212,6 +212,8 @@ var packs: Dictionary = {}
 var field_clock_on: bool = false
 var field_clock: float = 0.0
 var field_night: bool = false
+## 마지막으로 영주를 때린 적의 종류(플레이 기록용, state_hash에 넣지 않는다).
+var last_hit_by: StringName = &""
 ## 들판 보스(18단계): 무덤 기사 한 마리. 상태는 BOSS_*(자는 중, 깨어남, 돌아가는 중, 쓰러뜨림).
 var field_boss: Enemy = null
 var field_boss_state: int = BOSS_SLEEP
@@ -1071,8 +1073,12 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	if field_night and attacker != null and (attacker.pack != &"" or attacker.chief != &""):
 		d *= FieldLayout.FIELD_NIGHT_DAMAGE   # 29단계: 들판의 밤에는 무리 적과 곳마다 우두머리(32단계)가 더 아프게 때린다(옛 싸움터의 무덤 기사는 그대로)
 	d = powers.lord_damage(d, attacker)
+	if attacker != null and attacker.data != null:
+		last_hit_by = attacker.data.id
 	L.hp -= d
 	L.invuln = data.lord.hurt_invuln
+	if not duel:
+		freeze = maxi(freeze, roundi(data.lord.hitstop_hurt / dt))   # 맞은 순간 짧게 멈춘다(2026-11-20 히트스톱)
 	lord_hurt.emit(d)
 	if L.hp <= 0.0 and not powers.save_from_death():
 		lord_died()

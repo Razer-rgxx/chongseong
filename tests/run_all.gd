@@ -1126,8 +1126,8 @@ func _test_uniques() -> void:
 	r = _named("늪지기")
 	e = r.spawn_at(&"giant", r.lord.pos + Vector2(1, 0))
 	_swing_once(r)
-	r.step(_inp())
-	r.step(_inp())
+	for i in 6:   # 히트스톱(2026-11-20 2틱으로 늘림)이 지나도록
+		r.step(_inp())
 	check(r.powers.zones.size() == 1 and e.slow_k > 0.0, "늪지기: 찌른 자리에 늪이 생겨 느려진다")
 
 

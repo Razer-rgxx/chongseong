@@ -650,7 +650,8 @@ func _render_duel(picking: bool) -> void:
 			if s != null:
 				_duel_pick = [meta.sheath_id, meta.sheath_id]
 			_render_duel(true), 40.0))
-		_duel_box.add_child(UiKit.button("모르는 사람과 겨루기", _render_online_pick, 40.0))
+		if data.duel.online_enabled:   # 내보내는 데모에서는 끈다(data/duel.tres, 실제 서버 확인 전)
+			_duel_box.add_child(UiKit.button("모르는 사람과 겨루기", _render_online_pick, 40.0))
 		return
 	_duel_box.add_child(_wrap(UiKit.label("1P는 키보드와 마우스, 2P는 게임패드. 검집의 검이나 맨손을 든다. 결투에서는 부러지지 않는다.", 14, UiKit.MUTED)))
 	var ids: Array[int] = [0]

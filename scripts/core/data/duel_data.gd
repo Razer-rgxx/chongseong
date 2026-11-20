@@ -46,3 +46,8 @@ extends Resource
 @export var net_connect_timeout: float = 20.0
 ## 대역폭 어림에 쓰는 틱 수(한 판 90초 × 3판 + 시작·쉼).
 @export var net_estimate_seconds: float = 290.0
+## 결투의 히트스톱(2026-11-20: 언덕·들판은 길게 올렸지만 결투는 두 사람의 리듬을 위해 예전 값을 지킨다).
+@export var hitstop: float = 0.035
+@export var hitstop_big: float = 0.07
+## 온라인 결투(22단계) 단추를 보여 줄까. 실제 GD-Sync 접속·약관 확인 전이라 데모를 내보낼 때는 false로.
+@export var online_enabled: bool = true

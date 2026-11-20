@@ -617,6 +617,7 @@ func _on_end(won: bool) -> void:
 	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
 	var r := meta.record_run(rules, data.meta)
 	meta.save()
+	PlayLog.hill_end(rules, won, int(r.total))
 	_move_fx.clear()
 	_enemy_fx.clear()
 	_clear_night_view()

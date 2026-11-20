@@ -362,6 +362,7 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 ## 영주가 쓰러졌다: 쥔 검을 들판의 무덤 입구 앞에 떨구고(먼저 떨군 검은 잃는다) 그 앞에서 깬다(쓰러뜨린 방과 연 관은 Meta에 남아 있다).
 func _on_down(_won: bool) -> void:
 	_over = true
+	PlayLog.down("crypt", rules, _held_id, "crypt")
 	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, FieldLayout.CRYPT_WAKE + FieldLayout.CRYPT_DROP_OFFSET), _held_id, meta)
 	meta.save()
 	Meta.wake_at_crypt = true

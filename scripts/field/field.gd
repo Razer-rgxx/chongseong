@@ -672,6 +672,7 @@ func _on_chief_woke(_id: StringName, e: Enemy) -> void:
 
 ## 우두머리를 쓰러뜨렸다(32단계): 조각과, 처음이면 그 곳의 오픈월드 한정 검(Meta.chief_defeat)을 토스트로 알린다.
 func _on_chief_slain(id: StringName, e: Enemy) -> void:
+	PlayLog.chief(String(id), rules, _held_id)
 	var r: Dictionary = meta.chief_defeat(String(id))
 	_camera.add_shake(data.lord.shake_big * 2.0)
 	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
@@ -703,6 +704,7 @@ func _on_enemy_act(e: Enemy, act: StringName, _info: Dictionary) -> void:
 ## 영주가 쓰러졌다: 쥔 검을 이 자리에 떨구고(먼저 떨군 검이 있으면 그것은 잃는다) 마을 북문 앞에서 깬다(record_run을 부르지 않는다).
 func _on_down(_won: bool) -> void:
 	_over = true
+	PlayLog.down("field", rules, _held_id, String(FieldLayout.area_at(rules.lord.pos)))
 	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, rules.lord.pos), _held_id, meta)
 	Meta.carry_sword = -1
 	meta.field_clock = rules.field_clock
