@@ -199,12 +199,19 @@ static func _mat(key: String, c: Color, rough: float = 1.0, metal: float = 0.0, 
 	return m
 
 
+## 막돌 담(Poly Haven stone_wall_02, CC0). 질감 파일이 없으면 받은 색으로 칠한다(VillageMaterials).
 static func _stone() -> Material:
-	return VillageBuilder.noise_mat("field_stone", Color(0.2, 0.2, 0.21), Color(0.42, 0.42, 0.43), 2.5, 0.06)
+	return VillageMaterials.get_mat("stone_wall_02", Color(0.3, 0.3, 0.31), 3.0, Color(0.6, 0.58, 0.56))
 
 
+## 다듬은 돌(성채 벽, Poly Haven stone_brick_wall_001).
+static func _dressed_stone() -> Material:
+	return VillageMaterials.get_mat("stone_brick_wall_001", Color(0.3, 0.3, 0.31), 3.2, Color(0.55, 0.53, 0.5))
+
+
+## 거친 판자(마을과 같은 raw_plank_wall, 들판은 더 어둡게).
 static func _wood() -> Material:
-	return VillageBuilder.noise_mat("field_wood", Color(0.12, 0.09, 0.06), Color(0.3, 0.22, 0.14), 1.5, 0.08)
+	return VillageMaterials.get_mat("raw_plank_wall", Color(0.2, 0.14, 0.09), 1.5, Color(0.38, 0.3, 0.24))
 
 
 static func _box(parent: Node3D, size: Vector3, at: Vector3, m: Material, rot: Vector3 = Vector3.ZERO, far: float = 0.0) -> MeshInstance3D:
@@ -429,7 +436,7 @@ static func _tower(parent: Node3D, rects: Array[Rect2]) -> void:
 static func _keep(parent: Node3D, rects: Array[Rect2], low_rects: Array[Rect2]) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20
-	var st: Material = _stone()
+	var st: Material = _dressed_stone()
 	for w in FieldLayout.KEEP_WALLS:
 		var along_x: bool = w.size.x >= w.size.y
 		var length: float = (w.size.x if along_x else w.size.y) * Grid.CELL
@@ -1049,12 +1056,14 @@ static func _marsh(parent: Node3D, circles: Array) -> void:
 
 # ---------------------------------------------------------------- 새 곳 셋 (28단계)
 
+## 불에 그을린 막돌(불탄 마을, Poly Haven rustic_stone_wall을 아주 어둡게).
 static func _char_mat() -> Material:
-	return VillageBuilder.noise_mat("hamlet_char", Color(0.02, 0.017, 0.015), Color(0.1, 0.078, 0.064), 3.0, 0.09)
+	return VillageMaterials.get_mat("rustic_stone_wall", Color(0.05, 0.045, 0.04), 2.6, Color(0.2, 0.17, 0.15))
 
 
+## 깎아 낸 바위(채석장, Poly Haven rock_wall_12).
 static func _cut_stone() -> Material:
-	return VillageBuilder.noise_mat("quarry_cut", Color(0.3, 0.28, 0.26), Color(0.52, 0.5, 0.46), 2.0, 0.05)
+	return VillageMaterials.get_mat("rock_wall_12", Color(0.4, 0.38, 0.35), 4.0, Color(0.78, 0.75, 0.7))
 
 
 ## 돌 벼랑 한 줄(칸 표 rect): 긴 쪽을 따라 돌 상자를 세운다(높이가 들쭉날쭉). 그린 곳이 곧 막힌 곳이다.
@@ -1260,7 +1269,7 @@ static func stone(parent: Node3D, id: String) -> Node3D:
 	n.name = id
 	n.position = at_cell(FieldLayout.STONES[id][0])
 	n.rotation = Vector3(0, float(id.hash() % 628) / 100.0, 0.05)
-	var m := VillageBuilder.noise_mat("field_stone", Color(0.2, 0.2, 0.21), Color(0.42, 0.42, 0.43), 2.5, 0.06)
+	var m := _stone()
 	var slab := _box(n, Vector3(1.0, 1.9, 0.3), Vector3(0, 0.85, 0), m)
 	slab.name = "Slab"
 	_box(n, Vector3(1.4, 0.3, 0.8), Vector3(0, 0.05, 0), m)

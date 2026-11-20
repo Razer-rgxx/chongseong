@@ -7,8 +7,9 @@
 | Stone Wall (질감, 2K로 줄임) | Charlotte Baglioni(사진), Dario Barresi(처리) / Poly Haven | CC0 | https://polyhaven.com/a/stone_wall | 마을의 언덕 길 문, 대장간 굴뚝과 화덕 |
 | Medieval Blocks 03 (질감, 2K로 줄임) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/medieval_blocks_03 | 마을의 성소, 언덕의 숫돌 제단 |
 | Medieval Red Brick (질감, 2K로 줄임) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/medieval_red_brick | 마을의 집 벽 |
-| Raw Plank Wall (질감, 2K로 줄임) | Dimitrios Savva / Poly Haven | CC0 | https://polyhaven.com/a/raw_plank_wall | 마을의 대장간 벽, 울타리, 검 진열대 |
+| Raw Plank Wall (질감, 2K로 줄임) | Dimitrios Savva / Poly Haven | CC0 | https://polyhaven.com/a/raw_plank_wall | 마을의 대장간 벽, 울타리, 검 진열대, 들판의 나무(어둡게) |
 | Forrest Ground 01, Forest Ground 04, Lichen Rock (질감, 2K로 다시 압축) | Rob Tuytel, Rico Cilliers / Poly Haven | CC0 | https://polyhaven.com/a/forrest_ground_01 · https://polyhaven.com/a/forest_ground_04 · https://polyhaven.com/a/lichen_rock | 언덕의 풀·흙·바위 땅, 마을의 풀과 흙길 |
+| Stone Wall 02, Stone Brick Wall 001, Rustic Stone Wall, Rock Wall 12 (질감, 1K로 줄임) | Poly Haven | CC0 | https://polyhaven.com/a/stone_wall_02 · https://polyhaven.com/a/stone_brick_wall_001 · https://polyhaven.com/a/rustic_stone_wall · https://polyhaven.com/a/rock_wall_12 | 들판의 막돌 담·비석, 무너진 성채 벽, 불탄 마을(어둡게), 채석장 바위 |
 | Bark Brown 02 (질감, 1K) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/bark_brown_02 | 언덕과 마을의 잎 없는 나무 |
 | Rock Moss Set 01·02, Rock Face 01·02, Boulder 01, Dead Tree Trunk 02, Tree Stump 01, Dry Branches Medium 01 (모델, 1K 질감) | Kless Gyzen, Dario Barresi, Rico Cilliers, Jenelle van Heerden, Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/models | 언덕 둘레의 바위·벼랑·쓰러진 나무·가지, 싸움터 바닥 돌멩이, 마을의 돌 |
 | Overcast Soil (Pure Sky), Kloppenheim 02 (Pure Sky) (하늘 HDRI, 2K) | Sergej Majboroda, Greg Zaal, Jarod Guest / Poly Haven | CC0 | https://polyhaven.com/a/overcast_soil_puresky · https://polyhaven.com/a/kloppenheim_02_puresky | 언덕의 낮·밤 하늘, 마을의 저녁 하늘 |
