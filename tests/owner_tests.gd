@@ -23,6 +23,7 @@ func _all() -> void:
 	_owner_night_draw()
 	_ghost_moves_and_cuts()
 	_line()
+	_others()
 	_replay()
 
 
@@ -179,3 +180,24 @@ func _replay() -> void:
 			r.step(_inp(t == 1, t % 13 == 0))
 		hashes.append(r.state_hash())
 	check.call(hashes[0] == hashes[1], "결정성: 잔영이 섞인 밤도 같은 입력이면 state_hash가 같다")
+
+
+## 다른 영주의 검(FallenShare): 올리는 꼴은 2048바이트 안, 받으면 같은 기록(이름 붙음), Meta.others 저장, 주인 있는 검으로 꽂힘.
+func _others() -> void:
+	var rec := _rec(d.swords[12].id, d.run.ghost_ticks, 9)
+	var packed: Dictionary = FallenShare.pack(rec)
+	check.call(JSON.stringify(packed).to_utf8_buffer().size() < 2048, "다른 영주와 나누는 꼴은 2048바이트 안 (%d)" % JSON.stringify(packed).to_utf8_buffer().size())
+	var back: Dictionary = FallenShare.unpack(JSON.parse_string(JSON.stringify(packed)), "lord_abc")
+	var g0: Array = rec.ghost
+	var g1: Array = back.ghost
+	check.call(back.id == rec.id and back.name == "lord_abc" and g1.size() == g0.size() and absf(float(g1[4]) - float(g0[4])) < 0.011 and float(g1[3]) == float(g0[3]), "받은 꼴은 같은 기록이 된다(자리 0.01칸 안)")
+	check.call(FallenShare.unpack({}, "x").is_empty(), "이상한 꼴은 버린다")
+	var m := Meta.new()
+	m.others = [back]
+	var m2 := Meta.new()
+	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+	check.call(m2.others.size() == 1 and m2.others[0].name == "lord_abc", "받은 다른 영주의 검은 저장한다")
+	var r := _owner_day(m2, 13)
+	var h := _owner_hilt(r)
+	check.call(h != null and h.owner.get("name", "") == "lord_abc", "내 기록이 없어도 다른 영주의 검이 꽂힌다")
+	check.call(Meta.fallen_line(h.owner, 5, d.run.zone_names).begins_with("다른 영주 lord_abc"), "다른 영주의 검 한 줄: " + Meta.fallen_line(h.owner, 5, d.run.zone_names))

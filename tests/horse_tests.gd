@@ -1,7 +1,7 @@
 extends RefCounted
 ## 39단계 말 테스트(docs/open_world2.md): 수치·키, 부르기 조건(들판만·덤비는 적·이미 탐), 달려와 곁에 섬, 타기(곁에서만)·내리기,
 ## 탄 채 빠르기(×2.2)와 느린 방향 바꾸기, 도약(낮은 막힘을 넘는 높이), 맞으면 떨어짐(밀리고 휘청), 말 위 베기(넓게, 맨손이면 없음),
-## 결정성(state_hash), 결투 바이트 그대로, 말 화면(HorseView) 만들기.
+## 결정성(state_hash), 결투 바이트 그대로, 탈 검 화면(RideSwordView, 2026-11-21 말을 바꿈) 만들기.
 ## run_all.gd가 부른다: run(데이터, check).
 
 var d: GameData
@@ -195,11 +195,11 @@ func _duel_bytes() -> void:
 
 func _view() -> void:
 	var r := _field()
-	var v := HorseView.new()
+	var v := RideSwordView.new()
 	v.setup(r)
 	v.draw(1.0, 0.016)
-	check.call(not v.visible, "말 화면: 부르기 전에는 안 보인다")
+	check.call(not v.visible and v.stands(), "탈 검 화면: 부르기 전에는 안 보이고, 서서 탄다")
 	_summon(r)
 	v.draw(1.0, 0.016)
-	check.call(v.visible and v.seat_height() > 1.3 and v.seat_height() < 1.8, "말 화면: 부르면 보이고 안장 높이가 사람 허리 위다 (%.2fm)" % v.seat_height())
+	check.call(v.visible and v.seat_height() > 0.3 and v.seat_height() < 0.7, "탈 검 화면: 부르면 보이고 무릎 아래 높이에 떠 있다 (%.2fm)" % v.seat_height())
 	v.free()

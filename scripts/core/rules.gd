@@ -150,6 +150,8 @@ var lord := LordState.new()
 var lords: Array[LordState] = []
 ## 두 칸. 빈 칸은 null.
 var slots: Array[Sword] = [null, null]
+## swap(k)의 "다음 칸"(Q). 칸 번호(0~)와 겹치지 않게 큰 수(LordInput에는 swap_to + 1로 실린다).
+const SWAP_NEXT: int = 9
 var active: int = 0
 var hilts: Array[Hilt] = []
 var enemies: Array[Enemy] = []
@@ -342,6 +344,7 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	path_log.append({"zone": 0, "goal": &"survive", "rule": &"", "reward": &""})
 	_new_day()
 	if meta:
+		set_slot_count(meta.hill_slots())   # 검 보관집(2026-11-21)
 		var s := meta.sheath_sword(data)
 		if s:
 			slots[0] = s
@@ -821,12 +824,16 @@ func _try_draw() -> void:
 ## 낮마다 owner_chance로 손잡이 하나를 주인 있는 검으로(이 판에서 아직 안 나온 Meta.fallen 기록 하나).
 func _place_owner() -> void:
 	var R := data.run
-	if meta == null or meta.fallen.is_empty() or zone < R.owner_from_zone or field or yard or duel:
+	if meta == null or (meta.fallen.is_empty() and meta.others.is_empty()) or zone < R.owner_from_zone or field or yard or duel:
 		return
 	if rng.randf() >= R.owner_chance:
 		return
 	var pool: Array = []
-	for rec in meta.fallen:
+	# 다른 영주의 검(받아 둔 것이 있을 때 other_chance), 아니면 내 지난 판의 검
+	var src: Array = meta.fallen
+	if not meta.others.is_empty() and (meta.fallen.is_empty() or rng.randf() < R.other_chance):
+		src = meta.others
+	for rec in src:
 		if not _owners_used.has(rec) and data.sword_by_id(int(rec.get("id", 0))) != null:
 			pool.append(rec)
 	var cands: Array[Hilt] = []
@@ -1065,7 +1072,7 @@ func _open_window() -> void:
 func _receive(s: Sword) -> void:
 	if _whetstone:
 		_whet(s)
-	for k in 2:
+	for k in slots.size():
 		if slots[k] == null:
 			slots[k] = s
 			if slots[active] == null:
@@ -1076,11 +1083,11 @@ func _receive(s: Sword) -> void:
 	choice_needed.emit(s)
 
 
-## 두 칸이 다 찼을 때 새 검을 둘 칸(0, 1). -1이면 두고 간다.
+## 칸이 다 찼을 때 새 검을 둘 칸(0부터). -1이면 두고 간다.
 func choose(k: int) -> void:
 	if pending == null:
 		return
-	if k == 0 or k == 1:
+	if k >= 0 and k < slots.size():
 		slots[k] = pending
 	pending = null
 	slots_changed.emit()
@@ -1097,10 +1104,30 @@ func give(d: SwordData, k: int) -> Sword:
 
 
 ## 다른 칸의 검으로 바꿔 쥔다. 2는 "다른 칸".
+## 검 칸 수(언덕 판 기본 2, 들판 1, 마을의 검 보관집으로 3~4). 줄이면 뒤 칸의 검은 버린다.
+func set_slot_count(n: int) -> void:
+	n = maxi(1, n)
+	slots.resize(n)
+	if active >= n:
+		active = 0
+	slots_changed.emit()
+
+
+## 쥔 칸 다음으로(돌아가며) 검이 든 칸. 없으면 -1. 두 칸일 때는 "다른 칸"과 같다.
+func other_slot() -> int:
+	var n: int = slots.size()
+	for d in range(1, n):
+		var k: int = (active + d) % n
+		if slots[k] != null:
+			return k
+	return -1
+
+
+## 다른 칸의 검으로 바꿔 쥔다. SWAP_NEXT(Q)는 다음 칸(검이 든).
 func swap(k: int) -> void:
-	if k == 2:
-		k = 1 - active
-	if k < 0 or k > 1 or k == active or slots[k] == null:
+	if k == SWAP_NEXT:
+		k = other_slot()
+	if k < 0 or k >= slots.size() or k == active or slots[k] == null:
 		return
 	active = k
 	lord.combo = 0
@@ -1296,8 +1323,8 @@ func _break(k: int) -> void:
 	slots[k] = null
 	broken_by_grade[s.grade] += 1
 	powers.on_break(s)
-	if k == active and slots[1 - k] != null:
-		active = 1 - k
+	if k == active and other_slot() >= 0:
+		active = other_slot()
 	lord.combo = 0
 	sword_broke.emit(k, s)
 	slots_changed.emit()
@@ -2715,8 +2742,8 @@ func event_block(ev: DayEvent) -> String:
 
 ## 순례자에게 바칠 칸: 쥐지 않은 칸, 그 칸이 비면 쥔 칸. 둘 다 비면 -1.
 func pilgrim_slot() -> int:
-	if slots[1 - active] != null:
-		return 1 - active
+	if other_slot() >= 0:
+		return other_slot()
 	return active if slots[active] != null else -1
 
 
@@ -2739,8 +2766,8 @@ func _use_event(ev: DayEvent) -> void:
 			var k := pilgrim_slot()
 			var s := slots[k]
 			slots[k] = null
-			if k == active and slots[1 - k] != null:
-				active = 1 - k
+			if k == active and other_slot() >= 0:
+				active = other_slot()
 			lord.combo = 0
 			var before: float = lord.hp
 			lord.hp = minf(max_hp(), lord.hp + max_hp() * R.pilgrim_heal)
@@ -2787,11 +2814,11 @@ func near_altar() -> bool:
 ## 지금 할 수 있는 일. kind: melt(그 칸의 검을 조각으로), repair(다른 칸을 바쳐 쥔 검 내구를 채움), transfer(다른 칸을 바쳐 그 각인 하나를 쥔 검에).
 func altar_options() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	for k in 2:
+	for k in slots.size():
 		if slots[k]:
 			out.append({"kind": "melt", "slot": k})
 	var s := current()
-	var o := slots[1 - active]
+	var o: Sword = slots[other_slot()] if other_slot() >= 0 else null
 	if s and o:
 		if s.breakable() and s.durability < s.max_durability:
 			out.append({"kind": "repair"})
@@ -2813,7 +2840,7 @@ func use_altar(i: int) -> void:
 		return
 	var o: Dictionary = opts[i]
 	var s := current()
-	var other_k: int = 1 - active
+	var other_k: int = other_slot()
 	var text: String = ""
 	match o.kind:
 		"melt":
@@ -2821,8 +2848,8 @@ func use_altar(i: int) -> void:
 			var w := slots[k]
 			slots[k] = null
 			melted_by_grade[w.grade] += 1
-			if k == active and slots[1 - k] != null:
-				active = 1 - k
+			if k == active and other_slot() >= 0:
+				active = other_slot()
 			text = w.label()
 		"repair":
 			slots[other_k] = null

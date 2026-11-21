@@ -112,6 +112,7 @@ func _init() -> void:
 	(load("res://tests/horse_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/draw_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/owner_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/storage_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -375,7 +376,7 @@ func _test_swap() -> void:
 	r.give(d.swords[0], 0)
 	check(r.active == 0, "검이 하나면 그걸 쥔다")
 	var i := LordInput.new()
-	i.swap_to = 2
+	i.swap_to = Rules.SWAP_NEXT
 	r.step(i)
 	check(r.active == 0, "다른 칸이 비었으면 바꿔 쥐지 못한다")
 	r.give(d.swords[100], 1)
@@ -599,7 +600,7 @@ func _test_replay() -> void:
 		inp.aim_valid = rec.randf() < 0.7
 		inp.aim = Vector2(rec.randf_range(5, 29), rec.randf_range(3, 19))
 		inp.pull = rec.randf() < 0.1
-		inp.swap_to = 2 if rec.randf() < 0.02 else -1
+		inp.swap_to = Rules.SWAP_NEXT if rec.randf() < 0.02 else -1
 		inp.hook = rec.randf() < 0.03
 		inputs.append(inp)
 	for r in [a, b]:

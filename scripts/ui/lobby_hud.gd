@@ -50,6 +50,8 @@ var _readout: Label
 ## 17단계: 검 고르기 창이 북문용인지(검 걸이 창을 같이 쓴다)와 거기서 고른 검, 들판의 체력 막대.
 var _gate_mode: bool = false
 var _gate_pick: int = 0
+## 검 보관집(2026-11-21): 북문에서 고르는 나머지 칸의 검(칸 2부터, 0은 빈 칸).
+var _gate_more: Array[int] = []
 var _hp_bar: ProgressBar
 ## 들판 보스·우두머리의 체력 막대(18·32단계): 화면 아래 가운데, 큰 이름 한 줄과 막대.
 var _boss_box: VBoxContainer
@@ -303,8 +305,30 @@ func _render_forge(msg: String) -> void:
 			_forge_box.add_child(UiKit.label("떠돌이 대장장이가 거든다: 망치질 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_FORGE) * 100.0), 13, UiKit.MUTED))
 	else:
 		_forge_box.add_child(UiKit.label("끝까지 벼렸다.", 16, UiKit.TITLE))
+	# 검 보관집(2026-11-21): 검 칸을 늘린다(언덕 판 2 → 3 → 4, 들판·무덤 1 → 3 → 4)
+	var sc: int = meta.storage_cost(md)
+	var held: String = "언덕 판 %d칸 · 들판 %d칸" % [meta.hill_slots(), meta.field_slots()]
+	if sc >= 0:
+		var what: String = "검 보관집 짓기" if meta.storage_lv == 0 else "검 보관집 늘리기"
+		var sb := UiKit.button("%s · 조각 %s · 지금 %s" % [what, _num(sc), held], _build_storage, 42)
+		sb.disabled = _busy
+		_forge_box.add_child(sb)
+	else:
+		_forge_box.add_child(UiKit.label("검 보관집: " + held, 15, UiKit.TEXT))
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_forge_box.add_child(_msg)
+
+
+func _build_storage() -> void:
+	if _busy:
+		return
+	var sc: int = meta.storage_cost(data.meta)
+	if not meta.build_storage(data.meta):
+		_render_forge("조각이 %s 모자라." % _num(maxi(0, sc - meta.shards)))
+		return
+	meta.save()
+	refresh_top()
+	_render_forge("검 보관집을 지었다. 이제 언덕 판 %d칸, 들판 %d칸에 검을 든다." % [meta.hill_slots(), meta.field_slots()])
 
 
 func _forge_sheath() -> void:
@@ -612,6 +636,23 @@ func _render_yard_rack() -> void:
 			yard_sword_picked.emit(id)
 		_render_yard_rack())
 	_yard_box.add_child(pick)
+	if _gate_mode and meta.field_slots() > 1:
+		# 검 보관집: 칸 2부터 더 들고 나간다(Q·숫자 키로 바꿔 쥔다)
+		_gate_more.resize(meta.field_slots() - 1)
+		for j in _gate_more.size():
+			var more := OptionButton.new()
+			more.focus_mode = Control.FOCUS_NONE
+			more.custom_minimum_size = Vector2(520, 32)
+			more.add_item("%d번 칸: 비움" % (j + 2), 0)
+			for id in ids:
+				var d := data.sword_by_id(id)
+				more.add_item("%d번 칸: %s · %s (%s)" % [j + 2, data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name], id)
+				if id == _gate_more[j]:
+					more.select(more.item_count - 1)
+			var slot: int = j
+			more.item_selected.connect(func(i: int) -> void:
+				_gate_more[slot] = more.get_item_id(i))
+			_yard_box.add_child(more)
 	if chosen > 0:
 		var s: Sword = meta.unbreakable_sword(data, chosen)
 		if s:
@@ -622,7 +663,9 @@ func _render_yard_rack() -> void:
 			card.add_child(r)
 			_yard_box.add_child(card)
 	if _gate_mode:
-		_yard_box.add_child(UiKit.button("나선다", func() -> void: field_go.emit(_gate_pick), 40.0))
+		_yard_box.add_child(UiKit.button("나선다", func() -> void:
+			Meta.carry_more = _gate_more.duplicate()
+			field_go.emit(_gate_pick), 40.0))
 
 
 ## 결투 말뚝(21단계): 같은 PC로 겨루기, 모르는 사람과 겨루기(22단계까지 흐리게).

@@ -33,8 +33,8 @@ var _boss_bar: ProgressBar
 var _boss_fill: StyleBoxFlat
 var _choice: Control
 var _ch_new: RichTextLabel
-var _ch_a: RichTextLabel
-var _ch_b: RichTextLabel
+## 칸마다 지금 든 검(창을 열 때마다 칸 수만큼 새로 만든다).
+var _ch_slots: HBoxContainer
 var _discard: Button
 var _discard_armed: bool = false
 var _choice_t: float = 0.0
@@ -117,7 +117,7 @@ func _ready() -> void:
 	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	add_child(bottom)
-	for k in 2:
+	for k in 4:   # 검 칸은 2(언덕)·1(들판), 검 보관집이 있으면 3~4. set_cards가 쓰는 만큼만 보인다
 		var r := RichTextLabel.new()
 		r.bbcode_enabled = true
 		r.fit_content = true
@@ -133,7 +133,7 @@ func _ready() -> void:
 		_cards.append(r)
 		_card_boxes.append(box)
 
-	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/J 베기(검마다 다른 연타) · Shift 돌진 · Space 점프\n우클릭/F 갈고리(갈고리 검)\nQ 바꿔 쥐기 · 1/2 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정 · ` 또는 F6 검 받기", 13)
+	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/J 베기(검마다 다른 연타) · Shift 돌진 · Space 점프\n우클릭/F 갈고리(갈고리 검)\nQ 바꿔 쥐기 · 1~4 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정 · ` 또는 F6 검 받기", 13)
 	_help.modulate = UiKit.MUTED
 	_help.position = Vector2(20, 96)
 	_help.visible = false
@@ -188,7 +188,13 @@ func set_goal(title: String, k: float = -1.0, col: Color = Color(1.0, 0.3, 0.42)
 
 
 func set_cards(texts: Array[String], colors: Array[Color], active: int) -> void:
-	for k in 2:
+	var n: int = texts.size()
+	var w: float = [380.0, 380.0, 300.0, 240.0][clampi(n - 1, 0, 3)]
+	for k in _cards.size():
+		_card_boxes[k].visible = k < n
+		if k >= n:
+			continue
+		_cards[k].custom_minimum_size.x = w
 		_cards[k].text = texts[k]
 		var col: Color = colors[k] if k == active else Color(UiKit.LINE, 0.25)
 		_card_boxes[k].add_theme_stylebox_override("panel", _style(col, 2 if k == active else 1))
@@ -241,10 +247,28 @@ func flash(c: Color, strength: float = 0.7, time: float = 0.5) -> void:
 	tw.tween_property(_flash, "color:a", 0.0, time).set_ease(Tween.EASE_OUT)
 
 
-func open_choice(new_text: String, a_text: String, b_text: String) -> void:
+## 새 검(위)과 칸마다 지금 든 검(아래 한 줄, 칸 수만큼). 칸 버튼이나 1~4로 바꾼다.
+func open_choice(new_text: String, slot_texts: Array) -> void:
 	_ch_new.text = new_text
-	_ch_a.text = a_text
-	_ch_b.text = b_text
+	for c in _ch_slots.get_children():
+		c.queue_free()
+	var n: int = slot_texts.size()
+	var w: float = 320.0 if n <= 2 else (260.0 if n == 3 else 210.0)
+	for k in n:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 6)
+		col.add_child(_label("지금 %d번 칸" % (k + 1), 14))
+		var r := _choice_card(w, false)
+		r.text = str(slot_texts[k])
+		col.add_child(r.get_parent())
+		var b := Button.new()
+		b.text = "%d번 칸과 바꾸기 (%d)" % [k + 1, k + 1]
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(0, 40)
+		var slot: int = k
+		b.pressed.connect(func() -> void: pick(slot))
+		col.add_child(b)
+		_ch_slots.add_child(col)
 	_discard_armed = false
 	_discard.text = "두고 간다 (X)"
 	_choice_t = 0.0
@@ -296,7 +320,7 @@ func _build_choice() -> void:
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_choice.add_child(panel)
 	var head := HBoxContainer.new()
-	var title := _label("두 손이 다 찼다", 28)
+	var title := _label("검 칸이 다 찼다", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	_discard = Button.new()
@@ -305,39 +329,31 @@ func _build_choice() -> void:
 	head.add_child(_discard)
 	box.add_child(head)
 	box.add_child(_label("새 검을 어느 칸에 들까? 바꾸면 그 칸의 검은 버린다. 카드를 눌러서는 바뀌지 않는다.", 14))
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 12)
-	box.add_child(cols)
-	var made: Array[RichTextLabel] = []
-	for i in 3:
-		var col := VBoxContainer.new()
-		col.add_theme_constant_override("separation", 6)
-		col.add_child(_label(["지금 1번 칸", "새로 뽑은 검", "지금 2번 칸"][i], 14))
-		var r := RichTextLabel.new()
-		r.bbcode_enabled = true
-		r.fit_content = true
-		r.scroll_active = false
-		r.custom_minimum_size = Vector2(320, 0)
-		r.add_theme_font_size_override("normal_font_size", 14)
-		r.add_theme_font_size_override("bold_font_size", 17)
-		var card := PanelContainer.new()
-		card.add_theme_stylebox_override("panel", _style(Color(1, 0.84, 0.42) if i == 1 else Color(0.2, 0.23, 0.3), 2 if i == 1 else 1))
-		card.add_child(r)
-		col.add_child(card)
-		made.append(r)
-		if i != 1:
-			var slot: int = 0 if i == 0 else 1
-			var b := Button.new()
-			b.text = "%d번 칸과 바꾸기 (%d)" % [slot + 1, slot + 1]
-			b.focus_mode = Control.FOCUS_NONE
-			b.custom_minimum_size = Vector2(0, 40)
-			b.pressed.connect(func() -> void: pick(slot))
-			col.add_child(b)
-		cols.add_child(col)
-	_ch_a = made[0]
-	_ch_new = made[1]
-	_ch_b = made[2]
+	var top := VBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	top.add_child(_label("새로 뽑은 검", 14))
+	_ch_new = _choice_card(420.0, true)
+	top.add_child(_ch_new.get_parent())
+	box.add_child(top)
+	_ch_slots = HBoxContainer.new()
+	_ch_slots.add_theme_constant_override("separation", 12)
+	box.add_child(_ch_slots)
 	_choice.visible = false
+
+
+## 고르기 창의 검 카드 하나(PanelContainer 안의 RichTextLabel을 돌려준다).
+func _choice_card(w: float, fresh: bool) -> RichTextLabel:
+	var r := RichTextLabel.new()
+	r.bbcode_enabled = true
+	r.fit_content = true
+	r.scroll_active = false
+	r.custom_minimum_size = Vector2(w, 0)
+	r.add_theme_font_size_override("normal_font_size", 14)
+	r.add_theme_font_size_override("bold_font_size", 17)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _style(Color(1, 0.84, 0.42) if fresh else Color(0.2, 0.23, 0.3), 2 if fresh else 1))
+	card.add_child(r)
+	return r
 
 
 func open_altar(texts: Array[String]) -> void:

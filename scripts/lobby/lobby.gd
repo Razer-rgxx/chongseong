@@ -95,6 +95,7 @@ func _ready() -> void:
 	meta = Meta.load_or_new()
 	meta.fix_sheath(data)
 	meta.save()
+	FallenShare.sync(get_tree(), meta)   # 다른 영주의 쓰러진 검을 주고받는다(키가 없거나 실패하면 조용히, 기다리지 않는다)
 	rules = Rules.new(data, 1)
 	rules.hilts.clear()
 	rules.yard = true

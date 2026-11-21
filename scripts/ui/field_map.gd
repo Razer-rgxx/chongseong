@@ -43,7 +43,7 @@ const CACHE_C := Color(0.86, 0.72, 0.42)
 ## 범례 줄(표시 종류, 이름).
 const LEGEND: Array = [
 	[&"lord", "영주"], [&"gate", "마을 북문"], [&"trail", "언덕길"], [&"crypt", "지하 무덤"], [&"dropped", "떨군 검"],
-	[&"wanderer", "떠도는 사람"], [&"chief", "우두머리"], [&"cache", "유품"], [&"horse", "말"],
+	[&"wanderer", "떠도는 사람"], [&"chief", "우두머리"], [&"cache", "유품"], [&"horse", "탈 검"],
 ]
 
 var data: GameData

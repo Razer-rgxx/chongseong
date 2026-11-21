@@ -125,7 +125,7 @@ func _process(_delta: float) -> void:
 	if a != _area_id:
 		_area_id = a
 		_area.text = String(FieldLayout.AREA_NAMES.get(a, "들판"))
-	var s: Sword = rules.slots[0] if rules.slots.size() > 0 else null
+	var s: Sword = rules.current() if rules.slots.size() > 0 else null
 	if s == null:
 		_held.text = "맨손"
 		_held_dot.color = Color(0.6, 0.58, 0.55)

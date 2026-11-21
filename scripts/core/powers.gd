@@ -402,7 +402,7 @@ func save_from_death() -> bool:
 	if undying > 0.0:
 		L.hp = 1.0
 		return true
-	for k in 2:
+	for k in r.slots.size():
 		var s := r.slots[k]
 		if s and s.data.display_name == "충신" and not night_used.has("loyal"):
 			night_used["loyal"] = true
@@ -484,7 +484,7 @@ func on_night_start() -> void:
 func _restore() -> void:
 	var sn := _snapshot
 	r.lord.hp = sn.hp
-	for k in 2:
+	for k in mini(r.slots.size(), sn.slots.size()):
 		var pair: Array = sn.slots[k]
 		r.slots[k] = pair[0]
 		if pair[0]:

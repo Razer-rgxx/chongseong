@@ -108,7 +108,7 @@ var _was_air: bool = false
 var _land_t: float = -1.0
 var _hop_anim: bool = false
 ## 39단계 말: 들판이 넣는다(없으면 탈 일이 없다). 탄 정도(0~1, 타고 내릴 때 부드럽게), 기본 도형의 말 탄 다리.
-var horse_view: HorseView = null
+var horse_view: Node3D = null   ## 탈 검(RideSwordView). seat_height·seat_pitch·seat_yaw·stands를 묻는다
 var _ride_k: float = 0.0
 var _ride_legs: Node3D = null
 
@@ -494,7 +494,7 @@ func _jump_pose() -> Dictionary:
 	var tuck: float = float(_hop.tuck)
 	var out: Dictionary = {"pitch": float(_hop.pitch)}
 	if character:
-		character.set_ride(_ride_k)
+		character.set_ride(0.0 if _standing_ride() else _ride_k)
 		if _ride_k > 0.0:
 			character.set_legs(0.0, 0.0)
 		elif _hop_anim:
@@ -519,6 +519,10 @@ func _ride_pose(pose: Dictionary) -> float:
 	var k: float = smoothstep(0.0, 1.0, _ride_k)
 	var seat: float = horse_view.seat_height()
 	pose["pitch"] = float(pose.get("pitch", 0.0)) - horse_view.seat_pitch() * k
+	if _standing_ride():   # 탈 검: 칼 넓은 면 위에 선 채로(다리를 벌려 앉히지 않는다)
+		if _ride_legs:
+			_ride_legs.visible = false
+		return seat * k
 	if character:
 		return (seat - character.seat_drop()) * k
 	pose["scale_y"] = float(pose.get("scale_y", 1.0)) * lerpf(1.0, ride_squash, k)
@@ -529,6 +533,11 @@ func _ride_pose(pose: Dictionary) -> float:
 	_ride_legs.position = Vector3(0.0, seat - ride_sink + _jump_y, 0.0)
 	_ride_legs.rotation = Vector3(horse_view.seat_pitch(), horse_view.seat_yaw(), 0.0)
 	return (seat - ride_sink) * k
+
+
+## 선 채로 타는 것(탈 검)인지.
+func _standing_ride() -> bool:
+	return horse_view != null and horse_view.has_method("stands") and bool(horse_view.call("stands"))
 
 
 ## 기본 도형의 말 탄 다리: 엉덩이에서 앞아래로 넓적다리, 무릎에서 뒤아래로 정강이, 등자에 걸친 장화(말 몸통 양옆).

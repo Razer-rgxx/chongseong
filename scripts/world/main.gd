@@ -284,11 +284,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_hud.pick_path(1)
 		return
 	if _hud.choice_open():
-		if event.is_action_pressed("slot_1"):
-			_hud.pick(0)
-		elif event.is_action_pressed("slot_2"):
-			_hud.pick(1)
-		elif event.is_action_pressed("discard"):
+		for k in mini(4, rules.slots.size()):
+			if event.is_action_pressed("slot_%d" % (k + 1)):
+				_hud.pick(k)
+				return
+		if event.is_action_pressed("discard"):
 			_hud.pick(-1)
 		return
 	var mb := event as InputEventMouseButton
@@ -307,11 +307,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pull"):
 		_want_pull = true
 	if event.is_action_pressed("swap"):
-		_swap_to = 2
-	if event.is_action_pressed("slot_1"):
-		_swap_to = 0
-	if event.is_action_pressed("slot_2"):
-		_swap_to = 1
+		_swap_to = Rules.SWAP_NEXT
+	for k in mini(4, rules.slots.size()):
+		if event.is_action_pressed("slot_%d" % (k + 1)):
+			_swap_to = k
 	if event.is_action_pressed("start_night"):
 		rules.start_night()
 	var k := event as InputEventKey
@@ -503,7 +502,7 @@ func _card(s: Sword, slot: int, held: bool) -> String:
 func _refresh_cards() -> void:
 	var texts: Array[String] = []
 	var cols: Array[Color] = []
-	for k in 2:
+	for k in rules.slots.size():
 		var s := rules.slots[k]
 		texts.append(_card(s, k, k == rules.active))
 		cols.append(data.grades.colors[s.grade] if s else Color(0.4, 0.45, 0.55))
@@ -780,7 +779,10 @@ func _on_choice_needed(s: Sword) -> void:
 func _open_choice(s: Sword) -> void:
 	if rules.pending != s:
 		return
-	_hud.open_choice(_card(s, -1, false), _card(rules.slots[0], 0, false), _card(rules.slots[1], 1, false))
+	var slot_texts: Array = []
+	for k in rules.slots.size():
+		slot_texts.append(_card(rules.slots[k], k, false))
+	_hud.open_choice(_card(s, -1, false), slot_texts)
 	_capture(false)
 
 

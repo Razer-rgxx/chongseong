@@ -26,9 +26,15 @@ var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
 var runs: int = 0
+## 검 보관집(2026-11-21, 대장간에서 산다): 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
+var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
 var fallen: Array = []
+## 다른 영주들의 쓰러진 검(FallenShare가 GD-Sync에서 받아 둔다, 같은 꼴에 "name"). 저장해서 인터넷이 없어도 쓴다.
+var others: Array = []
+## 마지막으로 올린 내 쓰러진 검("id:run:kills"). 같은 것을 두 번 올리지 않는다.
+var shared_key: String = ""
 const FALLEN_MAX: int = 12
 ## 의뢰판(15단계): 붙은 의뢰(VillageData.quests의 번호) 3장, 맡은 장(-1 없음).
 var quest_board: Array[int] = []
@@ -72,6 +78,8 @@ var duel_losses: int = 0
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
 static var carry_sword: int = -1
+## 검 보관집이 있으면 북문에서 고른 나머지 검들(칸 1부터, SwordData.id). carry_sword가 칸 0.
+static var carry_more: Array[int] = []
 ## 결투(21단계)에서 1P와 2P가 든 검(SwordData.id, 0은 맨손). 마을 결투 말뚝에서 고르고 장면을 넘어 이어지는 값이라 static, 저장하지 않는다.
 static var duel_picks: Array[int] = [0, 0]
 static var wake_at_gate: bool = false
@@ -105,7 +113,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -131,6 +139,16 @@ func from_dict(d: Dictionary) -> void:
 				for v in e.get("ghost", []):
 					g.append(float(v))
 				fallen.append({"id": int(e["id"]), "run": int(e.get("run", 0)), "zone": int(e.get("zone", 0)), "kills": int(e.get("kills", 0)), "ghost": g})
+	others = []
+	var ot: Variant = d.get("others", [])
+	if ot is Array:
+		for e in ot:
+			if e is Dictionary and int(e.get("id", 0)) > 0:
+				var og: Array = []
+				for v in e.get("ghost", []):
+					og.append(float(v))
+				others.append({"id": int(e["id"]), "run": 0, "zone": int(e.get("zone", 0)), "kills": int(e.get("kills", 0)), "ghost": og, "name": str(e.get("name", ""))})
+	shared_key = str(d.get("shared_key", ""))
 	lost = {}
 	var lo: Variant = d.get("lost", {})
 	if lo is Dictionary:
@@ -149,6 +167,7 @@ func from_dict(d: Dictionary) -> void:
 		found[str(k)] = int(f[k])
 	best = int(d.get("best", 0))
 	runs = int(d.get("runs", 0))
+	storage_lv = clampi(int(d.get("storage_lv", 0)), 0, 2)
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -1104,4 +1123,31 @@ static func fallen_line(rec: Dictionary, runs_now: int, zone_names: PackedString
 	var ago: int = maxi(1, runs_now - int(rec.get("run", 0)))
 	var z: int = clampi(int(rec.get("zone", 0)), 0, maxi(0, zone_names.size() - 1))
 	var where: String = zone_names[z] if not zone_names.is_empty() else "언덕"
+	if str(rec.get("name", "")) != "":
+		return "다른 영주 %s · %s에서 쓰러짐 · 그 판에 %d마리" % [rec.name, where, int(rec.get("kills", 0))]
 	return "%d판 전의 영주 · %s에서 쓰러짐 · 그 판에 %d마리" % [ago, where, int(rec.get("kills", 0))]
+
+
+## 언덕 판의 검 칸 수(기본 2, 검 보관집 3~4).
+func hill_slots() -> int:
+	return 2 + storage_lv
+
+
+## 들판·무덤의 검 칸 수(기본 1, 검 보관집 3~4).
+func field_slots() -> int:
+	return 1 if storage_lv == 0 else 2 + storage_lv
+
+
+## 다음 단계 검 보관집 값(조각). 다 지었으면 -1.
+func storage_cost(md: MetaData) -> int:
+	return md.storage_costs[storage_lv] if storage_lv < md.storage_costs.size() else -1
+
+
+## 검 보관집을 짓거나 늘린다. 된 일이면 true(조각이 모자라거나 끝이면 false).
+func build_storage(md: MetaData) -> bool:
+	var c: int = storage_cost(md)
+	if c < 0 or shards < c:
+		return false
+	shards -= c
+	storage_lv += 1
+	return true

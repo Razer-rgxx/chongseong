@@ -8,7 +8,7 @@ extends Node3D
 ## 떠도는 사람(34단계): 아직 영입하지 않은 사람 하나가 후보 자리에 서 있다(Meta.wanderer). E로 말을 걸고, 조건이 맞으면 E로 데려간다(마을에 선다).
 ## 날이 밝으면 다른 사람(또는 같은 사람이 다른 자리)으로 바뀐다.
 ## 들판 지도(38단계): M으로 지도 창(FieldMap, 게임을 멈춘다)을 연다. 걸으면 영주 둘레가 밝혀진다(FieldLayout.SEEN_TICKS틱마다 Meta.see_field).
-## 말(39단계): H로 부르면(덤비는 적이 없을 때, 휘파람) 막힘을 피한 자리에서 달려와 곁에 선다(HorseView). 곁에서 E로 타고, 탄 채 H나 E로 내린다.
+## 탈 검(39단계 말을 2026-11-21에 바꿈): H로 부르면(덤비는 적이 없을 때) 막힘을 피한 자리에서 날아와 곁에 뜬다(RideSwordView, 규칙은 Horse 그대로). 곁에서 E로 올라서고, 탄 채 H나 E로 내린다.
 ## 탄 채 맞으면 떨어진다(규칙). 탄 동안 카메라는 조금 멀고 높게, 발굽 소리와 흙먼지. 말은 들판에만 있고 저장하지 않는다.
 
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
@@ -25,6 +25,8 @@ var rules: Rules
 var _acc: float = 0.0
 var _want_dash: bool = false
 var _want_jump: bool = false
+## 검 바꾸기(검 보관집이 있으면 칸이 여럿): Rules.SWAP_NEXT(Q) 또는 칸 번호, -1이면 없음.
+var _want_swap: int = -1
 var _lord: Node3D
 var _near: String = ""
 var _rects: Array[Rect2] = []
@@ -71,7 +73,7 @@ var _wander_step: int = 0
 var _wt: float = 0.0
 var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
 var _seen_t: int = 0   ## 38단계: 다음 밝힘까지 남은 틱
-var _horse: HorseView   ## 39단계 말의 몸
+var _horse: RideSwordView   ## 탈 검의 몸(규칙 이름은 39단계 말 그대로 horse)
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -128,11 +130,10 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
-	_horse = HorseView.new()
+	_horse = RideSwordView.new()
 	_horse.setup(rules)
 	_horse.height_of = FieldBuilder.walk_height
 	add_child(_horse)
-	_horse.footfall.connect(func(at: Vector3, k: float) -> void: _sfx.play(&"hoof", at, lerpf(-15.0, -4.0, k), lerpf(1.1, 0.92, k)))
 	_lord.horse_view = _horse
 	var H: HorseData = data.horse
 	_camera.ride_far = H.camera_far
@@ -153,7 +154,7 @@ func _ready() -> void:
 		_sfx.play(&"dash", _lord.position, -6.0)
 		_camera.kick(4.0))
 	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
-	rules.horse_called.connect(func() -> void: _sfx.play(&"whistle", _lord.position + Vector3(0, 1.6, 0), -2.0))
+	rules.horse_called.connect(func() -> void: _sfx.play(&"draw", _lord.position, -3.0, 0.8))
 	rules.horse_mounted.connect(func() -> void: _sfx.play(&"thump", _lord.position, -12.0, 1.4))
 	rules.horse_dismounted.connect(_on_dismounted)
 	rules.lord_hooked.connect(func(_e: Enemy) -> void:
@@ -219,6 +220,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_want_hook = true
 	if event.is_action_pressed("pull"):
 		_interact()
+	if rules.slots.size() > 1:
+		if event.is_action_pressed("swap"):
+			_want_swap = Rules.SWAP_NEXT
+		for sk in mini(4, rules.slots.size()):
+			if event.is_action_pressed("slot_%d" % (sk + 1)):
+				_want_swap = sk
 	if event.is_action_pressed("map") and not _over:
 		open_map()
 	if event.is_action_pressed("horse"):
@@ -239,6 +246,7 @@ func _physics_process(delta: float) -> void:
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
 		inp.jump = _want_jump
+		inp.swap_to = _want_swap
 		inp.attack = Input.is_action_pressed("attack") or _want_attack
 		inp.hook = _want_hook
 		if _camera.third():
@@ -263,6 +271,7 @@ func _physics_process(delta: float) -> void:
 			meta.see_field(rules.lord.pos)
 		_want_dash = false
 		_want_jump = false
+		_want_swap = -1
 		_want_attack = false
 		_want_hook = false
 		_acc -= rules.dt
@@ -392,7 +401,7 @@ func horse_key() -> void:
 		return
 	var why: StringName = rules.call_horse(_horse_from())
 	if why == &"fight":
-		_hud.toast("덤벼드는 적이 있어 말을 부를 수 없다")
+		_hud.toast("덤벼드는 적이 있어 탈 검을 부를 수 없다")
 
 
 ## 말이 나타날 자리: 영주 뒤에서 좌우로 30°씩 돌려 가며 call_from칸(못 찾으면 절반, 1/4) 떨어진 들판 안에서,
@@ -470,7 +479,7 @@ func _prompt(key: String) -> String:
 	if key == "dropped":
 		return "떨군 검을 줍는다"
 	if key == "horse":
-		return "말에 오른다"
+		return "검에 올라선다"
 	if key == "wanderer":
 		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
 	if key.begins_with("cache"):
@@ -649,9 +658,19 @@ func _hold_sword() -> void:
 		id = 0
 	_held_id = id
 	var s: Sword = meta.unbreakable_sword(data, id)
+	# 검 보관집(2026-11-21): 칸이 늘고, 북문에서 고른 나머지 검(Meta.carry_more)이 칸 1부터 든다
+	rules.set_slot_count(meta.field_slots())
 	rules.slots[0] = s
+	var k: int = 1
+	for more in Meta.carry_more:
+		if k >= rules.slots.size():
+			break
+		if more > 0 and more != id and meta.usable(more):
+			rules.slots[k] = meta.unbreakable_sword(data, more)
+			k += 1
 	rules.active = 0
 	rules.lord.combo = 0
+	rules.slots_changed.connect(_on_slots)
 	_lord.set_sword(s, data.grades)
 	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
 
@@ -933,3 +952,11 @@ func _memory_toast(d: SwordData, tier: int) -> void:
 		return
 	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])
 	_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -6.0, 0.7)
+
+
+## 검을 바꿔 쥐었다(검 보관집): 쥔 검의 모습·기록·쓰러질 때 떨굴 검을 따라 바꾼다.
+func _on_slots() -> void:
+	var s: Sword = rules.current()
+	_held_id = s.data.id if s and s.data else 0
+	_lord.set_sword(s, data.grades)
+	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))

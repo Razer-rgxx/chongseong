@@ -21,6 +21,8 @@ var crypt: CryptRun
 var _acc: float = 0.0
 var _want_dash: bool = false
 var _want_jump: bool = false
+## 검 바꾸기(검 보관집이 있으면 칸이 여럿): Rules.SWAP_NEXT(Q) 또는 칸 번호, -1이면 없음.
+var _want_swap: int = -1
 var _want_attack: bool = false
 var _want_hook: bool = false
 var _lord: Node3D
@@ -128,6 +130,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_want_hook = true
 	if event.is_action_pressed("pull"):
 		_interact()
+	if rules.slots.size() > 1:
+		if event.is_action_pressed("swap"):
+			_want_swap = Rules.SWAP_NEXT
+		for sk in mini(4, rules.slots.size()):
+			if event.is_action_pressed("slot_%d" % (sk + 1)):
+				_want_swap = sk
 	if k and k.pressed and not k.echo:
 		if k.physical_keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -144,6 +152,7 @@ func _physics_process(delta: float) -> void:
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _want_dash
 		inp.jump = _want_jump
+		inp.swap_to = _want_swap
 		inp.attack = Input.is_action_pressed("attack") or _want_attack
 		inp.hook = _want_hook
 		if _camera.third():
@@ -163,6 +172,7 @@ func _physics_process(delta: float) -> void:
 		rules.lord.pos = crypt.push(rules.lord.pos, rules.lord.airborne())
 		_want_dash = false
 		_want_jump = false
+		_want_swap = -1
 		_want_attack = false
 		_want_hook = false
 		_acc -= rules.dt
@@ -240,9 +250,19 @@ func _hold_sword() -> void:
 		id = 0
 	_held_id = id
 	var s: Sword = meta.unbreakable_sword(data, id)
+	# 검 보관집(2026-11-21): 칸이 늘고, 북문에서 고른 나머지 검(Meta.carry_more)이 칸 1부터 든다
+	rules.set_slot_count(meta.field_slots())
 	rules.slots[0] = s
+	var k: int = 1
+	for more in Meta.carry_more:
+		if k >= rules.slots.size():
+			break
+		if more > 0 and more != id and meta.usable(more):
+			rules.slots[k] = meta.unbreakable_sword(data, more)
+			k += 1
 	rules.active = 0
 	rules.lord.combo = 0
+	rules.slots_changed.connect(_on_slots)
 	_lord.set_sword(s, data.grades)
 	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
 
@@ -390,3 +410,11 @@ func _memory_toast(d: SwordData, tier: int) -> void:
 		return
 	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])
 	_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -6.0, 0.7)
+
+
+## 검을 바꿔 쥐었다(검 보관집): 쥔 검의 모습·기록·쓰러질 때 떨굴 검을 따라 바꾼다.
+func _on_slots() -> void:
+	var s: Sword = rules.current()
+	_held_id = s.data.id if s and s.data else 0
+	_lord.set_sword(s, data.grades)
+	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
