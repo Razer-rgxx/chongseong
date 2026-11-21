@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"forge"
+display_name = "풀무간"
+desc = "쇠를 녹여 검을 벼린다. 언덕에 오를 때 벼린 검 한 자루를 빈 칸에 쥐여 준다(마을 단계가 높을수록 좋은 검)."
+cost_wood = 6
+cost_stone = 16
+cost_iron = 10
+plot = Vector2(41.8, 19.3)
+size = Vector2(4.6, 3.8)
+facing = Vector2(0, -1)
+kind = &"forge"
+min_tier = 1

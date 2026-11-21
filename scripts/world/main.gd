@@ -212,8 +212,13 @@ func _ready() -> void:
 		_on_event_placed(rules.event)
 	_hud.area_title(_zone_name())
 	# 뽑는 법·밤 맞는 법은 손잡이 앞 E 안내와 밤 맞이하기 단추가 이미 말한다(2026-11-21 화면 글 정리)
-	if rules.slots[0]:
-		_hud.toast("검집에서 %s을(를) 꺼냈다." % rules.slots[0].label())
+	var from: Array[String] = []
+	if rules.slots[0] and rules.forged != 0:
+		from.append("검집에서 %s을(를) 꺼냈다." % rules.slots[0].label())
+	if rules.forged >= 0 and rules.slots[rules.forged]:
+		from.append("풀무간에서 벼린 %s을(를) 쥐었다." % rules.slots[rules.forged].label())
+	if not from.is_empty():
+		_hud.toast(" ".join(from))
 	_capture(true)
 	WebQuality.apply(self, _env.environment, _sun, _camera)   # 웹판에서만 가볍게
 

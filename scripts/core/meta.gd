@@ -46,6 +46,8 @@ var captives_freed: Array[String] = []
 var captives_ready: bool = false
 ## 마지막으로 알린 마을 단계(마을 키우기 4단계): 지금 단계가 이보다 높으면 마을에 들어올 때 알린다.
 var tier_seen: int = 0
+## 언덕을 몇 구역부터 오르는지(1부터, 마을 키우기 5단계). 들판의 언덕길에서 고른다.
+var start_zone: int = 1
 var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
@@ -132,7 +134,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -211,7 +213,8 @@ func from_dict(d: Dictionary) -> void:
 	for k in d.get("captives_freed", []):
 		captives_freed.append(str(k))
 	captives_ready = bool(d.get("captives_ready", false))
-	tier_seen = int(d.get("tier_seen", 0))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
+	tier_seen = int(d.get("tier_seen", 0))
+	start_zone = maxi(1, int(d.get("start_zone", 1)))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -567,7 +570,7 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 		melted += rules.melted_by_grade[g] * md.melt[g]
 	var r := {
 		"kills": floori(float(rules.kills) / md.kills_per_shard),
-		"zone": rules.zone * md.per_zone + (md.win_bonus if rules.won else 0),
+		"zone": (rules.zone - rules.start_zone) * md.per_zone + (md.win_bonus if rules.won else 0),   # 넘긴 구역만(깊은 곳부터 오르면 건너뛴 구역은 안 센다)
 		"broken": broken,
 		"elite": rules.elites_killed * md.elite,
 		"melt": melted,
@@ -1306,6 +1309,21 @@ func next_tier_need(d: GameData) -> Dictionary:
 		"wall": t == md.tier_names.size() - 1 and not has_built(&"wall")}
 
 
+## 고를 수 있는 시작 구역(1부터): 1과 단계마다 열린 구역(MetaData.tier_start_zone).
+func start_zones(d: GameData) -> Array[int]:
+	var out: Array[int] = []
+	for i in village_tier(d) + 1:
+		var z: int = d.meta.tier_start_zone[i]
+		if not out.has(z):
+			out.append(z)
+	return out
+
+
+## 풀무간이 벼려 주는 검의 등급(풀무간이 없으면 -1).
+func forge_grade(d: GameData) -> int:
+	return d.meta.tier_forge_grade[village_tier(d)] if has_built(&"forge") else -1
+
+
 ## 이 건물을 지금 지을 수 있는 단계인지.
 func tier_allows(b: BuildingData, d: GameData) -> bool:
 	return village_tier(d) >= b.min_tier
@@ -1394,10 +1412,11 @@ func free_captive(pack: String, d: GameData) -> Dictionary:
 
 ## 언덕 판에서 받는 재료: 넘긴 구역마다 나무·돌·쇠, 정예마다 쇠, 이기면 쇠 더.
 static func run_mats(rules: Rules, md: MetaData) -> Dictionary:
+	var z: int = rules.zone - rules.start_zone   # 넘긴 구역만
 	return {
-		&"wood": rules.zone * md.run_wood_per_zone,
-		&"stone": rules.zone * md.run_stone_per_zone,
-		&"iron": rules.zone * md.run_iron_per_zone + rules.elites_killed * md.run_iron_per_elite + (md.run_iron_win if rules.won else 0),
+		&"wood": z * md.run_wood_per_zone,
+		&"stone": z * md.run_stone_per_zone,
+		&"iron": z * md.run_iron_per_zone + rules.elites_killed * md.run_iron_per_elite + (md.run_iron_win if rules.won else 0),
 	}
 
 

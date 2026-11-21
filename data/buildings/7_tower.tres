@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"tower"
+display_name = "망루"
+desc = "높이 올라 들판을 살핀다. 까마귀 고개로 가는 막힌 길을 치운다."
+cost_wood = 18
+cost_stone = 12
+plot = Vector2(48.2, 4.4)
+size = Vector2(2.6, 2.6)
+facing = Vector2(-1, 0)
+kind = &"tower"
+min_tier = 1

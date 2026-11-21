@@ -435,6 +435,25 @@ func _render_building(msg: String) -> void:
 	_bld_box.add_child(_msg)
 
 
+# ---------------------------------------------------------------- 시작 구역(마을 키우기 5단계)
+
+## 들판의 언덕길에서 E: 마을 단계가 연 구역 중 어디부터 오를지. 고르면 picked(구역)를 부른다.
+func open_climb(starts: Array[int], current: int, picked: Callable) -> void:
+	_jobs_i = -1
+	_jobs.visible = true
+	for c in _jobs_box.get_children():
+		c.queue_free()
+	UiKit.header(_jobs_box, "언덕으로 오른다", close)
+	for z in starts:
+		var zz: int = z
+		var b := UiKit.button("%d구역부터" % z, func() -> void:
+			close()
+			picked.call(zz), 44)
+		if z == current:
+			b.text += "  ·  지난번"
+		_jobs_box.add_child(b)
+
+
 # ---------------------------------------------------------------- 주민의 일(마을 키우기 3단계)
 
 ## 주민에게 E: 쉰다 / 지은 일터(일꾼 수/자리, 일꾼 하나가 판마다 더 모으는 몫). 지금 하는 일은 눌리지 않는다.

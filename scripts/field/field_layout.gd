@@ -78,6 +78,8 @@ const MATS: Array = [
 const MAT_ACTIVE: int = 3
 ## 무리에 잡혀 있는 사람(2026-11-21 마을 키우기 3단계): 판마다 무리 CAPTIVES곳에 하나씩 묶여 있고, 그 무리를 쓰러뜨리면 풀어 줄 수 있다.
 const CAPTIVES: int = 2
+## 까마귀 고개로 가는 두 길(늪 → 고개, 불탄 마을 → 고개)을 막은 통나무·돌 더미(칸). 마을에 망루를 지으면 치운다(마을 키우기 5단계).
+const PASS_BARRICADES: Array[Rect2] = [Rect2(166.5, 91.0, 4.0, 8.0), Rect2(190.0, 84.0, 6.0, 2.6)]
 ## 주민 이름(옛 마을의 흔한 이름)과 생김새(VillageProps.LOOKS).
 const RESIDENT_NAMES: Array[String] = ["돌쇠", "막손", "덕배", "끝순", "언년", "삼월", "복실", "마당쇠", "개동", "판수", "순덕", "억쇠", "말순", "칠복", "분이", "갑돌"]
 const RESIDENT_LOOKS: Array[StringName] = [&"peasant", &"peasant2", &"peasant3", &"peasant4"]

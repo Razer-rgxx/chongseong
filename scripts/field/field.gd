@@ -120,6 +120,10 @@ func _ready() -> void:
 	_fog_base = env.fog_density
 	_fog_color = env.fog_light_color
 	var blockers: Dictionary = FieldBuilder.build(self, env)
+	if not meta.has_built(&"tower"):   # 망루를 짓기 전에는 까마귀 고개로 가는 길이 막혀 있다(마을 키우기 5단계)
+		for r in FieldLayout.PASS_BARRICADES:
+			FieldBuilder.barricade(self, r)
+			(blockers.rects as Array).append(r)
 	_rects.assign(blockers.rects)
 	_circles = blockers.circles
 	_low_rects.assign(blockers.low_rects)
@@ -520,7 +524,14 @@ func _interact() -> void:
 	if _near == "gate":
 		_leave(VILLAGE_PATH)
 	elif _near == "trail":
-		_leave(RUN_PATH)
+		var starts: Array[int] = meta.start_zones(data)
+		if starts.size() > 1:   # 마을 단계가 오르면 더 깊은 구역부터 오를 수 있다(마을 키우기 5단계)
+			_hud.open_climb(starts, meta.start_zone, func(z: int) -> void:
+				meta.start_zone = z
+				_leave(RUN_PATH))
+		else:
+			meta.start_zone = 1
+			_leave(RUN_PATH)
 	elif _near == "dropped":
 		var id: int = meta.pick_dropped()
 		if _dropped_node:

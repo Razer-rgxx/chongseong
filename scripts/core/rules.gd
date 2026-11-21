@@ -141,6 +141,10 @@ var tick: int = 0
 var phase: Phase = Phase.DAY
 ## 0부터 센다. 마지막 구역은 zone_count() - 1.
 var zone: int = 0
+## 판을 시작한 구역(0부터, 마을 키우기 5단계). 1구역부터 오르면 0.
+var start_zone: int = 0
+## 풀무간이 벼린 검이 든 칸(없으면 -1).
+var forged: int = -1
 ## 새벽까지 남은 시간(초). 0 아래로 내려가도 마지막 구역에서는 언덕지기를 쓰러뜨릴 때까지 밤이다.
 var night_left: float = 0.0
 ## 이 밤의 길이(초). 포위는 짧다.
@@ -341,7 +345,10 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 	foes = Foes.new(self)
 	night_total = data.run.night_length
 	lord.hp = max_hp()
-	path_log.append({"zone": 0, "goal": &"survive", "rule": &"", "reward": &""})
+	if meta and meta.start_zone > 1 and meta.start_zones(data).has(meta.start_zone):   # 마을 단계가 연 깊은 구역부터(마을 키우기 5단계)
+		zone = clampi(meta.start_zone - 1, 0, zone_count() - 2)
+		start_zone = zone
+	path_log.append({"zone": zone, "goal": &"survive", "rule": &"", "reward": &""})
 	_new_day()
 	if meta:
 		set_slot_count(meta.hill_slots())   # 검 보관집(2026-11-21)
@@ -349,6 +356,12 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 		if s:
 			slots[0] = s
 			active = 0
+		var fg: int = meta.forge_grade(data)
+		if fg >= 0:   # 풀무간(마을 키우기 5단계): 벼린 검 한 자루를 빈 칸에
+			var at: int = slots.find(null)
+			if at >= 0:
+				slots[at] = Sword.new(pick_sword(fg), data)
+				forged = at
 		_apply_pack()
 
 

@@ -37,6 +37,28 @@ func _make_body(root: Node3D) -> Vector3:
 			VillageBuilder.firewood(root, Vector3(-w / 2.0 - 0.5, 0.0, 0.2), PI / 2.0)
 			VillageBuilder.firewood(root, Vector3(w / 2.0 + 0.5, 0.0, -0.4), -PI / 2.0)
 			return top
+		&"tower":
+			_tower(root)
+			return Vector3.INF
+		&"forge":
+			var st := VillageBuilder.stone()
+			VillageBuilder.box(root, Vector3(w, 2.6, d), Vector3(0, 1.3, 0), st)
+			var slope: float = 0.5
+			for sz in [-1.0, 1.0]:
+				VillageBuilder.box(root, Vector3(w + 0.5, 0.12, d / 2.0 / cos(slope) + 0.4), Vector3(0, 2.6 + d / 4.0 * tan(slope), sz * d / 4.0), VillageBuilder.roof(), Vector3(sz * -slope, 0, 0))
+			VillageBuilder.box(root, Vector3(0.9, 4.6, 0.9), Vector3(w / 2.0 - 0.7, 2.3, -d / 2.0 + 0.6), st)   # 굴뚝
+			VillageBuilder.box(root, Vector3(1.3, 1.5, 0.1), Vector3(-w * 0.15, 0.75, d / 2.0 + 0.02), VillageBuilder.glow(Color(1.0, 0.42, 0.14), 2.4))   # 열린 아궁이 빛
+			var iron := VillageBuilder.plain(Color(0.2, 0.2, 0.21), 0.45, 0.85)
+			VillageBuilder.cyl(root, 0.3, 0.36, 0.55, Vector3(1.0, 0.27, d / 2.0 + 1.0), VillageBuilder.bark(), 10)   # 모루 받침
+			VillageBuilder.box(root, Vector3(0.7, 0.22, 0.3), Vector3(1.0, 0.66, d / 2.0 + 1.0), iron)            # 모루
+			VillageBuilder.box(root, Vector3(0.22, 0.14, 0.18), Vector3(1.42, 0.66, d / 2.0 + 1.0), iron)
+			var o := OmniLight3D.new()
+			o.light_color = Color(1.0, 0.5, 0.2)
+			o.omni_range = 6.0
+			o.light_energy = 1.4
+			o.position = Vector3(-w * 0.15, 1.0, d / 2.0 + 0.6)
+			root.add_child(o)
+			return to_global(Vector3(w / 2.0 - 0.7, 4.7, -d / 2.0 + 0.6))
 		&"woodcutter":
 			_shed(root, w, d, VillageBuilder.timber())
 			var log_mat := VillageBuilder.bark()
@@ -107,6 +129,49 @@ func _shed(root: Node3D, w: float, d: float, post_mat: Material, stone_walls: bo
 			VillageBuilder.box(root, Vector3(0.35, 1.2, d - 0.4), Vector3(sx * (w / 2.0 - 0.18), 0.6, 0), st)
 	else:
 		VillageBuilder.box(root, Vector3(w - 0.2, 1.6, 0.08), Vector3(0, 0.8, -d / 2.0 + 0.12), VillageBuilder.planks())   # 뒤 판자벽
+
+
+## 망루: 네 기둥(위로 좁아진다)과 엇갈린 버팀대, 높은 마루와 난간, 뾰족 지붕, 사다리.
+func _tower(root: Node3D) -> void:
+	var wood := VillageBuilder.timber()
+	var h: float = 7.0
+	var lo: float = size.x / 2.0
+	var hi: float = lo * 0.7
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var a := Vector3(sx * lo, 0.0, sz * lo)
+			var b := Vector3(sx * hi, h, sz * hi)
+			var mid: Vector3 = (a + b) / 2.0
+			var dv: Vector3 = b - a
+			VillageBuilder.box(root, Vector3(0.24, dv.length(), 0.24), mid, wood, Vector3(atan2(dv.z, dv.y), 0.0, -atan2(dv.x, dv.y)))
+	for k in 3:   # 층마다 가로대
+		var y: float = 1.4 + k * 2.0
+		var r: float = lerpf(lo, hi, y / h)
+		for sz in [-1.0, 1.0]:
+			VillageBuilder.box(root, Vector3(r * 2.0, 0.14, 0.14), Vector3(0, y, sz * r), wood)
+			VillageBuilder.box(root, Vector3(0.14, 0.14, r * 2.0), Vector3(sz * r, y, 0), wood)
+	VillageBuilder.box(root, Vector3(hi * 2.0 + 0.8, 0.16, hi * 2.0 + 0.8), Vector3(0, h, 0), VillageBuilder.planks())   # 마루
+	for sx in [-1.0, 1.0]:   # 난간
+		VillageBuilder.box(root, Vector3(0.1, 0.9, hi * 2.0 + 0.8), Vector3(sx * (hi + 0.4), h + 0.45, 0), wood)
+		VillageBuilder.box(root, Vector3(hi * 2.0 + 0.8, 0.9, 0.1), Vector3(0, h + 0.45, sx * (hi + 0.4)), wood)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			VillageBuilder.box(root, Vector3(0.12, 1.6, 0.12), Vector3(sx * (hi + 0.35), h + 0.8, sz * (hi + 0.35)), wood)
+	var cone := MeshInstance3D.new()   # 뾰족 지붕(네모뿔)
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = (hi + 0.8) * 1.414
+	cm.height = 1.6
+	cm.radial_segments = 4
+	cone.mesh = cm
+	cone.material_override = VillageBuilder.roof()
+	cone.position = Vector3(0, h + 2.4, 0)
+	cone.rotation.y = PI / 4.0
+	root.add_child(cone)
+	for k in 12:   # 사다리(앞)
+		VillageBuilder.box(root, Vector3(0.6, 0.06, 0.06), Vector3(0, 0.4 + k * 0.55, lo + 0.25 - k * 0.025), wood)
+	for sx in [-1.0, 1.0]:
+		VillageBuilder.box(root, Vector3(0.08, h, 0.08), Vector3(sx * 0.3, h / 2.0, lo + 0.1), wood, Vector3(-0.04, 0, 0))
 
 
 ## 모탕(통나무 토막)과 박힌 도끼.

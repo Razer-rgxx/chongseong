@@ -1369,6 +1369,36 @@ static func mat_spot(parent: Node3D, i: int) -> Node3D:
 	return n
 
 
+## 막힌 길(마을 키우기 5단계): 쓰러뜨려 쌓은 통나무와 굴려 놓은 바위. 망루를 지으면 없다.
+static func barricade(parent: Node3D, r: Rect2) -> Node3D:
+	var n := Node3D.new()
+	n.name = "barricade"
+	parent.add_child(n)
+	var bark := _mat("barricade_bark", Color(0.2, 0.14, 0.09), 0.95)
+	var along_y: bool = r.size.y > r.size.x
+	var len: float = (r.size.y if along_y else r.size.x) * Grid.CELL + 1.0
+	for k in 5:
+		var c: Vector2 = r.get_center() + (Vector2(0.35 * (k % 2) - 0.2, 0) if along_y else Vector2(0, 0.35 * (k % 2) - 0.2))
+		var p: Vector3 = at_cell(c, 0.32 + 0.42 * float(k / 2))
+		var lg := MeshInstance3D.new()
+		var cy := CylinderMesh.new()
+		cy.top_radius = 0.3
+		cy.bottom_radius = 0.34
+		cy.height = len - float(k) * 0.6
+		cy.radial_segments = 9
+		lg.mesh = cy
+		lg.material_override = bark
+		lg.position = p
+		lg.rotation = Vector3(PI / 2.0, 0.0, 0.08 * float(k - 2)) if along_y else Vector3(0.0, 0.0, PI / 2.0 + 0.06 * float(k - 2))
+		n.add_child(lg)
+	var rock := _cut_stone()
+	for k in 6:
+		var t: float = (float(k) + 0.5) / 6.0
+		var c2: Vector2 = (Vector2(r.position.x - 0.4, r.position.y + r.size.y * t) if along_y else Vector2(r.position.x + r.size.x * t, r.end.y + 0.3))
+		_box(n, Vector3(0.9, 0.7, 0.8), at_cell(c2, 0.3), rock, Vector3(0.1, k * 0.9, 0.05))
+	return n
+
+
 ## 무리에 잡힌 사람(마을 키우기 3단계): 땅에 박은 말뚝에 손이 뒤로 묶여 고개를 떨군 주민. 무리를 쓰러뜨려야 보인다.
 static func captive(parent: Node3D, pack: String) -> Node3D:
 	var info: Dictionary = FieldLayout.PACKS[pack]

@@ -30,6 +30,9 @@ extends Resource
 ## 단계마다 바깥 터 길가에 켜지는 등불 수와 마을을 걷는 사람 수.
 @export var tier_lights: PackedInt32Array = PackedInt32Array([0, 2, 4, 6])
 @export var tier_walkers: PackedInt32Array = PackedInt32Array([0, 2, 4, 6])
+## 열리는 것(마을 키우기 5단계): 단계마다 언덕을 몇 구역부터 오를 수 있는지(가장 깊은 곳), 풀무간이 벼려 주는 검의 등급.
+@export var tier_start_zone: PackedInt32Array = PackedInt32Array([1, 3, 5, 7])
+@export var tier_forge_grade: PackedInt32Array = PackedInt32Array([0, 1, 1, 2])
 
 @export_group("마을: 검 보관집 (2026-11-21)")
 ## 검 보관집을 짓는 값(조각). 마을 북동쪽 빈 터에 집이 올라가고, 그 집에서 검집을 산다.
