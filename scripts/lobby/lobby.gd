@@ -28,6 +28,10 @@ const DUEL_PATH: String = "res://scenes/duel/duel.tscn"
 @export var merchant_at: Vector2 = Vector2(14.7, 10.4)
 ## 검 보관집(2026-11-21): 북동쪽 빈 터(집 가운데). 지으면 집이 올라가고 그 집 문 앞에서 검집을 산다.
 @export var storage_at: Vector2 = Vector2(24.2, 4.25)
+## 바깥 터(2026-11-21 마을 키우기 2단계): 동쪽 목책 너머로 마을을 넓힌다(칸 34~50). 목책 사이 문과 동서로 난 흙길.
+const VILLAGE_W: int = 50
+const OUTER_GATE: Vector2 = Vector2(33.7, 11.2)
+const OUTER_GATE_HALF: float = 1.0
 ## 주민: id → [칸 자리, 바라볼 방향].
 const VILLAGERS: Dictionary = {
 	&"gatekeeper": [Vector2(19.4, 3.7), Vector2(-1, 1)],
@@ -107,6 +111,7 @@ func _ready() -> void:
 	meta.fill_board(data)
 	meta.fill_stock(data)
 	meta.save()
+	Grid.size = Vector2i(VILLAGE_W, Grid.size.y)   # 바깥 터까지 걸을 수 있게(언덕 판은 Rules.new가 되돌린다)
 	rules.lord.pos = Vector2(17.0, 13.0)
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
@@ -121,6 +126,7 @@ func _ready() -> void:
 	_build_houses()
 	_build_village_extras()
 	_build_storage()
+	_build_buildings()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -137,6 +143,7 @@ func _ready() -> void:
 	_hud.duel_online.connect(_on_duel_online)
 	_hud.duel_online_cancel.connect(_cancel_online)
 	_hud.storage_built.connect(_on_storage_built)
+	_hud.building_built.connect(_on_building_built)
 	_hud.sheath_bought.connect(_on_sheath_bought)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
@@ -248,6 +255,8 @@ func _process(delta: float) -> void:
 	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0),
 		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4),
 		("storage" if meta.storage_house else "storage_site"): storage_at + Vector2(-0.3, 1.75)}
+	for b in data.buildings:
+		spots["bld_" + String(b.id)] = b.plot + b.facing * (b.size.y / Grid.CELL / 2.0 + 0.9)
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
 	for id in RECRUITS:
@@ -266,7 +275,7 @@ func _process(delta: float) -> void:
 	elif _near.begins_with("v_"):
 		_hud.set_prompt("E", "%s에게 말을 건다" % _folk_name(StringName(_near.substr(2))))
 	else:
-		_hud.set_prompt("E", PROMPTS.get(_near, ""))
+		_hud.set_prompt("E", _prompt_for(_near))
 	_move_fx.draw(alpha)
 	_animate_village(delta)
 	_forge_light.light_energy = lerpf(_forge_light.light_energy, 1.6, delta * 3.0)
@@ -302,6 +311,8 @@ func _interact() -> void:
 			_hud.open_duel()
 		"storage", "storage_site":
 			_hud.open_storage()
+		_ when _near.begins_with("bld_"):
+			_hud.open_building(data.building(StringName(_near.substr(4))))
 		_:
 			return
 	_capture(false)
@@ -358,12 +369,21 @@ func _build_ground() -> void:
 	# 집 앞과 대장간 앞의 맨땅
 	for c in [Vector2(9.5, 10), Vector2(24.5, 10), Vector2(6.5, 9.5), Vector2(31, 13), Vector2(12, 17.8), Vector2(22.5, 17.8), Vector2(10, 15)]:
 		VillageBuilder.cyl(self, 2.6, 2.8, 0.05, Grid.cells_to_world(c, 0.02), dirt, 18)
-	# 목책: 북쪽은 문 기둥에 이어지고, 남쪽은 길이 나가는 곳만 비운다
+	# 목책: 북쪽은 문 기둥에 이어지고, 남쪽은 길이 나가는 곳만 비운다. 동쪽 목책은 바깥 터로 가는 문만 비우고,
+	# 바깥 터(마을 키우기 2단계)를 새 목책이 둘러싼다
+	var g: Vector2 = OUTER_GATE
 	var lines := [
 		[Vector2(0.3, 2.5), Vector2(15.8, 2.5)], [Vector2(18.2, 2.5), Vector2(33.7, 2.5)],
-		[Vector2(33.7, 2.5), Vector2(33.7, 21.7)], [Vector2(0.3, 2.5), Vector2(0.3, 21.7)],
+		[Vector2(33.7, 2.5), Vector2(33.7, g.y - OUTER_GATE_HALF)], [Vector2(33.7, g.y + OUTER_GATE_HALF), Vector2(33.7, 21.7)],
+		[Vector2(0.3, 2.5), Vector2(0.3, 21.7)],
 		[Vector2(0.3, 21.7), Vector2(15.2, 21.7)], [Vector2(18.8, 21.7), Vector2(33.7, 21.7)],
+		[Vector2(33.7, 2.5), Vector2(VILLAGE_W - 0.3, 2.5)], [Vector2(VILLAGE_W - 0.3, 2.5), Vector2(VILLAGE_W - 0.3, 21.7)],
+		[Vector2(33.7, 21.7), Vector2(VILLAGE_W - 0.3, 21.7)],
 	]
+	# 바깥 터의 흙길(문에서 동쪽으로)과 문 양옆 횃불
+	VillageBuilder.box(self, Vector3((VILLAGE_W - 34.0) * Grid.CELL + 6.0, 0.04, 3.2), Grid.cells_to_world(Vector2((33.7 + VILLAGE_W) / 2.0 - 1.5, g.y), 0.02), dirt)
+	for sy in [-1.0, 1.0]:
+		VillageBuilder.torch(self, Grid.cells_to_world(g + Vector2(0.0, sy * (OUTER_GATE_HALF + 0.25))))
 	for l in lines:
 		VillageBuilder.palisade(self, Grid.cells_to_world(l[0]), Grid.cells_to_world(l[1]), _deco)
 		_rects.append(Rect2(l[0], Vector2.ZERO).expand(l[1]).grow(0.35))
@@ -376,7 +396,7 @@ func _build_trees() -> void:
 		VillageBuilder.tree(self, Grid.cells_to_world(c), _deco, _deco.randf() < 0.5)
 		_circles.append([c, 0.5])
 	var size := Vector2(Grid.size) * Grid.CELL
-	var mid_x: float = size.x / 2.0
+	var mid_x: float = Grid.cells_to_world(Vector2(17, 0)).x   # 북쪽 길(마을 가운데 칸 17)
 	var placed: int = 0
 	while placed < 170:
 		var p := Vector3(_deco.randf_range(-45.0, size.x + 45.0), 0.0, _deco.randf_range(-40.0, size.y + 45.0))
@@ -609,7 +629,7 @@ func _build_houses() -> void:
 		_circles.append([c, 0.25])
 	# 집 둘레의 통, 상자, 건초, 장작
 	# 통(1m)·궤짝(0.95m 안)·장작더미(0.8m)는 낮은 막힘이라 점프로 넘는다(30단계). 건초(1.2m)는 높다.
-	for p in [Vector2(7.6, 11.6), Vector2(7.9, 12.2), Vector2(26.9, 21.0), Vector2(32.6, 11.0), Vector2(14.8, 20.6), Vector2(7.3, 17.3)]:
+	for p in [Vector2(7.6, 11.6), Vector2(7.9, 12.2), Vector2(26.9, 21.0), Vector2(32.7, 14.2), Vector2(14.8, 20.6), Vector2(7.3, 17.3)]:
 		VillageBuilder.barrel(self, Grid.cells_to_world(p), _deco)
 		_low_circles.append([p, 0.3])
 	for p in [Vector2(8.3, 11.9), Vector2(25.6, 20.7), Vector2(15.0, 21.0), Vector2(33.0, 7.8)]:
@@ -656,7 +676,7 @@ func _build_storage() -> void:
 	_storage = StorageHouse.new()
 	add_child(_storage)
 	_storage.position = Grid.cells_to_world(storage_at)
-	_storage.build(meta.storage_house, meta.storage_lv)
+	_storage.build_with(meta.storage_house, meta.storage_lv)
 	_storage_rect = _rects.size()
 	_rects.append(_storage.rect(storage_at))
 	if meta.storage_house:
@@ -665,6 +685,49 @@ func _build_storage() -> void:
 	_storage.raised.connect(func() -> void:
 		_sfx.play(&"anvil", Grid.cells_to_world(storage_at, 1.0), -8.0)
 		_hud.toast("검 보관집이 섰다. 문 앞에서 검집을 산다."))
+
+
+## 바깥 터의 마을 건물(마을 키우기 2단계): 지었으면 집, 아니면 그 건물에 쓸 더미를 쌓은 빈 터.
+var _plots: Dictionary = {}
+var _plot_rect: Dictionary = {}
+
+
+func _build_buildings() -> void:
+	for b in data.buildings:
+		var p := BuildingPlot.new()
+		p.setup(b)
+		add_child(p)
+		p.position = Grid.cells_to_world(b.plot)
+		p.rotation.y = VillageBuilder.facing_to(b.facing)
+		p.build(meta.has_built(b.id))
+		p.piece_placed.connect(func(at: Vector3) -> void: _sfx.play(&"thump", at, -8.0))
+		var nm: String = b.display_name
+		p.raised.connect(func() -> void:
+			_sfx.play(&"anvil", p.global_position + Vector3(0, 1, 0), -8.0)
+			_hud.toast("%s이(가) 섰다." % nm))
+		_plots[b.id] = p
+		_plot_rect[b.id] = _rects.size()
+		_rects.append(p.rect(b.plot))
+
+
+func _prompt_for(key: String) -> String:
+	if key.begins_with("bld_"):
+		var b: BuildingData = data.building(StringName(key.substr(4)))
+		if b == null:
+			return ""
+		return ("%s에 들른다" if meta.has_built(b.id) else "%s 터를 본다") % b.display_name
+	return PROMPTS.get(key, "")
+
+
+func _on_building_built(id: StringName) -> void:
+	var p: BuildingPlot = _plots.get(id)
+	if p == null:
+		return
+	p.raise()
+	var b: BuildingData = data.building(id)
+	_rects[_plot_rect[id]] = p.rect(b.plot)
+	rules.lord.pos = _push_out(rules.lord.pos)
+	rules.lord.prev_pos = rules.lord.pos
 
 
 func _rack_rect() -> Rect2:

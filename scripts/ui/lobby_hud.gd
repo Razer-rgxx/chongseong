@@ -20,6 +20,8 @@ signal duel_online(pick: int)
 signal duel_online_cancel()
 ## 검 보관집(2026-11-21): 터에 집을 지었다(마을이 집을 올린다), 검집을 샀다(그 단계).
 signal storage_built()
+## 바깥 터 건물을 지었다(마을이 집을 올린다).
+signal building_built(id: StringName)
 signal sheath_bought(level: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
@@ -39,6 +41,9 @@ var _shrine: Control
 var _shrine_box: VBoxContainer
 var _storage: Control
 var _storage_box: VBoxContainer
+var _bld: Control
+var _bld_box: VBoxContainer
+var _bld_data: BuildingData = null
 var _rack: Control
 var _rack_text: RichTextLabel
 var _msg: Label
@@ -110,6 +115,8 @@ func _ready() -> void:
 	_shrine_box = UiKit.center_panel(_shrine)
 	_storage = _layer()
 	_storage_box = UiKit.center_panel(_storage)
+	_bld = _layer()
+	_bld_box = UiKit.center_panel(_bld)
 	_board = _layer()
 	_board_box = UiKit.center_panel(_board)
 	_shop = _layer()
@@ -143,7 +150,7 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _storage.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
+	return _forge.visible or _shrine.visible or _storage.visible or _bld.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
 
 
 func close() -> void:
@@ -156,6 +163,7 @@ func close() -> void:
 	_forge.visible = false
 	_shrine.visible = false
 	_storage.visible = false
+	_bld.visible = false
 	_rack.visible = false
 	_board.visible = false
 	_shop.visible = false
@@ -361,6 +369,65 @@ func _render_storage(msg: String) -> void:
 			_storage_box.add_child(row)
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_storage_box.add_child(_msg)
+
+
+# ---------------------------------------------------------------- 바깥 터 건물(마을 키우기 2단계)
+
+## 터(짓기 전)나 집(지은 뒤)에서 E. 짓기 전: 하는 일과 값(재료 그림 + 가진 수/드는 수), 짓기 단추.
+## 지은 뒤: 하는 일 한 줄(판마다 모아 두는 양). 지으면 창을 닫고 마을이 집을 한 조각씩 올린다.
+func open_building(b: BuildingData) -> void:
+	if b == null:
+		return
+	_bld_data = b
+	_bld.visible = true
+	_render_building("")
+
+
+func _render_building(msg: String) -> void:
+	for c in _bld_box.get_children():
+		c.queue_free()
+	var b := _bld_data
+	var done: bool = meta.has_built(b.id)
+	UiKit.header(_bld_box, b.display_name if done else "%s 터" % b.display_name, close)
+	_bld_box.add_child(_wrap(UiKit.label(b.desc, 15, UiKit.TEXT)))
+	var made: Array[String] = []
+	for id in Meta.MAT_IDS:
+		if int(b.made()[id]) > 0:
+			made.append("%s +%d" % [Meta.MAT_NAMES[id], int(b.made()[id])])
+	if not made.is_empty():
+		_bld_box.add_child(UiKit.label("판마다  " + " · ".join(made), 15, UiKit.MUTED))
+	if not done:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 18)
+		for id in b.cost():
+			var need: int = int(b.cost()[id])
+			var cell := HBoxContainer.new()
+			cell.add_theme_constant_override("separation", 6)
+			var icon := Control.new()
+			icon.custom_minimum_size = Vector2(MatsBar.ICON, MatsBar.ICON)
+			icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			var kind: StringName = id
+			icon.draw.connect(func() -> void: MatsBar.draw_icon(icon, kind))
+			cell.add_child(icon)
+			cell.add_child(UiKit.label("%d / %d" % [meta.mat(id), need], 17, UiKit.TEXT if meta.mat(id) >= need else UiKit.MUTED))
+			row.add_child(cell)
+		_bld_box.add_child(row)
+		var go := UiKit.button("짓기", _build_building, 46)
+		go.disabled = not meta.can_pay(b.cost())
+		_bld_box.add_child(go)
+	_msg = UiKit.label(msg, 18, UiKit.TITLE)
+	_bld_box.add_child(_msg)
+
+
+func _build_building() -> void:
+	var b := _bld_data
+	if not meta.build(b):
+		_render_building("재료가 모자라.")
+		return
+	meta.save()
+	refresh_top()
+	close()
+	building_built.emit(b.id)
 
 
 func _build_house() -> void:

@@ -36,6 +36,8 @@ var mats: Dictionary = {&"wood": 0, &"stone": 0, &"iron": 0}
 ## 이번 판 들판에 생긴 재료 자리(FieldLayout.MATS 번호). 판이 끝날 때 새로 뽑는다.
 var mat_spots: Array[int] = []
 var mat_spots_ready: bool = false
+## 지은 마을 건물(2026-11-21 마을 키우기 2단계): id → true.
+var built: Dictionary = {}
 var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
@@ -122,7 +124,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -185,7 +187,10 @@ func from_dict(d: Dictionary) -> void:
 	for i in d.get("mat_spots", []):
 		if int(i) >= 0 and int(i) < FieldLayout.MATS.size():
 			mat_spots.append(int(i))
-	mat_spots_ready = bool(d.get("mat_spots_ready", false))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
+	mat_spots_ready = bool(d.get("mat_spots_ready", false))
+	built = {}
+	for k in d.get("built", []):
+		built[StringName(str(k))] = true   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -556,7 +561,9 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	var r := run_shards(rules, md)
 	shards += r.total
 	r["mats"] = run_mats(rules, md)
+	var made: Dictionary = village_made(rules.data)   # 마을 건물이 모아 둔 것도 같이(끝 화면에 한 줄로 합친다)
 	for id in r.mats:
+		r.mats[id] = int(r.mats[id]) + int(made[id])
 		add_mat(id, int(r.mats[id]))
 	# 의뢰: 맡은 것을 이루었으면 조각을 주고, 판이 끝날 때마다 안 맡은 것 하나를 바꾼다
 	r["quest_done"] = false
@@ -1219,6 +1226,31 @@ func take_mat(i: int) -> Array:
 	var n: int = rng.randi_range(y.x, y.y)
 	add_mat(id, n)
 	return [id, n]
+
+
+# ---------------------------------------------------------------- 마을 건물(마을 키우기 2단계)
+
+func has_built(id: StringName) -> bool:
+	return built.has(id)
+
+
+## 건물을 짓는다(재료를 낸다). 이미 있거나 모자라면 false.
+func build(b: BuildingData) -> bool:
+	if b == null or has_built(b.id) or not pay(b.cost()):
+		return false
+	built[b.id] = true
+	return true
+
+
+## 지은 건물들이 언덕 판마다 모아 두는 재료.
+func village_made(d: GameData) -> Dictionary:
+	var r := {&"wood": 0, &"stone": 0, &"iron": 0}
+	for b in d.buildings:
+		if has_built(b.id):
+			var m: Dictionary = b.made()
+			for id in r:
+				r[id] += int(m[id])
+	return r
 
 
 ## 언덕 판에서 받는 재료: 넘긴 구역마다 나무·돌·쇠, 정예마다 쇠, 이기면 쇠 더.

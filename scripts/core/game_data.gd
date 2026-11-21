@@ -29,6 +29,8 @@ var field_swords: PackedInt32Array = PackedInt32Array()
 var inscriptions: Dictionary = {}
 ## id → EnemyData
 var enemies: Dictionary = {}
+## 마을 건물(2026-11-21 마을 키우기 2단계, 파일 이름 순서).
+var buildings: Array[BuildingData] = []
 ## 좌클릭 기본 동작: id(StringName) → MoveData
 var moves: Dictionary = {}
 ## 공격 방식. 번호가 곧 자리다(0 맨손, 1 … 150).
@@ -48,6 +50,8 @@ static func load_default() -> GameData:
 	d.horse = load(DIR + "horse.tres") as HorseData if ResourceLoader.exists(DIR + "horse.tres") else HorseData.new()
 	for path in _tres_in(DIR + "forms/"):
 		d.forms.append(load(path) as FormData)
+	for path in _tres_in(DIR + "buildings/"):
+		d.buildings.append(load(path) as BuildingData)
 	for path in _tres_in(DIR + "inscriptions/"):
 		var ins := load(path) as InscriptionData
 		d.inscriptions[ins.key] = ins
@@ -72,6 +76,13 @@ static func load_default() -> GameData:
 			d.swords_by_grade[s.grade].append(d.swords.size())
 		d.swords.append(s)
 	return d
+
+
+func building(id: StringName) -> BuildingData:
+	for b in buildings:
+		if b.id == id:
+			return b
+	return null
 
 
 ## SwordData.id는 1부터 310까지이고 swords 순서와 같다.
