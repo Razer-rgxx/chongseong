@@ -3,7 +3,7 @@ extends RefCounted
 ## 다른 영주들의 쓰러진 검(docs/sword_hill.md 2번, 2026-11-21 사용자: "검의 주인은 다른 사람들 것도 가끔 뜨게").
 ## GD-Sync 클라우드 순위표 BOARD에 내 마지막 쓰러진 검(Meta.fallen의 끝)을 올리고(계정 하나에 한 줄, 점수 = 올린 때라 새것이 위),
 ## 다른 사람들 것을 받아 Meta.others에 둔다(저장, 인터넷이 없어도 다음 판에 쓴다). 마을에 들어올 때 마을이 sync를 부른다.
-## 계정은 처음 한 번 저절로 만든다(이름 영주xxxxxx, 비밀번호는 user://share_account.cfg). GD-Sync 쪽에서 할 일:
+## 계정은 처음 한 번 저절로 만든다(이름 lordxxxxxx, 비밀번호는 user://share_account.cfg). GD-Sync 쪽에서 할 일:
 ## 대시보드에 순위표 BOARD를 만들고, 계정 이메일 인증을 끈다(인증이 켜져 있으면 로그인이 안 되어 조용히 넘어간다).
 ## 키는 결투와 같은 user://gdsync_keys.cfg(GdSyncLink.load_keys). 실패는 모두 조용히(글 한 줄만 돌려준다).
 ## 올리는 꼴(pack)은 2048바이트 안: 몸놀림은 틱마다 6바이트(x·y × 100은 u16, 얼굴 u8, 휘두름 u8)를 base64로.
@@ -155,7 +155,8 @@ static func _new_account() -> Dictionary:
 	var pw: String = ""
 	for i in 16:
 		pw += NAME_CHARS[rng.randi_range(0, NAME_CHARS.length() - 1)]
-	return {"email": "lord_%s@geomhill.invalid" % tag, "name": "lord_%s" % tag, "password": pw}
+	# 이름은 영문·숫자만(GD-Sync 데이터베이스의 이름 규칙에 걸리지 않게, 3~20자), 메일은 받는 곳이 없는 예약 주소
+	return {"email": "lord%s@example.com" % tag, "name": "lord%s" % tag, "password": pw}
 
 
 static func _save_account(a: Dictionary) -> void:
