@@ -206,6 +206,10 @@ const GIRLS: Array[StringName] = [&"herbalist", &"merchant", &"gatherer", &"peas
 static func _modelled(P: Dictionary, kind: StringName, look: Array) -> Dictionary:
 	var m := NpcModel.new()
 	m.model = "girl" if GIRLS.has(kind) else "man"
+	if kind in [&"gatekeeper", &"hunter", &"knight"]:
+		m.model = "ranger"
+	elif kind in [&"herbalist", &"gatherer"]:
+		m.model = "ranger_girl"
 	m.tint = look[0]
 	m.phase = float(P.phase)
 	(P.root as Node3D).add_child(m)
