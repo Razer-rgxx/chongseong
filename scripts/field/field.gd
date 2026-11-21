@@ -888,9 +888,7 @@ func _end_read() -> void:
 		if left:
 			_build_wanderer()   # 데려갔다: 들판에서 사라진다(마을에 선다)
 		elif not _wander_P.is_empty():
-			for f: Node3D in _wander_P.get("forearms", []):
-				if _wander_P.rest.has(f):
-					f.transform = _wander_P.rest[f]
+			VillageProps.still(_wander_P)
 
 
 func _saved() -> void:

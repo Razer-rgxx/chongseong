@@ -867,6 +867,7 @@ func _build_tier() -> void:
 		var body := Node3D.new()
 		holder.add_child(body)
 		var P: Dictionary = VillageProps.villager(looks[(i + 1) % looks.size()], body)
+		VillageProps.pose(P, "walk")
 		var len: float = 0.0
 		for k in path.size() - 1:
 			len += (path[k] as Vector2).distance_to(path[k + 1])
@@ -894,7 +895,7 @@ func _walk(delta: float) -> void:
 				break
 			dist -= seg
 		var root: Node3D = w.root
-		root.position = Grid.cells_to_world(at, absf(sin(float(w.s) * 9.0)) * 0.04)
+		root.position = Grid.cells_to_world(at, 0.0 if w.P.has("npc") else absf(sin(float(w.s) * 9.0)) * 0.04)
 		root.rotation.y = VillageBuilder.facing_to(dir) + PI
 		EventArt.breathe(w.P, _vt)
 
@@ -1139,10 +1140,7 @@ func _start_talk(id: StringName) -> void:
 
 func _end_talk() -> void:
 	if _talker != &"" and _folk.has(_talker):
-		var P: Dictionary = _folk[_talker].P
-		for f: Node3D in P.get("forearms", []):
-			if P.rest.has(f):
-				f.transform = P.rest[f]
+		VillageProps.still(_folk[_talker].P)
 	_talker = &""
 	_hud.say_end()
 

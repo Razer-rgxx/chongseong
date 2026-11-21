@@ -90,7 +90,30 @@ static func plaster() -> StandardMaterial3D:
 
 
 static func timber() -> StandardMaterial3D:
+	if VillageMaterials.has("brown_planks_05"):
+		return VillageMaterials.get_mat("brown_planks_05", Color(0.2, 0.14, 0.09), 1.2, Color(0.5, 0.42, 0.36))
 	return VillageMaterials.get_mat("raw_plank_wall", Color(0.2, 0.14, 0.09), 1.5, Color(0.42, 0.33, 0.26))
+
+
+## 방바닥: 닳은 마루(Poly Haven old_wood_floor). 없으면 판자.
+static func floor_boards() -> StandardMaterial3D:
+	if VillageMaterials.has("old_wood_floor"):
+		return VillageMaterials.get_mat("old_wood_floor", Color(0.3, 0.22, 0.15), 2.0, Color(0.7, 0.62, 0.55))
+	return planks()
+
+
+## 방 안 돌벽: 거친 옛 돌담(old_stone_wall). 없으면 바깥 돌.
+static func inner_stone() -> StandardMaterial3D:
+	if VillageMaterials.has("old_stone_wall"):
+		return VillageMaterials.get_mat("old_stone_wall", Color(0.3, 0.29, 0.28), 2.2, Color(0.72, 0.68, 0.64))
+	return stone()
+
+
+## 마을 돌담: 이끼 낀 돌(mossy_stone_wall). 없으면 바깥 돌.
+static func wall_stone() -> StandardMaterial3D:
+	if VillageMaterials.has("mossy_stone_wall"):
+		return VillageMaterials.get_mat("mossy_stone_wall", Color(0.33, 0.33, 0.3), 2.5, Color(0.8, 0.8, 0.76))
+	return stone()
 
 
 static func planks() -> StandardMaterial3D:
@@ -109,6 +132,8 @@ static func roof() -> StandardMaterial3D:
 
 
 static func bark() -> StandardMaterial3D:
+	if VillageMaterials.has("bark_brown_02"):
+		return VillageMaterials.get_mat("bark_brown_02", Color(0.1, 0.075, 0.055), 1.0, Color(0.62, 0.55, 0.48))
 	return noise_mat("bark", Color(0.1, 0.075, 0.055), Color(0.27, 0.21, 0.15), 1.0, 0.12)
 
 
@@ -451,7 +476,7 @@ static func stone_wall(parent: Node3D, from: Vector3, to: Vector3) -> void:
 		return
 	var dir: Vector3 = (to - from) / len
 	var yaw: float = atan2(dir.x, dir.z)
-	var st := stone()
+	var st := wall_stone()
 	var cap := plain(Color(0.42, 0.4, 0.37), 0.9)
 	var n: int = maxi(1, int(ceil(len / 2.0)))
 	var seg: float = len / float(n)

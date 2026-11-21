@@ -135,6 +135,8 @@ static func villager(kind: StringName, parent: Node3D) -> Dictionary:
 	var look: Array = LOOKS.get(kind, LOOKS[&"elder"])
 	var P := EventArt._begin(kind, parent)
 	P.phase = float(LOOKS.keys().find(kind)) * 1.7 + 0.3
+	if NpcModel.available():
+		return _modelled(P, kind, look)
 	var root: Node3D = P.root
 	P.height = 1.75
 	P.radius = 0.9
@@ -196,8 +198,48 @@ static func villager(kind: StringName, parent: Node3D) -> Dictionary:
 	return P
 
 
+## 여자 모델로 서는 사람.
+const GIRLS: Array[StringName] = [&"herbalist", &"merchant", &"gatherer", &"peasant2", &"peasant4"]
+
+
+## Mixamo 농부 모델로 선 사람(NpcModel). 몸 부위 대신 P.npc가 있다.
+static func _modelled(P: Dictionary, kind: StringName, look: Array) -> Dictionary:
+	var m := NpcModel.new()
+	m.model = "girl" if GIRLS.has(kind) else "man"
+	m.tint = look[0]
+	m.phase = float(P.phase)
+	(P.root as Node3D).add_child(m)
+	P.npc = m
+	P.rest = {}
+	P.height = 1.75
+	P.radius = 0.9
+	return P
+
+
+## 모델로 선 사람의 동작(idle, talk, walk, sit, kneel, pray). 기본 도형이면 아무것도 안 한다.
+static func pose(P: Dictionary, state: String) -> void:
+	var m: NpcModel = P.get("npc")
+	if m:
+		m.play(state)
+
+
+## 말을 마치고 손을 내린다.
+static func still(P: Dictionary) -> void:
+	pose(P, "idle")
+	for f: Node3D in P.get("forearms", []):
+		if P.rest.has(f):
+			f.transform = P.rest[f]
+
+
 ## 주민이 영주 쪽을 본다(머리를 몸 기준 yaw로 k만큼 돌린다, -0.9~0.9 제한). target은 월드 위치.
 static func look_at(P: Dictionary, root: Node3D, target: Vector3, k: float) -> void:
+	var m: NpcModel = P.get("npc")
+	if m:
+		# 모델: 몸을 살짝 영주 쪽으로 돌린다
+		var dm: Vector3 = root.to_local(target)
+		var ym: float = clampf(atan2(-dm.x, -dm.z), -0.7, 0.7) * k
+		m.rotation.y = lerpf(m.rotation.y, ym, 0.06)
+		return
 	var head: Node3D = P.get("head")
 	if head == null or not P.rest.has(head):
 		return
@@ -212,6 +254,7 @@ static func look_at(P: Dictionary, root: Node3D, target: Vector3, k: float) -> v
 
 ## 말할 때 손짓(t: 누적 초).
 static func talk(P: Dictionary, t: float) -> void:
+	pose(P, "talk")
 	var forearms: Array = P.get("forearms", [])
 	if forearms.size() < 2:
 		return

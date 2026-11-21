@@ -14,6 +14,7 @@ var kind: StringName = &"house"
 var cam: Camera3D = null
 var _npc: Node3D = null
 var _npc_P: Dictionary = {}
+var _pray: bool = false
 var _t: float = 0.0
 
 
@@ -21,8 +22,8 @@ var _t: float = 0.0
 func build(p_kind: StringName) -> void:
 	kind = p_kind
 	var stone_walls: bool = kind == &"shrine" or kind == &"smithy" or kind == &"forge"
-	var wall_m: Material = VillageBuilder.stone() if stone_walls else VillageBuilder.planks()
-	var floor_m: Material = VillageBuilder.stone() if kind == &"shrine" else VillageBuilder.planks()
+	var wall_m: Material = VillageBuilder.inner_stone() if stone_walls else VillageBuilder.planks()
+	var floor_m: Material = VillageBuilder.inner_stone() if kind == &"shrine" else VillageBuilder.floor_boards()
 	VillageBuilder.box(self, Vector3(W, 0.2, D), Vector3(0, -0.1, 0), floor_m)
 	VillageBuilder.box(self, Vector3(W, 0.2, D), Vector3(0, H + 0.1, 0), VillageBuilder.timber())
 	VillageBuilder.box(self, Vector3(W, H, 0.3), Vector3(0, H / 2.0, -D / 2.0), wall_m)
@@ -62,13 +63,17 @@ func set_npc(look: StringName) -> void:
 	_npc.position = Vector3(-0.1, 0.0, -1.4)
 	_npc.rotation.y = PI   # 문 쪽(+Z)을 본다(사람 몸은 -Z를 본다)
 	_npc_P = VillageProps.villager(look, _npc)
+	_pray = kind == &"shrine"
 
 
 func _process(delta: float) -> void:
 	_t += delta
 	if not _npc_P.is_empty():
 		EventArt.breathe(_npc_P, _t)
-		VillageProps.talk(_npc_P, _t)
+		if _pray:
+			VillageProps.pose(_npc_P, "pray")   # 성소지기는 무릎 꿇고 빈다
+		else:
+			VillageProps.talk(_npc_P, _t)
 
 
 func _light(at: Vector3, c: Color, e: float, r: float) -> void:

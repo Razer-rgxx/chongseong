@@ -72,3 +72,18 @@ Mixamo(Adobe)에서 받은 모델과 동작을 둔다. Mixamo 약관상 원본 �
 - 활잡이·돌격병·자폭병·부르는 자는 제 모델을 넣으면 EnemyArt의 전용 모양과 자세(겨누기, 머리 낮추기, 심지)가 빠지고 걷기·베기·맞기·쓰러짐으로 움직인다(활잡이는 왼손에 활, 부르는 자는 오른손에 지팡이). 효과는 그대로다. 어색하면 그 파일만 빼면 된다.
 - 모델마다 뼈 이름이 `mixamorig:`로 시작해야 영주 동작이 붙는다(Mixamo 캐릭터는 다 그렇다). 동작이 안 붙고 T자로 서면 그 모델은 빼고 알려 준다.
 - 너무 밝거나 어두우면 `EnemyView._build_knight`의 `mul`(제 모델용 줄)을 고친다.
+
+## 마을 사람 (2026-11-21)
+
+`npc/`에 넣으면 마을 사람·주민·걷는 사람·포로·건물 안 사람이 기본 도형 대신 이 모델로 선다(`NpcModel`). 없으면 지금 모양 그대로다.
+
+| 자리 | 무엇 | Mixamo |
+| --- | --- | --- |
+| `npc/man.fbx` | 남자 모델 | Peasant Man, With Skin |
+| `npc/girl.fbx` | 여자 모델(약초꾼·상인·채집꾼·주민 일부) | Peasant Girl, 아무 동작이나 With Skin |
+| `npc/anims/idle.fbx` | 서 있기 | Idle |
+| `npc/anims/talk.fbx` | 말하기 | Talking |
+| `npc/anims/walk.fbx` | 걷기(제자리) | Walking, In Place |
+| `npc/anims/kneel.fbx` | 무릎 꿇기(들판의 포로) | Kneeling Idle |
+| `npc/anims/pray.fbx` | 빌기(성소지기) | Praying |
+| `npc/anims/sit.fbx` | 앉아 있기(아직 안 씀) | Sitting Idle |

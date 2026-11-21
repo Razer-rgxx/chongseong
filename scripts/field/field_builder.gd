@@ -1416,7 +1416,9 @@ static func captive(parent: Node3D, pack: String) -> Node3D:
 	var holder := Node3D.new()
 	n.add_child(holder)
 	var P: Dictionary = VillageProps.villager(looks[absi(pack.hash()) % looks.size()], holder)
-	(P.torso as Node3D).rotation.x = 0.22   # 고개를 떨군다
+	VillageProps.pose(P, "kneel")   # 모델: 무릎 꿇고 묶여 있다
+	if P.has("torso"):
+		(P.torso as Node3D).rotation.x = 0.22   # 고개를 떨군다
 	if P.has("head"):
 		(P.head as Node3D).rotation.x = 0.35
 	return n
