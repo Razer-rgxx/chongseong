@@ -11,6 +11,7 @@ extends Resource
 @export var hurt_invuln: float = 0.3
 
 @export_group("공격")
+## 기본 피해. data/lord.tres가 13으로 둔다(2026-11-21: 검이 너무 세다는 말에 20에서 내림, 등급 배수도 평평하게).
 @export var damage: float = 20.0
 @export var reach: float = 1.55
 ## 라디안.

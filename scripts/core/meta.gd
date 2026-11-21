@@ -26,7 +26,9 @@ var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
 var runs: int = 0
-## 검 보관집(2026-11-21, 대장간에서 산다): 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
+## 검 보관집(2026-11-21): 마을 터에 집을 짓고(storage_house), 그 집에서 검집을 단계로 산다(storage_lv).
+## 검집 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
+var storage_house: bool = false
 var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
@@ -113,7 +115,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -168,6 +170,7 @@ func from_dict(d: Dictionary) -> void:
 	best = int(d.get("best", 0))
 	runs = int(d.get("runs", 0))
 	storage_lv = clampi(int(d.get("storage_lv", 0)), 0, 2)
+	storage_house = bool(d.get("storage_house", storage_lv > 0))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -1138,15 +1141,30 @@ func field_slots() -> int:
 	return 1 if storage_lv == 0 else 2 + storage_lv
 
 
-## 다음 단계 검 보관집 값(조각). 다 지었으면 -1.
+## 검 보관집을 짓는 값(조각). 이미 지었으면 -1.
+func house_cost(md: MetaData) -> int:
+	return -1 if storage_house else md.storage_house_cost
+
+
+## 검 보관집을 짓는다. 된 일이면 true(조각이 모자라거나 이미 있으면 false).
+func build_house(md: MetaData) -> bool:
+	var c: int = house_cost(md)
+	if c < 0 or shards < c:
+		return false
+	shards -= c
+	storage_house = true
+	return true
+
+
+## 다음 단계 검집 값(조각). 다 샀으면 -1. 집이 없어도 값은 알려 준다(사기는 buy_sheath가 막는다).
 func storage_cost(md: MetaData) -> int:
 	return md.storage_costs[storage_lv] if storage_lv < md.storage_costs.size() else -1
 
 
-## 검 보관집을 짓거나 늘린다. 된 일이면 true(조각이 모자라거나 끝이면 false).
-func build_storage(md: MetaData) -> bool:
+## 보관집에서 다음 단계 검집을 산다. 된 일이면 true(집이 없거나 조각이 모자라거나 끝이면 false).
+func buy_sheath(md: MetaData) -> bool:
 	var c: int = storage_cost(md)
-	if c < 0 or shards < c:
+	if not storage_house or c < 0 or shards < c:
 		return false
 	shards -= c
 	storage_lv += 1

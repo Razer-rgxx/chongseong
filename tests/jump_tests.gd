@@ -302,6 +302,9 @@ func _pose() -> void:
 	check.call(float(mid.tuck) > 0.9 and float(mid.bend) < 0.01, "점프 자세: 공중 가운데에서 다리를 접는다")
 	check.call(float(land.bend) > 0.9 and float(land.pitch) > 0.0, "점프 자세: 내려앉으며 무릎을 굽힌다")
 	check.call(float(rest.bend) == 0.0 and float(rest.tuck) == 0.0, "점프 자세: 땅에서 가만히 있으면 아무것도 안 얹는다")
+	check.call(float(mid.gather) > 0.99 and float(a.gather) < 0.01 and float(rest.gather) == 0.0 and float(MoveMotion.hop_pose(1.0, -1.0).gather) < 0.01,
+		"점프 자세: 공중에서는 두 다리를 몸 밑에 모으고, 뜰 때와 내려앉을 때는 동작의 다리 그대로")
+	_gather()
 	check.call(LordCharacter._key_for("hop") == "hop" and LordCharacter._key_for("jump hop") == "hop" and LordCharacter._key_for("great sword jump") == "leap", "Mixamo 낱말: hop은 점프, jump는 그대로 도약 내려찍기")
 	# 다리 굽힘(LegFold): 뼈대 X축으로 허벅지를 -각(무릎이 앞 +Z), 정강이를 +각. 무릎 굽힘이면 발이 엉덩이 밑에 남고 발바닥이 평평하다.
 	var g: Vector3 = LegFold.angles(0.0, 1.0)
@@ -312,3 +315,25 @@ func _pose() -> void:
 	var knee: Vector3 = Basis(Vector3.RIGHT, t.x) * Vector3(0, -0.45, 0)
 	var foot: Vector3 = knee + Basis(Vector3.RIGHT, t.x + t.y) * Vector3(0, -0.45, 0)
 	check.call(knee.z > 0.3 and foot.y > -0.6, "다리 접기: 공중에서 무릎이 앞으로 들리고 발이 올라온다")
+
+
+## 다리 모으기(LegFold gather): 동작이 벌려 놓은 다리를 쉬는 자세 쪽으로 옮긴다(공중에서 걸음 중간에 굳은 다리가 따로 놀지 않게).
+func _gather() -> void:
+	var sk := Skeleton3D.new()
+	var names: Array[String] = ["mixamorig_Hips"]
+	for leg in LegFold.LEGS:
+		for n in leg:
+			names.append(n)
+	for n in names:
+		sk.add_bone(n)
+	for i in range(1, names.size()):
+		sk.set_bone_parent(i, 0 if (i == 1 or i == 4) else i - 1)
+	var spread := Quaternion(Vector3.FORWARD, 0.5)
+	var up: int = sk.find_bone("mixamorig_LeftUpLeg")
+	sk.set_bone_pose_rotation(up, spread)
+	LegFold.fold(sk, 0.0, 0.0, 0.0, 1.0)
+	check.call(sk.get_bone_pose_rotation(up).is_equal_approx(Quaternion.IDENTITY), "다리 모으기: 다 모으면 쉬는 자세(곧게 내린 다리)가 된다")
+	sk.set_bone_pose_rotation(up, spread)
+	LegFold.fold(sk, 0.0, 0.0, 0.0, 0.0)
+	check.call(sk.get_bone_pose_rotation(up).is_equal_approx(spread), "다리 모으기: 0이면 동작의 다리를 건드리지 않는다")
+	sk.free()

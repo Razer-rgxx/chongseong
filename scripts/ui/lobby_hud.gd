@@ -18,6 +18,9 @@ signal duel_go(a: int, b: int)
 ## 22단계: 모르는 사람과 겨루기. 검을 골랐다(찾기 시작) / 찾는 도중에 창을 닫았다(취소).
 signal duel_online(pick: int)
 signal duel_online_cancel()
+## 검 보관집(2026-11-21): 터에 집을 지었다(마을이 집을 올린다), 검집을 샀다(그 단계).
+signal storage_built()
+signal sheath_bought(level: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -34,6 +37,8 @@ var _forge: Control
 var _forge_box: VBoxContainer
 var _shrine: Control
 var _shrine_box: VBoxContainer
+var _storage: Control
+var _storage_box: VBoxContainer
 var _rack: Control
 var _rack_text: RichTextLabel
 var _msg: Label
@@ -97,6 +102,8 @@ func _ready() -> void:
 	_forge_box = UiKit.center_panel(_forge)
 	_shrine = _layer()
 	_shrine_box = UiKit.center_panel(_shrine)
+	_storage = _layer()
+	_storage_box = UiKit.center_panel(_storage)
 	_board = _layer()
 	_board_box = UiKit.center_panel(_board)
 	_shop = _layer()
@@ -130,7 +137,7 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
+	return _forge.visible or _shrine.visible or _storage.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
 
 
 func close() -> void:
@@ -142,6 +149,7 @@ func close() -> void:
 		duel_online_cancel.emit()
 	_forge.visible = false
 	_shrine.visible = false
+	_storage.visible = false
 	_rack.visible = false
 	_board.visible = false
 	_shop.visible = false
@@ -305,30 +313,70 @@ func _render_forge(msg: String) -> void:
 			_forge_box.add_child(UiKit.label("떠돌이 대장장이가 거든다: 망치질 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_FORGE) * 100.0), 13, UiKit.MUTED))
 	else:
 		_forge_box.add_child(UiKit.label("끝까지 벼렸다.", 16, UiKit.TITLE))
-	# 검 보관집(2026-11-21): 검 칸을 늘린다(언덕 판 2 → 3 → 4, 들판·무덤 1 → 3 → 4)
-	var sc: int = meta.storage_cost(md)
-	var held: String = "언덕 판 %d칸 · 들판 %d칸" % [meta.hill_slots(), meta.field_slots()]
-	if sc >= 0:
-		var what: String = "검 보관집 짓기" if meta.storage_lv == 0 else "검 보관집 늘리기"
-		var sb := UiKit.button("%s · 조각 %s · 지금 %s" % [what, _num(sc), held], _build_storage, 42)
-		sb.disabled = _busy
-		_forge_box.add_child(sb)
-	else:
-		_forge_box.add_child(UiKit.label("검 보관집: " + held, 15, UiKit.TEXT))
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_forge_box.add_child(_msg)
 
 
-func _build_storage() -> void:
-	if _busy:
-		return
-	var sc: int = meta.storage_cost(data.meta)
-	if not meta.build_storage(data.meta):
-		_render_forge("조각이 %s 모자라." % _num(maxi(0, sc - meta.shards)))
+# ---------------------------------------------------------------- 검 보관집(2026-11-21)
+
+## 터(짓기 전)나 집(지은 뒤)에서 E. 지으면 창을 닫고 마을이 집을 한 조각씩 올린다. 집에서는 검집을 단계로 산다.
+func open_storage() -> void:
+	_storage.visible = true
+	_render_storage("")
+
+
+func _render_storage(msg: String) -> void:
+	for c in _storage_box.get_children():
+		c.queue_free()
+	var md := data.meta
+	var held: String = "지금 언덕 판 %d칸 · 들판 %d칸" % [meta.hill_slots(), meta.field_slots()]
+	if not meta.storage_house:
+		UiKit.header(_storage_box, "검 보관집 터", close)
+		_storage_box.add_child(_wrap(UiKit.label("말뚝과 줄로 둘러친 빈 터에 통나무와 돌이 쌓여 있다.\n집을 지으면 그 안에서 검집을 살 수 있다. 검집이 늘면 언덕 판과 들판에서 한 번에 드는 검이 는다.", 15, UiKit.MUTED)))
+		_storage_box.add_child(UiKit.label(held, 15, UiKit.TEXT))
+		_storage_box.add_child(UiKit.button("검 보관집 짓기 · 조각 %s" % _num(meta.house_cost(md)), _build_house, 46))
+	else:
+		UiKit.header(_storage_box, "검 보관집 · 검집", close)
+		_storage_box.add_child(UiKit.label(held, 15, UiKit.TEXT))
+		for i in md.storage_costs.size():
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 14)
+			var txt := UiKit.label("검집 %d단계\n언덕 판 %d칸 · 들판 %d칸" % [i + 1, 3 + i, 3 + i], 15)
+			txt.custom_minimum_size = Vector2(360, 0)
+			row.add_child(txt)
+			if i < meta.storage_lv:
+				row.add_child(UiKit.label("걸려 있다", 15, UiKit.MUTED))
+			elif i == meta.storage_lv:
+				var b := UiKit.button("조각 %s" % _num(md.storage_costs[i]), _buy_sheath)
+				b.custom_minimum_size = Vector2(180, 40)
+				row.add_child(b)
+			else:
+				row.add_child(UiKit.label("앞 단계를 먼저", 15, UiKit.MUTED))
+			_storage_box.add_child(row)
+	_msg = UiKit.label(msg, 18, UiKit.TITLE)
+	_storage_box.add_child(_msg)
+
+
+func _build_house() -> void:
+	var c: int = meta.house_cost(data.meta)
+	if not meta.build_house(data.meta):
+		_render_storage("조각이 %s 모자라." % _num(maxi(0, c - meta.shards)))
 		return
 	meta.save()
 	refresh_top()
-	_render_forge("검 보관집을 지었다. 이제 언덕 판 %d칸, 들판 %d칸에 검을 든다." % [meta.hill_slots(), meta.field_slots()])
+	close()
+	storage_built.emit()
+
+
+func _buy_sheath() -> void:
+	var c: int = meta.storage_cost(data.meta)
+	if not meta.buy_sheath(data.meta):
+		_render_storage("조각이 %s 모자라." % _num(maxi(0, c - meta.shards)))
+		return
+	meta.save()
+	refresh_top()
+	sheath_bought.emit(meta.storage_lv)
+	_render_storage("검집 %d단계를 걸었다. 이제 언덕 판 %d칸, 들판 %d칸에 검을 든다." % [meta.storage_lv, meta.hill_slots(), meta.field_slots()])
 
 
 func _forge_sheath() -> void:

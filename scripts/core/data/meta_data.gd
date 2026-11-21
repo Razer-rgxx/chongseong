@@ -14,9 +14,11 @@ extends Resource
 @export var melt: PackedInt32Array = PackedInt32Array([2, 6, 20, 60, 200, 1000])
 @export var elite: int = 15
 
-@export_group("대장간: 검 보관집 (2026-11-21)")
-## 검 보관집 단계별 값(조각). 1단계: 검 칸 3, 2단계: 4(언덕 판·들판·무덤 모두).
-@export var storage_costs: PackedInt32Array = PackedInt32Array([120, 300])
+@export_group("마을: 검 보관집 (2026-11-21)")
+## 검 보관집을 짓는 값(조각). 마을 북동쪽 빈 터에 집이 올라가고, 그 집에서 검집을 산다.
+@export var storage_house_cost: int = 80
+## 보관집에서 사는 검집 단계별 값(조각). 1단계: 검 칸 3, 2단계: 4(언덕 판·들판·무덤 모두).
+@export var storage_costs: PackedInt32Array = PackedInt32Array([100, 220])
 
 @export_group("대장간: 검집")
 ## 이 등급 이상으로 뽑아 본 검만 검집에 넣는다(2 = 전설).

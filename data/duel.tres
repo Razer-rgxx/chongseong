@@ -4,3 +4,4 @@
 
 [resource]
 script = ExtResource("1_s")
+hp = 200.0

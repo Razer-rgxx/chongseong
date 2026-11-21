@@ -1,5 +1,5 @@
 extends RefCounted
-## 검 보관집 테스트(2026-11-21): 대장간에서 산다(조각), 검 칸 언덕 2 → 3 → 4·들판 1 → 3 → 4, 저장,
+## 검 보관집 테스트(2026-11-21): 마을 터에 집을 짓고(조각) 그 집에서 검집을 단계로 산다(조각), 검 칸 언덕 2 → 3 → 4·들판 1 → 3 → 4, 저장,
 ## 칸이 넷이면 넷까지 들고 다섯째에 고르기 창, 아무 칸이나 고른다, Q는 다음(검이 든) 칸, 숫자는 그 칸, 쥔 검이 부러지면 다음 칸, 입력 바이트.
 ## run_all.gd가 부른다: run(데이터, check).
 
@@ -25,13 +25,23 @@ func _all() -> void:
 func _buy() -> void:
 	var m := Meta.new()
 	check.call(m.hill_slots() == 2 and m.field_slots() == 1, "검 보관집이 없으면 언덕 판 2칸, 들판 1칸")
-	check.call(not m.build_storage(d.meta) and m.storage_lv == 0, "조각이 모자라면 못 짓는다")
+	check.call(not m.build_house(d.meta) and not m.storage_house, "조각이 모자라면 집을 못 짓는다")
 	m.shards = 1000
+	check.call(not m.buy_sheath(d.meta) and m.storage_lv == 0 and m.shards == 1000, "집이 없으면 검집을 못 산다")
+	var hc: int = m.house_cost(d.meta)
+	check.call(m.build_house(d.meta) and m.storage_house and m.shards == 1000 - hc and m.house_cost(d.meta) < 0, "검 보관집을 지으면 조각 %d을 쓴다" % hc)
+	check.call(m.hill_slots() == 2 and m.field_slots() == 1, "집만 지으면 칸은 그대로(검집을 사야 는다)")
+	check.call(not m.build_house(d.meta), "집은 한 번만 짓는다")
+	var before: int = m.shards
 	var c1: int = m.storage_cost(d.meta)
-	check.call(m.build_storage(d.meta) and m.storage_lv == 1 and m.shards == 1000 - c1, "검 보관집을 지으면 조각 %d을 쓴다" % c1)
-	check.call(m.hill_slots() == 3 and m.field_slots() == 3, "검 보관집 1단계: 언덕 판 3칸, 들판 3칸")
-	check.call(m.build_storage(d.meta) and m.hill_slots() == 4 and m.field_slots() == 4, "검 보관집 2단계: 4칸")
-	check.call(m.storage_cost(d.meta) < 0 and not m.build_storage(d.meta), "4칸이 끝이다")
+	check.call(m.buy_sheath(d.meta) and m.storage_lv == 1 and m.shards == before - c1, "검집 1단계는 조각 %d" % c1)
+	check.call(m.hill_slots() == 3 and m.field_slots() == 3, "검집 1단계: 언덕 판 3칸, 들판 3칸")
+	check.call(m.buy_sheath(d.meta) and m.hill_slots() == 4 and m.field_slots() == 4, "검집 2단계: 4칸")
+	check.call(m.storage_cost(d.meta) < 0 and not m.buy_sheath(d.meta), "4칸이 끝이다")
+	var poor := Meta.new()
+	poor.storage_house = true
+	poor.shards = d.meta.storage_costs[0] - 1
+	check.call(not poor.buy_sheath(d.meta) and poor.storage_lv == 0, "조각이 모자라면 검집을 못 산다")
 
 
 func _saved() -> void:
@@ -40,6 +50,15 @@ func _saved() -> void:
 	var m2 := Meta.new()
 	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
 	check.call(m2.storage_lv == 2, "검 보관집 단계는 저장하고 불러온다")
+	m.storage_house = true
+	m2 = Meta.new()
+	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+	check.call(m2.storage_house, "지은 집은 저장하고 불러온다")
+	var old := m.to_dict()
+	old.erase("storage_house")
+	m2 = Meta.new()
+	m2.from_dict(old)
+	check.call(m2.storage_house, "대장간에서 산 예전 저장은 집이 있는 것으로 읽는다")
 
 
 func _rules(lv: int) -> Rules:

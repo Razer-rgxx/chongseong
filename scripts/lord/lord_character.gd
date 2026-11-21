@@ -415,11 +415,13 @@ func recolor(mul: Color, glow: Color = Color.BLACK, glow_energy: float = 0.0) ->
 	return out
 
 
-## 점프(30단계): hop 동작이 없으면 다리를 코드로 굽힌다(LegFold). tuck = 공중에서 접기, bend = 선 채로 무릎 굽힘(0~1).
-func set_legs(tuck: float, bend: float) -> void:
+## 점프(30단계): hop 동작이 없으면 다리를 코드로 굽힌다(LegFold). tuck = 공중에서 접기, bend = 선 채로 무릎 굽힘(0~1),
+## gather = 공중에서 두 다리를 몸 밑으로 모으기(0~1).
+func set_legs(tuck: float, bend: float, gather: float = 0.0) -> void:
 	if _legs:
 		_legs.tuck = tuck
 		_legs.bend = bend
+		_legs.gather = gather
 
 
 ## 39단계 말 위: 앉은 다리(LegFold.ride, 0~1). 동작은 서 있기 그대로 두고 다리만 코드로 굽힌다.

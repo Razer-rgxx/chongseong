@@ -76,7 +76,7 @@ func _face_off(r: Rules, gap: float) -> void:
 
 func _data() -> void:
 	var D := d.duel
-	check.call(D != null and D.hp == 300.0 and D.round_time == 90.0 and D.rounds_to_win == 2 and D.break_time == 3.0, "결투 수치(data/duel.tres): 체력 300, 한 판 90초, 2선승, 쉼 3초")
+	check.call(D != null and D.hp == 200.0 and D.round_time == 90.0 and D.rounds_to_win == 2 and D.break_time == 3.0, "결투 수치(data/duel.tres): 체력 200(2026-11-21 피해를 내리며 같이), 한 판 90초, 2선승, 쉼 3초")
 
 
 func _start() -> void:

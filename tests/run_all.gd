@@ -113,6 +113,7 @@ func _init() -> void:
 	(load("res://tests/draw_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/owner_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/storage_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/balance_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -665,7 +666,7 @@ func _test_sheath() -> void:
 	r.lord.face = 0.0
 	var hp0: float = e.hp
 	r.step(_inp(Vector2.ZERO, true))
-	check(is_equal_approx(hp0 - e.hp, 20.0 * 1.6 * 1.4), "검집 보너스가 피해에 들어간다(%.1f)" % (hp0 - e.hp))
+	check(is_equal_approx(hp0 - e.hp, d.lord.damage * d.grades.damage_mult[2] * 1.4), "검집 보너스가 피해에 들어간다(%.1f)" % (hp0 - e.hp))
 
 
 func _test_forge() -> void:

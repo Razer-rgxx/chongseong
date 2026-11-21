@@ -26,6 +26,8 @@ const DUEL_PATH: String = "res://scenes/duel/duel.tscn"
 ## 결투 말뚝(21단계, docs/duel.md): 광장. E로 창을 열어 같은 PC로 겨루기 → 1P·2P 검 고르기 → 결투 장면.
 @export var duel_at: Vector2 = Vector2(19.4, 10.6)
 @export var merchant_at: Vector2 = Vector2(14.7, 10.4)
+## 검 보관집(2026-11-21): 북동쪽 빈 터(집 가운데). 지으면 집이 올라가고 그 집 문 앞에서 검집을 산다.
+@export var storage_at: Vector2 = Vector2(24.2, 4.25)
 ## 주민: id → [칸 자리, 바라볼 방향].
 const VILLAGERS: Dictionary = {
 	&"gatekeeper": [Vector2(19.4, 3.7), Vector2(-1, 1)],
@@ -45,7 +47,7 @@ const RECRUITS: Dictionary = {
 }
 
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
-const PROMPTS: Dictionary = {"forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
+const PROMPTS: Dictionary = {"storage": "검 보관집에 들른다", "storage_site": "검 보관집 터를 본다", "forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
 @export var max_ticks_per_frame: int = 8
 
 ## 온라인 찾기(22단계). 결투 장면으로 넘어가면 비운다.
@@ -83,6 +85,9 @@ var _talk_lines: Array[String] = []
 var _talk_i: int = 0
 ## 영입한 사람이 마을에서 한 말의 차례(id → 다음 줄 번호, 이번에 마을에 있는 동안만).
 var _recruit_said: Dictionary = {}
+## 검 보관집(2026-11-21)과 그 막힘이 _rects에서 몇 번째인지(지으면 바꾼다).
+var _storage: StorageHouse = null
+var _storage_rect: int = -1
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -115,6 +120,7 @@ func _ready() -> void:
 	_build_gate()
 	_build_houses()
 	_build_village_extras()
+	_build_storage()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -130,6 +136,8 @@ func _ready() -> void:
 	_hud.duel_go.connect(_on_duel_go)
 	_hud.duel_online.connect(_on_duel_online)
 	_hud.duel_online_cancel.connect(_cancel_online)
+	_hud.storage_built.connect(_on_storage_built)
+	_hud.sheath_bought.connect(_on_sheath_bought)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	rules.enemy_hit.connect(_on_dummy_hit)
@@ -238,7 +246,8 @@ func _process(delta: float) -> void:
 	var p: Vector2 = rules.lord.pos
 	_near = ""
 	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0),
-		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4)}
+		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4),
+		("storage" if meta.storage_house else "storage_site"): storage_at + Vector2(-0.3, 1.75)}
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
 	for id in RECRUITS:
@@ -291,6 +300,8 @@ func _interact() -> void:
 			_hud.open_field_pick()
 		"duel":
 			_hud.open_duel()
+		"storage", "storage_site":
+			_hud.open_storage()
 		_:
 			return
 	_capture(false)
@@ -383,7 +394,7 @@ func _build_trees() -> void:
 		var side: int = _deco.randi() % 4
 		var t: float = _deco.randf_range(1.5, 32.5)
 		var c: Vector2 = [Vector2(t, 3.2), Vector2(t, 21.0), Vector2(1.0, 3.0 + t * 0.55), Vector2(33.0, 3.0 + t * 0.55)][side]
-		if absf(c.x - 17.0) < 3.0:
+		if absf(c.x - 17.0) < 3.0 or Rect2(storage_at - Vector2(1.8, 1.6), Vector2(3.6, 3.2)).has_point(c):
 			continue
 		if _deco.randf() < 0.7:
 			VillageBuilder.bush(self, Grid.cells_to_world(c), _deco)
@@ -638,6 +649,41 @@ func _build_village_extras() -> void:
 	for id in RECRUITS:   # 34단계: 들판에서 데려온 사람
 		if meta.has_recruit(String(id)):
 			_add_folk(id, RECRUITS[id][0], RECRUITS[id][1])
+
+
+## 검 보관집(2026-11-21): 지었으면 집, 아니면 말뚝을 친 빈 터. 막힘은 _rects 한 칸(지으면 바꾼다)과 검집 걸이.
+func _build_storage() -> void:
+	_storage = StorageHouse.new()
+	add_child(_storage)
+	_storage.position = Grid.cells_to_world(storage_at)
+	_storage.build(meta.storage_house, meta.storage_lv)
+	_storage_rect = _rects.size()
+	_rects.append(_storage.rect(storage_at))
+	if meta.storage_house:
+		_rects.append(_rack_rect())
+	_storage.piece_placed.connect(func(at: Vector3) -> void: _sfx.play(&"thump", at, -8.0))
+	_storage.raised.connect(func() -> void:
+		_sfx.play(&"anvil", Grid.cells_to_world(storage_at, 1.0), -8.0)
+		_hud.toast("검 보관집이 섰다. 문 앞에서 검집을 산다."))
+
+
+func _rack_rect() -> Rect2:
+	var at: Vector2 = storage_at + Vector2(StorageHouse.RACK_AT.x, StorageHouse.RACK_AT.z) / Grid.CELL
+	return Rect2(at - Vector2(0.4, 0.12), Vector2(0.8, 0.24))
+
+
+func _on_storage_built() -> void:
+	_storage.raise()
+	_rects[_storage_rect] = _storage.rect(storage_at)
+	_rects.append(_rack_rect())
+	rules.lord.pos = _push_out(rules.lord.pos)   # 터 안에 서 있었으면 집 밖으로
+	rules.lord.prev_pos = rules.lord.pos
+	_hud.toast("검 보관집을 짓는다.")
+
+
+func _on_sheath_bought(level: int) -> void:
+	_storage.set_level(level)
+	_sfx.play(&"draw", Grid.cells_to_world(storage_at, 1.0), -6.0)
 
 
 func _add_folk(id: StringName, cell: Vector2, dir: Vector2) -> void:

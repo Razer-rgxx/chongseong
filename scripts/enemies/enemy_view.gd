@@ -35,6 +35,11 @@ const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshade
 @export var token_eye_size: float = 1.3
 @export var soon_eye_bright: float = 3.2
 @export var soon_eye_size: float = 1.6
+## 체력 막대(2026-11-21): 맞은 적의 머리 위에 짧은 막대(글자 없음). 마지막으로 깎인 뒤 이만큼(초) 보이다 사라진다.
+## 깎인 몫은 옅은 막대로 잠깐 남았다가 따라 줄어든다. 보스·우두머리(화면 아래 큰 막대)와 허수아비는 달지 않는다.
+@export var bar_show: float = 3.0
+@export var bar_fade: float = 0.5
+@export var bar_lag_speed: float = 0.9
 
 var enemy: Enemy
 var _mats: Array[StandardMaterial3D] = []
@@ -82,6 +87,15 @@ var _shield_knight: LordCharacter = null
 var _vel := Vector3.ZERO
 # 무덤 기사(기사 모델이 없을 때의 도형 칼 팔 포즈와 몸 기울임)
 var _arm_pivot: Node3D = null
+## 체력 막대: 뿌리(카메라를 본다), 채움, 깎인 몫, 막대 너비(m), 마지막으로 깎인 뒤 지난 초(-1이면 감춤), 지난 체력, 깎인 몫의 비율.
+var _bar: Node3D = null
+var _bar_fill: MeshInstance3D = null
+var _bar_lag: MeshInstance3D = null
+var _bar_mats: Array[StandardMaterial3D] = []
+var _bar_w: float = 0.9
+var _bar_t: float = -1.0
+var _bar_hp: float = -1.0
+var _lag_k: float = 1.0
 var _lean: float = 0.0
 
 
@@ -156,6 +170,8 @@ func hit(big: bool = false) -> void:
 
 func die() -> void:
 	_dying = 0.0
+	if _bar:
+		_bar.visible = false
 	if _knight:
 		_knight.play("death", 1.0)
 	if _shield_knight:
@@ -217,7 +233,82 @@ func draw(alpha: float, delta: float) -> bool:
 		_rust_pose(delta)
 	_paint()
 	_paint_eyes(delta)
+	_draw_bar(delta)
 	return false
+
+
+# ---------------------------------------------------------------- 체력 막대(2026-11-21)
+
+## 막대를 달 적인지: 보스·우두머리는 화면 아래 큰 막대가 있고, 허수아비는 수련장 위 줄이 있다.
+static func wants_bar(e: Enemy) -> bool:
+	return not e.data.boss and e.chief == &"" and e.data.acts() != &"dummy" and e.max_hp < 9999.0
+
+
+## 체력 몫(0~1)과 깎인 몫(0~1)으로 막대를 그린다. 깎이면 다시 보이고, bar_show초 지나면 옅어져 사라진다.
+func _draw_bar(delta: float) -> void:
+	if not wants_bar(enemy) or enemy.max_hp <= 0.0:
+		return
+	if _bar_hp < 0.0:
+		_bar_hp = enemy.hp
+	if enemy.hp < _bar_hp - 0.001:
+		if _bar == null:
+			_make_bar()
+		_bar_t = 0.0
+	_bar_hp = enemy.hp
+	if _bar == null or _bar_t < 0.0:
+		return
+	_bar_t += delta
+	if _bar_t > bar_show + bar_fade:
+		_bar_t = -1.0
+		_bar.visible = false
+		return
+	_bar.visible = true
+	var k: float = clampf(enemy.hp / enemy.max_hp, 0.0, 1.0)
+	_lag_k = maxf(k, move_toward(_lag_k, k, delta * bar_lag_speed) if _bar_t > 0.25 else _lag_k)
+	_fill_to(_bar_fill, k)
+	_fill_to(_bar_lag, _lag_k)
+	var a: float = 1.0 - clampf((_bar_t - bar_show) / bar_fade, 0.0, 1.0)
+	for i in _bar_mats.size():
+		var m := _bar_mats[i]
+		m.albedo_color.a = [0.8, 0.55, 1.0][i] * a
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if cam:
+		_bar.global_basis = cam.global_basis
+
+
+func _fill_to(mi: MeshInstance3D, k: float) -> void:
+	mi.scale.x = maxf(0.001, k)
+	mi.position.x = -_bar_w / 2.0 * (1.0 - k)
+
+
+func _make_bar() -> void:
+	_bar_w = clampf(Grid.cells_to_meters(enemy.radius) * 2.4, 0.7, 1.6)
+	_bar = Node3D.new()
+	_bar.position = Vector3(0.0, _height + 0.4, 0.0)
+	add_child(_bar)
+	var h: float = 0.09
+	var fill_c := Color(0.78, 0.52, 0.16) if enemy.elite else Color(0.72, 0.15, 0.12)
+	var cols := [Color(0.02, 0.018, 0.015), Color(0.86, 0.78, 0.64), fill_c]
+	var sizes := [Vector2(_bar_w + 0.05, h + 0.05), Vector2(_bar_w, h), Vector2(_bar_w, h)]
+	var made: Array[MeshInstance3D] = []
+	for i in 3:
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.no_depth_test = true   # 제 몸에 가리지 않게
+		m.render_priority = 10 + i
+		m.albedo_color = cols[i]
+		_bar_mats.append(m)
+		var q := QuadMesh.new()
+		q.size = sizes[i]
+		var mi := MeshInstance3D.new()
+		mi.mesh = q
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_bar.add_child(mi)
+		made.append(mi)
+	_bar_lag = made[1]
+	_bar_fill = made[2]
 
 
 func _draw_death(delta: float) -> bool:

@@ -223,7 +223,7 @@ func draw(alpha: float, delta: float) -> void:
 	var riding: bool = L.riding and horse_view != null
 	_ride_k = move_toward(_ride_k, 1.0 if riding else 0.0, delta / maxf(ride_blend, 0.01))
 	if character:
-		character.set_frozen(rules.freeze > 0 or _paused() or _air_frozen(L))
+		character.set_frozen(rules.freeze > 0 or _paused())
 		_step_then()
 		_animate(L, delta)
 		_turn(L, delta)
@@ -393,7 +393,12 @@ func _animate(L: LordState, delta: float) -> void:
 		_one_shot("hit", hit_speed)
 	elif _busy <= 0.0 and L.riding:   # 39단계: 말 위에서는 서 있기 동작(다리는 LegFold.ride가 굽힌다)
 		_loop("idle")
-	elif _busy <= 0.0 and not L.airborne():   # 공중에서는 뛰기 전 동작을 그대로 둔다(hop이 없으면 멈춰 두고 다리를 접는다)
+	elif _busy <= 0.0 and L.airborne():
+		# 공중(hop 동작이 없을 때): 뛰던 걸음을 멈춰 두면 팔과 몸이 걸음 중간에 굳어 접힌 다리와 따로 논다.
+		# 서 있기 자세(칼을 든 채)로 옮기고 다리는 LegFold가 접는다. hop 동작이 있으면 그것이 돈다.
+		if not _hop_anim:
+			_loop("idle")
+	elif _busy <= 0.0:
 		if rules.pull_hilt != null:
 			_loop("pull")
 		elif L.moving:
@@ -483,11 +488,6 @@ func _start_hop() -> void:
 	_hop_anim = true
 
 
-## hop 동작이 없는 기사 모델은 공중에서 뛰기 전 동작을 멈춰 두고 다리만 접는다(뛰던 다리가 허공을 젓지 않게).
-func _air_frozen(L: LordState) -> bool:
-	return L.airborne() and not _hop_anim
-
-
 ## 점프 자세를 모델에 얹을 몫(PullMotion.add 모양). 기사 모델은 다리를 굽히고 무릎 굽힘만큼 몸을 내린다(발이 땅에 붙게), 기본 도형은 눌린다.
 func _jump_pose() -> Dictionary:
 	var bend: float = float(_hop.bend)
@@ -501,7 +501,7 @@ func _jump_pose() -> Dictionary:
 			character.set_legs(0.0, 0.0)
 			out["pitch"] = 0.0
 		else:
-			character.set_legs(tuck, bend)
+			character.set_legs(tuck, bend, float(_hop.get("gather", 0.0)))
 			out["crouch"] = character.bend_drop(bend)
 	else:
 		out["scale_y"] = 1.0 - hop_squash_bend * bend - hop_squash_tuck * tuck

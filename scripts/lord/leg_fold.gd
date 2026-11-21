@@ -8,6 +8,8 @@ extends SkeletonModifier3D
 ##   tuck: 공중에서 다리 접기. 허벅지를 TUCK_THIGH 올리고 정강이를 TUCK_SHIN 접는다.
 ##   ride(39단계 말): 안장에 앉은 다리. 허벅지를 RIDE_THIGH 앞으로 들고 RIDE_SPREAD 벌리고(말 몸통을 끼고), 정강이를 RIDE_SHIN 뒤로 내려 등자에 발을 둔다.
 ##   벌리기는 뼈대 Z축(몸 앞)으로: 왼다리(+X 쪽) +각, 오른다리 -각.
+##   gather: 공중에서 다리를 모으기(0~1). 동작이 정한 다리(뛰는 걸음, 서 있기의 벌린 발)를 쉬는 자세(곧게 내린 두 다리)로 옮긴 뒤 접는다.
+##   그래야 두 다리가 같이 접히고 몸 밑에 모인다.
 
 const LEGS: Array = [
 	["mixamorig_LeftUpLeg", "mixamorig_LeftLeg", "mixamorig_LeftFoot"],
@@ -28,12 +30,13 @@ const RIDE_FOOT: float = -0.15
 var bend: float = 0.0
 var tuck: float = 0.0
 var ride: float = 0.0
+var gather: float = 0.0
 
 
 func _process_modification_with_delta(_delta: float) -> void:
 	var sk: Skeleton3D = get_skeleton()
 	if sk != null:
-		LegFold.fold(sk, tuck, bend, ride)
+		LegFold.fold(sk, tuck, bend, ride, gather)
 
 
 ## 허벅지·정강이·발을 돌리는 각(뼈대 X축, 라디안).
@@ -50,9 +53,17 @@ static func ride_angles(k: float) -> Vector4:
 
 
 ## 지금 자세(동작이 정한 것) 위에 다리를 굽힌다. 테스트는 만든 뼈대로 바로 부른다. p_ride(39단계)는 말 위 앉은 다리.
-static func fold(sk: Skeleton3D, p_tuck: float, p_bend: float, p_ride: float = 0.0) -> void:
-	if p_tuck <= 0.001 and p_bend <= 0.001 and p_ride <= 0.001:
+## p_gather는 굽히기 전에 다리 뼈를 쉬는 자세 쪽으로 옮기는 몫(공중에서 두 다리를 모은다).
+static func fold(sk: Skeleton3D, p_tuck: float, p_bend: float, p_ride: float = 0.0, p_gather: float = 0.0) -> void:
+	if p_tuck <= 0.001 and p_bend <= 0.001 and p_ride <= 0.001 and p_gather <= 0.001:
 		return
+	if p_gather > 0.001:
+		for leg in LEGS:
+			for n in leg:
+				var b: int = sk.find_bone(n)
+				if b >= 0:
+					var rest: Quaternion = sk.get_bone_rest(b).basis.get_rotation_quaternion()
+					sk.set_bone_pose_rotation(b, sk.get_bone_pose_rotation(b).slerp(rest, clampf(p_gather, 0.0, 1.0)))
 	var a: Vector3 = angles(p_tuck, p_bend)
 	var r: Vector4 = ride_angles(p_ride)
 	for li in LEGS.size():

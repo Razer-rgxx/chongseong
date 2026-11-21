@@ -411,6 +411,8 @@ static func apply(model: Node3D, pose_now: Dictionary, yaw: float, y: float) -> 
 ## 솟을 때 펴는 구간(뜬 시간의 비율), 다리 접기(시작, 다 접음, 펴기 시작, 다 폄: 비율), 내려앉은 뒤 무릎을 굽혔다 펴는 시간(초).
 const HOP_PUSH: float = 0.18
 const HOP_TUCK: Vector4 = Vector4(0.16, 0.4, 0.62, 0.92)
+## 공중에서 두 다리를 몸 밑으로 모으는 구간(뜬 비율): x~y에 모으고 z~w에 내려앉을 다리로 푼다.
+const HOP_GATHER: Vector4 = Vector4(0.0, 0.14, 0.86, 1.0)
 const HOP_LAND: float = 0.26
 ## 솟기 전 웅크림(bend), 내려앉을 때 굽힘의 가장 깊은 때(HOP_LAND의 비율), 공중과 내려앉을 때 앞으로 숙이는 정도(라디안).
 const HOP_CROUCH: float = 0.6
@@ -426,17 +428,19 @@ static func hop_pose(u: float, land: float) -> Dictionary:
 	var bend: float = 0.0
 	var tuck: float = 0.0
 	var pitch: float = 0.0
+	var gather: float = 0.0
 	if u >= 0.0:
 		var k: float = clampf(u, 0.0, 1.0)
 		bend = HOP_CROUCH * (1.0 - smoothstep(0.0, HOP_PUSH, k))
 		tuck = smoothstep(HOP_TUCK.x, HOP_TUCK.y, k) * (1.0 - 0.8 * smoothstep(HOP_TUCK.z, HOP_TUCK.w, k))
 		pitch = HOP_PITCH * sin(k * PI)
+		gather = smoothstep(HOP_GATHER.x, HOP_GATHER.y, k) * (1.0 - smoothstep(HOP_GATHER.z, HOP_GATHER.w, k))
 	if land >= 0.0 and land < HOP_LAND:
 		var t: float = land / HOP_LAND
 		var g: float = smoothstep(0.0, HOP_LAND_PEAK, t) * (1.0 - smoothstep(HOP_LAND_PEAK + 0.08, 1.0, t))
 		bend = maxf(bend, g)
 		pitch += HOP_LAND_PITCH * g
-	return {"bend": bend, "tuck": tuck, "pitch": pitch}
+	return {"bend": bend, "tuck": tuck, "pitch": pitch, "gather": gather}
 
 
 # ---------------------------------------------------------------- 안쪽
