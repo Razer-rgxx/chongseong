@@ -110,6 +110,8 @@ func _init() -> void:
 	(load("res://tests/pathing_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_map_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/horse_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/draw_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/owner_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -236,7 +238,7 @@ func _test_data() -> void:
 		six = six and (d.inscriptions[k] as InscriptionData).values.size() == 6
 	check(six, "각인마다 등급별 수치 6개")
 	check(d.forms.size() == 4 and d.forms[2].display_name == "대검" and d.forms[3].pierce == 2, "형태 4종(세검 2명 꿰뚫기)")
-	check(d.moves.size() == 20 and d.patterns.size() == 151 and d.patterns.all(func(p: PatternData) -> bool: return p != null), "좌클릭: 기본 동작 20, 공격 방식 151(맨손 + 150)")
+	check(d.moves.size() == 21 and d.moves.has(&"draw") and d.patterns.size() == 151 and d.patterns.all(func(p: PatternData) -> bool: return p != null), "좌클릭: 기본 동작 20 + 발검, 공격 방식 151(맨손 + 150)")
 	var unknown: Array[String] = []
 	for p in d.patterns:
 		for m in p.moves:
@@ -248,7 +250,7 @@ func _test_data() -> void:
 	check(d.enemies.size() == 20 and (d.enemies[&"boss"] as EnemyData).boss and (d.enemies[&"wraith"] as EnemyData).wraith, "적 20종(새 적 5종, 허수아비, 무덤 기사, 무덤 주인, 곳마다 우두머리 8 포함)")
 	check(d.run.zone_names.size() == 10 and d.run.zone_luck.size() == 10 and d.run.zone_hp.size() == 10 and d.run.zone_damage.size() == 10, "구역 10개, 구역 표 길이가 같다")
 	var s := Sword.new(d.sword_by_name("붉은 이삭"), d)
-	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(150.0 * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 195, 무리 베기 34")
+	check(s.grade == 2 and s.form.display_name == "대검" and s.max_durability == roundf(d.grades.durability[2] * 1.3) and is_equal_approx(s.ins["무리 베기"], 34.0), "전설 대검 붉은 이삭: 내구 %d" % s.max_durability + ", 무리 베기 34")
 	check(Sword.new(d.sword_by_name("언덕"), d).max_durability < 0.0, "무한 검 '언덕'은 부러지지 않는다")
 
 
@@ -535,7 +537,7 @@ func _test_night_flow() -> void:
 	r.day_started.connect(func(z: int) -> void: days.append(z))
 	r.lord.hp = 50.0
 	r.start_night()
-	check(r.phase == Rules.Phase.NIGHT and r.hilts.is_empty() and nights == [0], "N: 밤이 오면 꽂힌 검이 사라진다")
+	check(r.phase == Rules.Phase.NIGHT and not r.hilts.is_empty() and nights == [0], "N: 밤이 와도 뽑지 않은 검은 꽂혀 있다(발검 자리)")
 	var spawned: Array[int] = [0]
 	r.enemy_spawned.connect(func(_e: Enemy) -> void: spawned[0] += 1)
 	for t in roundi(d.run.night_length * d.run.tick_rate) + 5:
@@ -656,7 +658,7 @@ func _test_sheath() -> void:
 	var s := r.slots[0]
 	check(s != null and s.data == legend and s.from_sheath and r.active == 0, "판을 검집의 검을 들고 시작한다")
 	s.pattern = _pat(["sweep", "sweep", "sweep"])
-	check(is_equal_approx(s.bonus, 1.4) and s.max_durability == roundf(150.0 * 1.5) and s.ins.has("처형") and s.label() == "+5 늙은 사자", "+5: 피해 ×1.4, 내구 ×1.5, 검집 각인")
+	check(is_equal_approx(s.bonus, 1.4) and s.max_durability == roundf(d.grades.durability[2] * 1.5) and s.ins.has("처형") and s.label() == "+5 늙은 사자", "+5: 피해 ×1.4, 내구 ×1.5, 검집 각인")
 	var e := r.spawn_at(&"giant", r.lord.pos + Vector2(1.0, 0.0))
 	r.start_night()
 	r.lord.face = 0.0

@@ -161,7 +161,7 @@ func on_move_started(move: StringName, info: Dictionary) -> void:
 			_telegraph(move, i, float(i["time"]))
 		&"wave", &"boomerang":
 			pass   # 날아가는 것이 그린다(projectile_spawned)
-		&"parry":
+		&"parry", &"draw":
 			_stance(i)
 		&"lunge":
 			_lunge(i)
@@ -197,7 +197,7 @@ func on_move_area(move: StringName, info: Dictionary) -> void:
 				n.queue_free()
 		elif _clock - fired < 0.5:
 			return   # 대신 그린 것이 이미 나갔다
-	if move == &"parry" and i["shape"] == &"circle":
+	if move in [&"parry", &"draw"] and i["shape"] == &"circle":
 		var h := _holder()
 		var at: Vector2 = i["at"]
 		_glint(h, _ground(at, 1.3), 1.5, MoveArt.STEEL, float(i["k"]), 0.3)
@@ -376,9 +376,9 @@ func _norm(move: StringName, info: Dictionary, area: bool) -> Dictionary:
 			shape = &"ring" if area else &"circle"
 			_def(i, "radius", 3.5 if area else 1.5)
 			_def(i, "thick", 1.0)
-		&"parry":
+		&"parry", &"draw":
 			shape = &"circle" if area else &"arc"
-			_def(i, "radius", B * 1.2)
+			_def(i, "radius", B * (1.6 if move == &"draw" else 1.2))
 		&"crescent":
 			_def(i, "reach", B * 0.9)
 			_def(i, "arc", deg_to_rad(220.0))
@@ -410,7 +410,7 @@ func _norm(move: StringName, info: Dictionary, area: bool) -> Dictionary:
 	var el: StringName = StringName(i.get("element", &""))
 	i["el"] = el
 	i["color"] = _col(el)
-	var pm: StringName = &"parry_counter" if move == &"parry" and i["shape"] == &"circle" else move
+	var pm: StringName = &"parry_counter" if move in [&"parry", &"draw"] and i["shape"] == &"circle" else (&"parry" if move == &"draw" else move)
 	var side: float = float(MoveMotion.plan(pm, info, null)["side"])
 	i["side"] = side if side != 0.0 else 1.0
 	return i
@@ -546,13 +546,13 @@ func _circle(h: Node3D, move: StringName, i: Dictionary) -> void:
 	var k: float = float(i["k"])
 	var c: Color = i["color"]
 	var side: float = float(i["side"])
-	var sweep: bool = move in [&"spin", &"whirl", &"parry"]
+	var sweep: bool = move in [&"spin", &"whirl", &"parry", &"draw"]
 	# 휘두르는 원은 테만(가는 그을음과 빛줄), 내리찍는 원은 테 안쪽까지 그을린 넓은 고리
 	var inner: float = maxf(0.0, r - 0.4) if sweep else r * 0.7
 	var m := _mark(h, _ring_mesh(inner, r + 0.03, 56), c, 0.8 if sweep else 0.85, _ground(at, 0.03))
 	var mat: ShaderMaterial = m.material_override
 	match move:
-		&"spin", &"whirl", &"parry":
+		&"spin", &"whirl", &"parry", &"draw":
 			_orient_part(m, face, TAU, side)
 			var light: bool = move == &"whirl"
 			_play_mark(h, mat, 0.1, 0.0 if light else mark_hold, 0.25 if light else mark_fade, k * (0.75 if light else 1.0))

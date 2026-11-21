@@ -144,6 +144,7 @@ static func build(parent: Node3D, env: Environment, decor: bool = true) -> Dicti
 	_marsh(parent, circles)
 	if decor:
 		_grass(parent, rng)
+		_sword_forest(parent)
 	return {"rects": rects, "circles": circles, "low_rects": low_rects, "low_circles": low_circles}
 
 
@@ -564,8 +565,7 @@ static func _old_field(parent: Node3D, rng: RandomNumberGenerator, circles: Arra
 	bm.size = Vector3(0.09, 1.4, 0.025)
 	var gm := BoxMesh.new()
 	gm.size = Vector3(0.5, 0.07, 0.06)
-	HillBuilder._multi(parent, bm, blades, true, rust).visibility_range_end = 120.0
-	HillBuilder._multi(parent, gm, guards, true, rust).visibility_range_end = 120.0
+	# 상자 검(blades·guards)은 검의 숲(_sword_forest)으로 바뀌었다. 자리 굴림은 그대로 두어 뒤의 rng(막힘 표)가 바뀌지 않게 한다
 	for i in 12:
 		var c := Vector2(rng.randf_range(area.position.x + 2.0, area.end.x - 4.0), rng.randf_range(area.position.y + 2.0, area.end.y - 4.0))
 		if not _free(c):
@@ -1309,3 +1309,73 @@ static func take_glint(n: Node3D) -> void:
 	var t := n.create_tween()
 	t.tween_property(n, "scale", Vector3(0.01, 0.01, 0.01), 0.25)
 	t.tween_callback(n.queue_free)
+
+
+# ---------------------------------------------------------------- 검의 숲 (docs/sword_hill.md 3번)
+
+## 들판의 검의 숲(2026-11-21 사용자: "검 숲은 들판에만"): 옛 싸움터에 빽빽하게(병사 삼백의 검), 나머지 들판에 듬성듬성.
+## 꾸밈이라 막힘 표에 들지 않고, 들판의 다른 굴림(rng 16)과 따로 굴린다(막힘 표가 바뀌지 않게).
+const FOREST_OLD_FIELD: int = 1500
+const FOREST_WIDE: int = 1300
+
+
+static func _sword_forest(parent: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2121
+	var holder := Node3D.new()
+	holder.name = "SwordForest"
+	parent.add_child(holder)
+	var meshes: Array[Mesh] = SwordForest.variants()
+	var near: Array[Transform3D] = []
+	var wide: Array[Transform3D] = []
+	var area: Rect2 = FieldLayout.AREAS[&"old_field"]
+	var mid: Vector2 = area.get_center()
+	var tries: int = 0
+	while near.size() < FOREST_OLD_FIELD and tries < FOREST_OLD_FIELD * 6:
+		tries += 1
+		# 가운데로 몰리게(가장자리로 갈수록 듬성)
+		var c := mid + Vector2.from_angle(rng.randf() * TAU) * pow(rng.randf(), 0.75) * Vector2(area.size.x * 0.62, area.size.y * 0.62)
+		if not _forest_spot(c):
+			continue
+		var x: float = c.x * Grid.CELL
+		var z: float = c.y * Grid.CELL
+		near.append(SwordForest.stuck(rng, x, z, height(x, z), rng.randf_range(0.85, 1.25), 0.45, rng.randf_range(0.2, 0.85)))
+	tries = 0
+	while wide.size() < FOREST_WIDE and tries < FOREST_WIDE * 8:
+		tries += 1
+		var c := Vector2(rng.randf_range(2.0, FieldLayout.SIZE.x - 2.0), rng.randf_range(2.0, FieldLayout.SIZE.y - 2.0))
+		if area.has_point(c) or not _forest_spot(c):
+			continue
+		var x: float = c.x * Grid.CELL
+		var z: float = c.y * Grid.CELL
+		wide.append(SwordForest.stuck(rng, x, z, height(x, z), rng.randf_range(0.8, 1.15), 0.6, rng.randf_range(0.05, 0.7)))
+	SwordForest.plant(holder, meshes, near, rng, true, 140.0)
+	SwordForest.plant(holder, meshes, wide, rng, false, 110.0)
+
+
+## 꽂아도 되는 자리: 길·개울·무덤 입구·망루·수레·건물(성채·마을·채석장·고개·늪)·모닥불·상자·비석·빛 곁·들어오는 문은 비운다.
+static func _forest_spot(c: Vector2) -> bool:
+	var x: float = c.x * Grid.CELL
+	var z: float = c.y * Grid.CELL
+	if road_dist(x, z) < 3.5 or absf(z - brook_z(x)) < 7.0:
+		return false
+	if c.distance_to(FieldLayout.CRYPT_DOOR) < 5.0 or c.distance_to(FieldLayout.TOWER) < 6.0 or c.distance_to(Vector2(76, 84)) < 3.5 or c.distance_to(FieldLayout.START) < 8.0:
+		return false
+	if c.y > 105.0:
+		return false
+	for id in [&"keep", &"hamlet", &"quarry", &"pass", &"marsh"]:
+		if (FieldLayout.AREAS[id] as Rect2).grow(1.0).has_point(c):
+			return false
+	for k in FieldLayout.CACHES:
+		if c.distance_to(FieldLayout.CACHES[k][0]) < 1.5:
+			return false
+	for k in FieldLayout.STONES:
+		if c.distance_to(FieldLayout.STONES[k][0]) < 1.5:
+			return false
+	for g in FieldLayout.GLINTS:
+		if c.distance_to(g) < 1.5:
+			return false
+	for w in FieldLayout.WANDERER_SPOTS:
+		if c.distance_to(w.at) < 2.5:
+			return false
+	return true

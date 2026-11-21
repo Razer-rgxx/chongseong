@@ -417,7 +417,33 @@ func parried(_attacker: Enemy) -> bool:
 	a["main"] = true
 	a["emit"] = true
 	_fire(run, a)
+	if m.id == &"draw":
+		r._draw_countered()   # 발검 반격: 뽑기 값을 돌려받는다
 	return true
+
+
+## 밤의 발검(Rules._try_draw가 새 검을 쥐여 준 뒤 부른다): 반격 자세와 같은 틀(draw 동작).
+## 시간(draw.time) 동안 맞으면 parried가 발검 반격을 하고, 안 맞으면 끝에 앞을 약하게 벤다(_parry_weak, 뽑으며 긋는 한 칼).
+## 휘두르던 동작과 연타는 끊는다.
+func draw_strike() -> void:
+	var L := r.lord
+	var m: MoveData = r.data.move(&"draw")
+	if m == null:
+		return
+	var st: Dictionary = r.powers.stats()
+	var run := _new_run(m, 1, 1, false, st, pattern().element)
+	L.combo = 0
+	L.combo_timer = 0.0
+	L.big = false
+	L.cooldown = maxf(L.cooldown, m.time)
+	L.move_lock = maxf(L.move_lock, m.lock)
+	var a := _circle(run, L.pos, run.st.reach * m.counter_reach, m.counter_damage)
+	a["shape"] = &"arc"
+	a["reach"] = run.st.reach
+	a["arc"] = run.st.arc
+	_parry_run = run
+	L.parry = m.time
+	_started(run, a)
 
 
 ## 자세가 끝날 때까지 안 맞았다: 약한 횡베기.

@@ -303,7 +303,7 @@ func _on_move_started(move: StringName, info: Dictionary) -> void:
 func _on_move_area(move: StringName, info: Dictionary) -> void:
 	if not _mine():
 		return
-	if move == &"parry" and info.get("shape", &"") == &"circle" and not bool(info.get("echo", false)):
+	if move in [&"parry", &"draw"] and info.get("shape", &"") == &"circle" and not bool(info.get("echo", false)):
 		_start_plan(MoveMotion.plan(&"parry_counter", info, character), info)
 
 

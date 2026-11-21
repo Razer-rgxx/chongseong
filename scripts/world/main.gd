@@ -54,6 +54,8 @@ var _want_pull: bool = false
 var _swap_to: int = -1
 var _lord: Node3D
 var _hilts: Dictionary = {}
+## 검 주인의 잔영들(Ghost.id → GhostView).
+var _ghosts: Dictionary = {}
 var _enemies: Dictionary = {}
 var _dying: Array[EnemyView] = []
 var _fx := HitFx.new()
@@ -162,6 +164,20 @@ func _ready() -> void:
 				v.show_omen())
 	rules.pull_refused.connect(func(t: String) -> void: _hud.toast(t))
 	rules.sword_pulled.connect(_on_pulled)
+	rules.sword_drawn.connect(_on_drawn)
+	rules.ghost_spawned.connect(_on_ghost)
+	rules.ghost_swung.connect(func(g: Ghost, big: bool) -> void:
+		var v: GhostView = _ghosts.get(g.id)
+		if v:
+			v.swing(big)
+			_sfx.play(&"swish_big" if big else &"swish", v.position, -6.0, 0.85))
+	rules.ghost_gone.connect(func(g: Ghost) -> void:
+		var v: GhostView = _ghosts.get(g.id)
+		_ghosts.erase(g.id)
+		if v:
+			v.leave())
+	rules.draw_countered.connect(func(_at: Vector2) -> void:
+		_hud.toast("발검 반격 · 뽑기 값을 돌려받았다"))
 	rules.choice_needed.connect(_on_choice_needed)
 	rules.slots_changed.connect(_refresh_cards)
 	rules.sword_broke.connect(_on_broke)
@@ -371,6 +387,8 @@ func _read_input() -> LordInput:
 func _process(delta: float) -> void:
 	var alpha: float = clampf(_acc / rules.dt, 0.0, 1.0)
 	_lord.draw(alpha, delta)
+	for v: GhostView in _ghosts.values():
+		v.draw(alpha, delta)
 	# 타이밍 고리의 시계를 규칙에 맞춘다(눌린 때는 그 틱 사이의 가운데로 판정된다)
 	if rules.pull_hilt != null:
 		for fx in _timing_fx:
@@ -388,13 +406,22 @@ func _process(delta: float) -> void:
 	_camera.speed_blur = hook_blur if rules.lord.hook > 0.0 else (dash_blur if rules.lord.dash > 0.0 else 0.0)
 	_camera.follow_boost = 24.0 if rules.lord.hook > 0.0 else 0.0
 	_draw_event(delta)
-	var near := rules.nearest_hilt(data.run.pull_reach) if rules.phase == Rules.Phase.DAY and rules.pull_hilt == null and rules.pending == null else null
+	var night_draw: bool = rules.phase == Rules.Phase.NIGHT and rules.lord.move_lock <= 0.0
+	var near := rules.nearest_hilt(data.run.pull_reach) if (rules.phase == Rules.Phase.DAY or night_draw) and rules.pull_hilt == null and rules.pending == null and not rules.path_open else null
 	var altar_near: bool = rules.near_altar() and rules.pull_hilt == null and rules.pending == null and not rules.altar_open
 	var ev_near: DayEvent = rules.near_event() if rules.pull_hilt == null and rules.pending == null and not rules.altar_open else null
 	if altar_near:
 		_hud.set_prompt("E", "숫돌 제단에 선다")
 	elif ev_near:
 		_hud.set_prompt("E", _event_prompt(ev_near))
+	elif near and night_draw:
+		var what: String = "꽂아 둔 %s · 공짜" % near.sword.data.display_name if near.sword else ("공짜" if rules.free_pulls > 0 or near.cursed else "체력 %d · 맞는 순간 뽑으면 반격하고 돌려받는다" % rules.pull_cost())
+		_hud.set_prompt("E", "발검 · " + what)
+	elif near and not near.owner.is_empty():
+		var sd: SwordData = data.sword_by_id(int(near.owner.id))
+		_hud.set_prompt("E", "주인 있는 %s · %s · %s" % [sd.display_name if sd else "검", Meta.fallen_line(near.owner, meta.runs, data.run.zone_names), "공짜" if rules.free_pulls > 0 else "체력 %d" % rules.pull_cost()])
+	elif near and near.sword:
+		_hud.set_prompt("E", "꽂아 둔 %s을(를) 뽑는다 · 공짜" % near.sword.data.display_name)
 	elif near and near.cursed:
 		_hud.set_prompt("E", "저주받은 손잡이 — 체력 없이 뽑는다 · 운 ×%s · 이번 밤 적이 강해지고 최대 내구 절반" % str(data.run.cursed_luck))
 	elif near:
@@ -529,9 +556,8 @@ func _reward_text(ln: Dictionary) -> String:
 
 
 func _on_night(_zone: int) -> void:
-	for v in _hilts.values():
-		v.queue_free()
-	_hilts.clear()
+	# 뽑지 않은 검은 밤에도 꽂혀 있다(발검 자리, docs/sword_hill.md)
+	_sync_hilts()
 	_sync_altar()
 	_set_light(true)
 	_sfx.play(&"night", _lord.position, -2.0)
@@ -652,7 +678,7 @@ func _on_move_area(move: StringName, info: Dictionary) -> void:
 			_camera.add_shake(0.06 if echo else 0.12)
 		&"iaido":
 			_sfx.play(&"swish_big", _lord.position, -2.0 + quiet, 1.2)
-		&"parry":
+		&"parry", &"draw":
 			if info.get("shape", &"") == &"circle" and not echo:
 				_sfx.play(&"anvil", _lord.position, -4.0, 1.4)
 				_camera.add_shake(0.2)
@@ -719,6 +745,27 @@ func _on_pulled(s: Sword) -> void:
 		text += " " + _pull_note
 		_pull_note = ""
 	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void: _hud.toast(text))
+
+
+## 검 주인의 잔영이 나왔다(밤이 오는 순간이나 주인 있는 검을 발검한 순간).
+func _on_ghost(g: Ghost) -> void:
+	var v := GhostView.new()
+	v.setup(rules, g)
+	add_child(v)
+	_ghosts[g.id] = v
+	v.draw(1.0, 0.0)
+	_sfx.play(&"grunt", v.position, -10.0, 0.7)
+	_hud.toast("옛 주인의 잔영이 함께 싸운다")
+
+
+## 밤의 발검: 연출 없이 소리·흔들림·이름 한 줄. 쥐던 검이 꽂힌 새 손잡이를 그린다.
+func _on_drawn(s: Sword, _h: Hilt, _planted: Hilt) -> void:
+	meta.note_found(s.data.id)
+	meta.log_pull(s.data.id, false)
+	_sync_hilts()
+	_sfx.play(&"draw", _lord.position, -2.0, 1.15)
+	_camera.add_shake(0.08 + 0.04 * s.grade)
+	_hud.toast("%s · %s %s" % [data.grades.names[s.grade], s.form.display_name, s.data.display_name])
 
 
 func _on_choice_needed(s: Sword) -> void:

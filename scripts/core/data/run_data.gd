@@ -223,3 +223,15 @@ func extra_chance(kind: StringName, zone: int) -> float:
 	if a.is_empty():
 		return 0.0
 	return a[clampi(zone, 0, a.size() - 1)]
+
+@export_group("검의 주인 (docs/sword_hill.md 2번)")
+## 낮마다 손잡이 하나가 주인 있는 검(Meta.fallen의 기록)이 될 확률. 이 구역부터.
+@export var owner_chance: float = 0.35
+@export var owner_from_zone: int = 1
+## 잔영의 휘두르기 피해 배수(영주 기본 피해 × 등급 × 형태 × 이것, 큰 베기 × big_damage_mult).
+@export var ghost_damage: float = 0.6
+## 잔영이 다시 움직이는 길이(틱, 30틱 = 1초). 쓰러지기 전 이만큼을 적어 둔다.
+@export var ghost_ticks: int = 150
+## 잔영의 베기 사거리(칸)와 부채꼴(라디안).
+@export var ghost_reach: float = 1.7
+@export var ghost_arc: float = 2.0

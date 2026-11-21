@@ -26,6 +26,10 @@ var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
 var runs: int = 0
+## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
+## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
+var fallen: Array = []
+const FALLEN_MAX: int = 12
 ## 의뢰판(15단계): 붙은 의뢰(VillageData.quests의 번호) 3장, 맡은 장(-1 없음).
 var quest_board: Array[int] = []
 var quest_active: int = -1
@@ -101,7 +105,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -118,6 +122,15 @@ func from_dict(d: Dictionary) -> void:
 			var e: Variant = sl[k]
 			if e is Dictionary:
 				sword_log[str(k)] = {"k": int(e.get("k", 0)), "b": int(e.get("b", 0)), "p": int(e.get("p", 0)), "r": int(e.get("r", 0))}
+	fallen = []
+	var fa: Variant = d.get("fallen", [])
+	if fa is Array:
+		for e in fa:
+			if e is Dictionary and int(e.get("id", 0)) > 0:
+				var g: Array = []
+				for v in e.get("ghost", []):
+					g.append(float(v))
+				fallen.append({"id": int(e["id"]), "run": int(e.get("run", 0)), "zone": int(e.get("zone", 0)), "kills": int(e.get("kills", 0)), "ghost": g})
 	lost = {}
 	var lo: Variant = d.get("lost", {})
 	if lo is Dictionary:
@@ -1075,3 +1088,20 @@ func unbreakable_sword(game: GameData, id: int) -> Sword:
 	s.max_durability = -1.0
 	s.durability = -1.0
 	return s
+
+
+## 언덕에서 쓰러졌다: 쥐고 있던 검과 그 판의 기록을 남긴다(오래된 것부터 밀려난다).
+func add_fallen(rec: Dictionary) -> void:
+	if int(rec.get("id", 0)) <= 0:
+		return
+	fallen.append(rec)
+	while fallen.size() > FALLEN_MAX:
+		fallen.remove_at(0)
+
+
+## 주인 있는 검의 한 줄 기록: "N판 전의 영주 · 어디서 쓰러짐 · 이 판에 몇 마리".
+static func fallen_line(rec: Dictionary, runs_now: int, zone_names: PackedStringArray) -> String:
+	var ago: int = maxi(1, runs_now - int(rec.get("run", 0)))
+	var z: int = clampi(int(rec.get("zone", 0)), 0, maxi(0, zone_names.size() - 1))
+	var where: String = zone_names[z] if not zone_names.is_empty() else "언덕"
+	return "%d판 전의 영주 · %s에서 쓰러짐 · 그 판에 %d마리" % [ago, where, int(rec.get("kills", 0))]

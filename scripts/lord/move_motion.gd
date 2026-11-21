@@ -46,7 +46,7 @@ const TIME: Dictionary = {
 	&"sweep": 0.2, &"thrust": 0.2, &"rising": 0.2, &"flurry": 0.3, &"crescent": 0.2, &"retreat": 0.3,
 	&"pull": 0.2, &"smash": 0.2, &"spin": 0.2, &"lunge": 0.15, &"wave": 0.2, &"boomerang": 0.2,
 	&"leap": 0.35, &"iaido": 0.25, &"cross": 0.2, &"quake": 0.6, &"whirl": 0.6, &"blink": 0.2,
-	&"hook": 0.4, &"parry": 0.35, &"parry_counter": 0.2,
+	&"hook": 0.4, &"parry": 0.35, &"parry_counter": 0.2, &"draw": 0.4,
 }
 ## 판정이 늦게 터지는 동작의 기본 지연(초). info.delay가 있으면 그것을 쓴다.
 const DELAY: Dictionary = {&"smash": 0.12, &"iaido": 0.25}
@@ -326,10 +326,12 @@ static func plan(move: StringName, info: Dictionary, character: LordCharacter) -
 				p["pitch"] = _k([0, 0, 0.08, 0.15, T, 0.1, T + 0.25, 0])
 				p["face_lock"] = true
 				p["time"] = T + 0.3
-		&"parry":
+		&"parry", &"draw":
 			# 반격 자세: 다리를 벌리고 칼을 세워 몸 앞에 든 채 낮게 멈춘다. 안 맞으면 끝에 가볍게 벤다(then).
 			# 맞아서 반격하면 LordView가 plan(&"parry_counter", …)로 바꿔 튼다.
-			if not _extra(p, c, "block", 0.0, 1.0, true, T):
+			# 발검(draw, docs/sword_hill.md): 칼 뽑는 동작이 있으면 그것으로, 없으면 반격 자세와 같다.
+			var drew: bool = move == &"draw" and _extra(p, c, "draw", 0.0, 1.4, true, T)
+			if not drew and not _extra(p, c, "block", 0.0, 1.0, true, T):
 				if not _freeze(p, c, "guard", 1.0, T):
 					p["anim"] = "idle"
 					p["pause_at"] = _blend(c)

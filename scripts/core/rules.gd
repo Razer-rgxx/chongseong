@@ -20,6 +20,14 @@ signal pull_started(hilt: Hilt, grade: int)
 signal pull_step(hilt: Hilt, step: int)
 signal pull_refused(reason: String)
 signal sword_pulled(sword: Sword)
+## 밤의 발검(docs/sword_hill.md 1번): 꽂힌 검(hilt)에서 sword를 뽑았다. planted는 쥐고 있던 검을 꽂은 새 손잡이(맨손이었으면 null).
+signal sword_drawn(sword: Sword, hilt: Hilt, planted: Hilt)
+## 발검 반격이 됐다(뽑는 순간 맞으려 했다): 피해 없이 둘레를 크게 베고 뽑기 값을 돌려받았다.
+signal draw_countered(at: Vector2)
+## 검 주인의 잔영(docs/sword_hill.md 2번): 나타남, 휘두름(큰 베기면 big), 사라짐.
+signal ghost_spawned(g: Ghost)
+signal ghost_swung(g: Ghost, big: bool)
+signal ghost_gone(g: Ghost)
 ## 버팀 타이밍(14단계). step번째 버팀의 창이 열린다(open_at ~ close_at, 시각은 pull_t의 시계).
 ## 창의 가운데가 그 버팀이 저절로 끝나는 때다. 창은 앞 버팀이 판정된 뒤(뽑기 시작이면 바로) 하나씩 보낸다.
 signal pull_window(hilt: Hilt, open_at: float, close_at: float)
@@ -387,6 +395,19 @@ func max_hp() -> float:
 	return data.lord.hp + _bless("hp") + bonus_hp + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
 
 
+## 이번 발검에 쓴 체력(발검 반격이 되면 돌려준다).
+var _draw_cost: float = 0.0
+## 검 주인의 잔영들(밤에만 움직인다)과, 낮에 주인 있는 검을 뽑아 밤에 나올 잔영({"rec", "at"}).
+var ghosts: Array[Ghost] = []
+var _ghost_queue: Array[Dictionary] = []
+## 이 판에서 이미 꽂은 주인 기록(같은 검이 두 번 나오지 않게).
+var _owners_used: Array = []
+## 언덕의 밤에 영주의 몸놀림을 적는 고리(틱마다 [x, y, 얼굴, 휘두름]). 쓰러지면 Meta.fallen으로.
+var _rec := PackedFloat32Array()
+var _rec_head: int = 0
+var _rec_len: int = 0
+
+
 func pull_cost() -> float:
 	return maxf(1.0, data.run.pull_cost - _bless("cost") - (powers.pull_discount() if powers else 0.0))
 
@@ -434,6 +455,8 @@ func step(input: LordInput = null) -> void:
 		p.prev_pos = p.pos
 	for p in enemy_projectiles:
 		p.prev_pos = p.pos
+	for g in ghosts:
+		g.prev_pos = g.pos
 	if freeze > 0:
 		freeze -= 1
 		return
@@ -459,9 +482,13 @@ func step(input: LordInput = null) -> void:
 			foes.step_arrows(dt)
 		return
 	if phase == Phase.NIGHT:
+		if not duel and not yard:
+			_record_frame()
 		_step_night()
 		if phase == Phase.NIGHT:
 			_step_enemies()
+		if phase == Phase.NIGHT:
+			_step_ghosts()
 		if phase == Phase.NIGHT:
 			foes.step_arrows(dt)
 
@@ -487,7 +514,7 @@ func start_night() -> void:
 	elite_out = goal == &"hunt"
 	callers_out = 0
 	enemy_projectiles.clear()
-	hilts.clear()
+	# 낮에 뽑지 않은 검은 밤에도 꽂혀 있다(발검 자리, docs/sword_hill.md 1번)
 	altar = null
 	# 쓰지 않은 낮 사건은 밤이 오면 떠난다
 	if event:
@@ -501,6 +528,11 @@ func start_night() -> void:
 	_start_goal()
 	night_goal_changed.emit(goal, rule)
 	night_started.emit(zone)
+	# 낮에 뽑은 주인 있는 검의 잔영은 밤이 오는 순간 영주 곁에 나온다
+	var q := _ghost_queue
+	_ghost_queue = []
+	for k in q.size():
+		_spawn_ghost(q[k].rec, _clamp_cells(lord.pos + Vector2.from_angle(lord.face + PI * 0.5 + k) * 1.2))
 	if siege >= 0:
 		siege_side.emit(siege)
 
@@ -519,7 +551,13 @@ func _new_day(reward: StringName = &"") -> void:
 	day_luck = 1.0
 	seer_used_today = false
 	cursed_night = false
+	# 꽂아 둔(아는) 검은 새벽에도 남는다. 나머지 손잡이는 새로 꽂힌다.
+	var planted: Array[Hilt] = []
+	for h in hilts:
+		if not h.gone and h.sword != null:
+			planted.append(h)
 	hilts.clear()
+	hilts.append_array(planted)
 	lord.pos = Grid.middle()
 	lord.prev_pos = lord.pos
 	for i in R.hilts_per_day:
@@ -543,6 +581,7 @@ func _new_day(reward: StringName = &"") -> void:
 				break
 		altar = a
 	_place_event()
+	_place_owner()
 	_apply_path_reward(reward)
 	day_started.emit(zone)
 	if event:
@@ -560,6 +599,9 @@ func _hilt_spot_ok(p: Vector2) -> bool:
 
 func _end_night() -> void:
 	var reward := _goal_reward()
+	for g in ghosts:
+		ghost_gone.emit(g)
+	ghosts.clear()
 	enemies.clear()
 	enemy_projectiles.clear()
 	_end_hook()
@@ -675,6 +717,33 @@ func _try_pull() -> void:
 	var h := nearest_hilt(data.run.pull_reach)
 	if h == null:
 		return
+	# 꽂아 둔 검: 무엇인지 아니 버티지 않고 값 없이 바로 뽑는다
+	if h.sword != null:
+		h.gone = true
+		var known: Sword = h.sword
+		sword_pulled.emit(known)
+		_receive(known)
+		return
+	# 주인 있는 검: 무엇인지 보이니 버티지 않고 바로 뽑는다(값은 보통 뽑기와 같다). 잔영은 밤이 오면 나온다
+	if not h.owner.is_empty():
+		var owner_free: bool = free_pulls > 0
+		if not owner_free and lord.hp <= pull_cost():
+			pull_refused.emit("체력이 모자라. 더 뽑으면 쓰러진다.")
+			return
+		if owner_free:
+			free_pulls -= 1
+		else:
+			lord.hp -= pull_cost()
+		h.gone = true
+		var os := _owner_sword(h)
+		pulls += 1
+		run_stats.pulled_by_grade[os.grade] += 1
+		best_grade = maxi(best_grade, os.grade)
+		powers.on_pulled(os)
+		sword_pulled.emit(os)
+		_receive(os)
+		_owner_pulled(h)
+		return
 	# 저주받은 손잡이는 체력도 공짜 뽑기도 쓰지 않는다
 	_pull_cursed = h.cursed
 	_pull_free = not _pull_cursed and free_pulls > 0
@@ -694,6 +763,204 @@ func _try_pull() -> void:
 	_next_win_at = 0.0
 	pull_started.emit(h, pull_grade)
 	_open_window()
+
+
+## 밤의 발검(docs/sword_hill.md 1번): 꽂힌 검 앞에서 E. 쥔 검을 그 자리에 꽂고(아는 검이 된다) 새 검을 뽑으며 벤다.
+## 뽑는 순간부터 draw 동작의 시간 동안 맞으면 발검 반격(Moves.parried): 피해 없이 둘레를 크게 베고 뽑기 값을 돌려받는다.
+## 값: 모르는 검은 낮처럼 체력(공짜 뽑기가 있으면 그것), 꽂아 둔 검은 공짜. 저주받은 손잡이는 체력 없이(밤이라 저주는 걸리지 않는다).
+## 굴림은 낮 뽑기와 같다(운, 조짐). 버팀 타이밍은 없다. 두 칸 고르기 창도 없다: 쥔 칸이 바뀐다.
+func _try_draw() -> void:
+	var L := lord
+	if L.move_lock > 0.0 or L.parry > 0.0 or L.dash > 0.0 or L.hook > 0.0 or moves.steering() or L.riding:
+		return
+	var h := nearest_hilt(data.run.pull_reach)
+	if h == null:
+		return
+	var cost: float = 0.0
+	var s: Sword = h.sword
+	var free_pull: bool = false
+	if s == null:
+		free_pull = free_pulls > 0 and not h.cursed
+		if not free_pull and not h.cursed:
+			cost = pull_cost()
+			if L.hp <= cost:
+				pull_refused.emit("체력이 모자라. 더 뽑으면 쓰러진다.")
+				return
+		if not h.owner.is_empty():
+			s = _owner_sword(h)
+		else:
+			s = Sword.new(pick_sword(debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))), data)
+		if free_pull:
+			free_pulls -= 1
+		L.hp -= cost
+		pulls += 1
+		run_stats.pulled_by_grade[s.grade] += 1
+		best_grade = maxi(best_grade, s.grade)
+		powers.on_pulled(s)
+	h.gone = true
+	var old: Sword = slots[active]
+	var planted: Hilt = null
+	if old != null:
+		planted = Hilt.new()
+		planted.id = _new_id()
+		planted.pos = h.pos
+		planted.tilt = rng.randf_range(-0.25, 0.25)
+		planted.sword = old
+		hilts.append(planted)
+	slots[active] = s
+	_draw_cost = cost
+	slots_changed.emit()
+	sword_drawn.emit(s, h, planted)
+	if not h.owner.is_empty():
+		_owner_pulled(h)
+	moves.draw_strike()
+
+
+# ---------------------------------------------------------------- 검의 주인과 잔영 (docs/sword_hill.md 2번)
+
+## 낮마다 owner_chance로 손잡이 하나를 주인 있는 검으로(이 판에서 아직 안 나온 Meta.fallen 기록 하나).
+func _place_owner() -> void:
+	var R := data.run
+	if meta == null or meta.fallen.is_empty() or zone < R.owner_from_zone or field or yard or duel:
+		return
+	if rng.randf() >= R.owner_chance:
+		return
+	var pool: Array = []
+	for rec in meta.fallen:
+		if not _owners_used.has(rec) and data.sword_by_id(int(rec.get("id", 0))) != null:
+			pool.append(rec)
+	var cands: Array[Hilt] = []
+	for h in hilts:
+		if h.sword == null and not h.cursed and not h.gone:
+			cands.append(h)
+	if pool.is_empty() or cands.is_empty():
+		return
+	var rec: Dictionary = pool[rng.randi_range(0, pool.size() - 1)]
+	_owners_used.append(rec)
+	cands[rng.randi_range(0, cands.size() - 1)].owner = rec
+
+
+## 주인 있는 검에서 나오는 검(굴리지 않는다).
+func _owner_sword(h: Hilt) -> Sword:
+	var sd := data.sword_by_id(int(h.owner.get("id", 0)))
+	return Sword.new(sd if sd else pick_sword(0), data)
+
+
+## 주인 있는 검을 뽑았다: 밤이면 그 자리에 잔영이 바로, 낮이면 밤이 오는 순간.
+func _owner_pulled(h: Hilt) -> void:
+	if phase == Phase.NIGHT:
+		_spawn_ghost(h.owner, h.pos)
+	else:
+		_ghost_queue.append({"rec": h.owner, "at": h.pos})
+
+
+func _spawn_ghost(rec: Dictionary, at: Vector2) -> void:
+	var f := PackedFloat32Array()
+	for v in rec.get("ghost", []):
+		f.append(float(v))
+	if f.size() < 8:
+		return
+	var g := Ghost.new()
+	g.id = _new_id()
+	g.sword_id = int(rec.get("id", 0))
+	g.frames = f
+	g.offset = at - Vector2(f[0], f[1])
+	g.pos = at
+	g.prev_pos = at
+	g.face = f[2]
+	ghosts.append(g)
+	ghost_spawned.emit(g)
+
+
+## 잔영마다 한 틱: 기록을 읽어 옮기고, 휘두름이 적힌 틱이면 앞을 벤다. 다 움직였으면 사라진다.
+func _step_ghosts() -> void:
+	var k: int = 0
+	while k < ghosts.size():
+		var g := ghosts[k]
+		if g.done():
+			ghosts.remove_at(k)
+			ghost_gone.emit(g)
+			continue
+		var j: int = g.i * 4
+		g.pos = _clamp_cells(Vector2(g.frames[j], g.frames[j + 1]) + g.offset)
+		g.face = g.frames[j + 2]
+		var act: int = roundi(g.frames[j + 3])
+		g.i += 1
+		if act > 0:
+			_ghost_swing(g, act == 2)
+		k += 1
+
+
+## 잔영의 한 칼: 주인 검의 등급·형태로 앞 부채꼴(ghost_reach × 형태 사거리, ghost_arc)을 벤다. 아주 가까운 적도.
+func _ghost_swing(g: Ghost, big: bool) -> void:
+	var R := data.run
+	var sd := data.sword_by_id(g.sword_id)
+	if sd == null:
+		return
+	var F: FormData = data.forms[sd.form]
+	var dmg: float = data.lord.damage * data.grades.damage_mult[sd.grade] * F.damage * R.ghost_damage * (data.lord.big_damage_mult if big else 1.0)
+	var reach: float = R.ghost_reach * F.reach
+	for e in enemies.duplicate():
+		if e.dead:
+			continue
+		var to: Vector2 = e.pos - g.pos
+		var d: float = to.length()
+		if d > reach + e.radius:
+			continue
+		if d > e.radius + 0.35 and absf(angle_difference(g.face, to.angle())) > R.ghost_arc * 0.5:
+			continue
+		hurt(e, dmg, (to / maxf(d, 0.001)) * data.lord.knockback * F.knockback * 0.6, big, false, g.pos)
+	ghost_swung.emit(g, big)
+
+
+## 언덕의 밤에 영주의 한 틱을 적는다(ghost_ticks만큼 돌아가며). 휘두름: 이 틱에 좌클릭이 시작됐으면 1, 큰 베기면 2.
+func _record_frame() -> void:
+	var n: int = maxi(2, data.run.ghost_ticks)
+	if _rec.size() != n * 4:
+		_rec.resize(n * 4)
+		_rec_head = 0
+		_rec_len = 0
+	var L := lord
+	var act: int = 0
+	if L.swing > data.lord.swing_time - dt * 0.5:
+		act = 2 if L.big else 1
+	var j: int = _rec_head * 4
+	_rec[j] = L.pos.x
+	_rec[j + 1] = L.pos.y
+	_rec[j + 2] = L.face
+	_rec[j + 3] = act
+	_rec_head = (_rec_head + 1) % n
+	_rec_len = mini(n, _rec_len + 1)
+
+
+## 적어 둔 몸놀림을 오래된 것부터(쓰러진 순간이 끝).
+func recorded() -> Array:
+	var out: Array = []
+	var n: int = _rec.size() / 4
+	if n == 0:
+		return out
+	var start: int = (_rec_head - _rec_len + n) % n
+	for k in _rec_len:
+		var j: int = ((start + k) % n) * 4
+		out.append_array([snappedf(_rec[j], 0.01), snappedf(_rec[j + 1], 0.01), snappedf(_rec[j + 2], 0.01), _rec[j + 3]])
+	return out
+
+
+## 언덕에서 쓰러졌다: 쥐고 있던 검과 이 판의 기록, 마지막 몇 초를 Meta.fallen에 남긴다(맨손이면 남길 검이 없다).
+func _leave_fallen() -> void:
+	if meta == null or field or duel or yard:
+		return
+	var s := current()
+	if s == null or s.data == null:
+		return
+	meta.add_fallen({"id": s.data.id, "run": meta.runs, "zone": zone, "kills": kills, "ghost": recorded()})
+
+
+## Moves.parried가 발검 반격 때 부른다: 뽑기 값을 돌려받는다.
+func _draw_countered() -> void:
+	lord.hp = minf(max_hp(), lord.hp + _draw_cost)
+	_draw_cost = 0.0
+	draw_countered.emit(lord.pos)
 
 
 ## k번째 버팀이 저절로 끝나는 때(pull_t의 시계).
@@ -871,7 +1138,10 @@ func _step_lord(input: LordInput) -> void:
 		_step_ride(input)
 		return
 	if input and input.pull and L.air <= 0.0:
-		_try_pull()
+		if phase == Phase.NIGHT and not field and not duel:
+			_try_draw()
+		else:
+			_try_pull()
 		if pull_hilt != null:
 			L.moving = false
 			return
@@ -1106,6 +1376,7 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 
 func lord_died() -> void:
 	lord.hp = 0.0
+	_leave_fallen()
 	phase = Phase.OVER
 	won = false
 	run_ended.emit(false)
@@ -2305,7 +2576,13 @@ func _burn_lord(d: float) -> void:
 ## 새벽: 다음 구역의 길 두 개를 보이고 고를 때까지 기다린다(시간이 멈추고 손잡이도 없다).
 func _offer_path() -> void:
 	phase = Phase.DAY
+	# 꽂아 둔(아는) 검은 남긴다(_new_day가 다시 세운다). 나머지 손잡이는 걷는다
+	var planted: Array[Hilt] = []
+	for h in hilts:
+		if not h.gone and h.sword != null:
+			planted.append(h)
 	hilts.clear()
+	hilts.append_array(planted)
 	altar = null
 	event = null
 	path_cards = make_path_cards()
@@ -2602,9 +2879,12 @@ func state_hash() -> int:
 		parts.append_array([c.goal, c.rule, c.reward])
 	if event:
 		parts.append_array([event.kind, event.pos, event.used])
+	for g in ghosts:
+		parts.append_array([g.id, g.i, g.pos, g.face])
+	parts.append(_ghost_queue.size())
 	for h in hilts:
-		if h.cursed:
-			parts.append_array([h.id, h.gone])
+		if h.cursed or h.sword or not h.owner.is_empty():
+			parts.append_array([h.id, h.gone, h.pos, h.sword.data.id if h.sword else -1, h.sword.durability if h.sword else -1.0, str(h.owner)])
 		parts.append_array([h.omen, h.shown_omen, h.revealed])
 	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
 	if field:

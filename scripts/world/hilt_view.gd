@@ -38,7 +38,8 @@ func _ready() -> void:
 	_hole.scale = Vector3(1.0, 1.0, 0.85)
 	_hole.rotation.y = float(hilt.id) * 1.7
 	add_child(_hole)
-	OmenArt.apply(self, hilt.seen_omen())
+	if hilt.sword == null and hilt.owner.is_empty():
+		OmenArt.apply(self, hilt.seen_omen())
 
 
 ## 지금 보일 조짐(Hilt.seen_omen)을 다시 입힌다. 저주받은 손잡이의 검은 칠은 그대로 둔다.
@@ -79,7 +80,13 @@ func _process(_delta: float) -> void:
 ## 칼날이 땅에 박히도록 뒤집어 세운다(코등이가 무릎 높이).
 func _build() -> void:
 	var forms: Array[FormData] = rules.data.forms
-	var m := SwordModel.make(forms[hilt.id % forms.size()], 0, hilt.id * 31 + 7, Color.WHITE)
+	var known: SwordData = hilt.sword.data if hilt.sword else (rules.data.sword_by_id(int(hilt.owner.get("id", 0))) if not hilt.owner.is_empty() else null)
+	var m: SwordModel
+	if known:
+		# 꽂아 둔 검·주인 있는 검: 무엇인지 안다(그 검의 모습과 등급 색)
+		m = SwordModel.make(forms[known.form], known.grade, known.id, rules.data.grades.colors[known.grade])
+	else:
+		m = SwordModel.make(forms[hilt.id % forms.size()], 0, hilt.id * 31 + 7, Color.WHITE)
 	m.rotation.x = PI
 	m.position.y = 0.55 + m.grip_length * 0.3
 	_sword.add_child(m)
