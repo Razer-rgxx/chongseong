@@ -271,6 +271,46 @@ func area_title(t: String) -> void:
 	_title.show_title(t)
 
 
+# ---------------------------------------------------------------- 건물 안(2026-11-21)
+
+var _fade: ColorRect = null
+
+
+## 화면을 검게 덮거나(1) 걷는다(0). 끝나면 끝을 알리는 트윈을 돌려준다.
+func fade_to(a: float, time: float) -> Tween:
+	if _fade == null:
+		_fade = ColorRect.new()
+		_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_fade.color = Color(0, 0, 0, 0)
+		add_child(_fade)
+	move_child(_fade, get_child_count() - 1)
+	var t := create_tween()
+	t.tween_property(_fade, "color:a", a, time)
+	return t
+
+
+## 건물 안에서는 창을 화면 오른쪽에 두고 어둡게 덮지 않는다(안이 보이게, 아래에는 사람의 말).
+func set_inside(on: bool) -> void:
+	for layer in [_forge, _shrine, _storage, _bld, _jobs]:
+		(layer as ColorRect).color = Color(0, 0, 0, 0.08 if on else 0.62)
+		var c := (layer as Control).get_child(0) as Control
+		if on:
+			c.anchor_left = 0.56
+			c.anchor_right = 0.98
+			c.anchor_top = 0.04
+			c.anchor_bottom = 0.74
+		else:
+			c.anchor_left = 0.0
+			c.anchor_right = 1.0
+			c.anchor_top = 0.0
+			c.anchor_bottom = 1.0
+		c.offset_left = 0
+		c.offset_right = 0
+		c.offset_top = 0
+		c.offset_bottom = 0
+
+
 func flash(c: Color, strength: float, time: float = 0.5) -> void:
 	_flash.color = Color(c, strength)
 	create_tween().tween_property(_flash, "color:a", 0.0, time)

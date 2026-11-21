@@ -143,7 +143,11 @@ func _ready() -> void:
 	_lord.torch.light_energy = 1.2
 	_hud.forge_hit.connect(_on_hammer)
 	_hud.forge_done.connect(_on_forged)
-	_hud.closed.connect(func() -> void: _capture(true))
+	_hud.closed.connect(func() -> void:
+		if _room != null:
+			_leave_inside()
+		else:
+			_capture(true))
 	_hud.quest_taken.connect(func(_i: int) -> void: _sfx.play(&"thump", Grid.cells_to_world(board_at, 1.0), -4.0))
 	_hud.bought.connect(func(_id: StringName) -> void: _sfx.play(&"thump", Grid.cells_to_world(merchant_at, 1.0), -6.0))
 	_hud.yard_sword_picked.connect(_on_yard_sword)
@@ -313,21 +317,35 @@ func _interact() -> void:
 		"merchant":
 			_hud.open_shop()
 		"forge":
-			_hud.open_forge()
+			var smith: bool = meta.has_recruit("smith")
+			_enter(&"forge", "떠돌이 대장장이" if smith else "대장간 견습", &"smith" if smith else &"apprentice",
+				["모루는 식지 않았소. 검집을 두드려 볼 텐가.", "칼은 부러져도 검집은 남지. 무엇을 손볼까."] if smith else ["스승님은 언덕에서 돌아오지 않으셨어요. 망치질은 제가 할게요.", "검집 말씀이세요? 불은 지펴 두었어요."], _hud.open_forge)
 		"shrine":
-			_hud.open_shrine()
+			var pilgrim: bool = meta.has_recruit("pilgrim")
+			_enter(&"shrine", "길 잃은 순례자" if pilgrim else "성소지기", &"pilgrim" if pilgrim else &"elder",
+				["불은 꺼지지 않았소. 무엇을 빌러 왔소?", "언덕의 칼들도 여기선 조용하오."], _hud.open_shrine)
 		"rack":
 			_hud.open_rack()
 		"gate":
 			_hud.open_field_pick()
 		"duel":
 			_hud.open_duel()
-		"storage", "storage_site":
+		"storage":
+			_enter(&"storage", "보관집 지기", &"peasant2", ["걸이마다 기름을 먹여 두었소.", "검집은 칼보다 오래 가오. 하나 더 걸어 두겠소?"], _hud.open_storage)
+		"storage_site":
 			_hud.open_storage()
 		_ when _near.begins_with("r_"):
 			_hud.open_jobs(int(_near.substr(2)))
 		_ when _near.begins_with("bld_"):
-			_hud.open_building(data.building(StringName(_near.substr(4))))
+			var b: BuildingData = data.building(StringName(_near.substr(4)))
+			var open := func() -> void: _hud.open_building(b)
+			if b and meta.has_built(b.id) and b.kind in [&"cottage", &"longhouse"]:
+				var who: Dictionary = _resident_home(b)
+				_enter(&"house", who.get("name", ""), who.get("look", &""), ["들판에서 꺼내 준 은혜는 잊지 않소.", "불을 지펴 두었소. 쉬었다 가시오."] if not who.is_empty() else [], open)
+			elif b and meta.has_built(b.id) and b.kind == &"forge":
+				_enter(&"smithy", "풀무장이", &"smith", ["쇠가 녹는 소리가 좋지. 언덕에 오를 때 한 자루 쥐여 보내겠소."], open)
+			else:
+				open.call()
 		_:
 			return
 	_capture(false)
@@ -743,6 +761,79 @@ func _prompt_for(key: String) -> String:
 			return ""
 		return ("%s에 들른다" if meta.has_built(b.id) else "%s 터를 본다") % b.display_name
 	return PROMPTS.get(key, "")
+
+
+# ---------------------------------------------------------------- 건물 안(2026-11-21 사용자: "건물 안으로 들어가서 대화하는 느낌")
+
+## 종류별 방(처음 들어갈 때 마을 서쪽 멀리에 짓고 둔다).
+var _rooms: Dictionary = {}
+## 지금 들어가 있는 방(없으면 null)과 나올 때 되돌릴 카메라·빛.
+var _room: Interior = null
+var _out_cam: Camera3D = null
+var _out_sun: float = 1.0
+var _out_amb: float = 1.0
+
+
+## 들어간다: 검게 덮고 → 방의 카메라로 바꾸고 사람을 세우고 → 창(오른쪽)과 사람의 첫마디(아래) → 걷는다.
+## 창이 닫히면(_hud.closed) 같은 길로 나온다. lines가 비면 아무 말 없이(빈 집).
+func _enter(kind: StringName, who: String, look: StringName, lines: Array, open: Callable) -> void:
+	if _room != null:
+		return
+	_capture(false)
+	var t := _hud.fade_to(1.0, 0.22)
+	t.finished.connect(func() -> void:
+		var room: Interior = _rooms.get(kind)
+		if room == null:
+			room = Interior.new()
+			add_child(room)
+			room.position = Vector3(-420.0 - 40.0 * _rooms.size(), 0.0, -420.0)
+			room.build(kind)
+			_rooms[kind] = room
+		room.set_npc(look)
+		_room = room
+		_out_cam = get_viewport().get_camera_3d()
+		room.cam.make_current()
+		var env: Environment = ($Environment as WorldEnvironment).environment
+		_out_sun = _sun.light_energy
+		_out_amb = env.ambient_light_energy
+		_sun.light_energy = _out_sun * 0.12
+		env.ambient_light_energy = _out_amb * 0.35
+		_sfx.play(&"thump", _lord.position, -14.0, 0.7)   # 문
+		_hud.set_inside(true)
+		open.call()
+		if not lines.is_empty():
+			_hud.say(who, lines[_deco.randi() % lines.size()], true)
+		_hud.fade_to(0.0, 0.35))
+
+
+func _leave_inside() -> void:
+	if _room == null:
+		return
+	var t := _hud.fade_to(1.0, 0.2)
+	t.finished.connect(func() -> void:
+		_room.set_npc(&"")
+		_room = null
+		if _out_cam:
+			_out_cam.make_current()
+		_sun.light_energy = _out_sun
+		($Environment as WorldEnvironment).environment.ambient_light_energy = _out_amb
+		_hud.set_inside(false)
+		_hud.say_end()
+		_hud.fade_to(0.0, 0.3)
+		_capture(true))
+
+
+## 이 집에 사는 사람(쉬는 사람 중 그 집에 든 순서대로). 없으면 빈 사전.
+func _resident_home(b: BuildingData) -> Dictionary:
+	var start: int = 0
+	for o in data.buildings:
+		if o == b:
+			break
+		if meta.has_built(o.id):
+			start += o.housing
+	var rest: Array = meta.residents.filter(func(r: Dictionary) -> bool: return r.job == &"")
+	var all: Array = meta.residents
+	return all[start] if start < all.size() else (rest[0] if not rest.is_empty() else {})
 
 
 # ---------------------------------------------------------------- 마을 단계(마을 키우기 4단계)

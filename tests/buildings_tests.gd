@@ -32,3 +32,13 @@ static func run(d: GameData, check: Callable) -> void:
 	var m2 := Meta.new()
 	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
 	check.call(m2.has_built(&"cottage") and m2.has_built(&"mason") and m2.built.size() == 3, "지은 건물은 저장하고 불러온다")
+	# 건물 안(2026-11-21): 종류마다 방과 문 쪽 카메라, 마주 설 사람
+	var ok2: bool = true
+	for k in [&"forge", &"shrine", &"storage", &"house", &"smithy"]:
+		var room := Interior.new()
+		room.build(k)
+		room.set_npc(&"peasant")
+		ok2 = ok2 and room.cam != null and room.get_child_count() > 10
+		room.set_npc(&"")
+		room.free()
+	check.call(ok2, "건물 안: 대장간·성소·검 보관집·집·풀무간 방이 지어지고 카메라가 있다")
