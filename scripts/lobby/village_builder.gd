@@ -443,6 +443,28 @@ static func smoke(parent: Node3D, at: Vector3, strength: float = 1.0) -> void:
 
 
 ## 뾰족한 통나무 울타리(목책). from에서 to까지 한 줄. 많아서 MultiMesh로 그린다.
+## 돌담(마을 키우기 4단계): 2m마다 높이가 조금씩 다른 돌 덩이, 위에 갓돌, 6m마다 버팀 기둥. 조각마다 따로 놓여
+## (Plot이 한 조각씩 올린다) 끝은 기둥으로 닫는다.
+static func stone_wall(parent: Node3D, from: Vector3, to: Vector3) -> void:
+	var len: float = from.distance_to(to)
+	if len < 0.1:
+		return
+	var dir: Vector3 = (to - from) / len
+	var yaw: float = atan2(dir.x, dir.z)
+	var st := stone()
+	var cap := plain(Color(0.42, 0.4, 0.37), 0.9)
+	var n: int = maxi(1, int(ceil(len / 2.0)))
+	var seg: float = len / float(n)
+	for i in n:
+		var mid: Vector3 = from + dir * (seg * (float(i) + 0.5))
+		var h: float = 2.3 + 0.18 * float((i * 7) % 3)
+		box(parent, Vector3(0.7, h, seg + 0.02), mid + Vector3(0, h / 2.0, 0), st, Vector3(0, yaw, 0))
+		box(parent, Vector3(0.85, 0.16, seg + 0.04), mid + Vector3(0, h + 0.08, 0), cap, Vector3(0, yaw, 0))
+		if i % 3 == 0:
+			box(parent, Vector3(1.0, h + 0.5, 0.9), from + dir * (seg * float(i)) + Vector3(0, (h + 0.5) / 2.0, 0), st, Vector3(0, yaw, 0))
+	box(parent, Vector3(1.0, 2.9, 0.9), to + Vector3(0, 1.45, 0), st, Vector3(0, yaw, 0))
+
+
 static func palisade(parent: Node3D, from: Vector3, to: Vector3, rng: RandomNumberGenerator) -> void:
 	var len: float = from.distance_to(to)
 	var n: int = maxi(1, int(len / 0.36))

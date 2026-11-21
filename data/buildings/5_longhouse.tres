@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"longhouse"
+display_name = "긴 집"
+desc = "여럿이 함께 사는 긴 집. 셋이 더 들어와 산다."
+cost_wood = 22
+cost_stone = 14
+cost_iron = 2
+plot = Vector2(47.6, 11.2)
+size = Vector2(6.0, 4.0)
+facing = Vector2(-1, 0)
+kind = &"longhouse"
+min_tier = 1
+housing = 3

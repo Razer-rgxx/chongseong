@@ -32,6 +32,13 @@ const DUEL_PATH: String = "res://scenes/duel/duel.tscn"
 const VILLAGE_W: int = 50
 const OUTER_GATE: Vector2 = Vector2(33.7, 11.2)
 const OUTER_GATE_HALF: float = 1.0
+## 마을 단계(마을 키우기 4단계): 단계마다 켜지는 등불 자리(앞에서부터 MetaData.tier_lights만큼)와 걷는 사람의 길(왕복).
+const TIER_LIGHTS: Array[Vector2] = [Vector2(35.8, 9.5), Vector2(35.8, 12.9), Vector2(41.8, 9.5), Vector2(41.8, 12.9), Vector2(14.2, 9.8), Vector2(20.0, 9.6)]
+const WALK_PATHS: Array = [
+	[Vector2(17.5, 13.8), Vector2(23.5, 11.6), Vector2(26.5, 10.2), Vector2(31.8, 10.2), Vector2(33.0, 11.2), Vector2(46.0, 11.2)],
+	[Vector2(16.2, 15.2), Vector2(16.3, 21.4)],
+	[Vector2(17.0, 10.6), Vector2(17.0, 4.0)],
+]
 ## 주민: id → [칸 자리, 바라볼 방향].
 const VILLAGERS: Dictionary = {
 	&"gatekeeper": [Vector2(19.4, 3.7), Vector2(-1, 1)],
@@ -128,6 +135,7 @@ func _ready() -> void:
 	_build_storage()
 	_build_buildings()
 	_build_residents()
+	_build_tier()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -158,7 +166,8 @@ func _ready() -> void:
 	_camera.snap()
 	_sun.rotation_degrees = Vector3(-35.0, -60.0, 0.0)
 	_refresh_anvil()
-	_hud.area_title("언덕 아래 마을")
+	_hud.area_title("언덕 아래 " + data.meta.tier_names[_tier])
+	_check_tier()
 	if Meta.wake_at_gate:   # 들판에서 쓰러졌다: 잃은 것 없이 북문 앞에서 깬다
 		Meta.wake_at_gate = false
 		rules.lord.pos = gate_at + FieldLayout.WAKE_OFFSET
@@ -390,8 +399,11 @@ func _build_ground() -> void:
 	VillageBuilder.box(self, Vector3((VILLAGE_W - 34.0) * Grid.CELL + 6.0, 0.04, 3.2), Grid.cells_to_world(Vector2((33.7 + VILLAGE_W) / 2.0 - 1.5, g.y), 0.02), dirt)
 	for sy in [-1.0, 1.0]:
 		VillageBuilder.torch(self, Grid.cells_to_world(g + Vector2(0.0, sy * (OUTER_GATE_HALF + 0.25))))
+	_fence = Node3D.new()   # 목책(돌담을 지으면 감춘다)
+	add_child(_fence)
+	_fence_lines = lines
 	for l in lines:
-		VillageBuilder.palisade(self, Grid.cells_to_world(l[0]), Grid.cells_to_world(l[1]), _deco)
+		VillageBuilder.palisade(_fence, Grid.cells_to_world(l[0]), Grid.cells_to_world(l[1]), _deco)
 		_rects.append(Rect2(l[0], Vector2.ZERO).expand(l[1]).grow(0.35))
 	_build_trees()
 
@@ -702,15 +714,20 @@ func _build_buildings() -> void:
 	for b in data.buildings:
 		var p := BuildingPlot.new()
 		p.setup(b)
+		if b.kind == &"wall":
+			p.wall_lines = _fence_lines
 		add_child(p)
 		p.position = Grid.cells_to_world(b.plot)
 		p.rotation.y = VillageBuilder.facing_to(b.facing)
 		p.build(meta.has_built(b.id))
+		if b.kind == &"wall" and meta.has_built(b.id):
+			_fence.visible = false
 		p.piece_placed.connect(func(at: Vector3) -> void: _sfx.play(&"thump", at, -8.0))
 		var nm: String = b.display_name
 		p.raised.connect(func() -> void:
 			_sfx.play(&"anvil", p.global_position + Vector3(0, 1, 0), -8.0)
-			_hud.toast("%s이(가) 섰다." % nm))
+			_hud.toast("%s이(가) 섰다." % nm)
+			_check_tier())
 		_plots[b.id] = p
 		_plot_rect[b.id] = _rects.size()
 		_rects.append(p.rect(b.plot))
@@ -726,6 +743,97 @@ func _prompt_for(key: String) -> String:
 			return ""
 		return ("%s에 들른다" if meta.has_built(b.id) else "%s 터를 본다") % b.display_name
 	return PROMPTS.get(key, "")
+
+
+# ---------------------------------------------------------------- 마을 단계(마을 키우기 4단계)
+
+var _fence: Node3D = null
+var _fence_lines: Array = []
+var _tier: int = 0
+var _tier_node: Node3D = null
+## 걷는 사람: [{P, root, path(칸), len(칸), s(칸), speed(칸/초)}]
+var _walkers: Array = []
+
+
+## 지금 단계의 등불과 걷는 사람을 세운다(단계가 오르면 다시).
+func _build_tier() -> void:
+	_tier = meta.village_tier(data)
+	if _tier_node:
+		_tier_node.queue_free()
+	_tier_node = Node3D.new()
+	add_child(_tier_node)
+	var md := data.meta
+	for i in mini(md.tier_lights[_tier], TIER_LIGHTS.size()):
+		var c: Vector2 = TIER_LIGHTS[i]
+		var to_street: Vector2 = Vector2(c.x, OUTER_GATE.y) - c if c.x > 33.0 else Vector2(17, 12) - c
+		VillageBuilder.lantern(_tier_node, Grid.cells_to_world(c), VillageBuilder.facing_to(to_street), true)
+	_walkers = []
+	var looks: Array[StringName] = FieldLayout.RESIDENT_LOOKS
+	for i in md.tier_walkers[_tier]:
+		var path: Array = WALK_PATHS[i % WALK_PATHS.size()]
+		var holder := Node3D.new()
+		_tier_node.add_child(holder)
+		var body := Node3D.new()
+		holder.add_child(body)
+		var P: Dictionary = VillageProps.villager(looks[(i + 1) % looks.size()], body)
+		var len: float = 0.0
+		for k in path.size() - 1:
+			len += (path[k] as Vector2).distance_to(path[k + 1])
+		_walkers.append({"P": P, "root": holder, "path": path, "len": len, "s": len * float(i) * 0.37, "speed": 0.5 + 0.08 * float(i % 3)})
+
+
+## 걷는 사람: 길을 따라 오가며(끝에서 돌아선다) 걸음마다 살짝 출렁인다.
+func _walk(delta: float) -> void:
+	for w in _walkers:
+		w.s += float(w.speed) * delta
+		var L: float = maxf(0.01, float(w.len))
+		var u: float = fmod(float(w.s), 2.0 * L)
+		var back: bool = u > L
+		var dist: float = 2.0 * L - u if back else u
+		var path: Array = w.path
+		var at: Vector2 = path[0]
+		var dir := Vector2(0, 1)
+		for k in path.size() - 1:
+			var a: Vector2 = path[k]
+			var b: Vector2 = path[k + 1]
+			var seg: float = a.distance_to(b)
+			if dist <= seg or k == path.size() - 2:
+				at = a.lerp(b, clampf(dist / maxf(seg, 0.001), 0.0, 1.0))
+				dir = (b - a).normalized() * (-1.0 if back else 1.0)
+				break
+			dist -= seg
+		var root: Node3D = w.root
+		root.position = Grid.cells_to_world(at, absf(sin(float(w.s) * 9.0)) * 0.04)
+		root.rotation.y = VillageBuilder.facing_to(dir) + PI
+		EventArt.breathe(w.P, _vt)
+
+
+## 단계가 올랐으면 알리고(큰 글자 한 번, 소리) 등불과 걷는 사람을 늘린다.
+func _check_tier() -> void:
+	var t: int = meta.village_tier(data)
+	if t > meta.tier_seen:
+		meta.tier_seen = t
+		meta.save()
+		_hud.area_title("%s이 되었다" % data.meta.tier_names[t])
+		_sfx.play(&"anvil", _lord.position if _lord else Vector3.ZERO, -4.0)
+	if t != _tier:
+		_build_tier()
+
+
+## 촌장의 첫 줄: 지금 단계와 다음 단계까지 모자란 것.
+func _tier_line() -> String:
+	var md := data.meta
+	var need: Dictionary = meta.next_tier_need(data)
+	if need.is_empty():
+		return "이제 이곳은 %s이오. 언덕 아래에 이만한 곳은 없소." % md.tier_names[_tier]
+	var bits: Array[String] = []
+	if int(need.buildings) > 0:
+		bits.append("집 %d채" % int(need.buildings))
+	if int(need.residents) > 0:
+		bits.append("사는 사람 %d" % int(need.residents))
+	if bool(need.wall):
+		bits.append("돌담")
+	return "지금 이곳은 %s이오. %s이 되려면 %s이(가) 더 있어야 하오." % [md.tier_names[_tier], md.tier_names[int(need.tier)], ", ".join(bits)]
 
 
 # ---------------------------------------------------------------- 주민(마을 키우기 3단계)
@@ -766,6 +874,12 @@ func _on_building_built(id: StringName) -> void:
 		return
 	p.raise()
 	var b: BuildingData = data.building(id)
+	if b.kind == &"wall":   # 목책이 가라앉고 그 자리에 돌담이 한 조각씩 놓인다
+		var t := _fence.create_tween()
+		t.tween_property(_fence, "position:y", -3.2, 1.2).set_ease(Tween.EASE_IN)
+		t.tween_callback(func() -> void:
+			_fence.visible = false
+			_fence.position.y = 0.0)
 	_rects[_plot_rect[id]] = p.rect(b.plot)
 	rules.lord.pos = _push_out(rules.lord.pos)
 	rules.lord.prev_pos = rules.lord.pos
@@ -807,6 +921,7 @@ func _animate_village(delta: float) -> void:
 		VillageProps.look_at(f.P, root, eye, 1.0 if close else 0.0)
 		if id == _talker:
 			VillageProps.talk(f.P, _vt)
+	_walk(delta)
 	for r in _res:
 		EventArt.breathe(r.P, _vt)
 		var rr: Node3D = r.root
@@ -920,6 +1035,8 @@ func _on_dummy_hit(e: Enemy, damage: float, big: bool) -> void:
 
 func _start_talk(id: StringName) -> void:
 	var lines: Array[String] = meta.talk(data, id) if not RECRUITS.has(id) else _recruit_line(id)
+	if id == &"elder":   # 촌장은 먼저 마을 단계와 다음 단계까지 모자란 것을 말한다
+		lines.insert(0, _tier_line())
 	if lines.is_empty():
 		return
 	meta.save()

@@ -16,6 +16,8 @@ const DROP_FROM: float = 0.9
 
 ## 몸의 너비 × 깊이(m). 앞(+Z)이 facing 쪽.
 var size: Vector2 = Vector2(5.0, 4.0)
+## 다 올라가는 데 걸리는 시간(초). 돌담처럼 조각이 많으면 길게.
+var raise_time: float = RAISE_TIME
 var _rng := RandomNumberGenerator.new()
 var _site: Node3D = null
 var _body: Node3D = null
@@ -66,7 +68,7 @@ func raise() -> void:
 	var n: int = all.size()
 	for i in n:
 		var mi: MeshInstance3D = all[i]
-		_pieces.append([mi, mi.position, RAISE_TIME * float(i) / float(maxi(1, n - 1))])
+		_pieces.append([mi, mi.position, raise_time * float(i) / float(maxi(1, n - 1))])
 		mi.visible = false
 	_t = 0.0
 	_shown = 0
@@ -96,7 +98,7 @@ func _process(delta: float) -> void:
 		mi.position = home + Vector3(0.0, DROP_FROM * (1.0 - k * k), 0.0)   # 떨어지며 빨라진다
 	if landed_now > 0:
 		piece_placed.emit(global_position + Vector3(_rng.randf_range(-2.0, 2.0), 0.3, _rng.randf_range(-1.5, 1.5)))
-	if _t >= RAISE_TIME + DROP_TIME:
+	if _t >= raise_time + DROP_TIME:
 		for p in _pieces:
 			(p[0] as MeshInstance3D).position = p[1]
 		_pieces = []

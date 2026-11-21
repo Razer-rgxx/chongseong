@@ -427,7 +427,9 @@ func _render_building(msg: String) -> void:
 			row.add_child(cell)
 		_bld_box.add_child(row)
 		var go := UiKit.button("짓기", _build_building, 46)
-		go.disabled = not meta.can_pay(b.cost())
+		go.disabled = not meta.can_pay(b.cost()) or not meta.tier_allows(b, data)
+		if not meta.tier_allows(b, data):   # 눌리지 않는 까닭(화면에 안 보이는 것)
+			go.text = "%s이 되어야 지을 수 있다" % data.meta.tier_names[b.min_tier]
 		_bld_box.add_child(go)
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_bld_box.add_child(_msg)
@@ -474,7 +476,7 @@ func _pick_job(id: StringName) -> void:
 
 func _build_building() -> void:
 	var b := _bld_data
-	if not meta.build(b):
+	if not meta.build(b, data):
 		_render_building("재료가 모자라.")
 		return
 	meta.save()

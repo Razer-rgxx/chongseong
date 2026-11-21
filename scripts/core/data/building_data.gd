@@ -16,8 +16,11 @@ extends Resource
 @export var plot: Vector2 = Vector2.ZERO
 @export var size: Vector2 = Vector2(4.5, 4.0)
 @export var facing: Vector2 = Vector2(-1, 0)
-## 생김새: cottage(오두막), woodcutter(나무꾼 움막: 열린 헛간과 장작), mason(석공 마당: 돌 헛간과 다듬은 돌).
+## 생김새: cottage(오두막), woodcutter(나무꾼 움막: 열린 헛간과 장작), mason(석공 마당: 돌 헛간과 다듬은 돌),
+## longhouse(긴 집), wall(돌담: 마을 둘레의 목책을 돌담으로 바꾼다, 터에는 돌 더미만).
 @export var kind: StringName = &"cottage"
+## 이 마을 단계(Meta.village_tier)가 되어야 지을 수 있다.
+@export var min_tier: int = 0
 @export_group("하는 일")
 ## 언덕 판이 끝날 때마다 모아 두는 재료.
 @export var made_wood: int = 0

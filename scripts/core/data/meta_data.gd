@@ -22,6 +22,15 @@ extends Resource
 @export var run_iron_per_elite: int = 1
 @export var run_iron_win: int = 5
 
+@export_group("마을 키우기: 마을 단계 (2026-11-21)")
+## 개척지 → 마을 → 읍 → 성읍. 단계마다 지은 건물 수(검 보관집 포함)와 사는 사람 수, 성읍은 돌담도.
+@export var tier_names: PackedStringArray = PackedStringArray(["개척지", "마을", "읍", "성읍"])
+@export var tier_buildings: PackedInt32Array = PackedInt32Array([0, 2, 5, 7])
+@export var tier_residents: PackedInt32Array = PackedInt32Array([0, 1, 3, 6])
+## 단계마다 바깥 터 길가에 켜지는 등불 수와 마을을 걷는 사람 수.
+@export var tier_lights: PackedInt32Array = PackedInt32Array([0, 2, 4, 6])
+@export var tier_walkers: PackedInt32Array = PackedInt32Array([0, 2, 4, 6])
+
 @export_group("마을: 검 보관집 (2026-11-21)")
 ## 검 보관집을 짓는 값(조각). 마을 북동쪽 빈 터에 집이 올라가고, 그 집에서 검집을 산다.
 @export var storage_house_cost: int = 80
