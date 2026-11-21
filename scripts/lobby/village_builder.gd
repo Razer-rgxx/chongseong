@@ -206,6 +206,8 @@ static func facing_to(dir: Vector2) -> float:
 ## size: 너비(x) × 깊이(z) 미터. two_story가 아니면 돌로 된 단층집. 굴뚝 꼭대기(월드)를 돌려준다.
 static func house(parent: Node3D, at: Vector3, facing: float, size: Vector2, two_story: bool, rng: RandomNumberGenerator) -> Vector3:
 	var h := place(parent, at, facing)
+	if KitHouse.available():
+		return h.to_global(KitHouse.build(h, size, two_story, rng))
 	var w: float = size.x
 	var d: float = size.y
 	var g_h: float = 2.6
