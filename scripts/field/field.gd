@@ -86,6 +86,7 @@ func _ready() -> void:
 	meta = Meta.load_or_new()
 	meta.fix_sheath(data)
 	meta.ensure_glints()
+	meta.ensure_mat_spots()
 	meta.ensure_wanderer()   # 34단계: 아무도 없으면 한 사람이 선다
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
@@ -196,6 +197,8 @@ func _build_props() -> void:
 		_props[id] = n
 	for i in meta.glints:
 		_props["glint_%d" % i] = FieldBuilder.glint(self, i)
+	for i in meta.mat_spots:
+		_props["mat_%d" % i] = FieldBuilder.mat_spot(self, i)
 
 
 func _capture(on: bool) -> void:
@@ -464,6 +467,8 @@ func _spots() -> Dictionary:
 		s[id] = FieldLayout.STONES[id][0]
 	for i in meta.glints:
 		s["glint_%d" % i] = FieldLayout.GLINTS[i]
+	for i in meta.mat_spots:
+		s["mat_%d" % i] = FieldLayout.MATS[i][0]
 	return s
 
 
@@ -484,6 +489,8 @@ func _prompt(key: String) -> String:
 		return "유품을 연다"
 	if key.begins_with("stone"):
 		return "비석을 읽는다"
+	if key.begins_with("mat_"):
+		return {&"wood": "나무를 벤다", &"stone": "돌을 깬다", &"iron": "녹슨 쇠를 거둔다"}[FieldLayout.MATS[int(key.substr(4))][1]]
 	return "쇳조각을 줍는다"
 
 
@@ -538,6 +545,14 @@ func _interact() -> void:
 			_saved()
 		if pay > 0:
 			_hud.toast("비석을 모두 읽었다. 조각 %d개" % pay)
+	elif _near.begins_with("mat_"):
+		var got: Array = meta.take_mat(int(_near.substr(4)))
+		if int(got[1]) > 0:
+			FieldBuilder.take_glint(_props[_near])
+			_props.erase(_near)
+			_sfx.play(&"thump", _lord.position, -4.0, 0.8)
+			_hud.got_mat(got[0], int(got[1]))   # 오른쪽 아래 숫자 위에 +N(글 알림은 없다)
+			_saved()
 	elif _near.begins_with("glint"):
 		var i: int = int(_near.substr(6))
 		var got: int = meta.take_glint(i)

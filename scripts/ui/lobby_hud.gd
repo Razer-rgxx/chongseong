@@ -58,6 +58,7 @@ var _gate_pick: int = 0
 ## 검 보관집(2026-11-21): 북문에서 고르는 나머지 칸의 검(칸 2부터, 0은 빈 칸).
 var _gate_more: Array[int] = []
 var _hp_bar: LifeBar
+var _mats: MatsBar
 ## 들판 보스·우두머리의 체력 막대(18·32단계): 화면 아래 가운데, 큰 이름 한 줄과 막대.
 var _boss_box: VBoxContainer
 var _boss_name: Label
@@ -92,8 +93,13 @@ func _ready() -> void:
 	sb.offset_right = -28
 	sb.offset_bottom = -26
 	add_child(sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 22)
+	sb.add_child(row)
+	_mats = MatsBar.new()   # 나무·돌·쇠(마을 키우기 1단계)
+	row.add_child(_mats)
 	_shards = UiKit.label("", 20, UiKit.TITLE)
-	sb.add_child(_shards)
+	row.add_child(_shards)
 	_toast = Band.make(self, 96.0, 980.0, 50.0, 18)
 	_prompt = Band.make(self, -110.0, 640.0, 50.0, 19)
 	_say = DialogueBox.make(self)   # 대사: 이름 + 줄, 화면 아래 자막
@@ -256,6 +262,14 @@ func flash(c: Color, strength: float, time: float = 0.5) -> void:
 
 func refresh_top() -> void:
 	_shards.text = "조각  %s" % _num(meta.shards)
+	if _mats and meta:
+		_mats.refresh(meta)
+
+
+## 재료를 얻었다: 숫자를 바꾸고 그 위에 +N을 잠깐 띄운다(들판에서 거둘 때).
+func got_mat(id: StringName, n: int) -> void:
+	refresh_top()
+	_mats.pop(id, n)
 
 
 # ---------------------------------------------------------------- 대장간

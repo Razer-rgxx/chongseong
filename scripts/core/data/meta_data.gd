@@ -14,6 +14,14 @@ extends Resource
 @export var melt: PackedInt32Array = PackedInt32Array([2, 6, 20, 60, 200, 1000])
 @export var elite: int = 15
 
+@export_group("마을 키우기: 재료 (2026-11-21)")
+## 언덕 판이 끝날 때 넘긴 구역마다 받는 나무·돌·쇠, 정예 하나에 쇠, 꼭대기까지 이기면 더 받는 쇠.
+@export var run_wood_per_zone: int = 2
+@export var run_stone_per_zone: int = 2
+@export var run_iron_per_zone: int = 1
+@export var run_iron_per_elite: int = 1
+@export var run_iron_win: int = 5
+
 @export_group("마을: 검 보관집 (2026-11-21)")
 ## 검 보관집을 짓는 값(조각). 마을 북동쪽 빈 터에 집이 올라가고, 그 집에서 검집을 산다.
 @export var storage_house_cost: int = 80

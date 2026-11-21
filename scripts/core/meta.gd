@@ -29,6 +29,13 @@ var runs: int = 0
 ## 검 보관집(2026-11-21): 마을 터에 집을 짓고(storage_house), 그 집에서 검집을 단계로 산다(storage_lv).
 ## 검집 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
 var storage_house: bool = false
+## 마을 키우기 재료(2026-11-21): 나무·돌·쇠 수. 들판에서 줍고 언덕 판이 끝나면 받는다. 건물을 지을 때 쓴다.
+const MAT_IDS: Array[StringName] = [&"wood", &"stone", &"iron"]
+const MAT_NAMES: Dictionary = {&"wood": "나무", &"stone": "돌", &"iron": "쇠"}
+var mats: Dictionary = {&"wood": 0, &"stone": 0, &"iron": 0}
+## 이번 판 들판에 생긴 재료 자리(FieldLayout.MATS 번호). 판이 끝날 때 새로 뽑는다.
+var mat_spots: Array[int] = []
+var mat_spots_ready: bool = false
 var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
@@ -115,7 +122,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -170,7 +177,15 @@ func from_dict(d: Dictionary) -> void:
 	best = int(d.get("best", 0))
 	runs = int(d.get("runs", 0))
 	storage_lv = clampi(int(d.get("storage_lv", 0)), 0, 2)
-	storage_house = bool(d.get("storage_house", storage_lv > 0))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
+	storage_house = bool(d.get("storage_house", storage_lv > 0))
+	var md: Dictionary = d.get("mats", {})
+	for id in MAT_IDS:
+		mats[id] = maxi(0, int(md.get(String(id), 0)))
+	mat_spots = []
+	for i in d.get("mat_spots", []):
+		if int(i) >= 0 and int(i) < FieldLayout.MATS.size():
+			mat_spots.append(int(i))
+	mat_spots_ready = bool(d.get("mat_spots_ready", false))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -540,6 +555,9 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	var r := run_shards(rules, md)
 	shards += r.total
+	r["mats"] = run_mats(rules, md)
+	for id in r.mats:
+		add_mat(id, int(r.mats[id]))
 	# 의뢰: 맡은 것을 이루었으면 조각을 주고, 판이 끝날 때마다 안 맡은 것 하나를 바꾼다
 	r["quest_done"] = false
 	r["quest_reward"] = 0
@@ -558,6 +576,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	refresh_board(rules.data)
 	refresh_stock(rules.data)
 	roll_glints()
+	roll_mat_spots()
 	packs_cleared = {}
 	boss_down = false
 	chiefs_down = {}
@@ -1139,6 +1158,76 @@ func hill_slots() -> int:
 ## 들판·무덤의 검 칸 수(기본 1, 검 보관집 3~4).
 func field_slots() -> int:
 	return 1 if storage_lv == 0 else 2 + storage_lv
+
+
+# ---------------------------------------------------------------- 재료(마을 키우기 1단계)
+
+func mat(id: StringName) -> int:
+	return int(mats.get(id, 0))
+
+
+func add_mat(id: StringName, n: int) -> void:
+	mats[id] = maxi(0, mat(id) + n)
+
+
+## cost: 재료 → 수. 다 있으면 true.
+func can_pay(cost: Dictionary) -> bool:
+	for id in cost:
+		if mat(id) < int(cost[id]):
+			return false
+	return true
+
+
+## 재료를 낸다. 모자라면 아무것도 안 내고 false.
+func pay(cost: Dictionary) -> bool:
+	if not can_pay(cost):
+		return false
+	for id in cost:
+		add_mat(id, -int(cost[id]))
+	return true
+
+
+## 들판 재료 자리를 새로 뽑는다(판이 끝날 때마다): 재료마다 MAT_ACTIVE곳.
+func roll_mat_spots() -> void:
+	mat_spots = []
+	for id in MAT_IDS:
+		var pool: Array[int] = []
+		for i in FieldLayout.MATS.size():
+			if FieldLayout.MATS[i][1] == id:
+				pool.append(i)
+		for _k in mini(FieldLayout.MAT_ACTIVE, pool.size()):
+			var j: int = rng.randi() % pool.size()
+			mat_spots.append(pool[j])
+			pool.remove_at(j)
+	mat_spots.sort()
+	mat_spots_ready = true
+
+
+func ensure_mat_spots() -> void:
+	if not mat_spots_ready:
+		roll_mat_spots()
+
+
+## 재료 자리에서 거둔다. [재료, 수]를 돌려주고 없는 자리면 [&"", 0].
+func take_mat(i: int) -> Array:
+	var at: int = mat_spots.find(i)
+	if at < 0:
+		return [&"", 0]
+	mat_spots.remove_at(at)
+	var id: StringName = FieldLayout.MATS[i][1]
+	var y: Vector2i = FieldLayout.MAT_YIELD[id]
+	var n: int = rng.randi_range(y.x, y.y)
+	add_mat(id, n)
+	return [id, n]
+
+
+## 언덕 판에서 받는 재료: 넘긴 구역마다 나무·돌·쇠, 정예마다 쇠, 이기면 쇠 더.
+static func run_mats(rules: Rules, md: MetaData) -> Dictionary:
+	return {
+		&"wood": rules.zone * md.run_wood_per_zone,
+		&"stone": rules.zone * md.run_stone_per_zone,
+		&"iron": rules.zone * md.run_iron_per_zone + rules.elites_killed * md.run_iron_per_elite + (md.run_iron_win if rules.won else 0),
+	}
 
 
 ## 검 보관집을 짓는 값(조각). 이미 지었으면 -1.

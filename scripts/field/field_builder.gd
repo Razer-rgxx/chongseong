@@ -1304,6 +1304,71 @@ static func glint(parent: Node3D, i: int) -> Node3D:
 	return n
 
 
+## 재료 자리(2026-11-21 마을 키우기 1단계): 나무는 쓰러진 통나무와 그루터기, 돌은 금 간 바위와 떨어진 덩이,
+## 쇠는 녹슨 칼·투구 더미. 글자 없이 생김새로 알아보게 한다(E를 누르면 거둔다).
+static func mat_spot(parent: Node3D, i: int) -> Node3D:
+	var c: Vector2 = FieldLayout.MATS[i][0]
+	var kind: StringName = FieldLayout.MATS[i][1]
+	var n := Node3D.new()
+	n.name = "mat_%d" % i
+	n.position = at_cell(c, 0.0)
+	n.rotation.y = i * 1.7
+	match kind:
+		&"wood":
+			var bark := _mat("mat_bark", Color(0.22, 0.15, 0.1), 0.95)
+			var cut := _mat("mat_cut", Color(0.62, 0.46, 0.3), 0.9)
+			var log := MeshInstance3D.new()
+			var cy := CylinderMesh.new()
+			cy.top_radius = 0.32
+			cy.bottom_radius = 0.36
+			cy.height = 3.2
+			cy.radial_segments = 10
+			log.mesh = cy
+			log.material_override = bark
+			log.rotation = Vector3(0.0, 0.0, PI / 2.0)
+			log.position = Vector3(0.0, 0.32, 0.0)
+			n.add_child(log)
+			_box(n, Vector3(0.05, 0.6, 0.6), Vector3(1.62, 0.32, 0.0), cut)   # 벤 자리(밝은 속살)
+			var st := MeshInstance3D.new()
+			var sc := CylinderMesh.new()
+			sc.top_radius = 0.34
+			sc.bottom_radius = 0.42
+			sc.height = 0.5
+			sc.radial_segments = 10
+			st.mesh = sc
+			st.material_override = bark
+			st.position = Vector3(-0.6, 0.25, 0.9)
+			n.add_child(st)
+			_box(n, Vector3(0.6, 0.04, 0.6), Vector3(-0.6, 0.51, 0.9), cut)
+			for k in 5:   # 나뭇조각
+				_box(n, Vector3(0.14, 0.03, 0.06), Vector3(0.4 + k * 0.22, 0.02, 0.5 - k * 0.12), cut, Vector3(0, k * 1.1, 0))
+		&"stone":
+			var rock := _cut_stone()
+			_box(n, Vector3(1.5, 1.1, 1.2), Vector3(0.0, 0.5, 0.0), rock, Vector3(0.08, 0.3, -0.06))
+			_box(n, Vector3(0.9, 0.7, 0.8), Vector3(0.75, 0.32, 0.55), rock, Vector3(-0.1, -0.5, 0.12))
+			var crack := _mat("mat_crack", Color(0.05, 0.045, 0.04), 1.0)
+			_box(n, Vector3(0.04, 0.9, 1.25), Vector3(0.18, 0.55, 0.0), crack, Vector3(0.08, 0.3, -0.06))   # 금
+			for k in 4:   # 떨어진 덩이
+				_box(n, Vector3(0.32, 0.22, 0.28), Vector3(-0.9 + k * 0.28, 0.1, 0.8 - k * 0.15), rock, Vector3(0, k * 0.9, 0.1))
+		_:
+			var rust := _mat("mat_rust", Color(0.32, 0.17, 0.1), 0.85, 0.5)
+			var iron := _mat("mat_iron", Color(0.38, 0.37, 0.36), 0.6, 0.8)
+			for k in 6:   # 겹쳐 쌓인 녹슨 칼날
+				_box(n, Vector3(0.08, 0.03, 1.1), Vector3(-0.3 + k * 0.12, 0.05 + k * 0.035, k * 0.05), rust if k % 2 == 0 else iron, Vector3(0.0, -0.6 + k * 0.32, 0.05))
+			var helm := MeshInstance3D.new()
+			var sp := SphereMesh.new()
+			sp.radius = 0.2
+			sp.height = 0.26
+			sp.is_hemisphere = true
+			helm.mesh = sp
+			helm.material_override = rust
+			helm.position = Vector3(0.5, 0.02, -0.35)
+			n.add_child(helm)
+			_box(n, Vector3(0.5, 0.06, 0.08), Vector3(-0.4, 0.06, -0.5), iron, Vector3(0, 0.4, 0))   # 코등이
+	parent.add_child(n)
+	return n
+
+
 ## 줍힘: 작아지며 사라진다.
 static func take_glint(n: Node3D) -> void:
 	var t := n.create_tween()

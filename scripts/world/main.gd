@@ -647,7 +647,11 @@ func _on_end(won: bool) -> void:
 	_clear_night_view()
 	_clear_event_view()
 	_hud.set_goal("")
-	_hud.show_over(title, "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")] + _quest_line(r))
+	var got_mats: Array[String] = []
+	for id in Meta.MAT_IDS:
+		if int(r.mats[id]) > 0:
+			got_mats.append("%s +%d" % [Meta.MAT_NAMES[id], int(r.mats[id])])
+	_hud.show_over(title, (" · ".join(got_mats) + "\n" if not got_mats.is_empty() else "") + "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")] + _quest_line(r))
 	_capture(false)
 
 
