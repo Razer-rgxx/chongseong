@@ -194,7 +194,7 @@ func _ready() -> void:
 	rules.lord_hurt.connect(_on_lord_hurt)
 	rules.enemy_hit.connect(_on_enemy_hit)
 	rules.enemy_died.connect(_on_enemy_died)
-	rules.elite_spawned.connect(func(e: Enemy) -> void: _hud.toast("정예 %s이(가) 올라온다. 쓰러뜨리면 공짜 뽑기." % e.data.display_name))
+	rules.elite_spawned.connect(func(e: Enemy) -> void: _hud.toast("정예를 쓰러뜨리면 공짜 뽑기"))
 	rules.altar_opened.connect(_on_altar_opened)
 	rules.altar_used.connect(_on_altar_used)
 	rules.boss_spawned.connect(_on_boss)
@@ -210,9 +210,10 @@ func _ready() -> void:
 	_sync_altar()
 	if rules.event:
 		_on_event_placed(rules.event)
-	var start: String = "검집에서 %s을(를) 꺼냈다. " % rules.slots[0].label() if rules.slots[0] else ""
 	_hud.area_title(_zone_name())
-	_hud.toast("%s꽂힌 검 앞에서 E를 눌러 뽑는다. 한 번에 체력 %d. 준비되면 N으로 밤을 맞는다." % [start, rules.pull_cost()])
+	# 뽑는 법·밤 맞는 법은 손잡이 앞 E 안내와 밤 맞이하기 단추가 이미 말한다(2026-11-21 화면 글 정리)
+	if rules.slots[0]:
+		_hud.toast("검집에서 %s을(를) 꺼냈다." % rules.slots[0].label())
 	_capture(true)
 	WebQuality.apply(self, _env.environment, _sun, _camera)   # 웹판에서만 가볍게
 
@@ -444,20 +445,19 @@ func _zone_name() -> String:
 func _update_hud() -> void:
 	var night: bool = rules.phase == Rules.Phase.NIGHT
 	var sub: String
+	# 2026-11-21 화면 글 정리: 새벽까지 남은 초는 막대가, 남은 손잡이는 언덕이, 안개·불씨는 화면이 보여 준다.
+	# 여기에는 화면에 안 보이는 것만: 적 수, 뽑기 운(1배가 아닐 때), 공짜 뽑기
+	var bits: Array[String] = []
 	if night:
-		sub = ("새벽까지 %d초" % ceili(rules.night_left)) if rules.night_left > 0.0 else "언덕지기를 쓰러뜨려"
-		sub += " · 적 %d" % rules.enemies.size()
-		if RULE_NAMES.has(rules.rule):
-			sub += " · " + RULE_NAMES[rules.rule]
+		bits.append("적 %d" % rules.enemies.size())
 	else:
-		var left: int = 0
-		for h in rules.hilts:
-			left += 0 if h.gone else 1
-		sub = "남은 검 %d · 뽑기 운 ×%s" % [left, str(snappedf(rules.luck(), 0.01))]
+		if not is_equal_approx(rules.luck(), 1.0):
+			bits.append("뽑기 운 ×%s" % str(snappedf(rules.luck(), 0.01)))
 		if rules.free_pulls > 0:
-			sub += " · 공짜 뽑기 %d" % rules.free_pulls
+			bits.append("공짜 뽑기 %d" % rules.free_pulls)
+	sub = " · ".join(bits)
 	var k: float = 1.0 - maxf(0.0, rules.night_left) / maxf(1.0, rules.night_total) if night else 0.0
-	var zone_text: String = "%s · %s" % [_zone_name(), (GOAL_NAMES.get(rules.goal, "밤") if not rules.last_zone() else "언덕지기") if night else "낮"]
+	var zone_text: String = "%s · %s" % [_zone_name(), GOAL_NAMES.get(rules.goal, "밤") if not rules.last_zone() else "언덕지기"] if night else _zone_name()
 	_hud.set_status(rules.lord.hp, rules.max_hp(), zone_text, sub, k, night or rules.phase == Rules.Phase.OVER)
 	_update_goal_line(night)
 	_refresh_cards()
@@ -533,12 +533,12 @@ func _on_day(_zone: int) -> void:
 	var parts: Array[String] = []
 	if rules.path_reward != &"":
 		parts.append("길의 보상: " + _path_reward_name(rules.path_reward, true))
-	parts.append("뽑기 운 ×%s" % str(snappedf(rules.luck(), 0.01)))
 	if rules.altar:
 		parts.append("숫돌 제단이 섰다")
 	if rules.event:
 		parts.append(EVENT_NEWS.get(rules.event.kind, ""))
-	_hud.toast(" · ".join(parts))
+	if not parts.is_empty():
+		_hud.toast(" · ".join(parts))
 
 
 ## 지난 밤 목표의 결과 한 마디(없으면 "").
@@ -563,33 +563,31 @@ func _on_night(_zone: int) -> void:
 	_start_night_view()
 	var goal_name: String = "언덕지기" if rules.last_zone() else GOAL_NAMES.get(rules.goal, "버티기")
 	_hud.area_title("%s · %s" % [_zone_name(), goal_name])
-	_hud.toast(_goal_line())
+	var line: String = _goal_line()
+	if line != "":
+		_hud.toast(line)
 
 
-## 이 밤의 한 줄 목표(Band).
+## 이 밤의 한 줄 목표(Band). 2026-11-21 화면 글 정리: 밤이 온 것(어둠), 버틸 초(막대), 안개(화면)는 말하지 않는다.
+## 화면만 봐서는 모를 것만 남긴다. 없으면 "".
 func _goal_line() -> String:
+	var bits: Array[String] = []
 	if rules.last_zone():
-		return "밤이 왔다. 정상의 언덕지기를 쓰러뜨려야 끝난다."
-	var t: String
-	match rules.goal:
-		&"defend":
-			t = "봉화를 지켜라. 적의 일부가 봉화를 노린다."
-		&"hunt":
-			t = "곧 우두머리가 올라온다. 쓰러뜨리면 바로 새벽이다."
-		&"siege":
-			t = "적이 한쪽에서 몰려온다. %d초를 버텨." % roundi(rules.night_total)
-		_:
-			t = "밤이 왔다. %d초를 버텨." % roundi(rules.night_total)
+		bits.append("정상의 언덕지기를 쓰러뜨려야 끝난다")
+	else:
+		match rules.goal:
+			&"defend":
+				bits.append("적의 일부가 봉화를 노린다")
+			&"hunt":
+				bits.append("곧 올라올 우두머리를 쓰러뜨리면 바로 새벽")
 	match rules.rule:
-		&"fog":
-			t += " 짙은 안개가 깔린다."
 		&"embers":
-			t += " 달아오르는 땅을 피해."
+			bits.append("달아오르는 땅을 피해")
 		&"graves":
-			t += " 쓰러진 망령이 다시 일어난다."
+			bits.append("쓰러진 망령이 다시 일어난다")
 	if rules.cursed_night:
-		t += " 저주가 적을 사납게 한다."
-	return t
+		bits.append("저주가 적을 사납게 한다")
+	return " · ".join(bits)
 
 
 ## 밤이 시작될 때: 봉화를 세우고, 안개를 짙게 한다. 두 번째 기회로 밤이 다시 시작되면 앞의 것을 거두고 다시 한다.
@@ -625,10 +623,8 @@ func _on_boss(e: Enemy) -> void:
 	_camera.add_shake(0.5)
 	_sfx.play(&"night", _lord.position, 0.0)
 	if e.data.boss:
-		_hud.toast("언덕지기가 올라온다.")
-		return
+		return   # 위 가운데 목표 막대에 이름과 체력이 뜬다
 	_ring_for = e.id
-	_hud.toast("우두머리 %s이(가) 올라온다. 쓰러뜨리면 새벽이 온다." % e.data.display_name)
 
 
 ## 판이 끝났을 때 의뢰 한 줄(맡은 의뢰가 없으면 빈 글).

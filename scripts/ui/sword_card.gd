@@ -7,7 +7,7 @@ extends RefCounted
 static func bbcode(s: Sword, data: GameData, slot: int = -1, held: bool = false) -> String:
 	var key: String = "" if slot < 0 else "  [color=#8b96b3][%d][/color]" % (slot + 1)
 	if s == null:
-		return "[b][color=#8b96b3]%s[/color][/b]%s\n[color=#8b96b3]낮에 검을 뽑아 채워[/color]" % ["맨손" if held else "빈 칸", key]
+		return "[b][color=#8b96b3]%s[/color][/b]%s" % ["맨손" if held else "빈 칸", key]   # 채우는 법은 손잡이 앞 E가 말한다
 	var col: String = data.grades.colors[s.grade].to_html(false)
 	var dmg: int = roundi(s.damage(data))
 	var dur: String = "∞" if not s.breakable() else "%d/%d" % [ceili(s.durability), s.max_durability]

@@ -14,8 +14,7 @@ signal path_picked(index: int)
 @export var choice_guard: float = 0.8
 @export var toast_time: float = 4.0
 
-var _hp_bar: ProgressBar
-var _hp_label: Label
+var _life: LifeBar
 var _zone: Label
 var _sub: Label
 var _night_bar: ProgressBar
@@ -54,13 +53,15 @@ func _ready() -> void:
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE, Control.PRESET_MODE_MINSIZE, 14)
 	top.add_theme_constant_override("separation", 14)
 	add_child(top)
-	var hp_box := _panel(VBoxContainer.new())
-	hp_box.get_parent().custom_minimum_size = Vector2(260, 0)
-	top.add_child(hp_box.get_parent())
-	_hp_label = _label("", 16)
-	hp_box.add_child(_hp_label)
-	_hp_bar = _bar(Color(0.66, 0.12, 0.1))
-	hp_box.add_child(_hp_bar)
+	# 내 체력: 글자 없는 막대 하나(LifeBar). 최대 체력이 늘면 길어진다
+	_life = LifeBar.new()
+	_life.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var life_pad := MarginContainer.new()
+	life_pad.add_theme_constant_override("margin_left", 14)
+	life_pad.add_theme_constant_override("margin_top", 14)
+	life_pad.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	life_pad.add_child(_life)
+	top.add_child(life_pad)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(spacer)
@@ -142,6 +143,8 @@ func _ready() -> void:
 	_help_hint.modulate = Color(UiKit.MUTED, 0.7)
 	_help_hint.position = Vector2(20, 96)
 	add_child(_help_hint)
+	# 늘 떠 있으면 화면 소음: 처음 몇 초만 보이고 사라진다(F1은 그대로 된다)
+	create_tween().tween_property(_help_hint, "modulate:a", 0.0, 1.5).set_delay(8.0)
 
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -166,9 +169,7 @@ func night_button() -> Button:
 
 
 func set_status(hp: float, max_hp: float, zone_text: String, sub: String, night_k: float, night: bool) -> void:
-	_hp_bar.max_value = max_hp
-	_hp_bar.value = hp
-	_hp_label.text = "체력  %d / %d" % [ceili(hp), max_hp]
+	_life.set_hp(hp, max_hp)
 	_zone.text = zone_text
 	_sub.text = sub
 	_night_bar.value = night_k * 100.0
@@ -257,12 +258,11 @@ func open_choice(new_text: String, slot_texts: Array) -> void:
 	for k in n:
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 6)
-		col.add_child(_label("지금 %d번 칸" % (k + 1), 14))
 		var r := _choice_card(w, false)
 		r.text = str(slot_texts[k])
 		col.add_child(r.get_parent())
 		var b := Button.new()
-		b.text = "%d번 칸과 바꾸기 (%d)" % [k + 1, k + 1]
+		b.text = "바꾸기 (%d)" % (k + 1)
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(0, 40)
 		var slot: int = k
@@ -328,7 +328,7 @@ func _build_choice() -> void:
 	_discard.pressed.connect(func() -> void: pick(-1))
 	head.add_child(_discard)
 	box.add_child(head)
-	box.add_child(_label("새 검을 어느 칸에 들까? 바꾸면 그 칸의 검은 버린다. 카드를 눌러서는 바뀌지 않는다.", 14))
+	box.add_child(_label("바꾼 칸의 검은 버린다.", 14))   # 어느 칸인지는 아래 카드와 단추가 보여 준다
 	var top := VBoxContainer.new()
 	top.add_theme_constant_override("separation", 6)
 	top.add_child(_label("새로 뽑은 검", 14))

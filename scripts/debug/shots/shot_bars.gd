@@ -1,5 +1,5 @@
 extends SceneTree
-## 적 체력 막대(2026-11-21) 확인용: 언덕 밤에 늑대·망령·거인·정예를 앞에 세우고 체력을 깎는다.
+## 체력 막대(2026-11-21) 확인용: 언덕 밤에 늑대·망령·거인·정예를 앞에 세우고 체력을 깎는다. 내 체력도 1/4로.
 ## 돌리기: xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-driver opengl3 --rendering-method gl_compatibility -s scripts/debug/shots/shot_bars.gd
 ## 그림은 /home/claude/shots/bars.png.
 
@@ -32,7 +32,9 @@ func _init() -> void:
 	for f in foes:
 		var e: Enemy = f[0]
 		e.hp = e.max_hp * float(f[1])
-	await _wait(12)
+	await _wait(6)
+	rules.lord.hp = rules.max_hp() * 0.25   # 내 체력 막대: 깎인 몫이 옅게 남는지
+	await _wait(3)
 	root.get_texture().get_image().save_png("/home/claude/shots/bars.png")
 	print("shot bars")
 	quit()

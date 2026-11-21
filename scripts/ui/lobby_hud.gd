@@ -57,7 +57,7 @@ var _gate_mode: bool = false
 var _gate_pick: int = 0
 ## 검 보관집(2026-11-21): 북문에서 고르는 나머지 칸의 검(칸 2부터, 0은 빈 칸).
 var _gate_more: Array[int] = []
-var _hp_bar: ProgressBar
+var _hp_bar: LifeBar
 ## 들판 보스·우두머리의 체력 막대(18·32단계): 화면 아래 가운데, 큰 이름 한 줄과 막대.
 var _boss_box: VBoxContainer
 var _boss_name: Label
@@ -158,26 +158,18 @@ func close() -> void:
 	closed.emit()
 
 
-## 들판의 체력 막대(17단계). 글자 없이 줄만 그린다.
+## 들판·무덤의 내 체력 막대(17단계 → 2026-11-21 LifeBar): 글자 없이 막대만, 왼쪽 아래.
 func set_hp(hp: float, max_hp: float) -> void:
 	if _hp_bar == null:
-		_hp_bar = ProgressBar.new()
-		_hp_bar.show_percentage = false
-		_hp_bar.custom_minimum_size = Vector2(300, 12)
-		_hp_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		_hp_bar.offset_left = 28
-		_hp_bar.offset_right = 328
-		_hp_bar.offset_top = -40
-		_hp_bar.offset_bottom = -28
-		var bg := UiKit.style(Color(UiKit.LINE, 0.4), 1, Color(0.02, 0.018, 0.015, 0.75))
-		var fill := UiKit.style(Color(0.7, 0.16, 0.14), 0, Color(0.7, 0.16, 0.14))
-		for sb in [bg, fill]:
-			sb.set_content_margin_all(0)
-		_hp_bar.add_theme_stylebox_override("background", bg)
-		_hp_bar.add_theme_stylebox_override("fill", fill)
+		_hp_bar = LifeBar.new()
 		add_child(_hp_bar)
-	_hp_bar.max_value = max_hp
-	_hp_bar.value = maxf(0.0, hp)
+	_hp_bar.set_hp(hp, max_hp)
+	var sz: Vector2 = _hp_bar.custom_minimum_size
+	_hp_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_hp_bar.offset_left = 28
+	_hp_bar.offset_right = 28 + sz.x
+	_hp_bar.offset_top = -28 - sz.y
+	_hp_bar.offset_bottom = -28
 
 
 ## 들판 보스·곳마다 우두머리의 체력 막대(18·32단계, 엘든 링식). 화면 아래 가운데에 또렷한 큰 이름 한 줄, 그 아래 양 끝이 사라지는 놋쇠 줄과 긴 막대.
@@ -332,7 +324,7 @@ func _render_storage(msg: String) -> void:
 	var held: String = "지금 언덕 판 %d칸 · 들판 %d칸" % [meta.hill_slots(), meta.field_slots()]
 	if not meta.storage_house:
 		UiKit.header(_storage_box, "검 보관집 터", close)
-		_storage_box.add_child(_wrap(UiKit.label("말뚝과 줄로 둘러친 빈 터에 통나무와 돌이 쌓여 있다.\n집을 지으면 그 안에서 검집을 살 수 있다. 검집이 늘면 언덕 판과 들판에서 한 번에 드는 검이 는다.", 15, UiKit.MUTED)))
+		_storage_box.add_child(_wrap(UiKit.label("집을 지으면 그 안에서 검집을 살 수 있다. 검집이 늘면 언덕 판과 들판에서 한 번에 드는 검이 는다.", 15, UiKit.MUTED)))
 		_storage_box.add_child(UiKit.label(held, 15, UiKit.TEXT))
 		_storage_box.add_child(UiKit.button("검 보관집 짓기 · 조각 %s" % _num(meta.house_cost(md)), _build_house, 46))
 	else:
@@ -661,7 +653,7 @@ func _render_yard_rack() -> void:
 			var dd: SwordData = data.sword_by_id(meta.dropped_id())
 			_yard_box.add_child(_wrap(UiKit.label("들판에 떨군 검: %s" % (dd.display_name if dd else "?"), 14, Color(1.0, 0.45, 0.35))))
 	else:
-		_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다. 울타리 안에서 좌클릭으로 허수아비를 친다.", 14, UiKit.MUTED)))
+		_yard_box.add_child(_wrap(UiKit.label("고른 검은 마을에서만 쥔다.", 14, UiKit.MUTED)))
 	var ids := meta.yard_swords(data)
 	if ids.is_empty() and not _gate_mode:
 		_yard_box.add_child(UiKit.label("걸어 둘 검이 없다. 언덕에서 뽑아 와야 한다.", 16, UiKit.TEXT))

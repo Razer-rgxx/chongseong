@@ -361,13 +361,12 @@ func _apply_day_night(k: float) -> void:
 	_lord.torch.light_energy = lerpf(FieldLayout.FIELD_TORCH_DAY, FieldLayout.FIELD_TORCH_NIGHT, smoothstep(0.2, 0.9, k))
 
 
-## 해가 졌다: 한 줄과 밤 소리. 밤 무리는 Rules가 세웠다.
+## 해가 졌다: 밤 소리(하늘과 왼쪽 위 해·달이 보여 주니 글은 없다). 밤 무리는 Rules가 세웠다.
 func _on_dusk() -> void:
-	_hud.toast("해가 진다")
 	_sfx.play(&"night", _lord.position, -2.0)
 
 
-## 날이 밝았다: 한 줄. 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 맞춘다(영주 곁이라 건너뛴 것만 남는다).
+## 날이 밝았다(글 없음). 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 맞춘다(영주 곁이라 건너뛴 것만 남는다).
 ## 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
 func _on_dawn() -> void:
 	meta.packs_cleared = rules.field_cleared_ids()
@@ -375,7 +374,6 @@ func _on_dawn() -> void:
 	if _reading == "wanderer":
 		_end_read()
 	_build_wanderer()
-	_hud.toast("날이 밝는다")
 	_saved()
 
 
