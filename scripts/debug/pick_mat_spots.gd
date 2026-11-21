@@ -42,6 +42,15 @@ func _init() -> void:
 			for t in taken:
 				if t.distance_to(c) < 7.0:
 					ok = false
+			for k in FieldLayout.PACKS:   # 무리가 진 친 자리(포로가 묶이는 자리)와 밤 무리, 떠도는 사람 자리는 비운다
+				if c.distance_to(FieldLayout.PACKS[k].at) < float(FieldLayout.PACKS[k].wander) + 4.0:
+					ok = false
+			for k in FieldLayout.NIGHT_PACKS:
+				if c.distance_to(FieldLayout.NIGHT_PACKS[k].at) < float(FieldLayout.NIGHT_PACKS[k].wander) + 3.0:
+					ok = false
+			for w in FieldLayout.WANDERER_SPOTS:
+				if c.distance_to(w.at) < 5.0:
+					ok = false
 			if not ok:
 				continue
 			taken.append(c)

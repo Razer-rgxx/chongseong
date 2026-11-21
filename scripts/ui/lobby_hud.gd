@@ -22,6 +22,8 @@ signal duel_online_cancel()
 signal storage_built()
 ## 바깥 터 건물을 지었다(마을이 집을 올린다).
 signal building_built(id: StringName)
+## 주민 i의 일을 바꿨다(마을이 그 사람을 일터로 옮긴다).
+signal job_set(i: int)
 signal sheath_bought(level: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
@@ -44,6 +46,9 @@ var _storage_box: VBoxContainer
 var _bld: Control
 var _bld_box: VBoxContainer
 var _bld_data: BuildingData = null
+var _jobs: Control
+var _jobs_box: VBoxContainer
+var _jobs_i: int = -1
 var _rack: Control
 var _rack_text: RichTextLabel
 var _msg: Label
@@ -117,6 +122,8 @@ func _ready() -> void:
 	_storage_box = UiKit.center_panel(_storage)
 	_bld = _layer()
 	_bld_box = UiKit.center_panel(_bld)
+	_jobs = _layer()
+	_jobs_box = UiKit.center_panel(_jobs)
 	_board = _layer()
 	_board_box = UiKit.center_panel(_board)
 	_shop = _layer()
@@ -150,7 +157,7 @@ func _ready() -> void:
 
 
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _storage.visible or _bld.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
+	return _forge.visible or _shrine.visible or _storage.visible or _bld.visible or _jobs.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
 
 
 func close() -> void:
@@ -164,6 +171,7 @@ func close() -> void:
 	_shrine.visible = false
 	_storage.visible = false
 	_bld.visible = false
+	_jobs.visible = false
 	_rack.visible = false
 	_board.visible = false
 	_shop.visible = false
@@ -271,7 +279,13 @@ func flash(c: Color, strength: float, time: float = 0.5) -> void:
 func refresh_top() -> void:
 	_shards.text = "조각  %s" % _num(meta.shards)
 	if _mats and meta:
-		_mats.refresh(meta)
+		_mats.refresh(meta, data)
+
+
+## 주민이 늘었다(들판에서 풀어 줌): 사람 수 위에 +1.
+func got_resident() -> void:
+	refresh_top()
+	_mats.pop(MatsBar.FOLK, 1)
 
 
 ## 재료를 얻었다: 숫자를 바꾸고 그 위에 +N을 잠깐 띄운다(들판에서 거둘 때).
@@ -417,6 +431,45 @@ func _render_building(msg: String) -> void:
 		_bld_box.add_child(go)
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_bld_box.add_child(_msg)
+
+
+# ---------------------------------------------------------------- 주민의 일(마을 키우기 3단계)
+
+## 주민에게 E: 쉰다 / 지은 일터(일꾼 수/자리, 일꾼 하나가 판마다 더 모으는 몫). 지금 하는 일은 눌리지 않는다.
+func open_jobs(i: int) -> void:
+	if i < 0 or i >= meta.residents.size():
+		return
+	_jobs_i = i
+	_jobs.visible = true
+	_render_jobs()
+
+
+func _render_jobs() -> void:
+	for c in _jobs_box.get_children():
+		c.queue_free()
+	var r: Dictionary = meta.residents[_jobs_i]
+	UiKit.header(_jobs_box, r.name, close)
+	var rest := UiKit.button("쉰다", func() -> void: _pick_job(&""), 40)
+	rest.disabled = r.job == &""
+	_jobs_box.add_child(rest)
+	for b in data.buildings:
+		if b.workers <= 0 or not meta.has_built(b.id):
+			continue
+		var gain: Array[String] = []
+		for id in Meta.MAT_IDS:
+			if int(b.made()[id]) > 0:
+				gain.append("%s +%d" % [Meta.MAT_NAMES[id], b.per_worker])
+		var id: StringName = b.id
+		var btn := UiKit.button("%s  %d/%d  ·  판마다 %s" % [b.display_name, meta.workers_at(b.id), b.workers, " ".join(gain)], func() -> void: _pick_job(id), 40)
+		btn.disabled = r.job == b.id or meta.workers_at(b.id) >= b.workers
+		_jobs_box.add_child(btn)
+
+
+func _pick_job(id: StringName) -> void:
+	if meta.set_job(_jobs_i, id, data):
+		meta.save()
+		job_set.emit(_jobs_i)
+	close()
 
 
 func _build_building() -> void:

@@ -25,6 +25,9 @@ extends Resource
 @export var made_iron: int = 0
 ## 살 수 있는 주민 수(3단계).
 @export var housing: int = 0
+## 일자리 수와 일꾼 하나가 판마다 더 모으는 몫(이 건물이 모으는 재료로).
+@export var workers: int = 0
+@export var per_worker: int = 0
 
 
 func cost() -> Dictionary:
@@ -40,3 +43,12 @@ func cost() -> Dictionary:
 
 func made() -> Dictionary:
 	return {&"wood": made_wood, &"stone": made_stone, &"iron": made_iron}
+
+
+## 일꾼 n명이 있을 때 판마다 모으는 것(이 건물이 모으는 재료에 일꾼 몫을 더한다).
+func made_with(n: int) -> Dictionary:
+	var r := made()
+	for id in r:
+		if int(r[id]) > 0:
+			r[id] = int(r[id]) + per_worker * mini(n, workers)
+	return r

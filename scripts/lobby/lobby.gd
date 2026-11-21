@@ -127,6 +127,7 @@ func _ready() -> void:
 	_build_village_extras()
 	_build_storage()
 	_build_buildings()
+	_build_residents()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -144,6 +145,7 @@ func _ready() -> void:
 	_hud.duel_online_cancel.connect(_cancel_online)
 	_hud.storage_built.connect(_on_storage_built)
 	_hud.building_built.connect(_on_building_built)
+	_hud.job_set.connect(func(_i: int) -> void: _build_residents())
 	_hud.sheath_bought.connect(_on_sheath_bought)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
@@ -257,6 +259,8 @@ func _process(delta: float) -> void:
 		("storage" if meta.storage_house else "storage_site"): storage_at + Vector2(-0.3, 1.75)}
 	for b in data.buildings:
 		spots["bld_" + String(b.id)] = b.plot + b.facing * (b.size.y / Grid.CELL / 2.0 + 0.9)
+	for i in _res.size():
+		spots["r_%d" % i] = Grid.world_to_cells((_res[i].root as Node3D).position) + Vector2(0.0, 0.01)
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
 	for id in RECRUITS:
@@ -311,6 +315,8 @@ func _interact() -> void:
 			_hud.open_duel()
 		"storage", "storage_site":
 			_hud.open_storage()
+		_ when _near.begins_with("r_"):
+			_hud.open_jobs(int(_near.substr(2)))
 		_ when _near.begins_with("bld_"):
 			_hud.open_building(data.building(StringName(_near.substr(4))))
 		_:
@@ -711,12 +717,47 @@ func _build_buildings() -> void:
 
 
 func _prompt_for(key: String) -> String:
+	if key.begins_with("r_"):
+		var i: int = int(key.substr(2))
+		return "%s에게 일을 맡긴다" % meta.residents[i].name if i < meta.residents.size() else ""
 	if key.begins_with("bld_"):
 		var b: BuildingData = data.building(StringName(key.substr(4)))
 		if b == null:
 			return ""
 		return ("%s에 들른다" if meta.has_built(b.id) else "%s 터를 본다") % b.display_name
 	return PROMPTS.get(key, "")
+
+
+# ---------------------------------------------------------------- 주민(마을 키우기 3단계)
+
+## 주민의 몸: [{P, root, circle}]. 일을 바꾸면 다시 세운다.
+var _res: Array = []
+
+
+## 주민을 세운다: 일꾼은 제 일터 앞(일터를 보고), 쉬는 사람은 오두막 앞(길을 보고). 오두막이 없으면 광장 가.
+func _build_residents() -> void:
+	for r in _res:
+		(r.root as Node3D).queue_free()
+		_circles.erase(r.circle)
+	_res = []
+	var counts: Dictionary = {}
+	for i in meta.residents.size():
+		var res: Dictionary = meta.residents[i]
+		var key: StringName = res.job if res.job != &"" else &"cottage"
+		var k: int = int(counts.get(key, 0))
+		counts[key] = k + 1
+		var b: BuildingData = data.building(key) if meta.has_built(key) else null
+		var cell := Vector2(19.0 + k * 1.2, 15.5)
+		var face := Vector2(0, -1)
+		if b:
+			var side := Vector2(-b.facing.y, b.facing.x)
+			cell = b.plot + b.facing * (b.size.y / Grid.CELL / 2.0 + 1.6) + side * (-1.0 + 2.0 * float(k % 2)) * (0.9 if res.job != &"" else 1.6)
+			face = -b.facing if res.job != &"" else b.facing
+		var holder := VillageBuilder.place(self, Grid.cells_to_world(cell), VillageBuilder.facing_to(face) + PI)
+		var P: Dictionary = VillageProps.villager(res.look, holder)
+		var circ := [cell, 0.4]
+		_circles.append(circ)
+		_res.append({"P": P, "root": holder, "circle": circ})
 
 
 func _on_building_built(id: StringName) -> void:
@@ -766,6 +807,10 @@ func _animate_village(delta: float) -> void:
 		VillageProps.look_at(f.P, root, eye, 1.0 if close else 0.0)
 		if id == _talker:
 			VillageProps.talk(f.P, _vt)
+	for r in _res:
+		EventArt.breathe(r.P, _vt)
+		var rr: Node3D = r.root
+		VillageProps.look_at(r.P, rr, eye, 1.0 if rr.position.distance_to(_lord.position) < 8.0 else 0.0)
 	for i in _dummies.size():
 		_wobble[i] = maxf(0.0, _wobble[i] - delta * 1.6)
 		VillageProps.dummy_wobble(_dummies[i], _wobble_dir[i], _wobble[i])

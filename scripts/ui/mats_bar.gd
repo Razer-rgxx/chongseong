@@ -12,6 +12,8 @@ const COLORS: Dictionary = {
 
 var _nums: Dictionary = {}
 var _boxes: Dictionary = {}
+## 주민(마을 키우기 3단계): 사람 그림과 "사는 수/집".
+const FOLK: StringName = &"folk"
 
 
 func _init() -> void:
@@ -34,11 +36,31 @@ func _init() -> void:
 		add_child(box)
 		_nums[id] = n
 		_boxes[id] = box
+	var fb := HBoxContainer.new()
+	fb.add_theme_constant_override("separation", 6)
+	fb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fi := Control.new()
+	fi.custom_minimum_size = Vector2(ICON, ICON)
+	fi.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	fi.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fi.draw.connect(func() -> void: draw_icon(fi, FOLK))
+	fb.add_child(fi)
+	var fl := UiKit.label("0", 18, UiKit.TEXT)
+	fb.add_child(fl)
+	add_child(fb)
+	move_child(fb, 0)
+	_nums[FOLK] = fl
+	_boxes[FOLK] = fb
+	fb.visible = false
 
 
-func refresh(m: Meta) -> void:
+func refresh(m: Meta, d: GameData = null) -> void:
 	for id in Meta.MAT_IDS:
 		(_nums[id] as Label).text = str(m.mat(id))
+	if d:
+		var room: int = m.housing(d)
+		(_boxes[FOLK] as Control).visible = room > 0 or not m.residents.is_empty()   # 집을 짓기 전에는 안 보인다
+		(_nums[FOLK] as Label).text = "%d/%d" % [m.residents.size(), room]
 
 
 ## 얻은 몫을 숫자 위에 잠깐 띄운다.
@@ -76,6 +98,10 @@ static func draw_icon(c: Control, id: StringName) -> void:
 			c.draw_colored_polygon(p, col)
 			c.draw_polyline(p + PackedVector2Array([p[0]]), col.darkened(0.4), 1.2)
 			c.draw_line(Vector2(0.42, 0.3) * s, Vector2(0.55, 0.62) * s, col.darkened(0.3), 1.0)
+		&"folk":   # 사람: 머리와 어깨
+			var fc := Color(0.78, 0.72, 0.62)
+			c.draw_circle(Vector2(s / 2.0, s * 0.3), s * 0.2, fc)
+			c.draw_colored_polygon(PackedVector2Array([Vector2(0.12, 1.0) * s, Vector2(0.22, 0.62) * s, Vector2(0.78, 0.62) * s, Vector2(0.88, 1.0) * s]), fc)
 		&"iron":
 			var p := PackedVector2Array([Vector2(0.05, 0.78), Vector2(0.22, 0.3), Vector2(0.78, 0.3), Vector2(0.95, 0.78)])
 			for i in p.size():

@@ -66,15 +66,21 @@ const GLINTS: PackedVector2Array = [
 const GLINT_ACTIVE: int = 4
 ## 마을 키우기 재료 자리(2026-11-21, docs/village_growth.md 1단계): [칸, 재료]. scripts/debug/pick_mat_spots.gd가 뽑았다.
 ## 나무는 숲·개울·발치·늪, 돌은 채석장·성채·고개·망루, 쇠는 옛 싸움터·불탄 마을·성채·망루·고개. 판마다 재료별로 MAT_ACTIVE곳이 생긴다.
+## 무리가 진 친 자리(포로가 묶이는 자리)·밤 무리·떠도는 사람 자리와는 떨어져 있다.
 const MATS: Array = [
-	[Vector2(8, 27), &"wood"], [Vector2(30, 36), &"wood"], [Vector2(22, 43), &"wood"], [Vector2(142, 57), &"wood"],
-	[Vector2(83, 56), &"wood"], [Vector2(40, 5), &"wood"], [Vector2(76, 3), &"wood"], [Vector2(153, 84), &"wood"],
-	[Vector2(201, 22), &"stone"], [Vector2(189, 13), &"stone"], [Vector2(214, 31), &"stone"], [Vector2(114, 17), &"stone"],
-	[Vector2(118, 8), &"stone"], [Vector2(195, 96), &"stone"], [Vector2(194, 83), &"stone"], [Vector2(92, 28), &"stone"],
-	[Vector2(98, 106), &"iron"], [Vector2(79, 96), &"iron"], [Vector2(83, 79), &"iron"], [Vector2(208, 48), &"iron"],
-	[Vector2(181, 58), &"iron"], [Vector2(142, 24), &"iron"], [Vector2(82, 32), &"iron"], [Vector2(215, 94), &"iron"],
+	[Vector2(30, 36), &"wood"], [Vector2(22, 43), &"wood"], [Vector2(5, 41), &"wood"], [Vector2(107, 56), &"wood"],
+	[Vector2(153, 55), &"wood"], [Vector2(51, 18), &"wood"], [Vector2(61, 17), &"wood"], [Vector2(152, 84), &"wood"],
+	[Vector2(173, 15), &"stone"], [Vector2(174, 31), &"stone"], [Vector2(207, 11), &"stone"], [Vector2(155, 34), &"stone"],
+	[Vector2(116, 41), &"stone"], [Vector2(192, 95), &"stone"], [Vector2(181, 94), &"stone"], [Vector2(82, 37), &"stone"],
+	[Vector2(76, 88), &"iron"], [Vector2(97, 96), &"iron"], [Vector2(65, 106), &"iron"], [Vector2(209, 68), &"iron"],
+	[Vector2(205, 76), &"iron"], [Vector2(115, 28), &"iron"], [Vector2(94, 48), &"iron"], [Vector2(213, 95), &"iron"],
 ]
 const MAT_ACTIVE: int = 3
+## 무리에 잡혀 있는 사람(2026-11-21 마을 키우기 3단계): 판마다 무리 CAPTIVES곳에 하나씩 묶여 있고, 그 무리를 쓰러뜨리면 풀어 줄 수 있다.
+const CAPTIVES: int = 2
+## 주민 이름(옛 마을의 흔한 이름)과 생김새(VillageProps.LOOKS).
+const RESIDENT_NAMES: Array[String] = ["돌쇠", "막손", "덕배", "끝순", "언년", "삼월", "복실", "마당쇠", "개동", "판수", "순덕", "억쇠", "말순", "칠복", "분이", "갑돌"]
+const RESIDENT_LOOKS: Array[StringName] = [&"peasant", &"peasant2", &"peasant3", &"peasant4"]
 ## 한 자리에서 얻는 양(최소, 최대).
 const MAT_YIELD: Dictionary = {&"wood": Vector2i(3, 5), &"stone": Vector2i(2, 4), &"iron": Vector2i(1, 3)}
 const GLINT_MIN: int = 2

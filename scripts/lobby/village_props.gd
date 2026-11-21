@@ -17,6 +17,11 @@ const LOOKS: Dictionary = {
 	&"hunter": [Color(0.25, 0.2, 0.13), Color(0.5, 0.48, 0.45), "spear"],
 	&"pilgrim": [Color(0.4, 0.36, 0.3), Color(0.36, 0.32, 0.26), "staff"],
 	&"knight": [Color(0.13, 0.14, 0.17), Color(0.2, 0.18, 0.17), "blade"],
+	# 마을 키우기 3단계 주민(들판에서 풀어 준 사람): 바랜 삼베·무명 빛, 소품은 돌려 가며
+	&"peasant": [Color(0.33, 0.28, 0.21), Color(0.24, 0.19, 0.14), "basket"],
+	&"peasant2": [Color(0.24, 0.22, 0.2), Color(0.42, 0.38, 0.32), "apron"],
+	&"peasant3": [Color(0.29, 0.21, 0.16), Color(0.18, 0.14, 0.11), "pack"],
+	&"peasant4": [Color(0.2, 0.23, 0.22), Color(0.3, 0.26, 0.2), ""],
 }
 
 

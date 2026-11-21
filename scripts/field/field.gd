@@ -87,6 +87,7 @@ func _ready() -> void:
 	meta.fix_sheath(data)
 	meta.ensure_glints()
 	meta.ensure_mat_spots()
+	meta.ensure_captives()
 	meta.ensure_wanderer()   # 34단계: 아무도 없으면 한 사람이 선다
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
@@ -199,6 +200,9 @@ func _build_props() -> void:
 		_props["glint_%d" % i] = FieldBuilder.glint(self, i)
 	for i in meta.mat_spots:
 		_props["mat_%d" % i] = FieldBuilder.mat_spot(self, i)
+	for pk in meta.captive_packs:
+		if meta.captive_waiting(pk):
+			_props["captive_" + pk] = FieldBuilder.captive(self, pk)
 
 
 func _capture(on: bool) -> void:
@@ -469,6 +473,9 @@ func _spots() -> Dictionary:
 		s["glint_%d" % i] = FieldLayout.GLINTS[i]
 	for i in meta.mat_spots:
 		s["mat_%d" % i] = FieldLayout.MATS[i][0]
+	for pk in meta.captive_packs:
+		if meta.captive_waiting(pk):
+			s["captive_" + pk] = Vector2(FieldLayout.PACKS[pk].at) + Vector2(1.2, 0.8)
 	return s
 
 
@@ -489,6 +496,10 @@ func _prompt(key: String) -> String:
 		return "유품을 연다"
 	if key.begins_with("stone"):
 		return "비석을 읽는다"
+	if key.begins_with("captive_"):
+		if meta.housing(data) == 0:
+			return "마을에 지낼 집이 없다"
+		return "풀어 준다" if meta.has_room(data) else "오두막이 다 찼다"
 	if key.begins_with("mat_"):
 		return {&"wood": "나무를 벤다", &"stone": "돌을 깬다", &"iron": "녹슨 쇠를 거둔다"}[FieldLayout.MATS[int(key.substr(4))][1]]
 	return "쇳조각을 줍는다"
@@ -545,6 +556,17 @@ func _interact() -> void:
 			_saved()
 		if pay > 0:
 			_hud.toast("비석을 모두 읽었다. 조각 %d개" % pay)
+	elif _near.begins_with("captive_"):
+		var r: Dictionary = meta.free_captive(_near.substr(8), data)
+		if not r.is_empty():
+			var node: Node3D = _props.get(_near)
+			if node:
+				FieldBuilder.take_glint(node)
+			_props.erase(_near)
+			_sfx.play(&"draw", _lord.position, -8.0, 1.2)
+			_hud.got_resident()   # 오른쪽 아래 주민 수 위에 +1
+			_hud.toast("%s · 마을로 간다" % r.name)
+			_saved()
 	elif _near.begins_with("mat_"):
 		var got: Array = meta.take_mat(int(_near.substr(4)))
 		if int(got[1]) > 0:
@@ -776,6 +798,9 @@ func _on_pack_cleared(id: StringName) -> void:
 	if n > 0:
 		_hud.toast("무리를 쓰러뜨렸다. 조각 %d개" % n)
 		_hud.flash(Color(1, 0.84, 0.42), 0.2, 0.6)
+	var pk := String(id)
+	if meta.captive_waiting(pk) and not _props.has("captive_" + pk):   # 묶여 있던 사람이 보인다
+		_props["captive_" + pk] = FieldBuilder.captive(self, pk)
 	_saved()
 
 

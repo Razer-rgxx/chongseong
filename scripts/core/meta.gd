@@ -38,6 +38,12 @@ var mat_spots: Array[int] = []
 var mat_spots_ready: bool = false
 ## 지은 마을 건물(2026-11-21 마을 키우기 2단계): id → true.
 var built: Dictionary = {}
+## 주민(마을 키우기 3단계): {"name", "look", "job"(맡은 건물 id, 없으면 "")}. 집(BuildingData.housing)만큼 산다.
+var residents: Array[Dictionary] = []
+## 이번 판 포로가 묶인 무리(FieldLayout.PACKS 키)와 이번 판에 풀어 준 무리.
+var captive_packs: Array[String] = []
+var captives_freed: Array[String] = []
+var captives_ready: bool = false
 var storage_lv: int = 0
 ## 언덕에서 쓰러질 때 쥐고 있던 검과 그 판의 기록(docs/sword_hill.md 2번). 새것이 뒤, 최대 FALLEN_MAX.
 ## {"id": 검 id, "run": 몇 번째 판, "zone": 쓰러진 구역, "kills": 그 판 처치 수, "ghost": [x, y, 얼굴, 휘두름(0·1·2) …] 마지막 몇 초}
@@ -124,7 +130,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -190,7 +196,19 @@ func from_dict(d: Dictionary) -> void:
 	mat_spots_ready = bool(d.get("mat_spots_ready", false))
 	built = {}
 	for k in d.get("built", []):
-		built[StringName(str(k))] = true   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
+		built[StringName(str(k))] = true
+	residents = []
+	for r in d.get("residents", []):
+		if r is Dictionary:
+			residents.append({"name": str(r.get("name", "")), "look": StringName(str(r.get("look", "peasant"))), "job": StringName(str(r.get("job", "")))})
+	captive_packs = []
+	for k in d.get("captive_packs", []):
+		if FieldLayout.PACKS.has(str(k)):
+			captive_packs.append(str(k))
+	captives_freed = []
+	for k in d.get("captives_freed", []):
+		captives_freed.append(str(k))
+	captives_ready = bool(d.get("captives_ready", false))   # 대장간에서 사던 때의 저장은 집이 이미 있는 것으로
 	quest_board = []
 	for q in d.get("quest_board", []):
 		quest_board.append(int(q))
@@ -584,6 +602,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	refresh_stock(rules.data)
 	roll_glints()
 	roll_mat_spots()
+	roll_captives()
 	packs_cleared = {}
 	boss_down = false
 	chiefs_down = {}
@@ -1242,14 +1261,95 @@ func build(b: BuildingData) -> bool:
 	return true
 
 
-## 지은 건물들이 언덕 판마다 모아 두는 재료.
+## 지은 건물들이 언덕 판마다 모아 두는 재료(일꾼 몫 포함).
 func village_made(d: GameData) -> Dictionary:
 	var r := {&"wood": 0, &"stone": 0, &"iron": 0}
 	for b in d.buildings:
 		if has_built(b.id):
-			var m: Dictionary = b.made()
+			var m: Dictionary = b.made_with(workers_at(b.id))
 			for id in r:
 				r[id] += int(m[id])
+	return r
+
+
+# ---------------------------------------------------------------- 주민(마을 키우기 3단계)
+
+## 살 수 있는 주민 수(지은 집들의 housing 합).
+func housing(d: GameData) -> int:
+	var n: int = 0
+	for b in d.buildings:
+		if has_built(b.id):
+			n += b.housing
+	return n
+
+
+func has_room(d: GameData) -> bool:
+	return residents.size() < housing(d)
+
+
+## 그 건물에서 일하는 주민 수.
+func workers_at(id: StringName) -> int:
+	var n: int = 0
+	for r in residents:
+		n += 1 if r.job == id else 0
+	return n
+
+
+## 주민 i에게 일을 맡긴다(id ""이면 쉰다). 지은 일터이고 자리가 남았을 때만.
+func set_job(i: int, id: StringName, d: GameData) -> bool:
+	if i < 0 or i >= residents.size():
+		return false
+	if id != &"":
+		var b: BuildingData = d.building(id)
+		if b == null or not has_built(id) or b.workers <= 0:
+			return false
+		if residents[i].job != id and workers_at(id) >= b.workers:
+			return false
+	residents[i].job = id
+	return true
+
+
+## 새 주민(이름은 아직 없는 것 중, 생김새는 돌려 가며).
+func _new_resident() -> Dictionary:
+	var pool: Array[String] = []
+	for n in FieldLayout.RESIDENT_NAMES:
+		if not residents.any(func(r): return r.name == n):
+			pool.append(n)
+	var name: String = pool[rng.randi() % pool.size()] if not pool.is_empty() else "이름 없는 이"
+	return {"name": name, "look": FieldLayout.RESIDENT_LOOKS[residents.size() % FieldLayout.RESIDENT_LOOKS.size()], "job": &""}
+
+
+## 이번 판 포로가 묶일 무리를 새로 뽑는다(판이 끝날 때마다).
+func roll_captives() -> void:
+	var pool: Array[String] = []
+	for k in FieldLayout.PACKS:
+		pool.append(str(k))
+	captive_packs = []
+	for _k in mini(FieldLayout.CAPTIVES, pool.size()):
+		var j: int = rng.randi() % pool.size()
+		captive_packs.append(pool[j])
+		pool.remove_at(j)
+	captives_freed = []
+	captives_ready = true
+
+
+func ensure_captives() -> void:
+	if not captives_ready:
+		roll_captives()
+
+
+## 이 무리의 포로가 지금 묶여 있는지(무리를 쓰러뜨렸고 아직 안 풀어 줌).
+func captive_waiting(pack: String) -> bool:
+	return captive_packs.has(pack) and packs_cleared.has(pack) and not captives_freed.has(pack)
+
+
+## 포로를 풀어 준다: 집이 남았으면 주민이 되어 새 주민을 돌려준다(없으면 빈 사전).
+func free_captive(pack: String, d: GameData) -> Dictionary:
+	if not captive_waiting(pack) or not has_room(d):
+		return {}
+	var r := _new_resident()
+	residents.append(r)
+	captives_freed.append(pack)
 	return r
 
 

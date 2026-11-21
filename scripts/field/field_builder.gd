@@ -1369,6 +1369,29 @@ static func mat_spot(parent: Node3D, i: int) -> Node3D:
 	return n
 
 
+## 무리에 잡힌 사람(마을 키우기 3단계): 땅에 박은 말뚝에 손이 뒤로 묶여 고개를 떨군 주민. 무리를 쓰러뜨려야 보인다.
+static func captive(parent: Node3D, pack: String) -> Node3D:
+	var info: Dictionary = FieldLayout.PACKS[pack]
+	var c: Vector2 = Vector2(info.at) + Vector2(1.2, 0.8)
+	var n := Node3D.new()
+	n.name = "captive_" + pack
+	n.position = at_cell(c, 0.0)
+	n.rotation.y = float(pack.hash() % 628) / 100.0
+	parent.add_child(n)
+	var wood := _mat("captive_post", Color(0.2, 0.14, 0.09), 0.95)
+	_box(n, Vector3(0.16, 1.7, 0.16), Vector3(0, 0.85, 0.32), wood, Vector3(0.06, 0, 0))
+	var rope := _mat("captive_rope", Color(0.45, 0.37, 0.24), 0.95)
+	_box(n, Vector3(0.36, 0.05, 0.3), Vector3(0, 1.0, 0.2), rope)
+	var looks: Array[StringName] = FieldLayout.RESIDENT_LOOKS
+	var holder := Node3D.new()
+	n.add_child(holder)
+	var P: Dictionary = VillageProps.villager(looks[absi(pack.hash()) % looks.size()], holder)
+	(P.torso as Node3D).rotation.x = 0.22   # 고개를 떨군다
+	if P.has("head"):
+		(P.head as Node3D).rotation.x = 0.35
+	return n
+
+
 ## 줍힘: 작아지며 사라진다.
 static func take_glint(n: Node3D) -> void:
 	var t := n.create_tween()
