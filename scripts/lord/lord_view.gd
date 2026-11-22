@@ -137,6 +137,7 @@ func _ready() -> void:
 		_hand = null
 		_blade = null
 		character = LordCharacter.new()
+		character.object_head = &"lord"   # 오브젝트 헤드: 머리 대신 검
 		_model.add_child(character)
 		_fx = SlashFx.new()
 		add_child(_fx)

@@ -211,6 +211,7 @@ static func _modelled(P: Dictionary, kind: StringName, look: Array) -> Dictionar
 	elif kind in [&"herbalist", &"gatherer"]:
 		m.model = "ranger_girl"
 	m.tint = look[0]
+	m.head = kind
 	m.phase = float(P.phase)
 	(P.root as Node3D).add_child(m)
 	P.npc = m

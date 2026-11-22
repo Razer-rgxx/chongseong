@@ -22,6 +22,8 @@ var model: String = "man"
 var tint: Color = Color.WHITE
 ## 동작 시작을 사람마다 어긋나게(초).
 var phase: float = 0.0
+## 오브젝트 헤드: 사람 종류(ObjectHead.FOR_KIND). 비면 그대로.
+var head: StringName = &""
 var _body: Node3D
 var _player: AnimationPlayer
 var _state: String = ""
@@ -57,6 +59,8 @@ func _ready() -> void:
 	_player.add_animation_library("npc", _library())
 	if folk():
 		_add_skin()
+	if head != &"":
+		ObjectHead.attach(_body.find_child("Skeleton3D", true, false) as Skeleton3D, head)
 	_dye(_body)
 	play(_state if _state != "" else "idle")
 

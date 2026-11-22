@@ -49,6 +49,8 @@ var _legs: LegFold = null
 var _leg_len: float = -1.0
 var _body: Node3D
 var _skel: Skeleton3D
+## 오브젝트 헤드(ObjectHead): 영주는 &"lord"(검). 비면 원래 머리.
+var object_head: StringName = &""
 var _player: AnimationPlayer
 var _hand := BoneAttachment3D.new()
 var _grip := Node3D.new()
@@ -76,6 +78,8 @@ func _ready() -> void:
 	_body.rotation.y = PI   # Mixamo 캐릭터는 +Z를 본다. 이 게임의 모델 앞은 -Z다
 	add_child(_body)
 	_skel = _body.find_child("Skeleton3D", true, false) as Skeleton3D
+	if object_head != &"":
+		ObjectHead.attach(_skel, object_head)
 	_player = _body.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _player == null:
 		# 동작 없이 받은 모델: 동작을 붙일 자리를 만든다(동작 길은 모델 뿌리 기준)
