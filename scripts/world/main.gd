@@ -150,6 +150,9 @@ func _ready() -> void:
 	rules.move_area.connect(_on_move_area)
 	rules.effect.connect(_on_effect)
 	rules.day_started.connect(_on_day)
+	var hzv := HzView.new()   # 언덕 재설계: 검 지도의 줄·깨어남·거래 창
+	add_child(hzv)
+	hzv.setup(rules)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
 	rules.pull_started.connect(func(h: Hilt, _g: int) -> void:

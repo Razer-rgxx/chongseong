@@ -500,7 +500,7 @@ func step(input: LordInput = null) -> void:
 	if freeze > 0:
 		freeze -= 1
 		return
-	if pending != null or altar_open or path_open:
+	if pending != null or altar_open or path_open or not hz_offer.is_empty():
 		return
 	if pull_hilt != null:
 		_step_pull(input)
