@@ -46,7 +46,7 @@
 
 ## 만드는 순서
 
-1. [ ] **규칙(`Rules`, 화면 없이).**
+1. [x] **규칙(화면 없이).** 2026-11-22: `HillZone`(scripts/core/hill_zone.gd, Rules와 따로)·`HillZoneData`(data/hill_zone.tres), 테스트 17개. Rules에 붙이는 것은 2단계에서.
    - 데이터 `data/hill_zone.tres`(`HillZoneData`): 검 수, 이웃 거리, 깨어남 확률, 등급 오름, 다가오는 빠르기, 스스로 오는 시간, 사건 비율.
    - 상태: `Rules.zone_swords`(자리, 등급, 사건 종류, 깨어남 단계, 주인 위치·타이머, 뽑힘), `links`.
    - `Rules.pull(i)` → 사건 시작, `_wake_neighbors(i)`, `step`에서 주인 다가오기와 60초 타이머, `begin_reckoning()`.
