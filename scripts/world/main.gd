@@ -110,7 +110,9 @@ func _ready() -> void:
 	meta = Meta.load_or_new()
 	meta.fix_sheath(data)
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
+	Rules.events_default = true   # 언덕 재설계 시험(docs/hill_events.md): 첫 구역만
 	rules = Rules.new(data, s, meta)
+	Rules.events_default = false
 	meta.save()   # 산 물건은 이 판에서 쓰였다(Meta.pack은 Rules가 비운다)
 	_build_world()
 	_setup_console()

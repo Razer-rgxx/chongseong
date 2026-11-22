@@ -14,6 +14,11 @@ extends RefCounted
 ## 14단계 뽑기 손맛: 버팀 타이밍(pull_window·pull_good·pull_perfect·pull_miss, LordInput.pull_press)과 손잡이 조짐(Hilt.omen, 운 배수).
 
 signal day_started(zone: int)
+## 언덕 재설계(docs/hill_events.md): 검의 사건이 시작됐다(kind = HillZone.Event), 거래가 걸렸다, 사건이 끝났다.
+signal hz_event(zi: int, kind: int)
+signal hz_offer_made(zi: int, ask: StringName)
+signal hz_done(zi: int, won: bool)
+signal hz_woke(zi: int)
 signal night_started(zone: int)
 signal run_ended(won: bool)
 signal pull_started(hilt: Hilt, grade: int)
@@ -116,6 +121,21 @@ signal duel_over(winner: int)
 signal duelist_hurt(seat: int, damage: float, big: bool)
 
 enum Phase { DAY, NIGHT, OVER }
+
+## ---- 언덕 재설계(docs/hill_events.md, 2026-11-22). 첫 구역에서만 켠다(시험) ----
+## 시험이라 기본은 끈다. main.gd가 언덕 판을 만들기 전에 events_default를 켠다(옛 테스트는 예전 첫 구역).
+static var events_default: bool = false
+var use_hill_events: bool = events_default
+var hz: HillZone = null
+## 적 id → 검 번호, 검 번호 → 남은 적 수, 검 번호 → 이기면 받을 검.
+var hz_foes: Dictionary = {}
+var hz_left: Dictionary = {}
+var hz_prize: Dictionary = {}
+## 걸린 거래 {zi, ask}. 비어 있으면 없음. ask: &"sword" | &"max_hp" | &"durability"
+var hz_offer: Dictionary = {}
+var hz_max_hp_cut: float = 0.0
+## 지도(HillZone 칸) → 싸움터 칸 배율.
+var hz_scale: Vector2 = Vector2.ONE
 
 ## 결투의 한 판 단계: 시작 전 서 있기 → 싸움 → 판 사이 쉼 → 끝.
 const DUEL_READY: int = 0
@@ -406,6 +426,10 @@ func _bless(key: String) -> float:
 
 
 func max_hp() -> float:
+	return _max_hp_base() - hz_max_hp_cut
+
+
+func _max_hp_base() -> float:
 	if duel:
 		return data.duel.hp
 	return data.lord.hp + _bless("hp") + bonus_hp + (data.village.goods_by_id(&"bread").value if pack.has(&"bread") else 0.0)
@@ -497,6 +521,9 @@ func step(input: LordInput = null) -> void:
 		if phase == Phase.NIGHT:
 			foes.step_arrows(dt)
 		return
+	if phase == Phase.DAY and hz:
+		_step_hz()
+		return
 	if phase == Phase.NIGHT:
 		if not duel and not yard:
 			_record_frame()
@@ -517,6 +544,7 @@ func start_night() -> void:
 		return
 	var R := data.run
 	phase = Phase.NIGHT
+	_hz_reckon()
 	goal = next_goal
 	rule = next_rule
 	if zone == 0 or last_zone():
@@ -588,6 +616,7 @@ func _new_day(reward: StringName = &"") -> void:
 		h.tilt = rng.randf_range(-0.25, 0.25)
 		_roll_omen(h)
 		hilts.append(h)
+	_hz_setup()
 	altar = null
 	if zone >= R.altar_from_zone:
 		var a := Altar.new()
@@ -768,6 +797,8 @@ func _try_pull() -> void:
 		return
 	pull_hilt = h
 	pull_grade = debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))
+	if h.zi >= 0 and hz:
+		pull_grade = hz.blades[h.zi].final_grade(data.grades.names.size() - 1)
 	pull_t = 0.0
 	pull_steps = 0
 	pull_judged = 0
@@ -1033,6 +1064,9 @@ func _step_pull(input: LordInput = null) -> void:
 	if _pull_cursed:
 		_pull_cursed = false
 		_cursed_pulled(h, s)
+	if h.zi >= 0 and hz:
+		_hz_begin(h.zi, s)
+		return
 	sword_pulled.emit(s)
 	_receive(s)
 
@@ -1383,6 +1417,7 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 			hunt_killed = true
 		_note_grave(e)
 		powers.on_kill(e)
+		_hz_killed(e)
 		enemy_died.emit(e)
 		# 심지가 타는 동안 쓰러진 자폭병은 바로 터진다
 		if e.act == &"fuse":
@@ -1426,6 +1461,11 @@ func lord_died() -> void:
 
 func _step_night() -> void:
 	var R := data.run
+	# 첫 구역(재설계): 밤은 정산뿐. 몰려온 주인을 다 쓰러뜨리면 새벽
+	if hz:
+		if hz_left.is_empty():
+			_end_night()
+		return
 	# 사냥: 우두머리를 쓰러뜨리면 그 자리에서 새벽이 온다
 	if hunt_killed:
 		_end_night()
@@ -3195,3 +3235,174 @@ func _check_round_end() -> void:
 	else:
 		duel_phase = DUEL_BETWEEN
 		duel_timer = D.break_time
+
+
+# ---------------------------------------------------------------- 언덕 재설계(docs/hill_events.md)
+
+func _hz_on() -> bool:
+	return use_hill_events and data.hill_zone != null and zone == 0 and not field and not yard and not duel
+
+
+## 첫 구역의 낮: 손잡이를 HillZone의 검 지도로 바꾼다. 조짐은 등급에서(75% 맞음).
+func _hz_setup() -> void:
+	hz = null
+	hz_foes.clear()
+	hz_left.clear()
+	hz_prize.clear()
+	hz_offer = {}
+	if not _hz_on():
+		return
+	var R := data.run
+	hz = HillZone.new(data.hill_zone, rng.randi(), data.grades.names.size() - 1)
+	hilts.clear()
+	var mid := Grid.middle()
+	var sx: float = (float(R.arena_size.x) / 2.0 - 2.0) / data.hill_zone.radius
+	var sy: float = (float(R.arena_size.y) / 2.0 - 2.0) / data.hill_zone.radius
+	hz_scale = Vector2(sx, sy)
+	for i in hz.blades.size():
+		var b := hz.blades[i]
+		var h := Hilt.new()
+		h.id = _new_id()
+		h.zi = i
+		h.pos = mid + Vector2(b.at.x * sx, b.at.y * sy)
+		h.tilt = rng.randf_range(-0.25, 0.25)
+		h.omen = [0, 1, 1, 2, 2, 3][clampi(b.grade, 0, 5)]
+		h.shown_omen = h.omen if rng.randf() < 0.75 else clampi(h.omen + (1 if rng.randf() < 0.5 else -1), 0, 3)
+		hilts.append(h)
+
+
+func hilt_of(zi: int) -> Hilt:
+	for h in hilts:
+		if h.zi == zi:
+			return h
+	return null
+
+
+## 이 손잡이를 뽑으면 깨어날 수 있는 이웃 손잡이들(지도·땅에 미리 보인다).
+func hz_wake_preview(h: Hilt) -> Array[Hilt]:
+	var out: Array[Hilt] = []
+	if hz == null or h == null or h.zi < 0:
+		return out
+	for j in hz.wake_candidates(h.zi):
+		var o := hilt_of(j)
+		if o:
+			out.append(o)
+	return out
+
+
+## 뽑기가 끝났다: 검은 사건을 이겨야 받는다. 이웃이 깨어난다.
+func _hz_begin(zi: int, s: Sword) -> void:
+	var before: Array[int] = []
+	for i in hz.blades.size():
+		if hz.blades[i].state == HillZone.State.AWAKE:
+			before.append(i)
+	hz.pull(zi)
+	hz.started.erase(zi)
+	for i in hz.blades.size():
+		if hz.blades[i].state == HillZone.State.AWAKE and not before.has(i):
+			hz_woke.emit(i)
+	var h := hilt_of(zi)
+	if h:
+		h.gone = true
+	hz_prize[zi] = s
+	_hz_event(zi, hz.blades[zi].event)
+
+
+func _hz_event(zi: int, kind: int) -> void:
+	var h := hilt_of(zi)
+	var at: Vector2 = h.pos if h else lord.pos
+	if not hz_prize.has(zi):
+		hz_prize[zi] = Sword.new(pick_sword(hz.blades[zi].final_grade(data.grades.names.size() - 1)), data)
+	hz_event.emit(zi, kind)
+	match kind:
+		HillZone.Event.TRADE:
+			var asks: Array[StringName] = [&"max_hp", &"durability"]
+			if current() != null and not current().from_sheath:
+				asks.append(&"sword")
+			hz_offer = {"zi": zi, "ask": asks[rng.randi_range(0, asks.size() - 1)]}
+			hz_offer_made.emit(zi, hz_offer.ask)
+		HillZone.Event.CHASE:
+			var n: int = rng.randi_range(hz.d.chase_min, hz.d.chase_max)
+			hz_left[zi] = n
+			for k in n:
+				var a: float = rng.randf() * TAU
+				var e := spawn_at(&"wolf" if k % 2 == 0 else &"wraith", at + Vector2(cos(a), sin(a)) * 2.0)
+				hz_foes[e.id] = zi
+		_:
+			var e := spawn_at(&"wraith", at)
+			var m: float = hz.duel_hp_mult(zi) * 3.0
+			e.max_hp *= m
+			e.hp = e.max_hp
+			hz_foes[e.id] = zi
+			hz_left[zi] = 1
+
+
+## 거래에 답한다. 받으면 값을 내고 검(+각인 하나), 거절하면 결투.
+func hz_answer(accept: bool) -> void:
+	if hz_offer.is_empty():
+		return
+	var zi: int = hz_offer.zi
+	var ask: StringName = hz_offer.ask
+	hz_offer = {}
+	if not accept:
+		_hz_event(zi, HillZone.Event.DUEL)
+		return
+	match ask:
+		&"max_hp":
+			hz_max_hp_cut += hz.d.trade_max_hp
+			lord.hp = minf(lord.hp, max_hp())
+		&"durability":
+			for k in slots.size():
+				if slots[k] and slots[k].breakable():
+					slots[k].durability *= hz.d.trade_durability
+		&"sword":
+			for k in slots.size():
+				if slots[k] == current():
+					slots[k] = null
+					break
+			slots_changed.emit()
+	var s: Sword = hz_prize[zi]
+	var keys: Array = data.inscriptions.keys()
+	if not keys.is_empty():
+		s.extra_ins.append(str(keys[rng.randi_range(0, keys.size() - 1)]))
+	_hz_win(zi)
+
+
+func _hz_killed(e: Enemy) -> void:
+	if not hz_foes.has(e.id):
+		return
+	var zi: int = hz_foes[e.id]
+	hz_foes.erase(e.id)
+	hz_left[zi] = int(hz_left.get(zi, 1)) - 1
+	if int(hz_left[zi]) <= 0:
+		hz_left.erase(zi)
+		_hz_win(zi)
+
+
+func _hz_win(zi: int) -> void:
+	hz.finish(zi, true)
+	var s: Sword = hz_prize.get(zi)
+	hz_prize.erase(zi)
+	hz_done.emit(zi, true)
+	if s and phase != Phase.OVER:
+		sword_pulled.emit(s)
+		_receive(s)
+
+
+## 낮(첫 구역): 주인이 다가오고, 닿으면 그 검의 결투. 사건의 적이 움직인다.
+func _step_hz() -> void:
+	hz.step(dt, (lord.pos - Grid.middle()) / hz_scale)
+	for zi in hz.started:
+		_hz_event(zi, HillZone.Event.DUEL)
+	hz.started.clear()
+	if not enemies.is_empty():
+		_step_enemies()
+		foes.step_arrows(dt)
+
+
+## 첫 구역의 밤 = 정산: 깨어나고 안 뽑은 검의 주인이 모두 온다.
+func _hz_reckon() -> void:
+	if hz == null:
+		return
+	for zi in hz.begin_reckoning():
+		_hz_event(zi, HillZone.Event.DUEL)

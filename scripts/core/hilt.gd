@@ -23,3 +23,6 @@ var revealed: bool = false
 ## 화면에 보일 조짐.
 func seen_omen() -> int:
 	return omen if revealed else shown_omen
+
+## 언덕 재설계(docs/hill_events.md): HillZone의 검 번호. -1이면 예전 손잡이.
+var zi: int = -1

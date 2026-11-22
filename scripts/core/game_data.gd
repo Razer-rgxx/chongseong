@@ -15,6 +15,8 @@ var powers: PowerTable
 var village: VillageData
 ## 1대1 결투(21단계)의 수치.
 var duel: DuelData
+## 언덕 재설계(docs/hill_events.md): 한 구역의 검 지도 수치.
+var hill_zone: HillZoneData
 ## 39단계 말의 수치(들판에서만).
 var horse: HorseData
 ## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
@@ -46,6 +48,7 @@ static func load_default() -> GameData:
 	d.meta = load(DIR + "meta.tres") as MetaData
 	d.powers = load(DIR + "powers.tres") as PowerTable if ResourceLoader.exists(DIR + "powers.tres") else PowerTable.new()
 	d.village = load(DIR + "village.tres") as VillageData
+	d.hill_zone = load(DIR + "hill_zone.tres") as HillZoneData if ResourceLoader.exists(DIR + "hill_zone.tres") else null
 	d.duel = load(DIR + "duel.tres") as DuelData if ResourceLoader.exists(DIR + "duel.tres") else DuelData.new()
 	d.horse = load(DIR + "horse.tres") as HorseData if ResourceLoader.exists(DIR + "horse.tres") else HorseData.new()
 	for path in _tres_in(DIR + "forms/"):

@@ -84,3 +84,64 @@ func _all() -> void:
 	r.finish(5, true)
 	check.call(r.blades[5].state == HillZone.State.DONE, "이기면 끝난 검")
 	check.call(is_equal_approx(_z(1).duel_hp_mult(0), pow(1.5, float(_z(1).blades[0].grade))), "결투 체력 배수 = 1.5^등급")
+
+
+## 2단계: Rules에 붙인 것(첫 구역만, events_default를 켤 때).
+static func run_rules(game: GameData, chk: Callable) -> void:
+	Rules.events_default = true
+	var r := Rules.new(game, 21)
+	Rules.events_default = false
+	chk.call(r.hz != null and r.hilts.size() == 12 and r.hilts.all(func(h: Hilt) -> bool: return h.zi >= 0), "첫 구역 낮: 손잡이 12개가 검 지도에서")
+	var h: Hilt = r.hilts[0]
+	chk.call(r.hz_wake_preview(h).size() >= 1, "뽑기 전에 깨어날 이웃이 보인다")
+	# 결투: 뽑으면 주인이 서고, 쓰러뜨려야 검을 받는다
+	r.hz.blades[0].event = HillZone.Event.DUEL
+	r._hz_begin(0, Sword.new(r.pick_sword(0), game))
+	chk.call(r.enemies.size() == 1 and r.hz_left.get(0, 0) == 1, "결투: 주인 하나가 선다")
+	var e: Enemy = r.enemies[0]
+	var before: int = r.pulls
+	r.hurt(e, e.hp + 1.0, Vector2.ZERO, false)
+	chk.call(r.hz.blades[0].state == HillZone.State.DONE and not r.hz_left.has(0), "결투: 이기면 끝난 검")
+	chk.call(r.pending != null or r.slots.any(func(s): return s != null), "결투: 이기면 검을 받는다")
+	# 거래: 받으면 최대 체력이 준다
+	var r2 := _with_events(game, 22)
+	r2.hz.blades[1].event = HillZone.Event.TRADE
+	r2._hz_begin(1, Sword.new(r2.pick_sword(0), game))
+	chk.call(not r2.hz_offer.is_empty(), "거래: 조건이 걸린다")
+	r2.hz_offer.ask = &"max_hp"
+	var mh: float = r2.max_hp()
+	r2.hz_answer(true)
+	chk.call(is_equal_approx(r2.max_hp(), mh - r2.hz.d.trade_max_hp) and r2.hz.blades[1].state == HillZone.State.DONE, "거래: 받으면 값을 내고 검")
+	var r3 := _with_events(game, 23)
+	r3.hz.blades[2].event = HillZone.Event.TRADE
+	r3._hz_begin(2, Sword.new(r3.pick_sword(0), game))
+	r3.hz_answer(false)
+	chk.call(r3.enemies.size() == 1, "거래: 거절하면 결투")
+	# 추격: 무리를 다 쓰러뜨리면 검
+	var r4 := _with_events(game, 24)
+	r4.hz.blades[3].event = HillZone.Event.CHASE
+	r4._hz_begin(3, Sword.new(r4.pick_sword(0), game))
+	var n: int = r4.enemies.size()
+	chk.call(n >= 3 and n <= 5, "추격: 무리 3~5")
+	for x in r4.enemies.duplicate():
+		r4.hurt(x, x.hp + 1.0, Vector2.ZERO, false)
+	chk.call(r4.hz.blades[3].state == HillZone.State.DONE, "추격: 다 쓰러뜨리면 검")
+	# 정산: 밤이 되면 깨어난 검 주인이 오고, 다 쓰러뜨리면 새벽
+	var r5 := _with_events(game, 25)
+	r5.hz._wake(4)
+	r5.hz._wake(6)
+	var awake: int = r5.hz.awake_count()
+	r5.start_night()
+	chk.call(r5.enemies.size() == awake, "정산: 깨어난 검 주인만 온다(%d)" % r5.enemies.size())
+	for x in r5.enemies.duplicate():
+		r5.hurt(x, x.hp + 1.0, Vector2.ZERO, false)
+	for k in 3:
+		r5.step()
+	chk.call(r5.phase != Rules.Phase.NIGHT, "정산: 다 쓰러뜨리면 밤이 끝난다")
+
+
+static func _with_events(game: GameData, s: int) -> Rules:
+	Rules.events_default = true
+	var r := Rules.new(game, s)
+	Rules.events_default = false
+	return r
