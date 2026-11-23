@@ -40,6 +40,16 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 	var kind: String = KINDS.get(form.display_name, "longsword") if form else "longsword"
 	blade_length = form.blade_length if form else 1.1
 	var width: float = form.blade_width if form else 0.08
+	grip_length = {"dagger": 0.11, "longsword": 0.2, "greatsword": 0.36, "rapier": 0.14}.get(kind, 0.2)
+	# Blender로 지은 칼(tools/blender/make_swords.py → assets/swords/<번호>.glb)이 있으면 그것(최고 등급 몇 자루)
+	var glb: String = "res://assets/swords/%d.glb" % seed
+	if ResourceLoader.exists(glb):
+		var g := (load(glb) as PackedScene).instantiate() as Node3D
+		add_child(g)
+		_tint_glow(g, col)
+		if grade >= 4:
+			_aura(col, grade)
+		return
 	var mats := _materials(grade, col)
 	add_child(_blade(kind, blade_length, width, mats[0]))
 	if grade >= 2:
@@ -51,6 +61,20 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 	_pommel(rng.randi() % 3, guard_w, mats[1], mats[3])
 	if grade >= 4:
 		_aura(col, grade)
+
+
+## Blender 칼의 glow_·ghost_ 재질을 등급 빛깔로.
+static func _tint_glow(n: Node, col: Color) -> void:
+	for node in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for si in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(si) as StandardMaterial3D
+			if m and (m.resource_name.begins_with("glow") or m.resource_name.begins_with("ghost")):
+				var d := m.duplicate() as StandardMaterial3D
+				d.emission_enabled = true
+				d.emission = col
+				d.albedo_color = Color(col.lerp(Color.WHITE, 0.3), d.albedo_color.a)
+				mi.set_surface_override_material(si, d)
 
 
 # ---------------------------------------------------------------- 재질

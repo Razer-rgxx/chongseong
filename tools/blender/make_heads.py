@@ -159,11 +159,22 @@ LOOKS = {
     "wood_old": ("wood", (0.33, 0.21, 0.12), (0.09, 0.05, 0.03), (0.48, 0.36, 0.24), 0.82, 0.0),
     "cloth_black": ("cloth", (0.07, 0.07, 0.08), (0.015, 0.015, 0.02), (0.14, 0.14, 0.15), 0.95, 0.0),
     "wax_old": ("bone", (0.86, 0.84, 0.78), (0.5, 0.45, 0.35), (0.95, 0.94, 0.9), 0.45, 0.0),
+    # 칼(make_swords.py)
+    "metal_hamon": ("hamon", (0.6, 0.62, 0.66), (0.28, 0.29, 0.32), (0.93, 0.94, 0.96), 0.18, 1.0),
+    "metal_dark": ("metal", (0.07, 0.07, 0.08), (0.02, 0.02, 0.02), (0.42, 0.42, 0.45), 0.38, 1.0),
+    "metal_gold": ("brass", (0.78, 0.6, 0.26), (0.25, 0.18, 0.08), (1.0, 0.88, 0.55), 0.25, 1.0),
+    "metal_silver": ("steel", (0.78, 0.79, 0.8), (0.35, 0.35, 0.37), (0.95, 0.95, 0.96), 0.2, 1.0),
+    "cloth_red": ("cloth", (0.36, 0.04, 0.035), (0.08, 0.01, 0.01), (0.5, 0.1, 0.08), 0.9, 0.0),
+    "cloth_navy": ("cloth", (0.05, 0.07, 0.14), (0.01, 0.015, 0.03), (0.12, 0.15, 0.25), 0.9, 0.0),
+    "skin_ray": ("bone", (0.9, 0.88, 0.8), (0.55, 0.5, 0.42), (0.97, 0.96, 0.92), 0.6, 0.0),
+    "leather_dark": ("wood", (0.12, 0.07, 0.04), (0.03, 0.02, 0.01), (0.25, 0.16, 0.1), 0.7, 0.0),
 }
 GLOWS = {
     "glow_fire": ((1.0, 0.55, 0.2), (1.0, 0.42, 0.1), 7.0),
     "glow_cold": ((0.6, 0.8, 1.0), (0.45, 0.65, 1.0), 7.0),
     "glow_marsh": ((0.5, 1.0, 0.6), (0.3, 1.0, 0.45), 6.0),
+    "glow_edge": ((1.0, 0.6, 0.25), (1.0, 0.5, 0.15), 8.0),
+    "ghost_blade": ((0.7, 0.85, 1.0), (0.5, 0.7, 1.0), 3.0),
 }
 
 
@@ -184,6 +195,12 @@ def mat(name):
                 p.inputs[key].default_value = (*em, 1)
                 break
         p.inputs["Emission Strength"].default_value = st
+        if name.startswith("ghost"):   # 반투명한 옛 칼날
+            p.inputs["Alpha"].default_value = 0.22
+            try:
+                m.surface_render_method = "BLENDED"
+            except Exception:
+                m.blend_method = "BLEND"
         return m
     kind, base, dark, edge, rough, metal = LOOKS[name]
     m["metal"] = metal
@@ -234,6 +251,18 @@ def mat(name):
         rust = _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", 1.0, ao), _ramp(nt, big, 0.55, 0.75))
         color = _mix(nt, color, (0.25, 0.12, 0.05, 1), _math(nt, "MULTIPLY", rust, 0.9))
         r_add = _math(nt, "MULTIPLY", rust, 0.35)
+    elif kind == "hamon":
+        # 칼날의 물결 무늬(하몬): 날(+X) 쪽 띠가 서리처럼 희고, 경계는 잡음으로 물결친다
+        xyz = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(co, xyz.inputs[0])
+        wav = _noise(nt, co, 90.0, 3.0, 0.5)
+        x = _math(nt, "ADD", xyz.outputs["X"], _math(nt, "MULTIPLY", _math(nt, "SUBTRACT", wav, 0.5, False), 0.012, False), False)
+        hm = _ramp(nt, x, 0.002, 0.006)
+        color = _mix(nt, color, (0.9, 0.91, 0.93, 1), _math(nt, "MULTIPLY", hm, 0.8))
+        r_add = _math(nt, "MULTIPLY", hm, 0.18)
+        brush = _noise(nt, co, 300.0, 2.0, 0.4)
+        color = _mix(nt, color, (*edge, 1), _math(nt, "MULTIPLY", brush, 0.2))
+        height = _math(nt, "MULTIPLY", height, 0.15, False)
     elif kind == "cloth":
         weave = _noise(nt, co, 400.0, 1.0, 0.3)
         height = _math(nt, "MULTIPLY", weave, 0.6, False)
@@ -456,7 +485,7 @@ def _join_groups():
     return out
 
 
-def _bake(o, tag):
+def _bake(o, tag, size=None):
     """o(재질 하나짜리 묶음)의 절차 재질을 색·거칠기·노멀 세 장으로 굽고 단순한 재질로 바꾼다."""
     src = o.material_slots[0].material
     nt = src.node_tree
@@ -469,7 +498,7 @@ def _bake(o, tag):
     bpy.ops.object.mode_set(mode="OBJECT")
     imgs = {}
     for k in ("col", "rough", "nor"):
-        img = bpy.data.images.new("%s_%s" % (tag, k), BAKE_SIZE, BAKE_SIZE, alpha=False)
+        img = bpy.data.images.new("%s_%s" % (tag, k), size or BAKE_SIZE, size or BAKE_SIZE, alpha=False)
         if k != "col":
             img.colorspace_settings.name = "Non-Color"
         imgs[k] = img
@@ -523,7 +552,7 @@ def _bake(o, tag):
     o.data.materials.append(m)
 
 
-def finish(name):
+def finish(name, out=None, size=None):
     """수정자 적용 → 재질별로 묶기 → 굽기 → .glb."""
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
@@ -535,17 +564,18 @@ def finish(name):
     _split_by_material()
     groups = _join_groups()
     for gname, o in groups.items():
-        if gname.startswith("glow"):
+        if gname.startswith("glow") or gname.startswith("ghost"):
             continue
         try:
-            _bake(o, "%s_%s" % (name, gname))
+            _bake(o, "%s_%s" % (name, gname), size)
         except Exception:
             print("굽기 실패(굽지 않고 내보낸다):", name, gname)
             traceback.print_exc()
             if bpy.context.object and bpy.context.object.mode != "OBJECT":
                 bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.object.select_all(action="SELECT")
-    path = os.path.join(OUT, name + ".glb")
+    os.makedirs(out or OUT, exist_ok=True)
+    path = os.path.join(out or OUT, name + ".glb")
     kw = dict(filepath=path, export_format="GLB", use_selection=True, export_apply=True, export_yup=True)
     try:
         bpy.ops.export_scene.gltf(export_image_format="JPEG", **kw)
@@ -830,15 +860,20 @@ HEADS = {
     "pick": head_pick, "burnt": head_burnt, "raven": head_raven, "grave_helm": head_grave_helm, "tomb": head_tomb,
 }
 
-made, failed = [], []
-for name, fn in HEADS.items():
-    try:
-        clear()
-        fn()
-        finish(name)
-        made.append(name)
-    except Exception:
-        print("실패:", name)
-        traceback.print_exc()
-        failed.append(name)
-print("머리 %d개를 %s에 만들었다. 실패: %s" % (len(made), OUT, ", ".join(failed) or "없음"))
+def run_all(table, out=None, size=None, what="머리"):
+    made, failed = [], []
+    for name, fn in table.items():
+        try:
+            clear()
+            fn()
+            finish(name, out, size)
+            made.append(name)
+        except Exception:
+            print("실패:", name)
+            traceback.print_exc()
+            failed.append(name)
+    print("%s %d개를 %s에 만들었다. 실패: %s" % (what, len(made), out or OUT, ", ".join(failed) or "없음"))
+
+
+if __name__ == "__main__":   # make_swords.py가 도구만 빌려 쓸 때는 돌지 않는다
+    run_all(HEADS)
