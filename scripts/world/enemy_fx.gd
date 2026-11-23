@@ -253,7 +253,7 @@ const SOUNDS: Dictionary = {
 	&"enemy_blink": {"dur": 0.9, "f0": 66.0, "f1": 28.0, "tone": 0.6, "tdecay": 4.0, "noise": 0.5, "lp": 380.0, "ndecay": 3.6, "crackle": 0.006, "level": 0.8},
 }
 ## 보스 패턴의 그림(docs/boss_patterns.md): 칼비의 칼 크기와 떨어지는 시간(초), 칼이 꽂혀 남는 시간(초), 가라앉는 시간(초).
-const RAIN_SWORD_SCALE: float = 1.7
+const RAIN_SWORD_SCALE: float = 3.0
 const RAIN_FALL: float = 0.22
 const RAIN_STUCK: float = 2.4
 const RAIN_SINK: float = 0.45
@@ -261,7 +261,9 @@ const RAIN_SINK: float = 0.45
 const HAND_UP: float = 0.1
 const HAND_HOLD: float = 0.6
 const HAND_DOWN: float = 0.4
-const BONE := Color(0.3, 0.27, 0.23)
+const BONE := Color(0.4, 0.36, 0.3)
+## 보스 예고(휘두르기 부채꼴, 위험 원, 앞길 띠)의 스스로 빛남. 그늘·밤에도 보이게(땅 판은 빛을 받아 그늘에서 어두워진다).
+const BOSS_EMIT: float = 2.2
 const RATE: int = 22050
 const Q_ADD: int = 0
 const Q_FIRE: int = 1
@@ -686,7 +688,7 @@ func _swing_wind(e: Enemy, info: Dictionary) -> void:
 	var dir: Vector2 = _v2(info.get("dir", _face(e)))
 	var d := _decal(6)
 	if not d.is_empty():
-		_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "emit": 0.7, "arc": deg_to_rad(float(info.get("arc", 150.0))) * 0.5,
+		_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "emit": BOSS_EMIT, "arc": deg_to_rad(float(info.get("arc", 150.0))) * 0.5,
 			"ew": clampf(0.06 / maxf(R, 0.5), 0.02, 0.2), "hw": 0.06})
 	_by_enemy[_key(e, "swing_wind")] = _job(_run_swing_wind, {"e": e, "decal": d, "time": T, "dir": dir, "radius": R, "at": _v2(info.get("at", _epos(e))), "out": -1.0, "out_time": 0.3})
 	_run_swing_wind(_by_enemy[_key(e, "swing_wind")], 0.0)
@@ -713,7 +715,7 @@ func _run_swing_wind(j: Dictionary, _dt: float) -> bool:
 	var o: float = (t - out) / float(j["out_time"])
 	if o >= 1.0:
 		return false
-	_put(d, {"fill": 1.0, "fade": 1.0 - o, "emit": 0.7 + 1.2 * (1.0 - o)})
+	_put(d, {"fill": 1.0, "fade": 1.0 - o, "emit": BOSS_EMIT + 1.2 * (1.0 - o)})
 	return true
 
 
@@ -743,7 +745,7 @@ func _slam_wind(e: Enemy, info: Dictionary) -> void:
 	var R: float = Grid.cells_to_meters(float(info.get("radius", 2.4)))
 	var Q: float = Grid.cells_to_meters(float(info.get("range", 0.0)))
 	var d := _decal(1)
-	_put(d, {"fill": 0.0, "fade": 1.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
+	_put(d, {"fill": 0.0, "fade": 1.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": BOSS_EMIT, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
 	var o: Dictionary = _decal(7) if Q > R + 0.1 else {}
 	_put(o, {"fill": 0.985, "fade": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.05 / Q, 0.003, 0.05) if Q > 0.0 else 0.01})
 	var at: Vector3 = _ground(_v2(info.get("at", _epos(e))), 0.0)
@@ -775,7 +777,7 @@ func _run_slam_wind(j: Dictionary, _dt: float) -> bool:
 	var o: float = (t - out) / 0.22
 	if o >= 1.0:
 		return false
-	_put(ds[0], {"fill": 1.0, "fade": 1.0 - o, "emit": 0.9 + 1.5 * (1.0 - o)})
+	_put(ds[0], {"fill": 1.0, "fade": 1.0 - o, "emit": BOSS_EMIT + 1.5 * (1.0 - o)})
 	_put(ds[1], {"fade": 0.5 * (1.0 - o)})
 	return true
 
@@ -894,7 +896,7 @@ func _fall_spawned(p: Projectile) -> void:
 	var T: float = maxf(0.05, p.max_time)
 	var R: float = Grid.cells_to_meters(p.width * 0.5)
 	var d := _decal(1)
-	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.07 / R, 0.01, 0.2), "hw": clampf(0.18 / R, 0.01, 0.2)})
+	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": BOSS_EMIT, "ew": clampf(0.07 / R, 0.01, 0.2), "hw": clampf(0.18 / R, 0.01, 0.2)})
 	var c: Vector3 = _ground(p.pos, 0.0)
 	if not d.is_empty():
 		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(R * 2.0, 1.0, R * 2.0)), c + Vector3(0.0, 0.04 + 0.002 * (p.id % 5), 0.0))
@@ -932,7 +934,7 @@ func _run_fall(j: Dictionary, _dt: float) -> bool:
 		return true
 	var since: float = t - land
 	var o: float = since / 0.3
-	_put(d, {"fill": 1.0, "fade": maxf(0.0, 1.0 - o), "emit": 0.9 + 2.0 * maxf(0.0, 1.0 - o)})
+	_put(d, {"fill": 1.0, "fade": maxf(0.0, 1.0 - o), "emit": BOSS_EMIT + 2.0 * maxf(0.0, 1.0 - o)})
 	if sword == null:
 		return o < 1.0
 	if since > RAIN_STUCK:
@@ -992,7 +994,7 @@ func _spikes(at: Vector3, R: float) -> void:
 	if not _cache.has("bone_spike"):
 		var m := CylinderMesh.new()
 		m.top_radius = 0.0
-		m.bottom_radius = 0.075
+		m.bottom_radius = 0.15
 		m.height = 1.0
 		m.radial_segments = 5
 		m.rings = 1
@@ -1011,7 +1013,7 @@ func _spikes(at: Vector3, R: float) -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = _cache["bone_spike"]
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var h: float = _rng.randf_range(0.7, 1.3) * clampf(R, 0.8, 2.2)
+		var h: float = _rng.randf_range(0.9, 1.5) * clampf(R, 0.9, 2.2)
 		var lean := Basis(out.cross(Vector3.UP).normalized(), -_rng.randf_range(0.25, 0.6))
 		mi.transform = Transform3D(lean.scaled(Vector3(1.0, h, 1.0)), out * R * _rng.randf_range(0.15, 0.55) + lean * Vector3(0.0, h * 0.5, 0.0))
 		root.add_child(mi)
@@ -1041,7 +1043,7 @@ func _cleave_wind(e: Enemy, info: Dictionary) -> void:
 	var width: float = Grid.cells_to_meters(float(info.get("width", 1.0)))
 	var L: float = Grid.cells_to_meters(float(info.get("length", 9.0)))
 	var d := _decal(0)
-	_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "ew": clampf(0.07 / (width * 0.5), 0.02, 0.3), "hw": clampf(0.2 / maxf(L, 0.5), 0.004, 0.1)})
+	_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "emit": BOSS_EMIT, "ew": clampf(0.07 / (width * 0.5), 0.02, 0.3), "hw": clampf(0.2 / maxf(L, 0.5), 0.004, 0.1)})
 	var from: Vector2 = _v2(info.get("from", _epos(e)))
 	_play(&"enemy_skid", _ground(from, 0.0), -8.0, 0.75)
 	var j := _job(_run_cleave_wind, {"e": e, "decal": d, "time": T, "dir": dir, "from": from,
@@ -1080,7 +1082,7 @@ func _cleave(e: Enemy, info: Dictionary) -> void:
 func _shock_spawned(p: Projectile) -> void:
 	var dust := _emitter(true)
 	if dust != null:
-		dust.amount = 40
+		dust.amount = 56
 		dust.lifetime = 0.8
 		dust.explosiveness = 0.0
 		dust.randomness = 0.5
@@ -1116,7 +1118,10 @@ func _shock_spawned(p: Projectile) -> void:
 		chips.mesh = _chip_mesh
 		chips.restart()
 	var at: Vector3 = _ground(p.pos, 0.0)
-	_proj[p.get_instance_id()] = _job(_run_shock, {"p": p, "emit": [dust, chips], "last": at, "width": Grid.cells_to_meters(p.width), "done": false, "cracks": 0})
+	# 앞머리: 땅이 찢기며 검붉게 달아오른 짧은 띠(참격파를 따라간다)
+	var front := _decal(0)
+	_put(front, {"fill": 1.0, "fade": 0.85, "color": RED, "hot": RED_HOT, "emit": 1.8, "ew": 0.25, "hw": 0.12})
+	_proj[p.get_instance_id()] = _job(_run_shock, {"p": p, "emit": [dust, chips], "decal": front, "last": at, "width": Grid.cells_to_meters(p.width), "done": false, "cracks": 0})
 
 
 func _run_shock(j: Dictionary, _dt: float) -> bool:
@@ -1125,6 +1130,10 @@ func _run_shock(j: Dictionary, _dt: float) -> bool:
 	for x: Variant in j["emit"]:
 		if x is CPUParticles3D:
 			(x as CPUParticles3D).position = at + Vector3(0.0, 0.1, 0.0)
+	var front: Dictionary = j["decal"]
+	if not front.is_empty():
+		var W: float = j["width"]
+		_lane(front, p.prev_pos.lerp(p.pos, _alpha), -p.dir, -W * 0.3, minf(2.4, 0.4 + float(j["t"]) * 12.0), W, 0.05)
 	var last: Vector3 = j["last"]
 	if at.distance_to(last) >= 1.3 and int(j["cracks"]) < 14:
 		j["last"] = at
@@ -1165,7 +1174,7 @@ func _blink_wind(e: Enemy, info: Dictionary) -> void:
 	var R: float = Grid.cells_to_meters(e.radius if e != null else 0.8) * 1.4
 	var g: float = _bulk(e)
 	var d := _decal(1)
-	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
+	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": BOSS_EMIT, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
 	var dest: Vector3 = _ground(to, 0.0)
 	if not d.is_empty():
 		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(R * 2.0, 1.0, R * 2.0)), dest + Vector3(0.0, 0.045, 0.0))

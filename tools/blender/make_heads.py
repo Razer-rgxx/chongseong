@@ -583,6 +583,14 @@ def finish(name, out=None, size=None):
         bpy.ops.export_scene.gltf(export_image_format="JPEG", **kw)
     except TypeError:
         bpy.ops.export_scene.gltf(**kw)
+    # Blender 5.x는 JPEG에 ICC 색 프로필을 붙이는데 Godot 4.6이 그 그림을 못 읽는다: 프로필만 뺀다(glb_icc.py)
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import glb_icc
+        glb_icc.strip_glb(path)
+    except Exception:
+        traceback.print_exc()
     print("만듦", path)
 
 
