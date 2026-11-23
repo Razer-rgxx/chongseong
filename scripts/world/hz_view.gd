@@ -13,6 +13,9 @@ var _owners: Dictionary = {}   # zi -> Node3D
 var _panel: PanelContainer
 var _label: Label
 var _t: float = 0.0
+var _map: Control
+var _cue: Label
+const CUES: Array[String] = ["결투", "거래", "추격"]
 
 const ASKS: Dictionary = {
 	&"sword": "쥔 검을 내려놓아라. 그러면 이 검에 각인을 새겨 주마.",
@@ -58,6 +61,30 @@ func setup(r: Rules) -> void:
 	_panel.add_child(_label)
 	layer.add_child(_panel)
 	_panel.visible = false
+	# 지도 창: 오른쪽 위 작은 판. 검 점(조짐 밝기), 이웃 줄, 깨어난 검은 붉게, 뽑은 검은 꺼짐, 영주는 흰 점
+	_map = Control.new()
+	_map.anchor_left = 1.0
+	_map.anchor_right = 1.0
+	_map.offset_left = -236
+	_map.offset_right = -16
+	_map.offset_top = 64
+	_map.offset_bottom = 214
+	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map.draw.connect(_draw_map)
+	layer.add_child(_map)
+	# 사건이 시작되면 가운데 위에 한 낱말이 잠깐(결투·거래·추격)
+	_cue = Label.new()
+	_cue.anchor_left = 0.5
+	_cue.anchor_right = 0.5
+	_cue.anchor_top = 0.22
+	_cue.offset_left = -200
+	_cue.offset_right = 200
+	_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cue.add_theme_font_size_override("font_size", 40)
+	_cue.add_theme_color_override("font_color", Color(0.85, 0.3, 0.22))
+	_cue.modulate.a = 0.0
+	layer.add_child(_cue)
+	r.hz_event.connect(_on_event)
 
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -78,6 +105,8 @@ func _process(delta: float) -> void:
 	var on: bool = rules != null and rules.hz != null
 	visible = on
 	_panel.visible = on and not rules.hz_offer.is_empty()
+	if _map:
+		_map.visible = on
 	if not on:
 		_clear()
 		return
@@ -85,6 +114,43 @@ func _process(delta: float) -> void:
 		_label.text = "%s\n\nE 받는다    Q 거절한다(주인과 겨룬다)" % ASKS.get(rules.hz_offer.ask, "")
 	_draw_preview()
 	_draw_awake()
+	_map.visible = rules.phase != Rules.Phase.OVER
+	_map.queue_redraw()
+	_cue.modulate.a = maxf(0.0, _cue.modulate.a - delta * 0.6)
+
+
+func _on_event(_zi: int, kind: int) -> void:
+	_cue.text = CUES[clampi(kind, 0, 2)]
+	_cue.modulate.a = 1.6
+
+
+func _draw_map() -> void:
+	var hz := rules.hz
+	var sz: Vector2 = _map.size
+	_map.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.03, 0.03, 0.03, 0.72))
+	_map.draw_rect(Rect2(Vector2.ZERO, sz), Color(0.62, 0.5, 0.3, 0.6), false, 1.0)
+	var r: float = hz.d.radius
+	var to := func(p: Vector2) -> Vector2:
+		return sz / 2.0 + Vector2(p.x / r * (sz.x / 2.0 - 12.0), p.y / r * (sz.y / 2.0 - 12.0))
+	for i in hz.blades.size():
+		for j in hz.blades[i].links:
+			if j > i:
+				_map.draw_line(to.call(hz.blades[i].at), to.call(hz.blades[j].at), Color(0.5, 0.45, 0.38, 0.35), 1.0)
+	for i in hz.blades.size():
+		var b: HillZone.Blade = hz.blades[i]
+		var h := rules.hilt_of(i)
+		var omen: int = h.shown_omen if h else 0
+		var c := Color(0.55, 0.5, 0.42).lerp(Color(0.95, 0.8, 0.45), float(omen) / 3.0)
+		var rad: float = 3.0 + omen
+		match b.state:
+			HillZone.State.AWAKE:
+				c = Color(0.9, 0.25, 0.15)
+				_map.draw_circle(to.call(b.owner_at), 2.5, Color(0.6, 0.1, 0.08))
+			HillZone.State.PULLED, HillZone.State.DONE:
+				c = Color(0.25, 0.24, 0.22)
+		_map.draw_circle(to.call(b.at), rad, c)
+	var lp: Vector2 = (rules.lord.pos - Grid.middle()) / rules.hz_scale
+	_map.draw_circle(to.call(lp), 3.0, Color(0.95, 0.95, 0.9))
 
 
 func _clear() -> void:
