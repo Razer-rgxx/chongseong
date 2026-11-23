@@ -14,7 +14,7 @@ const FOR_KIND: Dictionary = {
 var bone_name: String = ""
 var holder: Node3D
 ## 몸 전체 크기(사람 키 1.75m 기준)에 맞춰 물건 크기를 곱한다.
-var size: float = 1.5
+var size: float = 1.1
 
 
 static func head_bone(skel: Skeleton3D) -> int:
