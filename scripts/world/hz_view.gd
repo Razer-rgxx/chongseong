@@ -85,6 +85,7 @@ func setup(r: Rules) -> void:
 	_cue.modulate.a = 0.0
 	layer.add_child(_cue)
 	r.hz_event.connect(_on_event)
+	r.night_started.connect(func(_z): if rules.hz: _cue.text = "정산"; _cue.modulate.a = 2.0)
 
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -95,7 +96,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		if k == KEY_E:
 			rules.hz_answer(true)
 			get_viewport().set_input_as_handled()
-		elif k == KEY_Q:
+		elif k == KEY_R:
 			rules.hz_answer(false)
 			get_viewport().set_input_as_handled()
 
@@ -111,7 +112,7 @@ func _process(delta: float) -> void:
 		_clear()
 		return
 	if _panel.visible:
-		_label.text = "%s\n\nE 받는다    Q 거절한다(주인과 겨룬다)" % ASKS.get(rules.hz_offer.ask, "")
+		_label.text = "%s\n\nE 받는다    R 거절한다(주인과 겨룬다)" % ASKS.get(rules.hz_offer.ask, "")
 	_draw_preview()
 	_draw_awake()
 	_map.visible = rules.phase != Rules.Phase.OVER

@@ -153,6 +153,10 @@ func _ready() -> void:
 	var hzv := HzView.new()   # 언덕 재설계: 검 지도의 줄·깨어남·거래 창
 	add_child(hzv)
 	hzv.setup(rules)
+	if meta and meta.runs == 0:   # 첫 판: 튜토리얼
+		var tut := Tutorial.new()
+		add_child(tut)
+		tut.setup(rules)
 	rules.night_started.connect(_on_night)
 	rules.run_ended.connect(_on_end)
 	rules.pull_started.connect(func(h: Hilt, _g: int) -> void:

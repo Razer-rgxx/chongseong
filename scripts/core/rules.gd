@@ -136,6 +136,8 @@ var hz_offer: Dictionary = {}
 var hz_max_hp_cut: float = 0.0
 ## 지도(HillZone 칸) → 싸움터 칸 배율.
 var hz_scale: Vector2 = Vector2.ONE
+## 플레이 기록용: 뽑은 순서(검 번호), 사건별 승, 정산 때 온 주인 수, 거래 받음/거절.
+var hz_log: Dictionary = {"order": [], "won": {}, "reckoned": 0, "trade_yes": 0, "trade_no": 0}
 
 ## 결투의 한 판 단계: 시작 전 서 있기 → 싸움 → 판 사이 쉼 → 끝.
 const DUEL_READY: int = 0
@@ -375,6 +377,9 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 		var s := meta.sheath_sword(data)
 		if s:
 			slots[0] = s
+			active = 0
+		if use_hill_events and meta.runs < 3 and slots.all(func(x): return x == null):
+			slots[0] = starter_sword()   # 처음 세 판: 빈손으로 시작하지 않게(튜토리얼)
 			active = 0
 		var fg: int = meta.forge_grade(data)
 		if fg >= 0:   # 풀무간(마을 키우기 5단계): 벼린 검 한 자루를 빈 칸에
@@ -1077,6 +1082,16 @@ func fate_reroll() -> bool:
 
 
 ## 그 등급에서 뽑힐 검 하나(rng). 후보는 GameData.swords_by_grade라 오픈월드 한정 검(33단계, field_only)은 나오지 않는다.
+## 초보자의 검(2026-11-23): 가장 흔한 검을 바탕으로, 이름을 바꾸고 내구를 두 배로. 처음 세 판에만 쥐고 시작한다.
+func starter_sword() -> Sword:
+	var d: SwordData = pick_sword(0).duplicate()
+	d.display_name = "초보자의 검"
+	var s := Sword.new(d, data)
+	s.max_durability *= 2.0
+	s.durability = s.max_durability
+	return s
+
+
 func pick_sword(grade: int) -> SwordData:
 	var list: PackedInt32Array = data.swords_by_grade[grade]
 	return data.swords[list[rng.randi_range(0, list.size() - 1)]]
@@ -3298,6 +3313,7 @@ func _hz_begin(zi: int, s: Sword) -> void:
 			before.append(i)
 	hz.pull(zi)
 	hz.started.erase(zi)
+	hz_log.order.append(zi)
 	for i in hz.blades.size():
 		if hz.blades[i].state == HillZone.State.AWAKE and not before.has(i):
 			hz_woke.emit(i)
@@ -3344,6 +3360,7 @@ func hz_answer(accept: bool) -> void:
 	var zi: int = hz_offer.zi
 	var ask: StringName = hz_offer.ask
 	hz_offer = {}
+	hz_log["trade_yes" if accept else "trade_no"] += 1
 	if not accept:
 		_hz_event(zi, HillZone.Event.DUEL)
 		return
@@ -3381,6 +3398,8 @@ func _hz_killed(e: Enemy) -> void:
 
 func _hz_win(zi: int) -> void:
 	hz.finish(zi, true)
+	var ek: String = str(hz.blades[zi].event)
+	hz_log.won[ek] = int(hz_log.won.get(ek, 0)) + 1
 	var s: Sword = hz_prize.get(zi)
 	hz_prize.erase(zi)
 	hz_done.emit(zi, true)
@@ -3404,5 +3423,7 @@ func _step_hz() -> void:
 func _hz_reckon() -> void:
 	if hz == null:
 		return
-	for zi in hz.begin_reckoning():
+	var come := hz.begin_reckoning()
+	hz_log.reckoned = come.size()
+	for zi in come:
 		_hz_event(zi, HillZone.Event.DUEL)

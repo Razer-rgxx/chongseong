@@ -28,6 +28,7 @@ static func hill_end(rules: Rules, won: bool, shards: int) -> void:
 		"pulls": rules.pulls, "kills": rules.kills, "best_grade": rules.best_grade, "shards": shards,
 		"pulled_by_grade": rules.run_stats.get("pulled_by_grade", []), "perfect": rules.run_stats.get("perfect", 0),
 		"elites": rules.run_stats.get("elites", 0), "killer": String(rules.last_hit_by), "hp_max": rules.max_hp(),
+		"hz": rules.hz_log,   # 언덕 재설계(첫 구역): 뽑은 순서, 사건별 승, 정산 때 온 수, 거래
 	})
 
 

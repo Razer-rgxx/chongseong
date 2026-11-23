@@ -145,3 +145,16 @@ static func _with_events(game: GameData, s: int) -> Rules:
 	var r := Rules.new(game, s)
 	Rules.events_default = false
 	return r
+
+
+## 튜토리얼(2026-11-23): 처음 세 판은 초보자의 검을 쥐고 시작한다.
+static func run_starter(game: GameData, chk: Callable) -> void:
+	var m := Meta.new()
+	Rules.events_default = true
+	var r := Rules.new(game, 31, m)
+	chk.call(r.slots[0] != null and r.slots[0].data.display_name == "초보자의 검", "첫 판: 초보자의 검을 쥐고 시작")
+	chk.call(is_equal_approx(r.slots[0].durability, r.slots[0].max_durability) and r.slots[0].grade == 0, "초보자의 검: 가장 흔한 등급, 내구 가득")
+	m.runs = 3
+	var r2 := Rules.new(game, 32, m)
+	Rules.events_default = false
+	chk.call(r2.slots.all(func(s): return s == null or s.data.display_name != "초보자의 검"), "네 번째 판부터는 없다")
