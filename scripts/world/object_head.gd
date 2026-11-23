@@ -14,7 +14,7 @@ const FOR_KIND: Dictionary = {
 var bone_name: String = ""
 var holder: Node3D
 ## 몸 전체 크기(사람 키 1.75m 기준)에 맞춰 물건 크기를 곱한다.
-var size: float = 1.5
+var size: float = 2.1
 
 
 static func head_bone(skel: Skeleton3D) -> int:
@@ -37,6 +37,17 @@ static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	skel.add_child(mod)
 	var obj: StringName = FOR_KIND.get(kind, kind)
 	var o := build(obj)
+	# 목깃: 줄인 머리 자리를 가리고 물건이 목에서 자라난 것처럼(요즘 오브젝트헤드는 목과 물건 사이를 천·쇠고리로 잇는다)
+	var collar := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	# 사진 속 등불머리처럼: 목 대신 주름 깃(러프)이 물건을 받친다
+	tm.inner_radius = 0.03
+	tm.outer_radius = 0.085
+	tm.rings = 24
+	collar.mesh = tm
+	collar.scale = Vector3(1, 0.55, 1)
+	collar.material_override = _m(Color(0.72, 0.68, 0.6))
+	o.add_child(collar)
 	# 머리뼈는 줄어 있으니 그 뼈에 달지 않는다. 매 갱신마다 머리뼈 자리에 크기 1로 세운다(top_level)
 	var holder := Node3D.new()
 	holder.top_level = true
@@ -122,15 +133,15 @@ static func build(obj: StringName) -> Node3D:
 			# 칼끝이 위: 칼날, 코등이, 손잡이, 칼자루 끝
 			_cyl(n, 0.022, 0.03, 0.09, Vector3(0, 0.05, 0), leather)
 			_ball(n, 0.035, Vector3(0, 0.0, 0), brass)
-			_box(n, Vector3(0.24, 0.035, 0.05), Vector3(0, 0.11, 0), brass)
-			_box(n, Vector3(0.065, 0.42, 0.016), Vector3(0, 0.34, 0), steel)
-			_box(n, Vector3(0.04, 0.06, 0.016), Vector3(0, 0.575, 0), steel, Vector3(0, 0, PI / 4))
+			_box(n, Vector3(0.34, 0.05, 0.07), Vector3(0, 0.11, 0), brass)
+			_box(n, Vector3(0.15, 0.4, 0.04), Vector3(0, 0.33, 0), steel)
+			_box(n, Vector3(0.106, 0.106, 0.04), Vector3(0, 0.53, 0), steel, Vector3(0, 0, PI / 4))
 		&"hammer":
-			_cyl(n, 0.022, 0.026, 0.2, Vector3(0, 0.1, 0), wood)
-			_box(n, Vector3(0.28, 0.12, 0.12), Vector3(0, 0.25, 0), iron)
+			_cyl(n, 0.035, 0.04, 0.12, Vector3(0, 0.06, 0), wood)
+			_box(n, Vector3(0.34, 0.2, 0.2), Vector3(0, 0.22, 0), iron)
 		&"tongs":
-			_box(n, Vector3(0.025, 0.36, 0.025), Vector3(-0.03, 0.18, 0), iron, Vector3(0, 0, 0.12))
-			_box(n, Vector3(0.025, 0.36, 0.025), Vector3(0.03, 0.18, 0), iron, Vector3(0, 0, -0.12))
+			_box(n, Vector3(0.06, 0.34, 0.05), Vector3(-0.05, 0.17, 0), iron, Vector3(0, 0, 0.15))
+			_box(n, Vector3(0.06, 0.34, 0.05), Vector3(0.05, 0.17, 0), iron, Vector3(0, 0, -0.15))
 		&"lantern":
 			_box(n, Vector3(0.18, 0.04, 0.18), Vector3(0, 0.02, 0), iron)
 			var g := _box(n, Vector3(0.15, 0.2, 0.15), Vector3(0, 0.14, 0), _m(Color(0.9, 0.62, 0.3)))
@@ -158,8 +169,8 @@ static func build(obj: StringName) -> Node3D:
 			_ball(n, 0.13, Vector3(0, 0.22, 0), iron, Vector3(1, 0.6, 1))
 			_box(n, Vector3(0.2, 0.025, 0.02), Vector3(0, 0.13, 0.135), _m(Color(0.02, 0.02, 0.02)))
 		&"spear":
-			_cyl(n, 0.016, 0.018, 0.4, Vector3(0, 0.2, 0), wood)
-			_cyl(n, 0.0, 0.04, 0.16, Vector3(0, 0.48, 0), steel)
+			_cyl(n, 0.03, 0.03, 0.12, Vector3(0, 0.06, 0), wood)
+			_cyl(n, 0.0, 0.11, 0.34, Vector3(0, 0.29, 0), steel)
 		&"candle":
 			_cyl(n, 0.06, 0.06, 0.24, Vector3(0, 0.12, 0), _m(Color(0.82, 0.78, 0.66)))
 			var f := _ball(n, 0.022, Vector3(0, 0.27, 0), _m(Color(1, 0.7, 0.3)), Vector3(1, 1.8, 1))
