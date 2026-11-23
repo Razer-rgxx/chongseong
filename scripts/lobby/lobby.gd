@@ -300,6 +300,9 @@ func _process(delta: float) -> void:
 
 
 func _interact() -> void:
+	if _talker != &"" and _hud.say_typing():
+		_hud.say_finish()   # 글자가 나오는 중이면 먼저 다 보인다
+		return
 	if _talker != &"":
 		_talk_i += 1
 		if _talk_i >= _talk_lines.size():

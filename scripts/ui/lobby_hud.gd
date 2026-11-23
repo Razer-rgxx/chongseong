@@ -263,6 +263,15 @@ func say(who: String, text: String, last: bool = false) -> void:
 	_say.show_line(who, text, last)
 
 
+## 대사 글자가 아직 나오는 중이면 참(E는 먼저 다 보이게 한다).
+func say_typing() -> bool:
+	return _say.is_typing()
+
+
+func say_finish() -> void:
+	_say.finish_typing()
+
+
 func say_end() -> void:
 	_say.hide_box()
 

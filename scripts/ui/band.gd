@@ -7,7 +7,7 @@ extends Control
 @export var fade_out: float = 0.35
 
 var _label: Label
-var _key_box: PanelContainer
+var _key_box: KeyGlyph
 var _key_label: Label
 var _t: float = 0.0
 var _hold: bool = false
@@ -49,15 +49,9 @@ func _build(font_size: int) -> void:
 	row.add_theme_constant_override("separation", 14)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(row)
-	_key_box = PanelContainer.new()
-	var ks := UiKit.style(Color(UiKit.LINE, 0.8), 1, Color(0.06, 0.05, 0.04, 0.9))
-	ks.content_margin_left = 9
-	ks.content_margin_right = 9
-	ks.content_margin_top = 1
-	ks.content_margin_bottom = 2
-	_key_box.add_theme_stylebox_override("panel", ks)
-	_key_label = UiKit.label("", font_size - 2, UiKit.TITLE)
-	_key_box.add_child(_key_label)
+	# 키: 놋쇠 마름모(2026-11-23, KeyGlyph). 글이 바뀌면 글이 오른쪽에서 살짝 밀려 들어온다
+	_key_box = KeyGlyph.make(float(font_size) * 2.1, font_size - 3)
+	_key_label = _key_box.label
 	row.add_child(_key_box)
 	_label = UiKit.label("", font_size)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -91,6 +85,10 @@ func show_for(t: String, secs: float) -> void:
 func show_key(key: String, t: String) -> void:
 	if _hold and _label.text == t and _key_label.text == key:
 		return
+	if _label.text != t:
+		_label.modulate.a = 0.0
+		var tw := create_tween().set_parallel()
+		tw.tween_property(_label, "modulate:a", 1.0, 0.22)
 	_label.text = t
 	_key_label.text = key
 	_key_box.visible = key != ""

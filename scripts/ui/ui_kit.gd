@@ -94,8 +94,21 @@ static func header(box: VBoxContainer, title: String, close: Callable, col: Colo
 	head.add_child(t)
 	head.add_child(button("Esc  닫기", close, 34))
 	box.add_child(head)
-	box.add_child(rule())
+	box.add_child(ornament_rule())
 	return t
+
+
+## 가운데에 작은 마름모가 박힌 가는 줄(창 제목 밑).
+static func ornament_rule() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(0, 9)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func() -> void:
+		var y: float = c.size.y / 2.0
+		c.draw_texture_rect(fade_texture(LINE, 0.7, 0.3), Rect2(0, y, c.size.x, 1), false)
+		var m := Vector2(c.size.x / 2.0, y)
+		c.draw_colored_polygon(PackedVector2Array([m + Vector2(0, -4), m + Vector2(4, 0), m + Vector2(0, 4), m + Vector2(-4, 0)]), LINE))
+	return c
 
 
 ## 화면 가운데의 판. 돌려주는 VBoxContainer에 내용을 넣는다.
@@ -110,6 +123,7 @@ static func center_panel(parent: Node, border: Color = Color(LINE, 0.4)) -> VBox
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	p.add_child(box)
+	p.add_child(PanelFrame.new())   # 꺾쇠·징·훑는 빛(2026-11-23)
 	return box
 
 

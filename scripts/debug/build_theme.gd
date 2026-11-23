@@ -36,8 +36,16 @@ func _init() -> void:
 	for type in ["Button", "OptionButton"]:
 		t.set_font("font", type, body)
 		t.set_stylebox("normal", type, _box(Color(0.07, 0.06, 0.05, 0.85), Color(LINE, 0.35)))
-		t.set_stylebox("hover", type, _box(Color(0.13, 0.105, 0.07, 0.95), Color(LINE, 0.95)))
-		t.set_stylebox("pressed", type, _box(Color(0.2, 0.15, 0.09, 0.95), Color(LINE, 1.0)))
+		# 2026-11-23: 비스듬한 칼날 모양 버튼. 올리면 왼쪽에 달군 쇠빛 띠와 둘레의 불빛
+		var hv := _box(Color(0.13, 0.095, 0.06, 0.96), Color(LINE, 0.95))
+		hv.border_width_left = 4
+		hv.border_color = Color(1.0, 0.62, 0.28)
+		hv.shadow_color = Color(1.0, 0.45, 0.15, 0.28)
+		hv.shadow_size = 7
+		t.set_stylebox("hover", type, hv)
+		var pr := _box(Color(0.24, 0.15, 0.08, 0.98), Color(1.0, 0.7, 0.35))
+		pr.border_width_left = 4
+		t.set_stylebox("pressed", type, pr)
 		t.set_stylebox("disabled", type, _box(Color(0.05, 0.05, 0.05, 0.6), Color(LINE, 0.12)))
 		t.set_stylebox("focus", type, StyleBoxEmpty.new())
 		t.set_color("font_color", type, Color(0.86, 0.82, 0.74))
@@ -70,4 +78,5 @@ static func _box(bg: Color, border: Color) -> StyleBoxFlat:
 	s.content_margin_right = 16
 	s.content_margin_top = 6
 	s.content_margin_bottom = 7
+	s.skew = Vector2(0.18, 0.0)
 	return s
