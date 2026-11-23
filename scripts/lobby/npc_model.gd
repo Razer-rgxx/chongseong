@@ -48,6 +48,8 @@ static func path_for(m: String) -> String:
 
 
 func _ready() -> void:
+	if COSTUME.has(head):
+		tint = COSTUME[head][0]
 	_body = (load(path_for(model)) as PackedScene).instantiate()
 	_body.rotation.y = PI   # Mixamo 캐릭터는 +Z를 본다. 마을 사람의 앞은 -Z다
 	add_child(_body)
@@ -61,6 +63,7 @@ func _ready() -> void:
 		_add_skin()
 	if head != &"":
 		ObjectHead.attach(_body.find_child("Skeleton3D", true, false) as Skeleton3D, head)
+		_dress()
 	_dye(_body)
 	play(_state if _state != "" else "idle")
 
@@ -82,6 +85,80 @@ func _add_skin() -> void:
 	src.free()
 
 
+## 머리 물건에 맞춘 옷(사진 속 등불머리의 연미복처럼): 옷감 색, 장식 색, 덧옷 한 벌.
+## 덧옷: apron(앞치마), tails(연미복 꼬리), cloak(망토), sash(띠), vest(조끼)
+const COSTUME: Dictionary = {
+	&"smith": [Color(0.26, 0.2, 0.15), Color(0.55, 0.4, 0.2), &"apron"],
+	&"apprentice": [Color(0.3, 0.24, 0.18), Color(0.5, 0.36, 0.2), &"apron"],
+	&"elder": [Color(0.12, 0.13, 0.22), Color(0.7, 0.55, 0.25), &"tails"],
+	&"merchant": [Color(0.34, 0.14, 0.12), Color(0.72, 0.58, 0.28), &"sash"],
+	&"pilgrim": [Color(0.5, 0.47, 0.42), Color(0.75, 0.68, 0.5), &"cloak"],
+	&"herbalist": [Color(0.2, 0.28, 0.18), Color(0.5, 0.44, 0.28), &"apron"],
+	&"gatherer": [Color(0.28, 0.3, 0.2), Color(0.45, 0.38, 0.24), &"vest"],
+	&"hunter": [Color(0.24, 0.22, 0.16), Color(0.4, 0.3, 0.2), &"cloak"],
+	&"knight": [Color(0.3, 0.32, 0.36), Color(0.55, 0.5, 0.4), &"tails"],
+	&"gatekeeper": [Color(0.22, 0.24, 0.3), Color(0.5, 0.42, 0.3), &"sash"],
+	&"drunk": [Color(0.35, 0.18, 0.2), Color(0.5, 0.4, 0.3), &"vest"],
+	&"peasant": [Color(0.36, 0.3, 0.22), Color(0.42, 0.34, 0.24), &"apron"],
+	&"peasant2": [Color(0.4, 0.34, 0.2), Color(0.5, 0.4, 0.22), &"vest"],
+	&"peasant3": [Color(0.3, 0.28, 0.26), Color(0.4, 0.36, 0.3), &"apron"],
+	&"peasant4": [Color(0.42, 0.36, 0.22), Color(0.55, 0.45, 0.22), &"sash"],
+}
+
+var _piece: Node3D
+
+
+func _dress() -> void:
+	var c: Array = COSTUME.get(head, [])
+	if c.is_empty():
+		return
+	var cloth := StandardMaterial3D.new()
+	cloth.albedo_color = (c[0] as Color) * 0.85
+	cloth.roughness = 0.95
+	var trim := StandardMaterial3D.new()
+	trim.albedo_color = c[1]
+	trim.metallic = 0.4
+	trim.roughness = 0.5
+	_piece = Node3D.new()
+	add_child(_piece)
+	var h: float = 1.75   # 사람 키
+	match c[2]:
+		&"apron":
+			_pbox(Vector3(0.36, 0.62, 0.02), Vector3(0, h * 0.42, -0.15), _mat(Color(0.2, 0.15, 0.1)), Vector3(-0.12, 0, 0))
+			_pbox(Vector3(0.38, 0.03, 0.025), Vector3(0, h * 0.58, -0.13), trim)
+		&"tails":
+			for sx in [-1.0, 1.0]:
+				_pbox(Vector3(0.16, 0.6, 0.02), Vector3(sx * 0.09, h * 0.36, 0.15), cloth, Vector3(0.12, 0, sx * 0.08))
+				_pbox(Vector3(0.02, 0.58, 0.022), Vector3(sx * 0.17, h * 0.36, 0.16), trim, Vector3(0.12, 0, sx * 0.08))
+		&"cloak":
+			_pbox(Vector3(0.52, 1.0, 0.03), Vector3(0, h * 0.5, 0.17), cloth, Vector3(0.08, 0, 0))
+			_pbox(Vector3(0.5, 0.06, 0.24), Vector3(0, h * 0.8, 0.04), cloth)
+		&"sash":
+			_pbox(Vector3(0.08, 0.7, 0.3), Vector3(0, h * 0.62, 0), trim, Vector3(0, 0, 0.75))
+		&"vest":
+			for sx in [-1.0, 1.0]:
+				_pbox(Vector3(0.15, 0.36, 0.02), Vector3(sx * 0.09, h * 0.63, -0.13), cloth)
+			_pbox(Vector3(0.02, 0.34, 0.025), Vector3(0, h * 0.63, -0.14), trim)
+
+
+func _mat(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = 0.9
+	return m
+
+
+func _pbox(size: Vector3, at: Vector3, m: Material, rot: Vector3 = Vector3.ZERO) -> void:
+	var mi := MeshInstance3D.new()
+	var b := BoxMesh.new()
+	b.size = size
+	mi.mesh = b
+	mi.position = at
+	mi.rotation = rot
+	mi.material_override = m
+	_piece.add_child(mi)
+
+
 ## 어둡고 바랜 빛에 맞게 조금 낮추고 tint 쪽으로 물들인다.
 func _dye(n: Node) -> void:
 	if n is MeshInstance3D:
@@ -90,7 +167,7 @@ func _dye(n: Node) -> void:
 			var m := mi.get_active_material(s)
 			if m is BaseMaterial3D:
 				var d := (m as BaseMaterial3D).duplicate() as BaseMaterial3D
-				d.albedo_color = d.albedo_color * Color(0.78, 0.74, 0.7).lerp(tint, 0.35)
+				d.albedo_color = d.albedo_color * Color(0.78, 0.74, 0.7).lerp(tint * 2.2, 0.6 if COSTUME.has(head) else 0.35)
 				d.roughness = maxf(d.roughness, 0.85)
 				d.metallic = 0.0
 				mi.set_surface_override_material(s, d)
@@ -144,6 +221,8 @@ func play(state: String) -> void:
 		return
 	if not has(name):
 		return
+	if _piece:
+		_piece.visible = not name in ["kneel", "sit", "pray"]
 	var first: bool = not _started
 	_started = true
 	_state = name

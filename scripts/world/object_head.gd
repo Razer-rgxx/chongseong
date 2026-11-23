@@ -130,26 +130,67 @@ static func build(obj: StringName) -> Node3D:
 	var clay := _m(Color(0.42, 0.26, 0.17))
 	match obj:
 		&"sword":
-			# 칼끝이 위: 칼날, 코등이, 손잡이, 칼자루 끝
-			_cyl(n, 0.022, 0.03, 0.09, Vector3(0, 0.05, 0), leather)
-			_ball(n, 0.035, Vector3(0, 0.0, 0), brass)
-			_box(n, Vector3(0.34, 0.05, 0.07), Vector3(0, 0.11, 0), brass)
-			_box(n, Vector3(0.15, 0.4, 0.04), Vector3(0, 0.33, 0), steel)
-			_box(n, Vector3(0.106, 0.106, 0.04), Vector3(0, 0.53, 0), steel, Vector3(0, 0, PI / 4))
+			# 칼끝이 위. 칼자루 끝(구슬) → 감은 손잡이 → 코등이(끝이 말림) → 칼날(가운데 홈, 끝은 뾰족)
+			_ball(n, 0.04, Vector3(0, -0.005, 0), brass)
+			_cyl(n, 0.026, 0.03, 0.1, Vector3(0, 0.06, 0), leather)
+			for k in 4:
+				_cyl(n, 0.031, 0.031, 0.008, Vector3(0, 0.025 + k * 0.025, 0), brass)
+			_box(n, Vector3(0.3, 0.045, 0.07), Vector3(0, 0.125, 0), brass)
+			for sx in [-1.0, 1.0]:
+				_ball(n, 0.035, Vector3(sx * 0.16, 0.14, 0), brass, Vector3(1, 1.3, 1))
+			_cyl(n, 0.05, 0.06, 0.03, Vector3(0, 0.155, 0), brass)
+			_box(n, Vector3(0.15, 0.36, 0.035), Vector3(0, 0.33, 0), steel)
+			_box(n, Vector3(0.03, 0.3, 0.04), Vector3(0, 0.32, 0), iron)
+			_box(n, Vector3(0.106, 0.106, 0.035), Vector3(0, 0.51, 0), steel, Vector3(0, 0, PI / 4))
 		&"hammer":
 			_cyl(n, 0.035, 0.04, 0.12, Vector3(0, 0.06, 0), wood)
-			_box(n, Vector3(0.34, 0.2, 0.2), Vector3(0, 0.22, 0), iron)
+			_cyl(n, 0.045, 0.045, 0.03, Vector3(0, 0.12, 0), iron)
+			_box(n, Vector3(0.24, 0.2, 0.2), Vector3(0, 0.22, 0), iron)
+			for sx in [-1.0, 1.0]:
+				_cyl(n, 0.1, 0.11, 0.06, Vector3(sx * 0.15, 0.22, 0), iron, Vector3(0, 0, PI / 2))
+				_cyl(n, 0.112, 0.112, 0.012, Vector3(sx * 0.1, 0.22, 0), brass, Vector3(0, 0, PI / 2))
+			_cyl(n, 0.03, 0.03, 0.05, Vector3(0, 0.33, 0), wood)
 		&"tongs":
-			_box(n, Vector3(0.06, 0.34, 0.05), Vector3(-0.05, 0.17, 0), iron, Vector3(0, 0, 0.15))
-			_box(n, Vector3(0.06, 0.34, 0.05), Vector3(0.05, 0.17, 0), iron, Vector3(0, 0, -0.15))
+			# 집게가 달군 쇳덩이를 물고 있다: 엇갈린 두 자루, 가운데 못, 벌어진 입, 빨갛게 빛나는 쇠
+			for sx in [-1.0, 1.0]:
+				_box(n, Vector3(0.045, 0.2, 0.04), Vector3(sx * 0.035, 0.1, 0), iron, Vector3(0, 0, sx * 0.25))
+				_box(n, Vector3(0.05, 0.16, 0.045), Vector3(-sx * 0.045, 0.27, 0), iron, Vector3(0, 0, -sx * 0.2))
+			_cyl(n, 0.03, 0.03, 0.06, Vector3(0, 0.19, 0), brass, Vector3(PI / 2, 0, 0))
+			var hot := _m(Color(1.0, 0.4, 0.12))
+			hot.emission_enabled = true
+			hot.emission = Color(1.0, 0.32, 0.06)
+			hot.emission_energy_multiplier = 3.0
+			_box(n, Vector3(0.2, 0.09, 0.09), Vector3(0, 0.37, 0), hot)
+			var hl := OmniLight3D.new()
+			hl.light_color = Color(1.0, 0.4, 0.15)
+			hl.omni_range = 2.0
+			hl.position = Vector3(0, 0.37, 0.1)
+			n.add_child(hl)
 		&"lantern":
-			_box(n, Vector3(0.18, 0.04, 0.18), Vector3(0, 0.02, 0), iron)
-			var g := _box(n, Vector3(0.15, 0.2, 0.15), Vector3(0, 0.14, 0), _m(Color(0.9, 0.62, 0.3)))
-			(g.material_override as StandardMaterial3D).emission_enabled = true
-			(g.material_override as StandardMaterial3D).emission = Color(1.0, 0.55, 0.2)
-			(g.material_override as StandardMaterial3D).emission_energy_multiplier = 1.2
-			_cyl(n, 0.02, 0.11, 0.08, Vector3(0, 0.28, 0), iron)
-			_cyl(n, 0.035, 0.035, 0.01, Vector3(0, 0.34, 0), iron, Vector3(PI / 2, 0, 0))
+			# 사진의 가로등 등불: 놋쇠 받침 → 여섯 모 유리(빛남) + 모서리 살 → 처마 → 여섯 모 지붕 → 꼭지
+			_cyl(n, 0.1, 0.07, 0.05, Vector3(0, 0.025, 0), iron)
+			_cyl(n, 0.13, 0.13, 0.025, Vector3(0, 0.06, 0), brass)
+			var glass := _m(Color(1.0, 0.82, 0.5))
+			glass.emission_enabled = true
+			glass.emission = Color(1.0, 0.68, 0.3)
+			glass.emission_energy_multiplier = 2.2
+			var g := _cyl(n, 0.12, 0.1, 0.22, Vector3(0, 0.18, 0), glass)
+			(g.mesh as CylinderMesh).radial_segments = 6
+			for k in 6:
+				var a: float = float(k) / 6.0 * TAU
+				_box(n, Vector3(0.018, 0.24, 0.018), Vector3(cos(a) * 0.112, 0.18, sin(a) * 0.112), iron, Vector3(0, -a, 0))
+			_cyl(n, 0.16, 0.16, 0.025, Vector3(0, 0.3, 0), brass)
+			var roof := _cyl(n, 0.03, 0.17, 0.12, Vector3(0, 0.37, 0), _m(Color(0.42, 0.22, 0.12), 0.6, 0.4))
+			(roof.mesh as CylinderMesh).radial_segments = 6
+			_cyl(n, 0.035, 0.035, 0.05, Vector3(0, 0.45, 0), iron)
+			_ball(n, 0.035, Vector3(0, 0.5, 0), brass)
+			_cyl(n, 0.0, 0.015, 0.06, Vector3(0, 0.55, 0), brass)
+			var l := OmniLight3D.new()
+			l.light_color = Color(1.0, 0.7, 0.35)
+			l.omni_range = 3.5
+			l.light_energy = 1.2
+			l.position = Vector3(0, 0.18, 0)
+			n.add_child(l)
 		&"pouch":
 			_ball(n, 0.15, Vector3(0, 0.13, 0), leather, Vector3(1, 0.9, 1))
 			_cyl(n, 0.05, 0.07, 0.06, Vector3(0, 0.27, 0), leather)
@@ -172,11 +213,28 @@ static func build(obj: StringName) -> Node3D:
 			_cyl(n, 0.03, 0.03, 0.12, Vector3(0, 0.06, 0), wood)
 			_cyl(n, 0.0, 0.11, 0.34, Vector3(0, 0.29, 0), steel)
 		&"candle":
-			_cyl(n, 0.06, 0.06, 0.24, Vector3(0, 0.12, 0), _m(Color(0.82, 0.78, 0.66)))
-			var f := _ball(n, 0.022, Vector3(0, 0.27, 0), _m(Color(1, 0.7, 0.3)), Vector3(1, 1.8, 1))
-			(f.material_override as StandardMaterial3D).emission_enabled = true
-			(f.material_override as StandardMaterial3D).emission = Color(1.0, 0.6, 0.2)
-			(f.material_override as StandardMaterial3D).emission_energy_multiplier = 2.5
+			# 사진의 촛불머리: 굵은 초, 위에서 흘러내린 촛농, 심지, 물방울 모양 불꽃과 빛
+			var wax := _m(Color(0.82, 0.86, 0.9), 0.0, 0.35)
+			_cyl(n, 0.13, 0.14, 0.3, Vector3(0, 0.15, 0), wax)
+			_cyl(n, 0.15, 0.15, 0.04, Vector3(0, 0.3, 0), wax)
+			for k in 9:
+				var a: float = float(k) / 9.0 * TAU + 0.3
+				var len: float = 0.06 + fmod(float(k) * 0.37, 1.0) * 0.14
+				_cyl(n, 0.026, 0.02, len, Vector3(cos(a) * 0.14, 0.3 - len / 2.0, sin(a) * 0.14), wax)
+				_ball(n, 0.024, Vector3(cos(a) * 0.14, 0.3 - len, sin(a) * 0.14), wax, Vector3(1, 1.3, 1))
+			_cyl(n, 0.006, 0.006, 0.05, Vector3(0, 0.34, 0), _m(Color(0.05, 0.04, 0.03)))
+			var fl := _m(Color(1, 0.6, 0.2))
+			fl.emission_enabled = true
+			fl.emission = Color(1.0, 0.55, 0.15)
+			fl.emission_energy_multiplier = 4.0
+			_ball(n, 0.045, Vector3(0, 0.4, 0), fl, Vector3(1, 1.5, 1))
+			_cyl(n, 0.0, 0.03, 0.08, Vector3(0, 0.47, 0), fl)
+			var cl := OmniLight3D.new()
+			cl.light_color = Color(1.0, 0.62, 0.28)
+			cl.omni_range = 3.0
+			cl.light_energy = 1.3
+			cl.position = Vector3(0, 0.42, 0)
+			n.add_child(cl)
 		&"jug":
 			_ball(n, 0.14, Vector3(0, 0.14, 0), clay)
 			_cyl(n, 0.04, 0.06, 0.1, Vector3(0, 0.3, 0), clay)
