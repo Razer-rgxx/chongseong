@@ -135,6 +135,30 @@ static func _m(c: Color, metal: float = 0.0, rough: float = 0.8) -> StandardMate
 	m.albedo_color = c
 	m.metallic = metal
 	m.roughness = rough
+	# 가장자리 빛(림): 어두운 화면에서도 윤곽이 산다
+	m.rim_enabled = true
+	m.rim = 0.35
+	m.rim_tint = 0.6
+	if metal > 0.5:
+		m.metallic_specular = 0.7
+		m.clearcoat_enabled = true
+		m.clearcoat = 0.25
+		m.clearcoat_roughness = 0.4
+	return m
+
+
+## Poly Haven 질감(assets/village, assets/hill)을 물건 크기에 맞춰(물체 기준 삼면 투영: 머리가 움직여도 무늬가 따라간다).
+static func _tex(name: String, c: Color, tile: float = 0.35) -> StandardMaterial3D:
+	var src := VillageMaterials.get_mat(name, c)
+	var m := src.duplicate() as StandardMaterial3D
+	if m.albedo_texture == null:
+		return _m(c, 0.0, 0.9)
+	m.albedo_color = c
+	m.uv1_world_triplanar = false
+	m.uv1_scale = Vector3.ONE / tile
+	m.normal_scale = 1.4
+	m.rim_enabled = true
+	m.rim = 0.3
 	return m
 
 
@@ -156,7 +180,7 @@ static func _cyl(p: Node3D, r_top: float, r_bot: float, h: float, at: Vector3, m
 	c.top_radius = r_top
 	c.bottom_radius = r_bot
 	c.height = h
-	c.radial_segments = 12
+	c.radial_segments = 32
 	mi.mesh = c
 	mi.position = at
 	mi.rotation = rot
@@ -183,8 +207,8 @@ static func build(obj: StringName) -> Node3D:
 	var n := Node3D.new()
 	var steel := _m(Color(0.55, 0.56, 0.58), 0.85, 0.35)
 	var iron := _m(Color(0.22, 0.22, 0.23), 0.7, 0.55)
-	var wood := _m(Color(0.3, 0.2, 0.12))
-	var leather := _m(Color(0.22, 0.14, 0.09))
+	var wood := _tex("bark_brown_02", Color(0.75, 0.6, 0.45), 0.25)
+	var leather := _tex("brown_planks_05", Color(0.45, 0.3, 0.2), 0.12)
 	var brass := _m(Color(0.55, 0.42, 0.2), 0.8, 0.4)
 	var cloth := _m(Color(0.42, 0.38, 0.3))
 	var clay := _m(Color(0.42, 0.26, 0.17))
@@ -205,7 +229,7 @@ static func build(obj: StringName) -> Node3D:
 		&"hill":
 			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,
 			# 갈라진 틈에서 불씨가 새고, 가운데 한 자루(주인의 검)만 우뚝하고 날이 희게 빛난다.
-			var rock := _m(Color(0.16, 0.15, 0.14), 0.0, 0.95)
+			var rock := _tex("rock_wall_12", Color(0.55, 0.52, 0.5), 0.4)
 			_ball(n, 0.17, Vector3(0, 0.07, 0), rock, Vector3(1.15, 0.55, 1.0))
 			_ball(n, 0.09, Vector3(0.09, 0.1, 0.06), rock, Vector3(1, 0.7, 1))
 			_ball(n, 0.08, Vector3(-0.1, 0.09, -0.05), rock, Vector3(1, 0.6, 1))
@@ -242,16 +266,16 @@ static func build(obj: StringName) -> Node3D:
 			n.add_child(gl)
 		&"tower":
 			# 망루 궁수장: 총안 있는 돌 망루, 화살 셋
-			_cyl(n, 0.12, 0.14, 0.3, Vector3(0, 0.15, 0), _m(Color(0.4, 0.38, 0.35)))
+			_cyl(n, 0.12, 0.14, 0.3, Vector3(0, 0.15, 0), _tex("stone_brick_wall_001", Color(0.85, 0.82, 0.78), 0.3))
 			for k in 6:
 				var a: float = float(k) / 6.0 * TAU
-				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(cos(a) * 0.12, 0.33, sin(a) * 0.12), _m(Color(0.4, 0.38, 0.35)))
+				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(cos(a) * 0.12, 0.33, sin(a) * 0.12), _tex("stone_brick_wall_001", Color(0.85, 0.82, 0.78), 0.3))
 			_box(n, Vector3(0.04, 0.08, 0.02), Vector3(0, 0.2, 0.13), _m(Color(1, 0.6, 0.2)))
 			for k in 3:
 				_cyl(n, 0.006, 0.006, 0.3, Vector3(-0.04 + k * 0.04, 0.42, -0.03), wood, Vector3(0.2, 0, -0.2 + k * 0.2))
 		&"wolf":
 			# 늑대왕: 길쭉한 늑대 두개골에 쇠 왕관
-			var bone := _m(Color(0.78, 0.74, 0.64))
+			var bone := _tex("stone_wall_02", Color(1.0, 0.95, 0.82), 0.3)
 			_ball(n, 0.13, Vector3(0, 0.13, -0.02), bone, Vector3(1, 0.9, 1.1))
 			_box(n, Vector3(0.1, 0.08, 0.2), Vector3(0, 0.09, 0.12), bone)
 			for sx in [-1.0, 1.0]:
@@ -261,7 +285,7 @@ static func build(obj: StringName) -> Node3D:
 				var a: float = float(k) / 5.0 * TAU
 				_cyl(n, 0.0, 0.02, 0.07, Vector3(cos(a) * 0.09, 0.26, sin(a) * 0.09 - 0.02), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4))
 		&"boulder":
-			var st := _m(Color(0.36, 0.34, 0.31))
+			var st := _tex("rock_wall_12", Color(0.8, 0.76, 0.7), 0.4)
 			_ball(n, 0.17, Vector3(0, 0.15, 0), st, Vector3(1.1, 0.9, 1))
 			_ball(n, 0.09, Vector3(0.1, 0.25, 0.05), st)
 			_box(n, Vector3(0.1, 0.02, 0.02), Vector3(0, 0.17, 0.16), _m(Color(1, 0.5, 0.2)))
@@ -292,7 +316,7 @@ static func build(obj: StringName) -> Node3D:
 			_cyl(n, 0.03, 0.03, 0.2, Vector3(0, 0.1, 0), wood)
 			_box(n, Vector3(0.44, 0.06, 0.06), Vector3(0, 0.22, 0), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4), Vector3(0, 0, 0.1))
 		&"burnt":
-			var ch := _m(Color(0.1, 0.08, 0.07))
+			var ch := _tex("rock_wall_12", Color(0.22, 0.18, 0.16), 0.35)
 			_ball(n, 0.16, Vector3(0, 0.15, 0), ch, Vector3(1, 1.1, 1))
 			var hot2 := _m(Color(1, 0.4, 0.1))
 			hot2.emission_enabled = true
@@ -316,7 +340,7 @@ static func build(obj: StringName) -> Node3D:
 			eye.emission_energy_multiplier = 3.0
 			_box(n, Vector3(0.18, 0.02, 0.02), Vector3(0, 0.17, 0.135), eye)
 		&"tomb":
-			var gs := _m(Color(0.45, 0.44, 0.42))
+			var gs := _tex("old_stone_wall", Color(0.85, 0.83, 0.8), 0.5)
 			_box(n, Vector3(0.26, 0.34, 0.08), Vector3(0, 0.17, 0), gs)
 			_cyl(n, 0.13, 0.13, 0.08, Vector3(0, 0.34, 0), gs, Vector3(PI / 2.0, 0, 0))
 			_box(n, Vector3(0.03, 0.14, 0.02), Vector3(0, 0.22, 0.045), _m(Color(0.2, 0.2, 0.2)))

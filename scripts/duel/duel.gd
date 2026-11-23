@@ -345,10 +345,6 @@ func _on_over(winner: int) -> void:
 	_ended = true
 	# 온라인은 내가 이기고 진 것으로 센다(같은 PC는 1P가 나)
 	meta.record_duel(winner if _net == null else (0 if winner == _my else (1 if winner == 1 - _my else -1)))
-	if _net != null and winner == _my:   # 온라인 결투에서 이겼다: 상대 머리의 사본(Heads)
-		var who: String = _hud.player_name(1 - _my)
-		if who != "" and meta.add_head("p:" + who):
-			_hud.announce("%s를 얻었다" % Heads.info("p:" + who).name, 2.0)
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	await get_tree().create_timer(result_delay).timeout

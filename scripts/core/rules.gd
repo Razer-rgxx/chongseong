@@ -914,8 +914,6 @@ func _owner_sword(h: Hilt) -> Sword:
 
 ## 주인 있는 검을 뽑았다: 밤이면 그 자리에 잔영이 바로, 낮이면 밤이 오는 순간.
 func _owner_pulled(h: Hilt) -> void:
-	if h.owner.has("name") and str(h.owner.name) != "":
-		head_found.emit("p:" + str(h.owner.name))   # 다른 영주의 검: 그 사람 머리의 사본
 	if phase == Phase.NIGHT:
 		_spawn_ghost(h.owner, h.pos)
 	else:

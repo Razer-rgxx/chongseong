@@ -633,7 +633,7 @@ func _render_shrine(msg: String) -> void:
 func _render_heads() -> void:
 	_shrine_box.add_child(UiKit.label("머리", 18, UiKit.TITLE))
 	if meta.heads.is_empty():
-		_shrine_box.add_child(UiKit.label("아직 없다. 우두머리를 쓰러뜨리면 가끔 떨어지고, 다른 영주의 검을 뽑으면 그 사람의 머리를 얻는다.", 13, UiKit.MUTED))
+		_shrine_box.add_child(UiKit.label("아직 없다. 들판과 무덤의 우두머리를 쓰러뜨리면 가끔 떨어진다.", 13, UiKit.MUTED))
 		return
 	for id in meta.heads.keys():
 		var i: Dictionary = Heads.info(id)
