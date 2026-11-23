@@ -97,6 +97,8 @@ var _bar_t: float = -1.0
 var _bar_hp: float = -1.0
 var _lag_k: float = 1.0
 var _lean: float = 0.0
+## 그림자 걸음(보스 패턴)으로 땅에 꺼진 정도(0~1).
+var _sink: float = 0.0
 
 
 func setup(e: Enemy) -> void:
@@ -229,7 +231,7 @@ func draw(alpha: float, delta: float) -> bool:
 		_body.scale = Vector3(1.0 + 0.06 * _recoil, 1.0 - 0.08 * _recoil, 1.0 + 0.06 * _recoil)
 		if _attack > 0.4:
 			_attack = -1.0
-	if enemy.data.model_scale > 0.0:
+	if enemy.data.model_scale > 0.0 or enemy.data.swing_arc > 0.0:
 		_rust_pose(delta)
 	_paint()
 	_paint_eyes(delta)
@@ -824,14 +826,37 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 		_arm_pivot.rotation = Vector3(-2.2, 0.0, 0.0)
 
 
-## 무덤 기사의 행동에 맞춘 몸 기울임: 휘두르기 예고에는 뒤로 젖히고(칼을 들어 올린다), 돌진 준비와 돌진에는 숙인다.
+## 무덤 기사형(언덕지기·무덤 기사·무덤 주인)의 행동에 맞춘 몸 기울임: 휘두르기 예고에는 뒤로 젖히고(칼을 들어 올린다), 돌진 준비와 돌진에는 숙인다.
 ## 기사 모델에는 몸만, 도형에는 칼 든 팔도 돌린다(내려치는 순간 옆에서 앞으로 쓸어낸다).
+## 보스 패턴(docs/boss_patterns.md): 내려찍기는 크게 젖혔다가 숙이고, 칼비는 칼을 하늘로 세우고, 땅 가르기는 낮게 숙여 칼을 뒤로 끌고,
+## 그림자 걸음은 땅으로 꺼졌다가(_sink) 나온 자리에서 솟는다.
 func _rust_pose(delta: float) -> void:
 	var want: float = 0.0
 	var arm := Vector3(-2.2, 0.0, 0.0)
+	var k: float = clampf(enemy.act_t / maxf(enemy.act_time, 0.01), 0.0, 1.0)
+	var sink: float = 0.0
 	match enemy.act:
+		&"slam_wind":
+			want = rust_lean * 1.4 * k
+			arm = Vector3(lerpf(-2.2, 1.0, k), 0.0, 0.0)
+		&"slam":
+			want = -rust_lean * 1.3
+			arm = Vector3(-2.7, 0.0, 0.0)
+		&"rain_wind":
+			want = rust_lean * 0.9 * k
+			arm = Vector3(lerpf(-2.2, 1.35, k), lerpf(0.0, 0.2, k), 0.0)
+		&"rain":
+			want = rust_lean * 0.5
+			arm = Vector3(1.2, 0.0, 0.0)
+		&"cleave_wind":
+			want = -rust_lean * 0.7 * k
+			arm = Vector3(lerpf(-2.2, -3.0, k), lerpf(0.0, -1.1, k), 0.0)
+		&"cleave":
+			want = -rust_lean * 1.0
+			arm = Vector3(-1.2, 1.3, 0.0)
+		&"blink_wind":
+			sink = k
 		&"swing_wind":
-			var k: float = clampf(enemy.act_t / maxf(enemy.act_time, 0.01), 0.0, 1.0)
 			want = rust_lean * k
 			arm = Vector3(lerpf(-2.2, 0.7, k), lerpf(0.0, 1.3, k), 0.0)
 		&"swing":
@@ -846,6 +871,8 @@ func _rust_pose(delta: float) -> void:
 			want = rust_lean * 0.3
 	_lean = lerpf(_lean, want, 1.0 - exp(-12.0 * delta))
 	_body.rotation.x += _lean
+	_sink = lerpf(_sink, sink, 1.0 - exp(-(16.0 if sink > _sink else 9.0) * delta))
+	_body.position.y = -_height * 1.1 * _sink
 	if _arm_pivot:
 		_arm_pivot.rotation = _arm_pivot.rotation.lerp(arm, 1.0 - exp(-16.0 * delta))
 

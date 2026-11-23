@@ -134,6 +134,7 @@ func _ready() -> void:
 	_enemy_fx.exploded.connect(func(_at: Vector3, k: float) -> void:
 		_camera.add_shake(0.35 * k)
 		_camera.kick(6.0 * k))
+	_enemy_fx.quaked.connect(func(_at: Vector3, k: float) -> void: _camera.add_shake(0.4 * k))   # 보스 패턴의 땅 울림
 	add_child(_night_fx)
 	_night_fx.setup(rules)
 	add_child(_efx)

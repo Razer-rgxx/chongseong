@@ -6,6 +6,12 @@ extends Node3D
 ##   돌격병   발굽 긁는 먼지, 돌진할 길(땅의 검붉은 띠가 머리 낮추는 동안 찬다), 달리는 먼지 꼬리와 땅 금, 멈춤 먼지, 비틀거림 티끌
 ##   자폭병   위험 원(심지가 타는 동안 찬다), 배의 틈에서 튀는 불똥과 쉬익 소리, 폭발(불덩이, 충격파, 파편, 그을음, 짧은 빛, 낮은 울림)
 ##   부르는 자 둘레의 재와 불씨 고리(점점 짙어진다), 부를 자리마다 땅이 갈라지고 검은 안개, 지팡이 끝의 충격 고리
+##   보스 패턴(2026-11-23, docs/boss_patterns.md)
+##            연속 베기는 휘두르기 부채꼴을 다시 쓴다. 내려찍기: 둘레 위험 원과 충격파가 갈 끝 고리(옅게), 내려치면 큰 먼지·금·짧은 빛,
+##            충격파는 땅을 쓸며 퍼지는 검붉은 띠 고리와 먼지 고리. 칼비: 떨어질 자리마다 위험 원이 차고 하늘에서 칼이 꽂혀 남았다가 가라앉는다.
+##            무덤 손: 자리마다 위험 원, 땅이 갈라져 찬빛이 새고 검은 뼈 가시가 솟는다. 땅 가르기: 앞길 띠가 차고, 참격파는 앞에서 흙이 튀고
+##            지나간 땅에 빛나는 금. 그림자 걸음: 발밑이 갈라지며 검은 안개, 나올 자리에 위험 원과 안개, 솟을 때 흙과 안개가 터진다.
+##            땅이 울리면 quaked 신호(장면이 카메라를 흔든다).
 ## 어두운 사실풍: 땅·쇠·불·먼지에서 나오는 것만. 글자, 문양, 별 모양, 형광빛은 쓰지 않는다.
 ## 꾸밈용 랜덤은 이 노드의 것(_rng)이다. Rules.rng는 건드리지 않는다.
 ##
@@ -38,6 +44,8 @@ extends Node3D
 
 ## 폭발했다. pos_world = 세계 자리, strength = 반지름 / 2.2칸(0.4~2).
 signal exploded(pos_world: Vector3, strength: float)
+## 보스 패턴으로 땅이 울렸다(내려찍기, 칼비가 꽂힘, 그림자 걸음으로 솟음). strength 0.3~1.2. 카메라 흔들림은 장면이 한다.
+signal quaked(pos_world: Vector3, strength: float)
 
 const SIGNALS: Dictionary = {
 	&"enemy_act": "on_act",
@@ -74,7 +82,8 @@ const CHAR := Color(0.07, 0.058, 0.05)
 ## 부르는 자리의 갈라진 틈에서 새는 흐린 찬빛(등불과 같은 결, 훨씬 어둡게).
 const CRACK_COLD := Color(0.4, 0.52, 0.46)
 
-## 땅 판 셰이더. 모양(mode): 0 위험 띠(돌진 길), 1 위험 원(심지), 2 겨눈 줄, 3 충격 고리(먼지), 4 그을음, 5 재·불씨 고리, 6 위험 부채꼴(무덤 기사의 휘두르기, 판의 -Z가 앞, arc는 반각).
+## 땅 판 셰이더. 모양(mode): 0 위험 띠(돌진 길), 1 위험 원(심지), 2 겨눈 줄, 3 충격 고리(먼지), 4 그을음, 5 재·불씨 고리, 6 위험 부채꼴(무덤 기사의 휘두르기, 판의 -Z가 앞, arc는 반각),
+## 7 위험 고리(보스의 충격파: 반지름 fill의 빛나는 띠, 폭 ew, 안쪽으로 옅은 꼬리).
 ## 1 × 1 PlaneMesh를 노드 크기로 늘린다. 섞어 그리고 땅처럼 빛을 받는다(낮에는 밝고 밤에는 어둡다).
 ## 빛나는 곳(위험 표시의 검붉은 빛, 불씨)만 EMISSION으로 스스로 빛나서 밤에도 보인다(emit = 그 세기).
 ## fill: 띠·원은 찬 정도(0~1), 겨눈 줄은 짙기, 충격 고리는 퍼진 정도, 재 고리는 세기. ew·hw: 테·머리 폭(판 크기에 대한 비율).
@@ -155,6 +164,11 @@ void fragment() {
 		} else if (mode == 3) {
 			float band = smoothstep(fill - 0.2, fill, r) * (1.0 - smoothstep(fill, fill + 0.04, r));
 			a = band * pow(clamp(1.0 - fill, 0.0, 1.0), 1.2) * 0.6 * (0.55 + 0.45 * n2) * smoothstep(0.1, 0.2, fill);
+		} else if (mode == 7) {
+			float band = exp(-pow((r - fill) / max(ew, 0.002), 2.0));
+			float trail = (1.0 - smoothstep(0.0, ew * 6.0, fill - r)) * step(r, fill) * 0.25;
+			a = (band * 0.85 + trail) * (0.6 + 0.4 * n2);
+			heat = band;
 		} else if (mode == 4) {
 			float rr = r + (n - 0.5) * 0.42 + (n2 - 0.5) * 0.12;
 			a = (1.0 - smoothstep(0.45, 0.95, rr)) * (0.7 + 0.3 * n2) * 0.85;
@@ -231,7 +245,23 @@ const SOUNDS: Dictionary = {
 	&"enemy_fuse": {"dur": 1.0, "noise": 0.35, "lp": 7200.0, "hp": 2600.0, "swell": true, "crackle": 0.02, "attack": 0.04, "level": 0.45},
 	&"enemy_boom": {"dur": 1.3, "f0": 64.0, "f1": 26.0, "tone": 0.8, "tdecay": 3.0, "noise": 0.85, "lp": 520.0, "ndecay": 3.4, "attack": 0.003, "clicks": [0.0], "level": 0.95},
 	&"enemy_call": {"dur": 0.9, "f0": 72.0, "f1": 32.0, "tone": 0.6, "tdecay": 5.0, "noise": 0.5, "lp": 420.0, "ndecay": 4.0, "crackle": 0.004, "level": 0.8},
+	&"enemy_slam": {"dur": 1.1, "f0": 56.0, "f1": 22.0, "tone": 0.9, "tdecay": 3.6, "noise": 0.85, "lp": 560.0, "ndecay": 4.2, "attack": 0.003, "clicks": [0.0, 0.02], "level": 0.95},
+	&"enemy_quake": {"dur": 1.2, "f0": 44.0, "f1": 26.0, "tone": 0.35, "tdecay": 2.2, "noise": 0.6, "lp": 260.0, "hp": 30.0, "ndecay": 2.0, "attack": 0.04, "crackle": 0.004, "level": 0.6},
+	&"enemy_sword_fall": {"dur": 0.34, "f0": 150.0, "f1": 62.0, "tone": 0.5, "tdecay": 14.0, "partials": [[430.0, 0.16, 28.0], [930.0, 0.07, 44.0]], "noise": 0.5, "lp": 2600.0, "ndecay": 20.0, "clicks": [0.0], "level": 0.8},
+	&"enemy_hand": {"dur": 0.5, "f0": 82.0, "f1": 36.0, "tone": 0.5, "tdecay": 8.0, "noise": 0.6, "lp": 900.0, "ndecay": 7.0, "crackle": 0.02, "clicks": [0.0, 0.03], "level": 0.75},
+	&"enemy_cleave": {"dur": 0.7, "f0": 92.0, "f1": 38.0, "tone": 0.4, "tdecay": 5.0, "noise": 0.7, "lp": 1400.0, "hp": 120.0, "ndecay": 3.6, "crackle": 0.03, "level": 0.8},
+	&"enemy_blink": {"dur": 0.9, "f0": 66.0, "f1": 28.0, "tone": 0.6, "tdecay": 4.0, "noise": 0.5, "lp": 380.0, "ndecay": 3.6, "crackle": 0.006, "level": 0.8},
 }
+## 보스 패턴의 그림(docs/boss_patterns.md): 칼비의 칼 크기와 떨어지는 시간(초), 칼이 꽂혀 남는 시간(초), 가라앉는 시간(초).
+const RAIN_SWORD_SCALE: float = 1.7
+const RAIN_FALL: float = 0.22
+const RAIN_STUCK: float = 2.4
+const RAIN_SINK: float = 0.45
+## 무덤 손의 뼈 가시: 솟는 시간, 서 있는 시간, 가라앉는 시간(초).
+const HAND_UP: float = 0.1
+const HAND_HOLD: float = 0.6
+const HAND_DOWN: float = 0.4
+const BONE := Color(0.3, 0.27, 0.23)
 const RATE: int = 22050
 const Q_ADD: int = 0
 const Q_FIRE: int = 1
@@ -280,6 +310,8 @@ var _streams: Dictionary = {}
 ## 날아가는 화살: Projectile 인스턴스 id → {p, mi, trail, mat, start, age}
 var _arrows: Dictionary = {}
 var _arrow_free: Array[Dictionary] = []
+## 보스 패턴의 날아가는 것(고리, 떨어지는 자리, 참격파): Projectile 인스턴스 id → 효과 job.
+var _proj: Dictionary = {}
 var _serial: int = 0
 var _plane := PlaneMesh.new()
 var _decal_shader := Shader.new()
@@ -374,6 +406,7 @@ func clear() -> void:
 	_jobs.clear()
 	_by_enemy.clear()
 	_call_r.clear()
+	_proj.clear()
 	for key in _arrows.keys():
 		_free_arrow(_arrows[key])
 	_arrows.clear()
@@ -422,6 +455,20 @@ func on_act(e: Enemy, act: StringName, info: Dictionary) -> void:
 			_call_wind(e, info)
 		&"call":
 			_call(e, info)
+		&"slam_wind":
+			_slam_wind(e, info)
+		&"slam":
+			_slam(e, info)
+		&"rain_wind":
+			_rain_wind(e, info)
+		&"cleave_wind":
+			_cleave_wind(e, info)
+		&"cleave":
+			_cleave(e, info)
+		&"blink_wind":
+			_blink_wind(e, info)
+		&"blink":
+			_blink(e, info)
 
 
 ## 화살이 났다(Rules.enemy_projectile_spawned). 활잡이의 걸어 둔 화살은 shoot에서 숨고 이 화살이 그 자리에서 난다.
@@ -429,6 +476,16 @@ func on_projectile_spawned(p: Projectile) -> void:
 	_build()
 	if p == null:
 		return
+	match p.kind:
+		&"ring":
+			_ring_spawned(p)
+			return
+		&"fall":
+			_fall_spawned(p)
+			return
+		&"shock":
+			_shock_spawned(p)
+			return
 	var key: int = p.get_instance_id()
 	if _arrows.has(key):
 		return
@@ -449,6 +506,9 @@ func on_projectile_spawned(p: Projectile) -> void:
 func on_projectile_ended(p: Projectile, hit: bool, cut: bool = false) -> void:
 	_build()
 	if p == null:
+		return
+	if p.kind == &"ring" or p.kind == &"fall" or p.kind == &"shock":
+		_boss_shot_ended(p, hit)
 		return
 	var key: int = p.get_instance_id()
 	if not _arrows.has(key):
@@ -667,6 +727,508 @@ func _swing(e: Enemy, info: Dictionary) -> void:
 		_dust(at + go * R * k, 8, 2.4, 0.5, 1.0, go + Vector3(0.0, 0.3, 0.0))
 	_chips(at + go * R * 0.7, 6, Color(0.2, 0.16, 0.12), 3.0, 0.7, go)
 	_play(&"enemy_skid", at + go * R * 0.6, -2.0, 0.8)
+
+
+# ---------------------------------------------------------------- 보스 패턴(docs/boss_patterns.md)
+
+## 보스의 몸 크기 배수: 먼지·금의 크기를 맞춘다.
+func _bulk(e: Enemy) -> float:
+	return clampf(Grid.cells_to_meters(e.radius if e != null else 0.8) / 1.6, 0.6, 1.6)
+
+
+## 내려찍기 예고: 발밑 위험 원(반지름 radius칸)이 가운데에서 밖으로 차고, 충격파가 갈 끝(range칸)에 옅은 고리. 보스를 따라간다.
+func _slam_wind(e: Enemy, info: Dictionary) -> void:
+	_drop(e, "slam_wind")
+	var T: float = maxf(0.05, float(info.get("time", 1.0)))
+	var R: float = Grid.cells_to_meters(float(info.get("radius", 2.4)))
+	var Q: float = Grid.cells_to_meters(float(info.get("range", 0.0)))
+	var d := _decal(1)
+	_put(d, {"fill": 0.0, "fade": 1.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
+	var o: Dictionary = _decal(7) if Q > R + 0.1 else {}
+	_put(o, {"fill": 0.985, "fade": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.05 / Q, 0.003, 0.05) if Q > 0.0 else 0.01})
+	var at: Vector3 = _ground(_v2(info.get("at", _epos(e))), 0.0)
+	_play(&"enemy_skid", at, -9.0, 0.6)
+	var j := _job(_run_slam_wind, {"e": e, "decal": [d, o], "time": T, "radius": R, "range": Q, "at": _v2(info.get("at", _epos(e))), "out": -1.0})
+	_by_enemy[_key(e, "slam_wind")] = j
+	_run_slam_wind(j, 0.0)
+
+
+func _run_slam_wind(j: Dictionary, _dt: float) -> bool:
+	var e: Enemy = j["e"]
+	var t: float = j["t"]
+	var T: float = j["time"]
+	var c: Vector3 = _ground(_epos(e) if e != null else j["at"], 0.04)
+	var ds: Array = j["decal"]
+	var sizes: Array[float] = [float(j["radius"]), float(j["range"])]
+	for i in 2:
+		var d: Dictionary = ds[i]
+		if not d.is_empty():
+			(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(sizes[i] * 2.0, 1.0, sizes[i] * 2.0)), c + Vector3(0.0, 0.003 * i, 0.0))
+	if float(j["out"]) < 0.0 and (t > T + 0.12 or not _still(e, &"slam_wind")):
+		j["out"] = t
+	var out: float = j["out"]
+	var k: float = clampf(t / T, 0.0, 1.0)
+	if out < 0.0:
+		_put(ds[0], {"fill": pow(k, 0.85), "energy": k, "fade": smoothstep(0.0, 0.08, t)})
+		_put(ds[1], {"fade": 0.5 * smoothstep(0.0, 0.3, t)})
+		return true
+	var o: float = (t - out) / 0.22
+	if o >= 1.0:
+		return false
+	_put(ds[0], {"fill": 1.0, "fade": 1.0 - o, "emit": 0.9 + 1.5 * (1.0 - o)})
+	_put(ds[1], {"fade": 0.5 * (1.0 - o)})
+	return true
+
+
+## 내려찍었다: 둘레로 큰 먼지와 흙, 땅이 크게 갈라져 잠깐 빛나고, 짧은 주황 빛과 낮은 쿵. 땅이 울린다.
+func _slam(e: Enemy, info: Dictionary) -> void:
+	var at: Vector3 = _ground(_v2(info.get("at", _epos(e))), 0.0)
+	var R: float = Grid.cells_to_meters(float(info.get("radius", 2.4)))
+	var g: float = _bulk(e)
+	_dust(at, 24, 3.6, 0.6 * g, 1.3)
+	for i in 6:
+		var a: float = TAU * i / 6.0 + _rng.randf() * 0.4
+		var out := Vector3(cos(a), 0.0, sin(a))
+		_dust(at + out * R * 0.75, 4, 2.6, 0.45 * g, 1.0, out + Vector3(0.0, 0.35, 0.0))
+	_chips(at, 14, Color(0.2, 0.16, 0.12), 5.0, 0.9)
+	_crack(at, R * 0.8, Color(1.0, 0.45, 0.15), 1.3, 2.6)
+	_light(at + Vector3(0.0, 0.8, 0.0), Color(1.0, 0.5, 0.2), 4.0, R * 2.5, 0.3)
+	_play(&"enemy_slam", at, 0.0)
+	quaked.emit(at, 1.0)
+
+
+## 충격파 고리: 반지름이 빠르기대로 커지는 검붉은 띠(mode 7)와 고리를 따라 이는 먼지. 낮은 울림.
+func _ring_spawned(p: Projectile) -> void:
+	var W: float = Grid.cells_to_meters(p.width)
+	var S: float = Grid.cells_to_meters(p.distance) + W
+	var d := _decal(7)
+	_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "emit": 1.0, "ew": clampf(W * 0.3 / S, 0.004, 0.2)})
+	var dust := _emitter(true)
+	if dust != null:
+		dust.amount = 64
+		dust.lifetime = 0.7
+		dust.explosiveness = 0.0
+		dust.randomness = 0.5
+		dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+		dust.emission_ring_axis = Vector3.UP
+		dust.emission_ring_height = 0.1
+		dust.direction = Vector3.UP
+		dust.spread = 35.0
+		dust.initial_velocity_min = 0.6
+		dust.initial_velocity_max = 1.8
+		dust.damping_min = 1.0
+		dust.damping_max = 2.0
+		dust.gravity = Vector3(0.0, 0.2, 0.0)
+		dust.angle_min = -180.0
+		dust.angle_max = 180.0
+		_curve(dust, 0.6, 1.8)
+		_ramp(dust, [Color(DUST, 0.0), Color(DUST, 0.38), Color(DUST.darkened(0.1), 0.0)], [0.0, 0.15, 1.0])
+		dust.mesh = _quad(0.9, Q_LIT)
+		dust.restart()
+	var c: Vector3 = _ground(p.pos, 0.0)
+	_play(&"enemy_quake", c, -3.0)
+	_proj[p.get_instance_id()] = _job(_run_quake, {"p": p, "decal": d, "emit": dust, "center": c, "r0": Grid.cells_to_meters(p.travelled),
+		"rmax": Grid.cells_to_meters(p.distance), "speed": Grid.cells_to_meters(p.speed), "size": S, "out": -1.0})
+
+
+func _run_quake(j: Dictionary, _dt: float) -> bool:
+	var t: float = j["t"]
+	var c: Vector3 = j["center"]
+	var S: float = j["size"]
+	var R: float = minf(float(j["rmax"]), float(j["r0"]) + float(j["speed"]) * t)
+	var d: Dictionary = j["decal"]
+	if not d.is_empty():
+		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(S * 2.0, 1.0, S * 2.0)), Vector3(c.x, _hy(c) + 0.05, c.z))
+	var dust: CPUParticles3D = j["emit"]
+	if dust != null:
+		dust.position = c + Vector3(0.0, 0.1, 0.0)
+		dust.emission_ring_radius = R
+		dust.emission_ring_inner_radius = R * 0.93
+	if float(j["out"]) < 0.0 and R >= float(j["rmax"]) - 0.01:
+		j["out"] = t
+		if dust != null:
+			dust.emitting = false
+	var out: float = j["out"]
+	if out < 0.0:
+		_put(d, {"fill": R / S, "fade": smoothstep(0.0, 0.06, t)})
+		return true
+	var o: float = (t - out) / 0.25
+	_put(d, {"fill": R / S, "fade": 1.0 - o})
+	return o < 1.0
+
+
+## 칼비·무덤 손 예고: 칼비는 칼끝이 하늘을 향하며 번쩍이고 불똥이 튄다. 무덤 손은 발밑이 갈라져 찬빛이 새고 검은 안개가 인다.
+func _rain_wind(e: Enemy, info: Dictionary) -> void:
+	var T: float = maxf(0.05, float(info.get("time", 0.9)))
+	var at2: Vector2 = _v2(info.get("at", _epos(e)))
+	var at: Vector3 = _ground(at2, 0.0)
+	var g: float = _bulk(e)
+	if StringName(info.get("look", &"sword")) == &"hand":
+		_crack(at, 1.6 * g, CRACK_COLD, 0.9, T + 0.5, 0.8)
+		_rise(at2)
+		_play(&"enemy_call", at, -4.0, 0.8)
+		return
+	_job(_run_rain_wind, {"e": e, "time": T, "flash": 0})
+	_play(&"enemy_block", at + Vector3(0.0, 2.0, 0.0), -8.0, 0.7)
+
+
+func _run_rain_wind(j: Dictionary, _dt: float) -> bool:
+	var e: Enemy = j["e"]
+	var t: float = j["t"]
+	var T: float = j["time"]
+	var top: Vector3 = _head(e) + Vector3(0.0, 1.6 * _bulk(e), 0.0)
+	var n: int = j["flash"]
+	if n == 0 and t >= T * 0.35:
+		j["flash"] = 1
+		_glint(top, 0.9, STEEL, 0.7, 0.3)
+		_sparks(top, 10, Vector3.UP, 25.0, 3.0, 6.0, SPARK, 0.5, true)
+	elif n == 1 and t >= T * 0.9:
+		j["flash"] = 2
+		_glint(top, 1.3, STEEL.lerp(SPARK, 0.3), 0.9, 0.35)
+		_light(top, Color(1.0, 0.55, 0.25), 2.5, 6.0, 0.3)
+	return int(j["flash"]) < 2 and t < T + 0.5
+
+
+## 떨어질 자리: 위험 원이 max_time초 동안 가운데에서 밖으로 찬다. 칼비는 마지막 RAIN_FALL초에 하늘에서 칼이 떨어진다.
+func _fall_spawned(p: Projectile) -> void:
+	var T: float = maxf(0.05, p.max_time)
+	var R: float = Grid.cells_to_meters(p.width * 0.5)
+	var d := _decal(1)
+	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.07 / R, 0.01, 0.2), "hw": clampf(0.18 / R, 0.01, 0.2)})
+	var c: Vector3 = _ground(p.pos, 0.0)
+	if not d.is_empty():
+		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(R * 2.0, 1.0, R * 2.0)), c + Vector3(0.0, 0.04 + 0.002 * (p.id % 5), 0.0))
+	var sword: Node3D = null
+	var stuck := Transform3D.IDENTITY
+	if p.look != &"hand":
+		var s := SwordModel.make(null, 0, 7000 + p.id % 97, Color.WHITE)
+		_layer.add_child(s)
+		var axis := Vector3(_rng.randf_range(-1.0, 1.0), 0.0, _rng.randf_range(-1.0, 1.0))
+		var tilt := Basis(axis.normalized() if axis.length() > 0.01 else Vector3.RIGHT, _rng.randf_range(0.05, 0.22))
+		var b: Basis = (tilt * Basis(Vector3.UP, _rng.randf() * TAU) * Basis(Vector3.RIGHT, PI)).scaled(Vector3.ONE * RAIN_SWORD_SCALE)
+		stuck = Transform3D(b, c + tilt * Vector3(0.0, (s.blade_length - 0.38) * RAIN_SWORD_SCALE, 0.0))
+		s.transform = Transform3D(b, stuck.origin + Vector3(0.0, 14.0, 0.0))
+		s.visible = false
+		sword = s
+	_proj[p.get_instance_id()] = _job(_run_fall, {"decal": d, "node": sword, "stuck": stuck, "time": T, "at": c, "radius": R, "land": -1.0})
+
+
+func _run_fall(j: Dictionary, _dt: float) -> bool:
+	var t: float = j["t"]
+	var T: float = j["time"]
+	var d: Dictionary = j["decal"]
+	var sword: Node3D = j["node"]
+	if float(j["land"]) < 0.0 and t >= T + 0.15:
+		_land(j)
+	var land: float = j["land"]
+	if land < 0.0:
+		var k: float = clampf(t / T, 0.0, 1.0)
+		_put(d, {"fill": pow(k, 0.9), "energy": k, "fade": smoothstep(0.0, 0.1, t)})
+		if sword != null and t >= T - RAIN_FALL:
+			var f: float = clampf((t - (T - RAIN_FALL)) / RAIN_FALL, 0.0, 1.0)
+			var xf: Transform3D = j["stuck"]
+			sword.visible = true
+			sword.transform = Transform3D(xf.basis, xf.origin + Vector3(0.0, 14.0 * (1.0 - f * f), 0.0))
+		return true
+	var since: float = t - land
+	var o: float = since / 0.3
+	_put(d, {"fill": 1.0, "fade": maxf(0.0, 1.0 - o), "emit": 0.9 + 2.0 * maxf(0.0, 1.0 - o)})
+	if sword == null:
+		return o < 1.0
+	if since > RAIN_STUCK:
+		var s: float = (since - RAIN_STUCK) / RAIN_SINK
+		if s >= 1.0:
+			return false
+		var xf2: Transform3D = j["stuck"]
+		sword.transform = Transform3D(xf2.basis, xf2.origin - Vector3(0.0, 1.6 * s * s, 0.0))
+	return true
+
+
+## 떨어졌다(규칙이 끝냈거나 시간이 지났다): 칼은 꽂히며 흙과 불똥, 무덤 손은 땅이 갈라지며 뼈 가시가 솟는다.
+func _land(j: Dictionary) -> void:
+	if float(j["land"]) >= 0.0:
+		return
+	j["land"] = float(j["t"])
+	var at: Vector3 = j["at"]
+	var R: float = j["radius"]
+	var sword: Node3D = j["node"]
+	if sword != null:
+		sword.visible = true
+		sword.transform = j["stuck"]
+		_dust(at, 12, 2.6, 0.4, 0.9)
+		_chips(at, 8, Color(0.2, 0.16, 0.12), 3.6, 0.7)
+		_sparks(at + Vector3(0.0, 0.1, 0.0), 8, Vector3.UP, 70.0, 2.0, 4.5, SPARK, 0.35, true)
+		_crack(at, R * 0.7, Color(1.0, 0.45, 0.15), 0.8, 1.4, 0.7)
+		_play(&"enemy_sword_fall", at, -3.0, _rng.randf_range(0.9, 1.1))
+		quaked.emit(at, 0.3)
+		return
+	_crack(at, R * 0.8, CRACK_COLD, 1.0, 1.6, 0.8)
+	_chips(at, 7, Color(0.16, 0.13, 0.1), 3.0, 0.7)
+	_dust(at, 8, 2.0, 0.35, 0.8)
+	_spikes(at, R)
+	var mist := _emitter()
+	if mist != null:
+		mist.amount = 10
+		mist.lifetime = 1.4
+		mist.explosiveness = 0.7
+		mist.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		mist.emission_sphere_radius = R * 0.5
+		mist.direction = Vector3.UP
+		mist.spread = 15.0
+		mist.initial_velocity_min = 0.6
+		mist.initial_velocity_max = 1.6
+		mist.gravity = Vector3(0.0, 0.3, 0.0)
+		mist.angle_min = -180.0
+		mist.angle_max = 180.0
+		_curve(mist, 0.5, 1.8)
+		_ramp(mist, [Color(MIST, 0.0), Color(MIST, 0.5), Color(MIST.lightened(0.05), 0.0)], [0.0, 0.2, 1.0])
+		mist.mesh = _quad(0.7, Q_LIT)
+		_fire(mist, at + Vector3(0.0, 0.15, 0.0))
+	_play(&"enemy_hand", at, -3.0, _rng.randf_range(0.9, 1.1))
+
+
+## 무덤 손: 갈라진 틈에서 검은 뼈 가시 다섯이 바깥으로 비스듬히 솟았다가 가라앉는다.
+func _spikes(at: Vector3, R: float) -> void:
+	if not _cache.has("bone_spike"):
+		var m := CylinderMesh.new()
+		m.top_radius = 0.0
+		m.bottom_radius = 0.075
+		m.height = 1.0
+		m.radial_segments = 5
+		m.rings = 1
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = BONE
+		mat.roughness = 0.85
+		m.material = mat
+		_cache["bone_spike"] = m
+	var root := Node3D.new()
+	root.position = Vector3(at.x, _hy(at), at.z)
+	_layer.add_child(root)
+	var a0: float = _rng.randf() * TAU
+	for i in 5:
+		var a: float = a0 + TAU * i / 5.0 + _rng.randf_range(-0.3, 0.3)
+		var out := Vector3(cos(a), 0.0, sin(a))
+		var mi := MeshInstance3D.new()
+		mi.mesh = _cache["bone_spike"]
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var h: float = _rng.randf_range(0.7, 1.3) * clampf(R, 0.8, 2.2)
+		var lean := Basis(out.cross(Vector3.UP).normalized(), -_rng.randf_range(0.25, 0.6))
+		mi.transform = Transform3D(lean.scaled(Vector3(1.0, h, 1.0)), out * R * _rng.randf_range(0.15, 0.55) + lean * Vector3(0.0, h * 0.5, 0.0))
+		root.add_child(mi)
+	_job(_run_spikes, {"node": root})
+
+
+func _run_spikes(j: Dictionary, _dt: float) -> bool:
+	var t: float = j["t"]
+	var root: Node3D = j["node"]
+	var k: float = 1.0
+	if t < HAND_UP:
+		k = 1.0 - pow(1.0 - t / HAND_UP, 2.0)
+	elif t > HAND_UP + HAND_HOLD:
+		k = 1.0 - (t - HAND_UP - HAND_HOLD) / HAND_DOWN
+	if k <= 0.0:
+		return false
+	root.scale = Vector3(1.0, maxf(0.01, k), 1.0)
+	return true
+
+
+## 땅 가르기 예고: 앞길이 땅에 검붉은 띠로 보이고 cleave_time 동안 찬다. 칼끝이 땅을 긁는 소리.
+func _cleave_wind(e: Enemy, info: Dictionary) -> void:
+	_drop(e, "cleave_wind")
+	var T: float = maxf(0.05, float(info.get("time", 0.8)))
+	var dir: Vector2 = _v2(info.get("dir", _face(e)))
+	var rr: float = e.radius if e != null else 0.8
+	var width: float = Grid.cells_to_meters(float(info.get("width", 1.0)))
+	var L: float = Grid.cells_to_meters(float(info.get("length", 9.0)))
+	var d := _decal(0)
+	_put(d, {"fill": 0.0, "fade": 1.0, "color": RED, "hot": RED_HOT, "ew": clampf(0.07 / (width * 0.5), 0.02, 0.3), "hw": clampf(0.2 / maxf(L, 0.5), 0.004, 0.1)})
+	var from: Vector2 = _v2(info.get("from", _epos(e)))
+	_play(&"enemy_skid", _ground(from, 0.0), -8.0, 0.75)
+	var j := _job(_run_cleave_wind, {"e": e, "decal": d, "time": T, "dir": dir, "from": from,
+		"start": Grid.cells_to_meters(rr * 0.5), "length": maxf(0.5, L - Grid.cells_to_meters(rr * 0.5)), "width": width, "out": -1.0})
+	_by_enemy[_key(e, "cleave_wind")] = j
+	_run_cleave_wind(j, 0.0)
+
+
+func _run_cleave_wind(j: Dictionary, _dt: float) -> bool:
+	var e: Enemy = j["e"]
+	var T: float = j["time"]
+	var t: float = j["t"]
+	var d: Dictionary = j["decal"]
+	_lane(d, j["from"], j["dir"], float(j["start"]), float(j["length"]), float(j["width"]), 0.03)
+	if float(j["out"]) < 0.0 and (t > T + 0.12 or not _still(e, &"cleave_wind")):
+		j["out"] = t
+	var out: float = j["out"]
+	if out < 0.0:
+		_put(d, {"fill": 1.0 - pow(1.0 - clampf(t / T, 0.0, 1.0), 1.6), "fade": 1.0})
+		return true
+	var o: float = (t - out) / 0.5
+	_put(d, {"fill": 1.0, "fade": 1.0 - o})
+	return o < 1.0
+
+
+## 갈랐다: 칼이 닿은 자리에 흙과 불똥. 참격파는 on_projectile_spawned가 그린다.
+func _cleave(e: Enemy, info: Dictionary) -> void:
+	var dir: Vector3 = _dir3(_v2(info.get("dir", _face(e))))
+	var at: Vector3 = _ground(_v2(info.get("at", _epos(e))), 0.0) + dir * Grid.cells_to_meters(e.radius if e != null else 0.8)
+	_dust(at, 10, 3.0, 0.45, 0.9, dir + Vector3(0.0, 0.3, 0.0))
+	_sparks(at + Vector3(0.0, 0.2, 0.0), 12, dir + Vector3(0.0, 0.5, 0.0), 40.0, 3.0, 7.0, SPARK, 0.4)
+	_play(&"enemy_cleave", at, -1.0)
+
+
+## 참격파: 앞에서 흙이 튀고 먼지가 이는 땅의 찢김. 지나간 땅에 잠깐 빛나는 금이 1.3m마다 남는다.
+func _shock_spawned(p: Projectile) -> void:
+	var dust := _emitter(true)
+	if dust != null:
+		dust.amount = 40
+		dust.lifetime = 0.8
+		dust.explosiveness = 0.0
+		dust.randomness = 0.5
+		dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		dust.emission_sphere_radius = Grid.cells_to_meters(p.width) * 0.35
+		dust.direction = Vector3.UP
+		dust.spread = 40.0
+		dust.initial_velocity_min = 1.0
+		dust.initial_velocity_max = 2.6
+		dust.damping_min = 1.5
+		dust.damping_max = 2.5
+		dust.gravity = Vector3(0.0, -1.0, 0.0)
+		dust.angle_min = -180.0
+		dust.angle_max = 180.0
+		_curve(dust, 0.6, 1.6)
+		_ramp(dust, [Color(DUST, 0.0), Color(DUST, 0.45), Color(DUST.darkened(0.1), 0.0)], [0.0, 0.12, 1.0])
+		dust.mesh = _quad(0.8, Q_LIT)
+		dust.restart()
+	var chips := _emitter(true)
+	if chips != null:
+		chips.amount = 24
+		chips.lifetime = 0.6
+		chips.explosiveness = 0.0
+		chips.randomness = 0.5
+		chips.direction = Vector3.UP
+		chips.spread = 35.0
+		chips.initial_velocity_min = 2.0
+		chips.initial_velocity_max = 4.5
+		chips.gravity = Vector3(0.0, -12.0, 0.0)
+		chips.angular_velocity_min = -480.0
+		chips.angular_velocity_max = 480.0
+		chips.color = Color(0.2, 0.16, 0.12)
+		chips.mesh = _chip_mesh
+		chips.restart()
+	var at: Vector3 = _ground(p.pos, 0.0)
+	_proj[p.get_instance_id()] = _job(_run_shock, {"p": p, "emit": [dust, chips], "last": at, "width": Grid.cells_to_meters(p.width), "done": false, "cracks": 0})
+
+
+func _run_shock(j: Dictionary, _dt: float) -> bool:
+	var p: Projectile = j["p"]
+	var at: Vector3 = _ground(p.prev_pos.lerp(p.pos, _alpha), 0.0)
+	for x: Variant in j["emit"]:
+		if x is CPUParticles3D:
+			(x as CPUParticles3D).position = at + Vector3(0.0, 0.1, 0.0)
+	var last: Vector3 = j["last"]
+	if at.distance_to(last) >= 1.3 and int(j["cracks"]) < 14:
+		j["last"] = at
+		j["cracks"] = int(j["cracks"]) + 1
+		_crack(at, float(j["width"]) * 0.45, Color(1.0, 0.42, 0.14), 1.1, 1.2, 0.8, _dir3(p.dir))
+	if bool(j["done"]):
+		return false
+	return float(j["t"]) < p.max_time + 0.5
+
+
+## 고리·떨어지는 자리·참격파가 끝났다.
+func _boss_shot_ended(p: Projectile, hit: bool) -> void:
+	var key: int = p.get_instance_id()
+	var j: Dictionary = _proj.get(key, {})
+	_proj.erase(key)
+	match p.kind:
+		&"fall":
+			if not j.is_empty():
+				_land(j)
+		&"shock":
+			if not j.is_empty():
+				j["done"] = true
+			var at: Vector3 = _ground(p.pos, 0.0)
+			_dust(at, 10, 2.4, 0.45, 0.9, _dir3(p.dir) + Vector3(0.0, 0.3, 0.0))
+			_chips(at, 6, Color(0.2, 0.16, 0.12), 3.0, 0.6, _dir3(p.dir))
+	if hit and rules != null:
+		var lp: Vector3 = _ground(rules.lord.pos, 0.0)
+		_dust(lp, 8, 2.2, 0.4, 0.8)
+		_sparks(lp + Vector3(0.0, 1.0, 0.0), 8, Vector3.UP, 70.0, 2.0, 4.0, SPARK, 0.3, true)
+
+
+## 그림자 걸음 예고: 보스 발밑이 갈라져 찬빛이 새고 검은 안개가 감싼다(몸이 꺼지는 것은 EnemyView). 나올 자리(to)에 위험 원이 차고 안개가 샌다.
+func _blink_wind(e: Enemy, info: Dictionary) -> void:
+	_drop(e, "blink_wind")
+	var T: float = maxf(0.05, float(info.get("time", 0.8)))
+	var from: Vector2 = _v2(info.get("from", _epos(e)))
+	var to: Vector2 = _v2(info.get("to", from))
+	var R: float = Grid.cells_to_meters(e.radius if e != null else 0.8) * 1.4
+	var g: float = _bulk(e)
+	var d := _decal(1)
+	_put(d, {"fill": 0.0, "fade": 0.0, "energy": 0.0, "color": RED, "hot": RED_HOT, "emit": 0.9, "ew": clampf(0.08 / R, 0.01, 0.2), "hw": clampf(0.2 / R, 0.01, 0.2)})
+	var dest: Vector3 = _ground(to, 0.0)
+	if not d.is_empty():
+		(d["mi"] as MeshInstance3D).transform = Transform3D(Basis.from_scale(Vector3(R * 2.0, 1.0, R * 2.0)), dest + Vector3(0.0, 0.045, 0.0))
+	_crack(_ground(from, 0.0), 1.5 * g, CRACK_COLD, 0.9, T + 0.4, 0.8)
+	_crack(dest, R * 0.8, CRACK_COLD, 0.6, T + 0.6, 0.6)
+	var mists: Array = []
+	for at: Vector3 in [_ground(from, 0.0), dest]:
+		var m := _emitter(true)
+		if m != null:
+			m.amount = 22
+			m.lifetime = 1.2
+			m.explosiveness = 0.0
+			m.randomness = 0.5
+			m.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+			m.emission_sphere_radius = R * 0.6
+			m.direction = Vector3.UP
+			m.spread = 20.0
+			m.initial_velocity_min = 0.4
+			m.initial_velocity_max = 1.4
+			m.gravity = Vector3(0.0, 0.25, 0.0)
+			m.angle_min = -180.0
+			m.angle_max = 180.0
+			_curve(m, 0.5, 1.8)
+			_ramp(m, [Color(MIST, 0.0), Color(MIST, 0.55), Color(MIST.lightened(0.05), 0.0)], [0.0, 0.2, 1.0])
+			m.mesh = _quad(1.0 * g, Q_LIT)
+			m.position = at + Vector3(0.0, 0.2, 0.0)
+			m.restart()
+		mists.append(m)
+	_play(&"enemy_blink", _ground(from, 0.0), -2.0)
+	_by_enemy[_key(e, "blink_wind")] = _job(_run_blink_wind, {"e": e, "decal": d, "emit": mists, "time": T, "out": -1.0})
+
+
+func _run_blink_wind(j: Dictionary, _dt: float) -> bool:
+	var e: Enemy = j["e"]
+	var T: float = j["time"]
+	var t: float = j["t"]
+	var d: Dictionary = j["decal"]
+	if float(j["out"]) < 0.0 and (t > T + 0.12 or not _still(e, &"blink_wind")):
+		j["out"] = t
+		for x: Variant in j["emit"]:
+			if x is CPUParticles3D:
+				(x as CPUParticles3D).emitting = false
+	var out: float = j["out"]
+	if out < 0.0:
+		var k: float = clampf(t / T, 0.0, 1.0)
+		_put(d, {"fill": pow(k, 0.85), "energy": k, "fade": smoothstep(0.0, 0.1, t)})
+		return true
+	var o: float = (t - out) / 0.25
+	_put(d, {"fill": 1.0, "fade": 1.0 - o})
+	return o < 1.0
+
+
+## 솟았다: 나온 자리에서 흙과 돌조각이 터지고 땅이 갈라지며 검은 안개가 오른다. 떠난 자리에는 안개만 흩어진다.
+func _blink(e: Enemy, info: Dictionary) -> void:
+	var at2: Vector2 = _v2(info.get("at", _epos(e)))
+	var at: Vector3 = _ground(at2, 0.0)
+	var g: float = _bulk(e)
+	_dust(at, 18, 3.2, 0.55 * g, 1.1)
+	_chips(at, 10, Color(0.16, 0.13, 0.1), 4.5, 0.8)
+	_rise(at2)
+	_dust(_ground(_v2(info.get("from", at2)), 0.0), 8, 1.4, 0.5 * g, 1.2)
+	_play(&"enemy_hand", at, -1.0, 0.8)
+	quaked.emit(at, 0.5)
 
 
 # ---------------------------------------------------------------- 돌격병

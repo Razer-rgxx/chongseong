@@ -13,15 +13,25 @@ extends RefCounted
 ##   무덤 기사 (18단계, 들판 보스) 표를 쓰지 않는다. 쿨다운이 끝나면 가까우면 크게 휘두르기(swing_wind: 앞 swing_arc° 부채꼴, swing_time초 예고),
 ##            charge_min~charge_max칸이면 charge_chance 확률로 돌진 베기(돌격병과 같은 wind → charge), 아니면 다가간다. 체력이 summon_below 밑이면 망령을 한 번 부른다(summon_again이 있으면 그 밑에서 한 번 더, 31단계 무덤 주인).
 ##            체력이 rage_hp 밑이면 빠르기·예고·돌진·쉬는 시간이 rage_mult배 빨라진다(_rate).
+##   보스 패턴(2026-11-23, docs/boss_patterns.md) 언덕지기·무덤 기사·무덤 주인이 기사형 행동에 더 얹는다(EnemyData의 "보스 패턴" 칸, 0이면 없다):
+##            연속 베기(swing → 다시 겨눠 swing_wind), 내려찍기(slam_wind → slam, 충격파 고리), 칼비·무덤 손(rain_wind → rain, 떨어지는 자리),
+##            땅 가르기(cleave_wind → cleave, 참격파), 그림자 걸음(blink_wind → blink: 영주 너머에서 솟아 곧바로 휘두르기).
+##            고리·떨어지는 자리·참격파는 Rules.enemy_projectiles(kind ring, fall, shock)이고 화살과 달리 칼로 부러지지 않는다.
 ## 기절하면 겨눔·머리 낮춤·불러내기가 끊기고 돌진은 멈춘다(비틀거림). 심지와 방패 깨짐, 비틀거림은 기절해도 이어진다.
 ## 랜덤은 Rules.rng만 쓴다(부를 자리의 첫 각). 화면에는 Rules.enemy_act·enemy_projectile_spawned·enemy_projectile_ended로 알린다.
 
 ## 기절하면 끊기는 일.
-const BREAKABLE: Array[StringName] = [&"aim", &"wind", &"call_wind", &"swing_wind"]
+const BREAKABLE: Array[StringName] = [&"aim", &"wind", &"call_wind", &"swing_wind", &"slam_wind", &"rain_wind", &"cleave_wind", &"blink_wind"]
+## 보스의 예고(끊기면 쉬고 연속 베기도 그친다).
+const BOSS_WINDS: Array[StringName] = [&"swing_wind", &"slam_wind", &"rain_wind", &"cleave_wind", &"blink_wind"]
+## 기사형 행동을 쓰는 적(acts()).
+const KNIGHTS: Array[StringName] = [&"grave_knight", &"crypt_lord", &"boss"]
 ## 이 일 동안은 몸을 돌리지 않는다(정한 쪽을 본다).
-const LOCK_FACE: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge", &"charge_end", &"guard_break", &"swing_wind", &"swing"]
+const LOCK_FACE: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge", &"charge_end", &"guard_break", &"swing_wind", &"swing",
+	&"slam_wind", &"slam", &"rain_wind", &"cleave_wind", &"cleave", &"blink_wind"]
 ## 이 일 동안은 걷지 않는다(돌진은 따로 달린다). block은 막은 채 걷는다.
-const HOLD: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge_end", &"guard_break", &"fuse", &"explode", &"call_wind", &"call", &"swing_wind", &"swing"]
+const HOLD: Array[StringName] = [&"aim", &"shoot", &"wind", &"charge_end", &"guard_break", &"fuse", &"explode", &"call_wind", &"call", &"swing_wind", &"swing",
+	&"slam_wind", &"slam", &"rain_wind", &"rain", &"cleave_wind", &"cleave", &"blink_wind"]
 
 var r: Rules
 
@@ -66,7 +76,7 @@ func detour(e: Enemy, _k: float, dt: float) -> bool:
 	match e.data.acts():
 		&"caller":
 			return _try_call(e)
-		&"grave_knight", &"crypt_lord":
+		&"grave_knight", &"crypt_lord", &"boss":
 			return _try_knight_call(e)
 	return false
 
@@ -89,8 +99,9 @@ func tick(e: Enemy, k: float, dt: float) -> void:
 		if BREAKABLE.has(e.act):
 			if e.act == &"call_wind":
 				e.cooldown = e.data.summon_interval
-			elif e.act == &"swing_wind":
+			elif BOSS_WINDS.has(e.act):
 				e.cooldown = _cd(e)
+				e.combo_left = 0
 			e.act = &""
 			return
 		if e.act == &"charge":
@@ -112,6 +123,19 @@ func tick(e: Enemy, k: float, dt: float) -> void:
 			_call(e)
 		&"swing_wind":
 			_swing(e)
+		&"swing":
+			if e.combo_left > 0:
+				_next_swing(e)
+			else:
+				e.act = &""
+		&"slam_wind":
+			_slam(e)
+		&"rain_wind":
+			_rain(e)
+		&"cleave_wind":
+			_cleave(e)
+		&"blink_wind":
+			_blink(e)
 		_:
 			e.act = &""
 
@@ -154,7 +178,7 @@ func step(e: Enemy, foe: Enemy, to: Vector2, d: float, k: float, dt: float) -> b
 		&"caller":
 			_caller(e, to, d, k, dt)
 			return true
-		&"grave_knight", &"crypt_lord":
+		&"grave_knight", &"crypt_lord", &"boss":
 			_knight(e, to, d, k, dt)
 			return true
 	return false
@@ -254,13 +278,19 @@ func _shoot(e: Enemy) -> void:
 	r.enemy_projectile_spawned.emit(p)
 
 
-## 화살을 옮기고 영주에게 닿았는지 본다. Rules가 적이 다 움직인 뒤 부른다.
+## 화살(과 보스의 참격파·고리·떨어지는 자리)을 옮기고 영주에게 닿았는지 본다. Rules가 적이 다 움직인 뒤 부른다.
 func step_arrows(dt: float) -> void:
 	var L := r.lord
 	for p in r.enemy_projectiles.duplicate():
 		if not r.enemy_projectiles.has(p):
 			continue
 		p.age += dt
+		if p.kind == &"fall":
+			_step_fall(p)
+			continue
+		if p.kind == &"ring":
+			_step_ring(p, dt)
+			continue
 		var from: Vector2 = p.pos
 		var s: float = p.speed * dt
 		p.pos += p.dir * s
@@ -274,9 +304,9 @@ func step_arrows(dt: float) -> void:
 			_end_arrow(p, false)
 
 
-## 영주의 좌클릭에 부러졌다.
+## 영주의 좌클릭에 부러졌다. 화살만 부러진다(보스의 참격파·고리·떨어지는 자리는 그대로).
 func cut_arrow(p: Projectile) -> void:
-	if not r.enemy_projectiles.has(p):
+	if not r.enemy_projectiles.has(p) or p.kind != &"arrow":
 		return
 	p.cut = true
 	_end_arrow(p, false)
@@ -517,11 +547,29 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 		return
 	if e.cooldown <= 0.0:
 		if d <= D.swing_range:
-			e.act_dir = to / d
-			e.face = e.act_dir
-			_begin(e, &"swing_wind", D.swing_time)
-			r.enemy_act.emit(e, &"swing_wind", {"at": e.pos, "dir": e.act_dir, "arc": D.swing_arc, "range": D.swing_range, "time": D.swing_time / rate})
+			if D.slam_chance > 0.0 and r.rng.randf() < D.slam_chance:
+				_start_slam(e)
+				return
+			e.combo_left = _combo(e)
+			_start_swing(e, to / d, D.swing_time)
 			return
+		# 멀면: 그림자 걸음 → 칼비·무덤 손 → 땅 가르기 → 돌진 차례로 고른다(안 고르면 charge_retry초 다가가다 다시)
+		var tried: bool = false
+		if D.blink_chance > 0.0 and d >= D.blink_min:
+			tried = true
+			if r.rng.randf() < D.blink_chance:
+				_start_blink(e, to / d)
+				return
+		if D.rain_count > 0 and d >= D.rain_min:
+			tried = true
+			if r.rng.randf() < D.rain_chance:
+				_start_rain(e)
+				return
+		if D.cleave_chance > 0.0 and d <= D.cleave_range:
+			tried = true
+			if r.rng.randf() < D.cleave_chance:
+				_start_cleave(e, to / d)
+				return
 		if d >= D.charge_min and d <= D.charge_max:
 			if r.rng.randf() < D.charge_chance:
 				e.act_dir = to / d
@@ -532,7 +580,9 @@ func _knight(e: Enemy, to: Vector2, d: float, k: float, dt: float) -> void:
 				_begin(e, &"wind", D.wind_time)
 				r.enemy_act.emit(e, &"wind", {"from": e.pos, "dir": e.act_dir, "length": length, "time": D.wind_time / rate, "width": e.radius * 2.0})
 				return
-			e.cooldown = D.charge_retry   # 이번엔 안 달린다: 조금 더 다가가 다시 고른다
+			tried = true
+		if tried:
+			e.cooldown = D.charge_retry   # 이번엔 아무것도 안 고른다: 조금 더 다가가 다시 고른다
 	if d > D.swing_range * 0.85:
 		e.pos += to / d * D.speed * k * rate * dt
 
@@ -549,7 +599,22 @@ func _try_knight_call(e: Enemy) -> bool:
 	return false
 
 
+## 휘두르기 예고: 앞 swing_arc° 부채꼴을 time초(빨라지면 짧게) 알린다. combo는 이 뒤에 더 벨 횟수.
+func _start_swing(e: Enemy, dir: Vector2, time: float) -> void:
+	var D := e.data
+	e.act_dir = dir
+	e.face = dir
+	_begin(e, &"swing_wind", time)
+	r.enemy_act.emit(e, &"swing_wind", {"at": e.pos, "dir": dir, "arc": D.swing_arc, "range": D.swing_range, "time": time / _rate(e), "combo": e.combo_left})
+
+
+## 이번 연속 베기의 남은 횟수(빨라지면 combo_rage만큼 더).
+func _combo(e: Enemy) -> int:
+	return e.data.combo + (e.data.combo_rage if raged(e) else 0)
+
+
 ## 예고가 끝났다: 앞 swing_arc° 부채꼴 안에 영주가 있으면 벤다(구르는 중이면 지나간다).
+## 연속 베기가 남았으면 combo_gap초 뒤에 다시 겨눈다(_next_swing).
 func _swing(e: Enemy) -> void:
 	var D := e.data
 	var L := r.lord
@@ -557,9 +622,217 @@ func _swing(e: Enemy) -> void:
 	var hit: bool = v.length() <= D.swing_range and absf(angle_difference(e.act_dir.angle(), v.angle())) <= deg_to_rad(D.swing_arc) / 2.0
 	if hit and L.dash <= 0.0 and L.hook <= 0.0:
 		r._hurt_lord(e.damage, e)
-	_begin(e, &"swing", D.act_after)
+	var more: bool = e.combo_left > 0
+	_begin(e, &"swing", D.combo_gap if more else D.act_after)
 	e.cooldown = _cd(e)
-	r.enemy_act.emit(e, &"swing", {"at": e.pos, "dir": e.act_dir, "arc": D.swing_arc, "range": D.swing_range, "hit": hit})
+	r.enemy_act.emit(e, &"swing", {"at": e.pos, "dir": e.act_dir, "arc": D.swing_arc, "range": D.swing_range, "hit": hit, "more": more})
+
+
+## 연속 베기의 다음 한 번: 영주 쪽으로 다시 겨눠 combo_wind초 알린다. 묶여 있으면 그친다.
+func _next_swing(e: Enemy) -> void:
+	e.combo_left -= 1
+	if e.stun > 0.0 or e.frozen:
+		e.combo_left = 0
+		e.act = &""
+		return
+	var v: Vector2 = r.lord.pos - e.pos
+	_start_swing(e, v.normalized() if v.length() > 0.001 else e.act_dir, e.data.combo_wind)
+
+
+# ---------------------------------------------------------------- 보스 패턴(docs/boss_patterns.md)
+
+## 내려찍기 예고: 칼을 높이 들고 둘레 slam_radius칸을 알린다(충격파가 갈 quake_range칸도 같이).
+func _start_slam(e: Enemy) -> void:
+	var D := e.data
+	_begin(e, &"slam_wind", D.slam_time)
+	r.enemy_act.emit(e, &"slam_wind", {"at": e.pos, "radius": D.slam_radius, "range": D.quake_range, "time": D.slam_time / _rate(e)})
+
+
+## 내려찍는다: 둘레 slam_radius칸 안이면 피해 × slam_mult와 slam_knock칸 밀림. 가장자리에서 충격파 고리가 퍼진다. 그 뒤 slam_rest초 숨을 고른다.
+func _slam(e: Enemy) -> void:
+	var D := e.data
+	var L := r.lord
+	var hit: bool = L.pos.distance_to(e.pos) <= D.slam_radius and L.dash <= 0.0 and L.hook <= 0.0
+	if hit:
+		_strike(e, e.damage * D.slam_mult, e.pos, D.slam_knock)
+	if D.quake_range > D.slam_radius:
+		var p := Projectile.new()
+		p.kind = &"ring"
+		p.id = r._new_id()
+		p.pos = e.pos
+		p.prev_pos = e.pos
+		p.dir = e.face
+		p.travelled = D.slam_radius
+		p.distance = D.quake_range
+		p.speed = D.quake_speed
+		p.width = D.quake_width
+		p.max_time = (D.quake_range - D.slam_radius) / maxf(D.quake_speed, 0.1) + 0.5
+		p.owner = e
+		p.damage = e.damage * D.quake_mult
+		r.enemy_projectiles.append(p)
+		r.enemy_projectile_spawned.emit(p)
+	_begin(e, &"slam", D.slam_rest)
+	e.cooldown = _cd(e)
+	r.enemy_act.emit(e, &"slam", {"at": e.pos, "radius": D.slam_radius, "range": D.quake_range, "hit": hit})
+
+
+## 충격파 고리: 반지름이 quake_speed로 커지고, 고리 띠가 영주를 지나가면 한 번 맞힌다(구르는 중이면 지나간다).
+func _step_ring(p: Projectile, dt: float) -> void:
+	var L := r.lord
+	var r0: float = p.travelled
+	p.travelled = minf(p.distance, p.travelled + p.speed * dt)
+	if not p.landed and L.dash <= 0.0 and L.hook <= 0.0:
+		var d: float = L.pos.distance_to(p.pos)
+		if d >= r0 - p.width / 2.0 and d <= p.travelled + p.width / 2.0:
+			p.landed = true
+			r._hurt_lord(p.damage, p.owner)
+	if p.travelled >= p.distance - 0.0001 or p.age >= p.max_time:
+		_end_arrow(p, p.landed)
+
+
+## 칼비·무덤 손 예고: rain_time초 칼(손)을 들어 올린다.
+func _start_rain(e: Enemy) -> void:
+	var D := e.data
+	_begin(e, &"rain_wind", D.rain_time)
+	r.enemy_act.emit(e, &"rain_wind", {"at": e.pos, "time": D.rain_time / _rate(e), "look": D.rain_look})
+
+
+## 떨어질 자리를 정한다. 칼비는 영주 자리 하나와 그 둘레 rain_spread칸 안 아무 곳(Rules.rng), 무덤 손은 보스에서 영주를 지나는 줄.
+## 자리마다 rain_delay + rain_step × 차례초 뒤에 터진다(빨라지면 짧게).
+func _rain(e: Enemy) -> void:
+	var D := e.data
+	var L := r.lord
+	var rate: float = _rate(e)
+	var n: int = D.rain_count + (D.rain_rage if raged(e) else 0)
+	var spots := PackedVector2Array()
+	if D.rain_line:
+		var v: Vector2 = L.pos - e.pos
+		var d: float = v.length()
+		var dir: Vector2 = v / d if d > 0.001 else e.face
+		e.act_dir = dir
+		e.face = dir
+		var start: float = e.radius + D.rain_radius * 0.6
+		var length: float = _lane(e.pos, dir, d + D.rain_spread, 0.0)
+		var gap: float = (length - start) / float(maxi(1, n - 1))
+		for i in n:
+			var s: float = start + gap * i
+			if s > length + 0.001:
+				break
+			spots.append(e.pos + dir * s)
+	else:
+		spots.append(_clamp(L.pos, 1.0))
+		for i in range(1, n):
+			var a: float = r.rng.randf() * TAU
+			var rr: float = D.rain_spread * sqrt(r.rng.randf())
+			var at: Vector2 = _clamp(L.pos + Vector2.from_angle(a) * rr, 1.0)
+			if r.nav != null:
+				at = r.nav.reach(L.pos, at, 0)
+			spots.append(at)
+	for i in spots.size():
+		var p := Projectile.new()
+		p.kind = &"fall"
+		p.look = D.rain_look
+		p.id = r._new_id()
+		p.pos = spots[i]
+		p.prev_pos = spots[i]
+		var to: Vector2 = spots[i] - e.pos
+		p.dir = to.normalized() if to.length() > 0.001 else e.face
+		p.width = D.rain_radius * 2.0
+		p.max_time = (D.rain_delay + D.rain_step * i) / rate
+		p.owner = e
+		p.damage = e.damage * D.rain_mult
+		r.enemy_projectiles.append(p)
+		r.enemy_projectile_spawned.emit(p)
+	_begin(e, &"rain", D.act_after)
+	e.cooldown = _cd(e)
+	r.enemy_act.emit(e, &"rain", {"at": e.pos, "count": spots.size(), "look": D.rain_look})
+
+
+## 떨어지는 자리: 때가 되면 반지름 안의 영주를 맞힌다(구르는 중이면 지나간다).
+func _step_fall(p: Projectile) -> void:
+	if p.age < p.max_time - 0.0001:
+		return
+	var L := r.lord
+	var hit: bool = L.dash <= 0.0 and L.hook <= 0.0 and L.pos.distance_to(p.pos) <= p.width / 2.0
+	if hit:
+		r._hurt_lord(p.damage, p.owner)
+	p.landed = hit
+	_end_arrow(p, hit)
+
+
+## 땅 가르기 예고: 앞길(cleave_range칸, 벽에서 멈춘다)을 cleave_time초 알린다.
+func _start_cleave(e: Enemy, dir: Vector2) -> void:
+	var D := e.data
+	e.act_dir = dir
+	e.face = dir
+	var length: float = _lane(e.pos, dir, D.cleave_range, 0.0)
+	_begin(e, &"cleave_wind", D.cleave_time)
+	r.enemy_act.emit(e, &"cleave_wind", {"from": e.pos, "dir": dir, "length": length, "time": D.cleave_time / _rate(e), "width": D.cleave_width})
+
+
+## 땅을 가른다: 참격파(kind shock)가 곧게 간다. 화살처럼 영주에게 닿으면 맞히고 사라진다.
+func _cleave(e: Enemy) -> void:
+	var D := e.data
+	var start: float = e.radius + 0.1
+	var length: float = _lane(e.pos, e.act_dir, D.cleave_range, 0.0) - start
+	if length > 0.3:
+		var p := Projectile.new()
+		p.kind = &"shock"
+		p.id = r._new_id()
+		p.dir = e.act_dir
+		p.pos = e.pos + e.act_dir * start
+		p.prev_pos = p.pos
+		p.speed = D.cleave_speed
+		p.distance = length
+		p.width = D.cleave_width
+		p.max_time = length / maxf(D.cleave_speed, 0.1) + 0.5
+		p.owner = e
+		p.damage = e.damage * D.cleave_mult
+		r.enemy_projectiles.append(p)
+		r.enemy_projectile_spawned.emit(p)
+	_begin(e, &"cleave", D.act_after)
+	e.cooldown = _cd(e)
+	r.enemy_act.emit(e, &"cleave", {"at": e.pos, "dir": e.act_dir})
+
+
+## 그림자 걸음 예고: 땅으로 꺼지며 나올 자리(지금 영주 너머 blink_dist칸, 싸움터 안·막힘 앞)를 blink_time초 알린다.
+func _start_blink(e: Enemy, dir: Vector2) -> void:
+	var D := e.data
+	var L := r.lord
+	var dest: Vector2 = _clamp(L.pos + dir * D.blink_dist, 1.0)
+	if r.nav != null:
+		dest = r.nav.reach(L.pos, dest, Nav.class_of(e.radius))
+	e.act_from = e.pos
+	e.act_to = dest
+	_begin(e, &"blink_wind", D.blink_time)
+	r.enemy_act.emit(e, &"blink_wind", {"from": e.pos, "to": dest, "time": D.blink_time / _rate(e)})
+
+
+## 알린 자리에서 솟는다(틱 사이로 잇지 않고 바로 옮긴다). 영주 쪽을 보고 곧바로 blink_swing초 알린 휘두르기.
+func _blink(e: Enemy) -> void:
+	var D := e.data
+	var from: Vector2 = e.pos
+	e.pos = e.act_to
+	e.prev_pos = e.pos
+	e.push = Vector2.ZERO
+	var v: Vector2 = r.lord.pos - e.pos
+	var dir: Vector2 = v.normalized() if v.length() > 0.001 else -e.face
+	r.enemy_act.emit(e, &"blink", {"from": from, "at": e.pos, "dir": dir})
+	e.combo_left = _combo(e)
+	_start_swing(e, dir, D.blink_swing)
+
+
+## 보스가 영주를 친다: 피해, 그리고 반격 자세가 아니면 from에서 먼 쪽으로 knock칸 밀린다(돌진과 같은 셈).
+func _strike(e: Enemy, dmg: float, from: Vector2, knock: float) -> void:
+	var L := r.lord
+	var parry: bool = L.parry > 0.0
+	r._hurt_lord(dmg, e)
+	if parry or knock <= 0.0 or r.phase != Rules.Phase.NIGHT:
+		return
+	var away: Vector2 = L.pos - from
+	var dir: Vector2 = away.normalized() if away.length() > 0.001 else e.face
+	var q: float = pow(r.data.lord.knock_keep, r.dt)
+	L.push += dir * knock * (1.0 - q) / r.dt
 
 
 # ---------------------------------------------------------------- 공통

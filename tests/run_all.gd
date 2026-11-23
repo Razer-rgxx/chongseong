@@ -95,6 +95,7 @@ func _init() -> void:
 	_test_field_meta()
 	(load("res://tests/field_fight_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_boss_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/boss_pattern_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_region_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_night_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/crypt_tests.gd") as GDScript).call("run", d, check)
@@ -1848,7 +1849,7 @@ func _test_tokens_boss() -> void:
 	var boss := _close(r, &"boss", PI)
 	boss.cooldown = 0.0
 	var log: Array = []
-	_run_log(r, 10, log)
+	_run_log(r, 40, log)   # 보스 패턴(2026-11-23): 휘두르기 예고 0.85초 뒤에 벤다
 	var boss_hit: bool = log.any(func(x: Array) -> bool: return x[1] == boss)
 	check(r.tokens.cost(boss) == 0 and boss.token == 0 and boss_hit, "표: 언덕지기는 표 없이 덤빈다")
 	check(r.tokens.held() == r.tokens.total() and full.all(func(e: Enemy) -> bool: return e.token == 1), "표: 언덕지기는 남의 표를 가져가지 않는다")

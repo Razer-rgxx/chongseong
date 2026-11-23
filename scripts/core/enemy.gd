@@ -56,6 +56,8 @@ var act_from: Vector2 = Vector2.ZERO
 var act_to: Vector2 = Vector2.ZERO
 var act_spots: PackedVector2Array = PackedVector2Array()
 var summoned: int = 0
+## 보스 패턴: 이번 연속 베기에서 더 벨 횟수.
+var combo_left: int = 0
 
 # ---- 밤 목표와 구역 규칙(12단계). 화면은 읽기만 한다.
 ## 봉화를 노린다(지키기). 봉화가 타는 동안은 표 없이 봉화를 때리고, 꺼지면 다른 적과 같다.

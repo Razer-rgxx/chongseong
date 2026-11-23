@@ -81,6 +81,7 @@ func _ready() -> void:
 	_move_fx.setup(rules)
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)
+	_enemy_fx.quaked.connect(func(_at: Vector3, k: float) -> void: _camera.add_shake(0.4 * k))   # 보스 패턴의 땅 울림
 	_hold_sword()
 	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -2.0 if big else -6.0))
 	rules.lord_dashed.connect(func() -> void:

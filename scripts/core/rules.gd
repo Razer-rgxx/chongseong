@@ -2256,6 +2256,7 @@ func _recall_boss() -> void:
 	b.act_t = 0.0
 	b.windup = 0.0
 	b.summoned = 0
+	b.combo_left = 0
 	_dismiss_minions()
 
 
@@ -2963,6 +2964,7 @@ func state_hash() -> int:
 		parts.append(p.pos)
 	for p in enemy_projectiles:
 		parts.append(p.pos)
+		parts.append(p.travelled)
 	parts.append(tokens.cooling)
 	parts.append(lord.push)
 	parts.append(lord.air)
@@ -2981,6 +2983,7 @@ func state_hash() -> int:
 		parts.append(e.act_t)
 		parts.append(e.guard_down)
 		parts.append(e.summoned)
+		parts.append(e.combo_left)
 		parts.append_array([e.beacon, e.hunt, e.risen])
 	for s in slots:
 		parts.append(s.data.id if s else -1)

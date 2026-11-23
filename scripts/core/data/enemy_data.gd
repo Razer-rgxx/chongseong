@@ -103,6 +103,56 @@ extends Resource
 ## 그림 크기 배수(기사 모델 기준 1.0). 0이면 기본.
 @export var model_scale: float = 0.0
 
+@export_group("보스 패턴(2026-11-23, docs/boss_patterns.md)")
+## 연속 베기: 첫 휘두르기 뒤에 combo번 더 벤다(빨라지면 combo_rage번 더). 이어지는 베기는 combo_gap초 쉬고 영주 쪽으로 다시 겨눠 combo_wind초 알린다.
+@export var combo: int = 0
+@export var combo_rage: int = 0
+@export var combo_wind: float = 0.5
+@export var combo_gap: float = 0.15
+## 내려찍기: 휘두를 거리 안에서 slam_chance로 고른다. slam_time초 알린 뒤 둘레 slam_radius칸을 피해 × slam_mult로 치고,
+## 그 가장자리에서 충격파 고리가 quake_speed칸/초로 quake_range칸까지 퍼진다(고리 폭 quake_width칸, 피해 × quake_mult, 구르면 지나간다).
+@export var slam_chance: float = 0.0
+@export var slam_time: float = 1.0
+@export var slam_radius: float = 2.4
+@export var slam_mult: float = 1.2
+## 내려찍기에 맞으면 밀려나는 거리(칸), 내려찍은 뒤 숨 고르는 시간(초, 그동안 칠 틈).
+@export var slam_knock: float = 2.5
+@export var slam_rest: float = 0.9
+@export var quake_range: float = 0.0
+@export var quake_speed: float = 9.0
+@export var quake_width: float = 0.9
+@export var quake_mult: float = 0.7
+## 칼비(rain_look sword) / 무덤 손(hand): rain_min칸보다 멀면 rain_chance로 고른다. rain_time초 들어 올린 뒤 rain_count곳(빨라지면 + rain_rage)에
+## 표시가 서고, rain_delay초 뒤부터 rain_step초 간격으로 반지름 rain_radius칸이 피해 × rain_mult로 터진다.
+## rain_line이 거짓이면 첫 곳은 영주 자리, 나머지는 영주 둘레 rain_spread칸 안 아무 곳(칼비). 참이면 보스에서 영주를 지나 rain_spread칸 더 가는 줄(무덤 손).
+@export var rain_count: int = 0
+@export var rain_rage: int = 0
+@export var rain_chance: float = 0.4
+@export var rain_min: float = 4.0
+@export var rain_time: float = 0.9
+@export var rain_delay: float = 1.0
+@export var rain_step: float = 0.18
+@export var rain_radius: float = 1.1
+@export var rain_spread: float = 3.5
+@export var rain_mult: float = 0.8
+@export var rain_line: bool = false
+@export var rain_look: StringName = &"sword"
+## 땅 가르기: swing_range보다 멀고 cleave_range칸 안이면 cleave_chance로 고른다. cleave_time초 앞길을 알린 뒤 참격파가
+## cleave_speed칸/초로 곧게 간다(폭 cleave_width칸, 피해 × cleave_mult, 벽에서 멈춘다, 칼로 부러뜨리지 못하고 구르면 지나간다).
+@export var cleave_chance: float = 0.0
+@export var cleave_range: float = 9.0
+@export var cleave_time: float = 0.8
+@export var cleave_speed: float = 12.0
+@export var cleave_width: float = 1.0
+@export var cleave_mult: float = 0.7
+## 그림자 걸음: blink_min칸보다 멀면 blink_chance로 고른다. blink_time초 땅으로 꺼지며 나올 자리(영주 너머 blink_dist칸)를 알리고,
+## 그 자리에서 솟아 곧바로 blink_swing초 알린 휘두르기를 한다(연속 베기도 이어진다).
+@export var blink_chance: float = 0.0
+@export var blink_min: float = 4.0
+@export var blink_time: float = 0.8
+@export var blink_dist: float = 2.4
+@export var blink_swing: float = 0.55
+
 @export_group("수련장(15단계, docs/village.md)")
 ## 움직이지도 때리지도 않는다(허수아비). 넉백도 받지 않는다.
 @export var still: bool = false

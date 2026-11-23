@@ -22,3 +22,7 @@ var run: MoveRun
 var owner: Enemy = null
 var damage: float = 0.0
 var cut: bool = false
+## 보스 패턴(docs/boss_patterns.md): 적의 것 중 화살 말고 kind shock(참격파, 화살처럼 곧게), ring(충격파 고리: pos는 가운데, travelled가 지금 반지름,
+## distance가 끝 반지름), fall(칼비·무덤 손: pos 자리에서 max_time초 뒤 터진다). look은 그림(sword, hand). 영주에게 맞았는지(고리는 한 번만 맞힌다).
+var look: StringName = &""
+var landed: bool = false
