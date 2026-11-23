@@ -5,7 +5,7 @@ extends SkeletonModifier3D
 ## 쓰는 법: ObjectHead.attach(skeleton, &"smith")
 
 const FOR_KIND: Dictionary = {
-	&"lord": &"sword", &"smith": &"hammer", &"apprentice": &"tongs", &"elder": &"lantern",
+	&"lord": &"hill", &"smith": &"hammer", &"apprentice": &"tongs", &"elder": &"lantern",
 	&"merchant": &"pouch", &"herbalist": &"mortar", &"gatherer": &"basket", &"hunter": &"antlers",
 	&"knight": &"helm", &"gatekeeper": &"spear", &"pilgrim": &"candle", &"drunk": &"jug",
 	&"peasant": &"bucket", &"peasant2": &"wheat", &"peasant3": &"pot", &"peasant4": &"wheat",
@@ -54,6 +54,8 @@ static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	skel.add_child(holder)
 	holder.add_child(o)
 	mod.holder = holder
+	if obj == &"hill":
+		mod.size = 1.7   # 주인공 머리는 눈에 띄게
 	return holder
 
 
@@ -142,6 +144,44 @@ static func build(obj: StringName) -> Node3D:
 			_box(n, Vector3(0.15, 0.36, 0.035), Vector3(0, 0.33, 0), steel)
 			_box(n, Vector3(0.03, 0.3, 0.04), Vector3(0, 0.32, 0), iron)
 			_box(n, Vector3(0.106, 0.106, 0.035), Vector3(0, 0.51, 0), steel, Vector3(0, 0, PI / 4))
+		&"hill":
+			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,
+			# 갈라진 틈에서 불씨가 새고, 가운데 한 자루(주인의 검)만 우뚝하고 날이 희게 빛난다.
+			var rock := _m(Color(0.16, 0.15, 0.14), 0.0, 0.95)
+			_ball(n, 0.17, Vector3(0, 0.07, 0), rock, Vector3(1.15, 0.55, 1.0))
+			_ball(n, 0.09, Vector3(0.09, 0.1, 0.06), rock, Vector3(1, 0.7, 1))
+			_ball(n, 0.08, Vector3(-0.1, 0.09, -0.05), rock, Vector3(1, 0.6, 1))
+			var ember := _m(Color(1.0, 0.4, 0.12))
+			ember.emission_enabled = true
+			ember.emission = Color(1.0, 0.35, 0.08)
+			ember.emission_energy_multiplier = 2.5
+			for k in 5:
+				var a: float = float(k) / 5.0 * TAU + 0.4
+				_box(n, Vector3(0.05, 0.012, 0.012), Vector3(cos(a) * 0.13, 0.1, sin(a) * 0.12), ember, Vector3(0, -a, 0.3))
+			var tilts := [Vector3(0.0, 0.0, 0.0), Vector3(0.35, 0, 0.2), Vector3(-0.3, 0, -0.35), Vector3(0.25, 0, -0.45), Vector3(-0.4, 0, 0.3)]
+			var spots := [Vector3(0, 0.1, 0), Vector3(0.1, 0.08, 0.07), Vector3(-0.11, 0.07, 0.05), Vector3(0.08, 0.07, -0.09), Vector3(-0.07, 0.08, -0.1)]
+			for k in 5:
+				var sw := Node3D.new()
+				sw.position = spots[k]
+				sw.rotation = tilts[k]
+				n.add_child(sw)
+				var big: bool = k == 0
+				var bl: float = 0.36 if big else 0.2 + 0.03 * k
+				var blade := _m(Color(0.85, 0.88, 0.95), 0.9, 0.25) if big else _m(Color(0.42, 0.4, 0.38), 0.7, 0.6)
+				if big:
+					blade.emission_enabled = true
+					blade.emission = Color(0.75, 0.82, 1.0)
+					blade.emission_energy_multiplier = 0.6
+				_box(sw, Vector3(0.05 if big else 0.035, bl, 0.012), Vector3(0, bl / 2.0, 0), blade)
+				_box(sw, Vector3(0.14 if big else 0.09, 0.022, 0.03), Vector3(0, bl + 0.01, 0), brass if big else iron)
+				_cyl(sw, 0.012, 0.014, 0.08 if big else 0.06, Vector3(0, bl + 0.06, 0), leather)
+				_ball(sw, 0.02, Vector3(0, bl + 0.11, 0), brass if big else iron)
+			var gl := OmniLight3D.new()
+			gl.light_color = Color(1.0, 0.45, 0.15)
+			gl.omni_range = 1.6
+			gl.light_energy = 0.8
+			gl.position = Vector3(0, 0.12, 0)
+			n.add_child(gl)
 		&"hammer":
 			_cyl(n, 0.035, 0.04, 0.12, Vector3(0, 0.06, 0), wood)
 			_cyl(n, 0.045, 0.045, 0.03, Vector3(0, 0.12, 0), iron)
