@@ -16,6 +16,20 @@ var _npc: Node3D = null
 var _npc_P: Dictionary = {}
 var _pray: bool = false
 var _t: float = 0.0
+## 대장간 연출(2026-11-24 사용자: "대장간 연출이 직관적이지 않다"): 모루 위의 검집 검, 망치질마다 사람이 내리치고 불똥이 튀며
+## 모루가 달아오른다. 결과에 성공은 등급 빛이 솟고 불똥이 크게 터지며, 실패는 잿빛 먼지, 내려가면 금 가는 소리와 떨어지는 불똥.
+const ANVIL_TOP := Vector3(0.3, 0.84, -0.3)
+## 사람이 망치를 내리치는 동작: 칼 휘두르기(Sword_Attack)를 STRIKE_FROM초부터 틀면 치켜들었다가 IMPACT초 뒤에 모루에 닿는다.
+## 그동안(STRIKE_TIME) 말하는 몸짓을 하지 않는다. 불똥·달아오름·흔들림·소리는 닿는 때에.
+const STRIKE_FROM: float = 0.35
+const IMPACT: float = 0.3
+const STRIKE_TIME: float = 0.7
+var _anvil_sword: Node3D = null
+var _heat: OmniLight3D = null
+var _strike_left: float = 0.0
+var _shake: float = 0.0
+var _cam_base := Transform3D.IDENTITY
+var _rng := RandomNumberGenerator.new()
 
 
 ## 방을 짓는다(트리에 넣은 뒤).
@@ -45,7 +59,10 @@ func build(p_kind: StringName) -> void:
 	cam.fov = 58.0
 	cam.attributes = CameraAttributesPractical.new()
 	add_child(cam)
-	cam.look_at_from_position(to_global(Vector3(0.6, 1.62, D / 2.0 - 0.7)), to_global(Vector3(-0.1, 1.3, -1.2)))
+	# 대장간은 모루가 대사 띠 위로 보이게 조금 내려다본다
+	var look_y: float = 1.05 if kind == &"forge" else 1.3
+	cam.look_at_from_position(to_global(Vector3(0.6, 1.62, D / 2.0 - 0.7)), to_global(Vector3(-0.1, look_y, -1.2)))
+	_cam_base = cam.transform
 	# 방을 고루 밝히는 약한 빛(위)
 	_light(Vector3(0, H - 0.4, 0.5), Color(1.0, 0.78, 0.55), 0.5, 9.0)
 
@@ -64,16 +81,206 @@ func set_npc(look: StringName) -> void:
 	_npc.rotation.y = PI   # 문 쪽(+Z)을 본다(사람 몸은 -Z를 본다)
 	_npc_P = VillageProps.villager(look, _npc)
 	_pray = kind == &"shrine"
+	if kind == &"forge":
+		var m: NpcModel = _npc_P.get("npc")
+		if m:
+			m.hold(_hammer_mesh())   # 대장장이는 망치를 쥐고 있다
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	_strike_left = maxf(0.0, _strike_left - delta)
 	if not _npc_P.is_empty():
 		EventArt.breathe(_npc_P, _t)
 		if _pray:
 			VillageProps.pose(_npc_P, "pray")   # 성소지기는 무릎 꿇고 빈다
-		else:
+		elif _strike_left <= 0.0:
 			VillageProps.talk(_npc_P, _t)
+	if _heat:
+		_heat.light_energy = lerpf(_heat.light_energy, 0.0, 1.0 - exp(-2.5 * delta))
+	if cam and _shake > 0.001:
+		_shake = lerpf(_shake, 0.0, 1.0 - exp(-14.0 * delta))
+		var o := Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1), 0.0) * _shake * 0.05
+		cam.transform = Transform3D(_cam_base.basis, _cam_base.origin + _cam_base.basis * o)
+	elif cam and _shake > 0.0:
+		_shake = 0.0
+		cam.transform = _cam_base
+
+
+# ---------------------------------------------------------------- 대장간 연출
+
+## 모루 윗면의 세계 위치(소리 자리).
+func anvil_world() -> Vector3:
+	return to_global(ANVIL_TOP)
+
+
+## 모루 위에 검집의 검을 눕힌다(없으면 비운다).
+func show_sword(s: Sword, grades: GradeTable) -> void:
+	if _anvil_sword:
+		_anvil_sword.queue_free()
+		_anvil_sword = null
+	if s == null:
+		return
+	_anvil_sword = Node3D.new()
+	_anvil_sword.position = ANVIL_TOP + Vector3(0.0, 0.015, 0.02)
+	add_child(_anvil_sword)
+	var m := SwordModel.for_sword(s, grades)
+	m.rotation = Vector3(PI / 2.0, 0.0, -PI / 2.0)
+	m.position = Vector3(-0.35, 0.0, 0.0)
+	m.scale = Vector3.ONE * 0.85
+	_anvil_sword.add_child(m)
+
+
+## 망치를 한 번 내리친다(step 1~3, 셀수록 세게): 사람이 내리치고 모루에서 불똥, 모루가 달아오르고 방이 조금 흔들린다.
+func hammer(step: int) -> void:
+	var m: NpcModel = _npc_P.get("npc")
+	if m:
+		m.strike(STRIKE_FROM)
+		_strike_left = STRIKE_TIME
+		await get_tree().create_timer(IMPACT).timeout
+	_ensure_heat()
+	_heat.light_color = Color(1.0, 0.55, 0.22)
+	_heat.light_energy = 2.0 + 1.0 * step
+	_sparks(14 + 8 * step, Color(1.0, 0.62, 0.25), 2.5 + 0.6 * step, 0.55)
+	_shake = 0.6 + 0.3 * step
+
+
+## 결과: ok(성공)·dropped(내려감). big이면 더 크게. col은 검의 등급 빛.
+func forged(ok: bool, dropped: bool, big: bool, col: Color) -> void:
+	_ensure_heat()
+	if ok:
+		_heat.light_color = col.lerp(Color(1.0, 0.8, 0.5), 0.35)
+		_heat.light_energy = 9.0 if big else 6.0
+		_sparks(70 if big else 44, col.lerp(Color(1.0, 0.75, 0.35), 0.5), 5.5 if big else 4.2, 0.9)
+		_rise(col)
+		_shake = 1.6 if big else 1.0
+	else:
+		_heat.light_color = Color(0.55, 0.5, 0.45)
+		_heat.light_energy = 1.2
+		_smoke()
+		if dropped:
+			_sparks(18, Color(0.85, 0.4, 0.2), 1.2, 0.5, true)
+			_shake = 0.8
+
+
+func _ensure_heat() -> void:
+	if _heat:
+		return
+	_heat = OmniLight3D.new()
+	_heat.omni_range = 3.2
+	_heat.light_energy = 0.0
+	_heat.position = ANVIL_TOP + Vector3(0.0, 0.35, 0.25)
+	add_child(_heat)
+
+
+## 모루 위에서 불똥이 튄다. down이면 힘없이 흘러내린다(실패해서 내려갔을 때).
+func _sparks(n: int, c: Color, speed: float, life: float, down: bool = false) -> void:
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.explosiveness = 0.95
+	p.amount = n
+	p.lifetime = life
+	p.direction = Vector3(0, 1, 0.3)
+	p.spread = 20.0 if down else 65.0
+	p.initial_velocity_min = speed * (0.3 if down else 0.5)
+	p.initial_velocity_max = speed * (0.6 if down else 1.2)
+	p.gravity = Vector3(0, -9.0, 0)
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.2
+	p.mesh = _spark_mesh(0.008)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.4, 1.2, 1.0))
+	ramp.set_color(1, Color(c, 0.0))
+	p.color_ramp = ramp
+	p.position = ANVIL_TOP + Vector3(0.0, 0.05, 0.0)
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(life + 0.3).timeout.connect(p.queue_free)
+
+
+## 성공: 모루 위로 등급 빛이 한 줄기 솟았다 사그라든다(빛 기둥 대신 낮게 깔린 불티 기둥).
+func _rise(col: Color) -> void:
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.explosiveness = 0.4
+	p.amount = 40
+	p.lifetime = 1.4
+	p.direction = Vector3.UP
+	p.spread = 10.0
+	p.initial_velocity_min = 0.6
+	p.initial_velocity_max = 1.8
+	p.gravity = Vector3(0, 0.4, 0)
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(0.5, 0.02, 0.08)
+	p.mesh = _spark_mesh(0.011)
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(col.lerp(Color.WHITE, 0.4), 0.0))
+	ramp.add_point(0.15, col.lerp(Color.WHITE, 0.3))
+	ramp.set_color(ramp.get_point_count() - 1, Color(col, 0.0))
+	p.color_ramp = ramp
+	p.position = ANVIL_TOP + Vector3(0.0, 0.05, 0.0)
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
+
+
+## 실패: 모루에서 잿빛 김이 피어오른다.
+func _smoke() -> void:
+	var p := CPUParticles3D.new()
+	p.one_shot = true
+	p.explosiveness = 0.6
+	p.amount = 16
+	p.lifetime = 1.6
+	p.direction = Vector3.UP
+	p.spread = 25.0
+	p.initial_velocity_min = 0.3
+	p.initial_velocity_max = 0.8
+	p.gravity = Vector3(0, 0.25, 0)
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.4
+	var q := QuadMesh.new()
+	q.size = Vector2(0.3, 0.3)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	q.material = m
+	p.mesh = q
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0.5, 0.48, 0.45, 0.0))
+	ramp.add_point(0.2, Color(0.5, 0.48, 0.45, 0.35))
+	ramp.set_color(ramp.get_point_count() - 1, Color(0.4, 0.38, 0.36, 0.0))
+	p.color_ramp = ramp
+	p.position = ANVIL_TOP + Vector3(0.0, 0.1, 0.0)
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(2.2).timeout.connect(p.queue_free)
+
+
+## 불똥 하나(둥근 작은 알, 빛을 안 받고 더해 그린다. 색은 입자 색).
+func _spark_mesh(r: float) -> Mesh:
+	var sm := SphereMesh.new()
+	sm.radius = r
+	sm.height = r * 2.0
+	sm.radial_segments = 6
+	sm.rings = 3
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.vertex_color_use_as_albedo = true
+	sm.material = m
+	return sm
+
+
+## 대장장이의 망치(나무 자루 + 쇠 머리). 손뼈에 단다.
+func _hammer_mesh() -> Node3D:
+	var h := Node3D.new()
+	var wood := VillageBuilder.timber()
+	var iron := VillageBuilder.plain(Color(0.2, 0.2, 0.21), 0.45, 0.85)
+	VillageBuilder.cyl(h, 0.018, 0.022, 0.42, Vector3(0.0, 0.12, 0.0), wood, 8)
+	VillageBuilder.box(h, Vector3(0.16, 0.07, 0.07), Vector3(0.0, 0.32, 0.0), iron)
+	return h
 
 
 func _light(at: Vector3, c: Color, e: float, r: float) -> void:

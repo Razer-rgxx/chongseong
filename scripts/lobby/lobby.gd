@@ -144,6 +144,9 @@ func _ready() -> void:
 	_lord.torch.light_energy = 1.2
 	_hud.forge_hit.connect(_on_hammer)
 	_hud.forge_done.connect(_on_forged)
+	_hud.forge_changed.connect(func() -> void:
+		_refresh_anvil()
+		_lord.set_sword(meta.sheath_sword(data), data.grades))
 	_hud.closed.connect(func() -> void:
 		if _room != null:
 			_leave_inside()
@@ -355,23 +358,42 @@ func _interact() -> void:
 	_capture(false)
 
 
+## 망치질 한 번. 대장간 안이면(Interior) 그 방의 모루에서: 대장장이가 내리치고 불똥·달아오름·흔들림, 소리도 그 모루에서.
 func _on_hammer(step: int) -> void:
-	_sfx.play(&"anvil", Grid.cells_to_world(forge_at, 1.0), -6.0 + 2.0 * step)
-	_camera.add_shake(0.08 + 0.04 * step)
-	_forge_light.light_energy = 6.0
-	_hud.flash(Color(1, 0.7, 0.35), 0.08 + 0.03 * step, 0.2)
+	var room := _forge_room()
+	if step == 1:
+		_hud.say_end()   # 대사 띠를 걷어 모루가 보이게
+	if room:
+		room.hammer(step)
+		get_tree().create_timer(Interior.IMPACT).timeout.connect(func() -> void: _sfx.play(&"anvil", room.anvil_world(), -4.0 + 2.0 * step))
+	else:
+		_sfx.play(&"anvil", Grid.cells_to_world(forge_at, 1.0), -6.0 + 2.0 * step)
+		_camera.add_shake(0.08 + 0.04 * step)
+		_forge_light.light_energy = 6.0
+	_hud.flash(Color(1, 0.7, 0.35), 0.05 + 0.02 * step, 0.15)
 
 
 func _on_forged(r: Dictionary, big: bool) -> void:
+	var room := _forge_room()
+	var at: Vector3 = room.anvil_world() if room else Grid.cells_to_world(forge_at, 1.0)
+	var s := meta.sheath_sword(data)
 	if r.ok:
-		_sfx.play(&"anvil", Grid.cells_to_world(forge_at, 1.0), 4.0)
-		_hud.flash(Color(1, 0.84, 0.42), 0.7 if big else 0.35, 1.4 if big else 0.6)
-		_camera.add_shake(0.5 if big else 0.25)
+		_sfx.play(&"anvil", at, 4.0, 0.8)
+		_hud.flash(Color(1, 0.84, 0.42), 0.55 if big else 0.3, 1.2 if big else 0.6)
+		if room == null:
+			_camera.add_shake(0.5 if big else 0.25)
 	else:
-		_sfx.play(&"break" if r.get("dropped", false) else &"thump", Grid.cells_to_world(forge_at, 1.0), -2.0)
-		_hud.flash(Color(0.45, 0.48, 0.55), 0.25, 0.4)
+		_sfx.play(&"break" if r.get("dropped", false) else &"thump", at, -2.0)
+		_hud.flash(Color(0.45, 0.48, 0.55), 0.2, 0.4)
+	if room:
+		room.forged(r.ok, r.get("dropped", false), big, data.grades.colors[s.grade] if s else Color(1.0, 0.75, 0.4))
 	_refresh_anvil()
-	_lord.set_sword(meta.sheath_sword(data), data.grades)
+	_lord.set_sword(s, data.grades)
+
+
+## 지금 들어와 있는 대장간 방(아니면 null).
+func _forge_room() -> Interior:
+	return _room if _room != null and _room.kind == &"forge" else null
 
 
 ## 모루 위에 놓인 검: 검집의 검이 바뀌거나 강화되면 다시 만든다.
@@ -379,6 +401,9 @@ func _refresh_anvil() -> void:
 	for c in _anvil_sword.get_children():
 		c.queue_free()
 	var s := meta.sheath_sword(data)
+	var room: Interior = _rooms.get(&"forge")
+	if room:
+		room.show_sword(s, data.grades)   # 대장간 안 모루에도 같은 검
 	if s == null:
 		return
 	var m := SwordModel.for_sword(s, data.grades)
@@ -795,6 +820,8 @@ func _enter(kind: StringName, who: String, look: StringName, lines: Array, open:
 			_rooms[kind] = room
 		room.set_npc(look)
 		_room = room
+		if kind == &"forge":
+			room.show_sword(meta.sheath_sword(data), data.grades)
 		_out_cam = get_viewport().get_camera_3d()
 		room.cam.make_current()
 		var env: Environment = ($Environment as WorldEnvironment).environment

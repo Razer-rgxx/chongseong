@@ -11,7 +11,9 @@ const LOOPING: Array[String] = ["idle", "talk", "walk", "sit", "kneel", "pray"]
 
 ## 2026-11-22: Quaternius 농부·순찰자(CC0, assets/characters_cc0/folk/)가 있으면 그것을 먼저 쓴다. 동작은 Universal Animation Library.
 const FOLK: String = "res://assets/characters_cc0/folk/"
-const FOLK_ANIMS: Dictionary = {"idle": "Idle", "talk": "Idle_Talking", "walk": "Walk", "sit": "Sitting_Idle", "kneel": "Crouch_Idle", "pray": "Fixing_Kneeling"}
+const FOLK_ANIMS: Dictionary = {"idle": "Idle", "talk": "Idle_Talking", "walk": "Walk", "sit": "Sitting_Idle", "kneel": "Crouch_Idle", "pray": "Fixing_Kneeling", "strike": "Sword_Attack"}
+## 한 번만 하는 동작(대장장이의 망치질, Interior.hammer).
+const ONCE: Array[String] = ["strike"]
 const FOLK_MODELS: Dictionary = {"man": "Male_Peasant", "girl": "Female_Peasant", "ranger": "Male_Ranger", "ranger_girl": "Female_Ranger"}
 
 static var _lib: AnimationLibrary = null
@@ -185,7 +187,7 @@ static func _library() -> AnimationLibrary:
 		for key in FOLK_ANIMS:
 			if ap and ap.has_animation(FOLK_ANIMS[key]):
 				var a := ap.get_animation(FOLK_ANIMS[key]).duplicate(true) as Animation
-				a.loop_mode = Animation.LOOP_LINEAR
+				a.loop_mode = Animation.LOOP_NONE if ONCE.has(key) else Animation.LOOP_LINEAR
 				_lib.add_animation(key, a)
 		root.free()
 		return _lib
@@ -205,6 +207,28 @@ static func _library() -> AnimationLibrary:
 		a.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(key) else Animation.LOOP_NONE
 		_lib.add_animation(key, a)
 	return _lib
+
+
+## 망치를 한 번 내리친다(from초부터 다시: 칼 휘두르기 동작의 치켜든 데부터 쓰면 내리치기가 된다). 동작이 없으면 아무것도 안 한다.
+func strike(from: float = 0.0) -> void:
+	if _player == null or not has("strike"):
+		return
+	_started = true
+	_state = "strike"
+	_player.play("npc/strike", 0.08)
+	_player.seek(from, true)
+
+
+## 오른손에 물건을 쥐여 준다(대장장이의 망치). 손뼈가 없으면 버린다.
+func hold(item: Node3D, bone: String = "hand_r") -> void:
+	var skel := _body.find_child("Skeleton3D", true, false) as Skeleton3D if _body else null
+	if skel == null or skel.find_bone(bone) < 0:
+		item.queue_free()
+		return
+	var at := BoneAttachment3D.new()
+	at.bone_name = bone
+	skel.add_child(at)
+	at.add_child(item)
 
 
 func has(state: String) -> bool:

@@ -6,6 +6,8 @@ extends CanvasLayer
 
 signal forge_hit(step: int)
 signal forge_done(result: Dictionary, big: bool)
+## 대장간 창에서 검집에 넣을 검을 바꿨다(모루 위 검을 다시 놓는다).
+signal forge_changed
 signal closed()
 ## 15단계: 의뢰를 맡았다(판의 번호), 물건을 샀다(id), 수련장 검을 골랐다(SwordData.id).
 signal quest_taken(i: int)
@@ -28,7 +30,9 @@ signal sheath_bought(level: int)
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
-@export var result_delay: float = 0.4
+@export var result_delay: float = 0.5
+## 대장간 망치질 사이(초): 대장장이가 한 번씩 내리치는 동작이 보이게 축복보다 느리다.
+@export var forge_gap: float = 0.6
 
 var data: GameData
 var meta: Meta
@@ -53,6 +57,8 @@ var _rack: Control
 var _rack_text: RichTextLabel
 var _msg: Label
 var _busy: bool = false
+## 대장간 창의 마지막 결과(제목·색·아랫줄). 창을 새로 열거나 검을 바꾸면 비운다.
+var _forge_last: Dictionary = {}
 var _rack_head: Label
 var _board: Control
 var _board_box: VBoxContainer
@@ -347,17 +353,22 @@ func got_mat(id: StringName, n: int) -> void:
 
 func open_forge() -> void:
 	_forge.visible = true
+	_forge_last = {}
 	_render_forge("")
 
 
+## 대장간 창(2026-11-24 사용자: "대장간 연출이랑 강화 보상이 직관적이지 않다"):
+## 검집에 넣을 검과 그 카드 → 검집 강화 줄(ForgeTrack: 지금 단계, 각인 단계, 내려가는 단계) → 다음 단계에 무엇이 오르는지(피해·내구 숫자 앞뒤, 각인)
+## → 성공 확률과 실패하면 어떻게 되는지 → 망치질 단추 → 결과(크게: 성공/그대로/내려감과 바뀐 숫자).
 func _render_forge(msg: String) -> void:
 	for c in _forge_box.get_children():
 		c.queue_free()
 	var md := data.meta
-	UiKit.header(_forge_box, "대장간 · 검집 +%d" % meta.sheath_lv, close)
+	UiKit.header(_forge_box, "대장간 · 검집 강화 +%d" % meta.sheath_lv, close)
 	var cands := meta.sheath_candidates(data)
+	var now := meta.sheath_sword(data)
 	if cands.is_empty():
-		_forge_box.add_child(_wrap(UiKit.label("검집에는 찾아 본 전설 이상의 검만 넣을 수 있다(언덕에서 뽑았거나 들판에서 얻은 검). 아직 없다.\n검집 강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
+		_forge_box.add_child(_wrap(UiKit.label("검집에 넣을 검이 아직 없다. 전설 이상을 한 번 손에 넣으면 여기 놓인다(언덕에서 뽑거나 들판에서 얻기).\n강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
 	else:
 		var pick := OptionButton.new()
 		pick.focus_mode = Control.FOCUS_NONE
@@ -366,32 +377,94 @@ func _render_forge(msg: String) -> void:
 			pick.add_item("%s · %s (%s)" % [data.grades.names[d.grade], d.display_name, data.forms[d.form].display_name], id)
 			if id == meta.sheath_id:
 				pick.select(pick.item_count - 1)
+		pick.disabled = _busy
 		pick.item_selected.connect(func(i: int) -> void:
 			meta.sheath_id = pick.get_item_id(i)
 			meta.save()
+			_forge_last = {}
+			forge_changed.emit()
 			_render_forge(""))
 		_forge_box.add_child(pick)
 		var card := PanelContainer.new()
-		var s := meta.sheath_sword(data)
-		card.add_theme_stylebox_override("panel", UiKit.style(data.grades.colors[s.grade] if s else Color.GRAY, 2))
+		card.add_theme_stylebox_override("panel", UiKit.style(data.grades.colors[now.grade] if now else Color.GRAY, 2))
 		var r := UiKit.rich(15, 520)
-		r.text = SwordCard.bbcode(s, data)
+		r.text = SwordCard.bbcode(now, data)
 		card.add_child(r)
 		_forge_box.add_child(card)
-	var ins: String = ", ".join(meta.sheath_ins) if not meta.sheath_ins.is_empty() else "없음"
-	_forge_box.add_child(UiKit.label("검집 효과: 피해 +%d%% · 내구 +%d%% · 붙은 각인 %s" % [roundi(md.sheath_damage * 100 * meta.sheath_lv), roundi(md.sheath_durability * 100 * meta.sheath_lv), ins], 15, UiKit.TEXT))
+	_forge_box.add_child(UiKit.rule())
+	_forge_box.add_child(UiKit.label("검집 강화", 17, UiKit.TITLE))
+	_forge_box.add_child(UiKit.label("검이 아니라 검집이 단단해진다. 넣은 검을 바꿔도 단계와 각인은 남는다.", 13, UiKit.MUTED))
+	var track := ForgeTrack.new()
+	track.setup(meta.sheath_lv, meta.sheath_peak, md.sheath_max, md.sheath_drop_from, md.sheath_ins_levels)
+	_forge_box.add_child(track)
 	if meta.sheath_lv < md.sheath_max:
-		var b := UiKit.button("망치질 · 조각 %s · 성공 %d%%" % [_num(meta.sheath_cost(md)), roundi(meta.sheath_rate(md))], _forge_sheath, 46)
+		var nx := UiKit.rich(16, 520)
+		nx.text = _forge_next_bbcode(now, meta.sheath_lv + 1)
+		_forge_box.add_child(nx)
+		var odds := UiKit.rich(15, 520)
+		var fail: String = ("[color=#%s]실패하면 +%d로 내려간다[/color]" % [FORGE_BAD.to_html(false), meta.sheath_lv - 1]) if meta.sheath_lv >= md.sheath_drop_from else "실패하면 그대로 +%d (조각만 든다)" % meta.sheath_lv
+		odds.text = "성공 [b]%d%%[/b] · %s" % [roundi(meta.sheath_rate(md)), fail]
+		_forge_box.add_child(odds)
+		var cost: int = meta.sheath_cost(md)
+		var b := UiKit.button("망치질 · 조각 %s%s" % [_num(cost), "  (모자람)" if meta.shards < cost else ""], _forge_sheath, 46)
 		b.disabled = _busy
 		_forge_box.add_child(b)
-		var note: String = "실패하면 한 단계 내려간다." if meta.sheath_lv >= md.sheath_drop_from else "+%d부터는 실패하면 한 단계 내려간다." % md.sheath_drop_from
-		_forge_box.add_child(UiKit.label(note + " +5, +10에 처음 닿으면 각인이 붙는다.", 13, UiKit.MUTED))
 		if meta.has_recruit("smith"):
 			_forge_box.add_child(UiKit.label("떠돌이 대장장이가 거든다: 망치질 값 -%d%%" % roundi((1.0 - FieldLayout.RECRUIT_FORGE) * 100.0), 13, UiKit.MUTED))
 	else:
 		_forge_box.add_child(UiKit.label("끝까지 벼렸다.", 16, UiKit.TITLE))
+	# 결과(크게)
+	if not _forge_last.is_empty():
+		_forge_box.add_child(UiKit.rule())
+		var big := UiKit.label(str(_forge_last.title), 24, _forge_last.col)
+		_forge_box.add_child(big)
+		if str(_forge_last.sub) != "":
+			var sub := UiKit.rich(15, 520)
+			sub.text = str(_forge_last.sub)
+			_forge_box.add_child(sub)
+		if bool(_forge_last.get("pop", false)):
+			_forge_last.pop = false
+			big.modulate = Color(2.2, 2.0, 1.6)
+			create_tween().tween_property(big, "modulate", Color.WHITE, 0.6)
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_forge_box.add_child(_msg)
+
+
+const FORGE_GOLD := Color(0.95, 0.78, 0.4)
+const FORGE_BAD := Color(0.86, 0.36, 0.28)
+
+
+## 검집 단계 lv일 때 넣은 검의 모습(창의 앞뒤 숫자). 검이 없으면 null.
+func _sheath_at(lv: int) -> Sword:
+	var s := meta.sheath_sword(data)
+	if s == null:
+		return null
+	var t := Sword.new(s.data, data)
+	t.apply_sheath(lv, meta.sheath_ins, data)
+	return t
+
+
+## "피해 73 → 77 · 내구 246 → 264" (검이 없으면 % 앞뒤).
+func _forge_diff(a_lv: int, b_lv: int) -> String:
+	var md := data.meta
+	var a := _sheath_at(a_lv)
+	var b := _sheath_at(b_lv)
+	var gold: String = FORGE_GOLD.to_html(false) if b_lv > a_lv else FORGE_BAD.to_html(false)
+	if a == null:
+		return "피해 +%d%% → [color=#%s]+%d%%[/color] · 내구 +%d%% → [color=#%s]+%d%%[/color]" % [roundi(md.sheath_damage * 100 * a_lv), gold, roundi(md.sheath_damage * 100 * b_lv), roundi(md.sheath_durability * 100 * a_lv), gold, roundi(md.sheath_durability * 100 * b_lv)]
+	var t: String = "피해 %d → [color=#%s]%d[/color]" % [roundi(a.damage(data)), gold, roundi(b.damage(data))]
+	if a.breakable():
+		t += " · 내구 %d → [color=#%s]%d[/color]" % [roundi(a.max_durability), gold, roundi(b.max_durability)]
+	return t
+
+
+## 다음 단계에 오르는 것: "+4 → +5  피해 73 → 77 · 내구 …" 그리고 처음 닿는 각인 단계면 각인 줄.
+func _forge_next_bbcode(_now: Sword, nxt: int) -> String:
+	var md := data.meta
+	var t: String = "[b][color=#%s]+%d → +%d[/color][/b]   %s" % [FORGE_GOLD.to_html(false), meta.sheath_lv, nxt, _forge_diff(meta.sheath_lv, nxt)]
+	if md.sheath_ins_levels.has(nxt) and nxt > meta.sheath_peak:
+		t += "\n[color=#%s]◆ +%d에 처음 닿으면 각인 하나가 붙는다[/color]" % [FORGE_GOLD.to_html(false), nxt]
+	return t
 
 
 # ---------------------------------------------------------------- 검 보관집(2026-11-21)
@@ -578,30 +651,37 @@ func _buy_sheath() -> void:
 func _forge_sheath() -> void:
 	if _busy:
 		return
-	if meta.shards < meta.sheath_cost(data.meta):
-		_render_forge("조각이 %s 모자라." % _num(meta.sheath_cost(data.meta) - meta.shards))
+	var cost: int = meta.sheath_cost(data.meta)
+	if meta.shards < cost:
+		_forge_last = {}
+		_render_forge("조각이 %s 모자라." % _num(cost - meta.shards))
 		return
 	_busy = true
+	_forge_last = {"title": "망치질", "sub": "", "col": UiKit.MUTED}
 	_render_forge("")
+	var beats: PackedStringArray = PackedStringArray()
 	for i in 3:
-		await get_tree().create_timer(hammer_gap).timeout
+		await get_tree().create_timer(forge_gap).timeout
 		forge_hit.emit(i + 1)
-		_msg.text = "…".repeat(i + 1)
+		beats.append("땅!")
+		_forge_last = {"title": "  ".join(beats), "sub": "", "col": UiKit.TITLE}
+		_render_forge("")
 	await get_tree().create_timer(result_delay).timeout
 	var lv0: int = meta.sheath_lv
 	var r := meta.forge_sheath(data)
 	meta.save()
 	_busy = false
-	var msg: String
 	if r.ok:
-		msg = "성공! 검집 +%d." % meta.sheath_lv + (" 각인 「%s」이(가) 붙었다." % r.ins if r.ins != "" else "")
+		_forge_last = {"title": "성공 · 검집 +%d" % meta.sheath_lv, "col": FORGE_GOLD, "pop": true,
+			"sub": _forge_diff(lv0, meta.sheath_lv) + ("\n[color=#%s]◆ 각인 「%s」이(가) 붙었다[/color]" % [FORGE_GOLD.to_html(false), r.ins] if r.ins != "" else "")}
 	elif r.dropped:
-		msg = "실패. 검집이 +%d(으)로 내려갔다." % meta.sheath_lv
+		_forge_last = {"title": "실패 · +%d → +%d" % [lv0, meta.sheath_lv], "col": FORGE_BAD, "pop": true,
+			"sub": "검집이 한 단계 내려갔다. " + _forge_diff(lv0, meta.sheath_lv)}
 	else:
-		msg = "실패. 조각만 날아갔다."
+		_forge_last = {"title": "실패 · 그대로 +%d" % lv0, "col": UiKit.MUTED, "pop": true, "sub": "조각 %s만 들었다. 단계는 그대로다." % _num(cost)}
 	forge_done.emit(r, r.ok and meta.sheath_lv >= 7 and meta.sheath_lv > lv0)
 	refresh_top()
-	_render_forge(msg)
+	_render_forge("")
 
 
 # ---------------------------------------------------------------- 성소
