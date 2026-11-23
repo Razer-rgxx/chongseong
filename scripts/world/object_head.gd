@@ -39,23 +39,37 @@ static func attach_info(skel: Skeleton3D, info: Dictionary) -> Node3D:
 	return holder
 
 
+static func _recolor(src: Material, name: String, tint: Color, glow: Color, frame: Color) -> Material:
+	var m := src.duplicate() as StandardMaterial3D
+	if m == null:
+		return src
+	if m.emission_enabled or name.begins_with("glow"):
+		m.emission_enabled = true
+		m.emission = glow
+		m.albedo_color = glow.lerp(Color.WHITE, 0.3)
+	elif name.begins_with("metal") or (name == "" and m.metallic > 0.5):
+		m.albedo_color = frame if not name.begins_with("metal_steel") else m.albedo_color
+	else:
+		m.albedo_color = m.albedo_color * tint
+	m.rim_enabled = true
+	m.rim = 0.3
+	return m
+
+
 static func _decorate(o: Node3D, info: Dictionary) -> void:
 	var tint: Color = info.get("tint", Color.WHITE)
 	var glow: Color = info.get("glow", Color(1, 0.5, 0.2))
 	var frame: Color = {&"iron": Color(0.25, 0.25, 0.27), &"brass": Color(0.58, 0.44, 0.2), &"bone": Color(0.72, 0.68, 0.58), &"rust": Color(0.4, 0.2, 0.1)}.get(info.get("frame", &"iron"), Color(0.25, 0.25, 0.27))
-	for mi in o.find_children("*", "MeshInstance3D", true, false):
-		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
-		if m == null:
+	for node in o.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.material_override != null:
+			mi.material_override = _recolor(mi.material_override, "", tint, glow, frame)
 			continue
-		m = m.duplicate()
-		if m.emission_enabled:
-			m.emission = glow
-			m.albedo_color = glow.lerp(Color.WHITE, 0.3)
-		elif m.metallic > 0.5:
-			m.albedo_color = frame
-		else:
-			m.albedo_color = m.albedo_color * tint
-		(mi as MeshInstance3D).material_override = m
+		# Blender 머리: 면마다 재질. 이름 앞머리(metal_·glow_)로 나눈다
+		for si in mi.mesh.get_surface_count():
+			var sm: Material = mi.mesh.surface_get_material(si)
+			if sm:
+				mi.set_surface_override_material(si, _recolor(sm, sm.resource_name, tint, glow, frame))
 	for l in o.find_children("*", "OmniLight3D", true, false):
 		(l as OmniLight3D).light_color = glow
 	var gm := _m(glow)
@@ -204,6 +218,13 @@ static func _ball(p: Node3D, r: float, at: Vector3, m: Material, squash: Vector3
 
 ## 물건 하나(바닥이 원점, 위로 0.3~0.5m). 색은 어둡고 바랬다.
 static func build(obj: StringName) -> Node3D:
+	# Blender로 지은 머리(tools/blender/make_heads.py → assets/heads/<모양>.glb)가 있으면 그것
+	var glb: String = "res://assets/heads/%s.glb" % obj
+	if ResourceLoader.exists(glb):
+		var g := (load(glb) as PackedScene).instantiate() as Node3D
+		var wrap := Node3D.new()
+		wrap.add_child(g)
+		return wrap
 	var n := Node3D.new()
 	var steel := _m(Color(0.55, 0.56, 0.58), 0.85, 0.35)
 	var iron := _m(Color(0.22, 0.22, 0.23), 0.7, 0.55)
