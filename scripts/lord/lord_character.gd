@@ -78,8 +78,9 @@ func _ready() -> void:
 	_body.rotation.y = PI   # Mixamo 캐릭터는 +Z를 본다. 이 게임의 모델 앞은 -Z다
 	add_child(_body)
 	_skel = _body.find_child("Skeleton3D", true, false) as Skeleton3D
-	if object_head == &"lord" and not ObjectHead.lord_info.is_empty():
-		ObjectHead.attach_info(_skel, ObjectHead.lord_info)   # 쓴 머리(Heads)
+	if object_head == &"lord":
+		if not ObjectHead.lord_info.is_empty():
+			ObjectHead.attach_info(_skel, ObjectHead.lord_info)   # 쓴 머리(Heads). 안 썼으면 사람 머리 그대로(2026-11-23 사용자: 처음엔 머리 없게)
 	elif object_head != &"":
 		ObjectHead.attach(_skel, object_head)
 	_player = _body.find_child("AnimationPlayer", true, false) as AnimationPlayer

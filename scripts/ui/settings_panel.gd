@@ -15,6 +15,10 @@ var _key_buttons: Dictionary = {}
 var _waiting: String = ""
 var _was_paused: bool = false
 var _was_mouse: Input.MouseMode = Input.MOUSE_MODE_VISIBLE
+## 기록 모두 지우기: 한 번 누르면 묻고(_wipe_armed), 한 번 더 누르면 지운다.
+var _wipe: Button
+var _wipe_armed: bool = false
+const TITLE_SCENE: String = "res://scenes/title/title.tscn"
 
 
 func _ready() -> void:
@@ -68,6 +72,11 @@ func _ready() -> void:
 	box.add_child(UiKit.label("키 칸을 누르고 새 키를 누릅니다. 예비 키(화살표 등)는 그대로 남습니다.", 13, UiKit.MUTED))
 	box.add_child(UiKit.rule())
 	box.add_child(UiKit.button("기본값으로", _reset, 34))
+	box.add_child(UiKit.rule())
+	box.add_child(UiKit.label("기록", 18, UiKit.TITLE))
+	_wipe = UiKit.button("기록 모두 지우기", _on_wipe, 34)
+	box.add_child(_wipe)
+	box.add_child(UiKit.label("조각·검집·도감·머리·마을·들판 기록이 모두 지워지고 처음부터 시작합니다.\n소리·감도·키 설정은 남습니다.", 13, UiKit.MUTED))
 	_refresh()
 
 
@@ -133,6 +142,21 @@ func _on_volume(v: float) -> void:
 func _on_mouse(v: float) -> void:
 	GameSettings.mouse_k = v
 	_refresh()
+
+
+## 기록 모두 지우기: 처음 누르면 한 번 더 누르라고 바꾸고, 두 번째에 지우고 시작 화면으로 간다.
+func _on_wipe() -> void:
+	if not _wipe_armed:
+		_wipe_armed = true
+		_wipe.text = "정말 지웁니다 · 한 번 더 누르세요"
+		_wipe.add_theme_color_override("font_color", Color(0.9, 0.35, 0.28))
+		return
+	Meta.wipe()
+	ObjectHead.lord_info = {}
+	GameSettings.save()
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file(TITLE_SCENE)
 
 
 func _reset() -> void:

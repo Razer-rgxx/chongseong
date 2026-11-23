@@ -132,6 +132,19 @@ static func load_or_new(path: String = SAVE_PATH) -> Meta:
 	return m
 
 
+## 기록을 모두 지운다(설정 창의 "기록 모두 지우기", 2026-11-23). 저장 파일을 지우고 장면 사이에 넘기던 값도 비운다.
+## 설정(user://settings.cfg: 소리·감도·키)은 그대로 둔다. 다음에 읽으면 처음 시작한 기록(Meta.new)이다.
+static func wipe(path: String = SAVE_PATH) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	carry_sword = -1
+	carry_more = []
+	duel_picks = [0, 0]
+	wake_at_gate = false
+	wake_note = ""
+	wake_at_crypt = false
+
+
 func save(path: String = SAVE_PATH) -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f:

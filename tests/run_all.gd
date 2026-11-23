@@ -92,6 +92,7 @@ func _init() -> void:
 	_test_village_talk()
 	_test_village_yard()
 	_test_village_save()
+	_test_meta_wipe()
 	_test_field_meta()
 	(load("res://tests/field_fight_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/field_boss_tests.gd") as GDScript).call("run", d, check)
@@ -3774,6 +3775,20 @@ func _test_village_save() -> void:
 	m3.fill_board(d)
 	check(m3.quest_board.size() == 3, "저장: 옛 저장에도 의뢰판이 채워진다")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+## 기록 모두 지우기(2026-11-23): 저장 파일이 사라지고 다시 읽으면 처음 기록, 장면 사이 값도 비운다.
+func _test_meta_wipe() -> void:
+	var path: String = "user://test_wipe.json"
+	var m := Meta.new()
+	m.shards = 321
+	m.head = "chief_tower|00000001"
+	m.save(path)
+	Meta.carry_sword = 5
+	Meta.wake_at_gate = true
+	Meta.wipe(path)
+	var m2 := Meta.load_or_new(path)
+	check(not FileAccess.file_exists(path) and m2.shards == 0 and m2.head == "" and m2.heads.is_empty() and Meta.carry_sword == -1 and not Meta.wake_at_gate, "기록 지우기: 파일이 사라지고 처음 기록(머리 없음)으로 시작한다")
 
 
 func _test_field_meta() -> void:
