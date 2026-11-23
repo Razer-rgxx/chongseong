@@ -1,4 +1,4 @@
-# 「검의 언덕」 최고 등급(무한) 칼 여섯 자루를 Blender로 짓고 .glb로 내보낸다. (2026-11-23)
+# 「검의 언덕」 최고 등급(무한) 칼 열세 자루(무한 전부)를 Blender로 짓고 .glb로 내보낸다. (2026-11-23)
 #
 # PC에서 한 번(chongseong 폴더에서, Blender 4.x):
 #   "C:\Program Files\Blender Foundation\Blender 4.2\blender.exe" -b -P tools\blender\make_swords.py
@@ -16,6 +16,13 @@
 #   294 떨어진 검         → 몰락한 왕의 부러진 대검(톱니처럼 빠진 날, 꺾인 자리 너머 반투명한 옛 칼날, 왕관 코등이, 깨진 보석, 해진 천)
 #   291 꺼지지 않는 불    → 플랑베르주(불꽃처럼 물결치는 대검 날, 날을 따라 타오르는 빛, 갈고리 리카소)
 #   289 그림자 왕         → 그림자 왕의 단검(검은 물결 칼날, 박쥐 날개 코등이, 왕관 자루끝)
+#   293 피의 왕좌         → 기사 왕의 장검(핏빛 피홈, 왕좌 팔걸이 코등이, 보석)
+#   297 모든 검의 어머니  → 사인검(곧은 조선 양날, 칼날의 별자리)
+#   299 처음이자 마지막 칼 → 비파형 동검(청동, 비파 모양 칼날, 돌 자루끝 추)
+#   300 이름을 잃은 검    → 지워진 이름의 단도(흰 나무 손잡이, 긁힌 각인)
+#   295 망각              → 빛으로만 남은 컵 손잡이 레이피어
+#   288 언덕의 심장       → 창살 속 심장이 뛰는 두 손 대검(핏줄 같은 빛)
+#   298 언덕              → 이끼 낀 돌 대검에 작은 칼들이 꽂혔다
 
 import bpy
 import bmesh
@@ -270,6 +277,204 @@ SWORDS = {
     "291": sword_flamberge,
     "289": sword_shadow_king,
 }
+
+
+# ------------------------------------------------------------------ 2026-11-23 추가 일곱 자루(무한 등급 전부)
+def sword_blood_throne():
+    """피의 왕좌: 기사 왕의 곧은 장검. 피홈을 따라 핏빛이 흐르고, 금 십자 코등이 끝이 왕좌의 팔걸이처럼 말려 오른다.
+    가운데 붉은 보석, 붉은 천 손잡이, 수레바퀴 자루끝에도 보석."""
+    L = 1.10
+    hw = lambda t: 0.034 - 0.01 * t
+    blade("blade", L, hw, 0.006, "metal_steel", single=False, tip=0.14)
+    blade("fuller", L * 0.72, lambda t: 0.0045 - 0.002 * t, 0.0063, "glow_edge", single=False, tip=0.3, z0=0.04, segs=40)
+    K.box((0.28, 0.03, 0.03), (0, 0, -0.015), "metal_gold", bev=0.006)
+    for sx in (-1, 1):
+        K.limb(K.arc((sx * 0.14, 0, -0.015), (sx * 0.15, 0, 0.06), (sx * 0.04, 0, -0.01), 6), [0.013 - i * 0.0013 for i in range(7)], "metal_gold", 10)
+        K.ball(0.012, (sx * 0.15, 0, 0.065), "metal_gold", sub=3)
+    K.box((0.06, 0.036, 0.05), (0, 0, -0.012), "metal_gold", bev=0.008)
+    for sy in (-1, 1):
+        K.ball(0.012, (0, sy * 0.02, -0.012), "glow_edge", (1, 0.5, 1.3), 3)
+    K.cyl(0.016, 0.017, 0.19, (0, 0, -0.125), "cloth_red", 24)
+    grip_wrap(-0.03, -0.215, 0.017, "metal_gold", 4, 0.0)
+    K.cyl(0.04, 0.04, 0.018, (0, 0, -0.245), "metal_gold", 48, (math.pi / 2, 0, 0))
+    K.ring(0.04, 0.004, (0, 0, -0.245), "metal_gold", (math.pi / 2, 0, 0))
+    for sy in (-1, 1):
+        K.ball(0.011, (0, sy * 0.01, -0.245), "glow_edge", (1, 0.6, 1), 3)
+
+
+def sword_sain():
+    """모든 검의 어머니(사인검): 곧고 가는 조선의 양날 검. 칼날 양면에 별자리가 박혀 빛나고 별끼리 가는 빛줄로 잇는다.
+    은 테를 두른 둥근 코등이, 상어 가죽에 남색 줄, 놋쇠 자루끝 고리에 남색 술."""
+    L = 1.10
+    hw = lambda t: 0.024 - 0.006 * t
+    th = 0.0055
+    blade("blade", L, hw, th, "metal_steel", single=False, tip=0.12)
+    rnd = random.Random(4)
+    for sy in (-1, 1):
+        stars = []
+        for k in range(14):
+            z = 0.06 + k * 0.062 + rnd.uniform(-0.015, 0.015)
+            x = rnd.uniform(-0.6, 0.6) * hw(z / L) * 0.55
+            stars.append((x, sy * (th + 0.0008), z))
+        for i, p in enumerate(stars):
+            K.ball(0.0032 if i % 3 else 0.0045, p, "glow_edge", (1, 0.4, 1), 2)
+            if i > 0:
+                K.limb([stars[i - 1], p], [0.0007, 0.0007], "glow_edge", 4)
+    K.cyl(0.03, 0.03, 0.007, (0, 0, -0.008), "metal_iron", 48, (0, 0, 0))
+    K.ring(0.03, 0.0025, (0, 0, -0.008), "metal_silver")
+    K.cyl(0.016, 0.017, 0.2, (0, 0, -0.112), "skin_ray", 32)
+    cord_spiral(-0.015, -0.21, 0.0172, "cloth_navy", 9)
+    K.cyl(0.018, 0.016, 0.02, (0, 0, -0.222), "metal_brass", 32)
+    K.ring(0.014, 0.0032, (0, 0, -0.243), "metal_brass", (math.pi / 2, 0, 0))
+    for k in range(8):
+        a = k / 8 * math.tau
+        K.limb([(0, 0, -0.256), (math.cos(a) * 0.012, math.sin(a) * 0.012, -0.3), (math.cos(a) * 0.015, math.sin(a) * 0.015, -0.37)], [0.0028, 0.0026, 0.0018], "cloth_navy", 6)
+
+
+def sword_bronze():
+    """처음이자 마지막 칼(비파형 동검): 비파처럼 아래가 불룩하고 허리에 돌기가 솟은 청동 칼날, 가운데 둥근 등대,
+    T자 청동 손잡이, 돌로 된 자루끝 추(검파두식). 녹청이 앉았다."""
+    L = 1.10
+
+    def hw(t):
+        bulge = 0.042 * math.sin(math.pi * min(t / 0.62, 1.0)) ** 0.8
+        notch = 0.012 * math.exp(-((t - 0.6) / 0.03) ** 2)
+        return 0.016 + bulge * (1.0 if t < 0.62 else 0.0) + notch + (0.012 * (1.0 - t) if t >= 0.62 else 0.0)
+
+    def prof(w, th, k):
+        ww = w * k
+        r1 = min(0.012, ww * 0.6)     # 등대(가운데 둥근 마루): 칼끝으로 갈수록 같이 가늘어진다
+        r2 = min(0.006, ww * 0.3)
+        tr = th * (0.5 + 1.1 * k)
+        return [(ww, 0.0), (max(ww * 0.5, r1 * 1.05), th * 0.35), (r1, th * 0.7), (r2, tr), (-r2, tr), (-r1, th * 0.7), (-max(ww * 0.5, r1 * 1.05), th * 0.35), (-ww, 0.0),
+                (-max(ww * 0.5, r1 * 1.05), -th * 0.35), (-r1, -th * 0.7), (-r2, -tr), (r2, -tr), (r1, -th * 0.7), (max(ww * 0.5, r1 * 1.05), -th * 0.35)]
+    blade("blade", L, hw, 0.0065, "metal_bronze", single=False, tip=0.1, profile=prof, segs=120)
+    K.cyl(0.014, 0.016, 0.06, (0, 0, -0.02), "metal_bronze", 24)
+    K.limb([(-0.07, 0, -0.05), (0, 0, -0.05), (0.07, 0, -0.05)], [0.012, 0.016, 0.012], "metal_bronze", 12)
+    K.cyl(0.015, 0.016, 0.17, (0, 0, -0.14), "metal_bronze", 24)
+    for k in range(5):
+        K.ring(0.0165, 0.003, (0, 0, -0.07 - k * 0.035), "metal_bronze")
+    w = K.ball(0.035, (0, 0, -0.24), "stone_dark", (1.6, 0.8, 0.7), 4)
+    K.displace(w, 0.004, 0.02, "VORONOI")
+
+
+def sword_nameless():
+    """이름을 잃은 검: 코등이 없는 흰 나무 칼집 손잡이(시라사야)의 짧은 외날. 칼날에 새긴 이름은 긁혀 지워졌고,
+    그 자국만 희미하게 빛난다. 손잡이에 금이 갔다."""
+    L = 0.55
+    blade("blade", L, lambda t: 0.019 - 0.003 * t, 0.0045, "metal_hamon", curve=0.012, single=True, tip=0.14)
+    rnd = random.Random(9)
+    for k in range(6):
+        z = 0.05 + k * 0.028
+        K.box((0.004 + rnd.uniform(0, 0.006), 0.0006, 0.012), (-0.008 + rnd.uniform(-0.002, 0.002), 0.0047, z), "glow_edge", (0, 0, rnd.uniform(-0.8, 0.8)), 0)
+    K.box((0.042, 0.013, 0.022), (-0.001, 0, -0.008), "metal_brass", bev=0.002)
+    h = K.cyl(0.019, 0.017, 0.14, (0, 0, -0.088), "wood_pale", 32)
+    h.scale = (1.0, 0.72, 1.0)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0.015, 0, -0.11), rotation=(0, 0.3, 0))
+    c = bpy.context.active_object
+    c.scale = (0.003, 0.05, 0.05)
+    K.cut(h, c)
+    K.cyl(0.0195, 0.0195, 0.006, (0, 0, -0.161), "wood_pale", 32)
+
+
+def sword_oblivion():
+    """망각: 칼날이 반투명한 빛으로만 남은 레이피어. 그 안에 은빛 심 하나. 구멍 뚫린 반구 컵 코등이, 끝이 구슬인 곧은 키용,
+    손등 테, 은실 손잡이, 둥근 자루끝."""
+    L = 1.42
+    blade("ghost", L, lambda t: 0.013 - 0.004 * t, 0.005, "ghost_blade", single=False, tip=0.2)
+    blade("core", L * 0.96, lambda t: 0.0016, 0.0016, "metal_silver", single=False, tip=0.1)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.065, location=(0, 0, -0.005), segments=48, ring_count=24)
+    cup = bpy.context.active_object
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.09))
+    top = bpy.context.active_object
+    top.scale = (0.2, 0.2, 0.2)
+    K.cut(cup, top)
+    K.give(cup, "metal_silver")
+    sol = cup.modifiers.new("solid", "SOLIDIFY")
+    sol.thickness = 0.003
+    rnd = random.Random(3)
+    for k in range(10):
+        a = k / 10 * math.tau
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.006, depth=0.05, location=(math.cos(a) * 0.05, math.sin(a) * 0.05, -0.035), rotation=(math.cos(a) * 0.9, math.sin(a) * 0.9, 0))
+        cut_c = bpy.context.active_object
+        cup.modifiers.remove(sol)
+        K.cut(cup, cut_c)
+        sol = cup.modifiers.new("solid", "SOLIDIFY")
+        sol.thickness = 0.003
+    K.smooth(cup)
+    K.limb([(-0.17, 0, -0.012), (0, 0, -0.012), (0.17, 0, -0.012)], [0.005, 0.007, 0.005], "metal_silver", 12)
+    for sx in (-1, 1):
+        K.ball(0.012, (sx * 0.17, 0, -0.012), "metal_silver", sub=3)
+    K.limb(K.arc((0.05, 0, -0.03), (0.02, 0, -0.17), (0.04, 0, 0), 8), [0.0045] * 9, "metal_silver", 10)
+    K.cyl(0.012, 0.013, 0.12, (0, 0, -0.1), "leather_dark", 24)
+    cord_spiral(-0.045, -0.155, 0.0135, "metal_silver", 11)
+    K.ball(0.024, (0, 0, -0.18), "metal_silver", sub=4)
+
+
+def sword_heart():
+    """언덕의 심장: 두 손 대검(츠바이헨더). 검은 칼날에 핏줄 같은 빛이 갈라져 흐르고, 넓은 코등이 가운데 쇠창살 안에서
+    심장 모양 빛이 뛴다. 양쪽 고리, 금띠 두른 긴 손잡이, 배 모양 자루끝."""
+    L = 1.61
+    hw = lambda t: 0.055 - 0.018 * t
+    th = 0.0075
+    blade("blade", L, hw, th, "metal_dark", single=False, tip=0.12)
+    rnd = random.Random(21)
+    for sy in (-1, 1):
+        for b in range(5):
+            x0 = rnd.uniform(-0.01, 0.01)
+            z = 0.1 + b * 0.25
+            pts = [(x0, sy * (th + 0.0006), z)]
+            for k in range(6):
+                q = pts[-1]
+                nz = q[2] + rnd.uniform(0.03, 0.06)
+                nx = max(-hw(nz / L) * 0.7, min(hw(nz / L) * 0.7, q[0] + rnd.uniform(-0.015, 0.015)))
+                pts.append((nx, q[1], nz))
+            K.limb(pts, [0.0016 - i * 0.0002 for i in range(7)], "glow_edge", 5)
+    K.box((0.42, 0.04, 0.035), (0, 0, -0.02), "metal_iron", bev=0.006)
+    for sx in (-1, 1):
+        K.ring(0.03, 0.005, (sx * 0.08, 0, 0.02), "metal_iron", (math.pi / 2, 0, 0))
+        K.limb(K.arc((sx * 0.21, 0, -0.02), (sx * 0.24, 0, -0.08), (sx * 0.03, 0, 0), 5), [0.012, 0.011, 0.01, 0.008, 0.006, 0.004], "metal_iron", 10)
+    # 창살 안의 심장
+    K.ball(0.018, (-0.011, 0, 0.005), "glow_edge", (1, 0.7, 1), 3)
+    K.ball(0.018, (0.011, 0, 0.005), "glow_edge", (1, 0.7, 1), 3)
+    K.cyl(0.0, 0.024, 0.032, (0, 0, -0.018), "glow_edge", 24, (math.pi, 0, 0))
+    for k in range(6):
+        a = k / 6 * math.tau
+        K.limb(K.arc((math.cos(a) * 0.01, math.sin(a) * 0.01, -0.045), (math.cos(a) * 0.01, math.sin(a) * 0.01, 0.04), (math.cos(a) * 0.03, math.sin(a) * 0.03, 0), 6), [0.003] * 7, "metal_iron", 6)
+    K.cyl(0.023, 0.025, 0.42, (0, 0, -0.26), "leather_dark", 24)
+    for z in (-0.06, -0.26, -0.46):
+        K.ring(0.026, 0.005, (0, 0, z), "metal_gold")
+    K.ball(0.038, (0, 0, -0.5), "metal_iron", (1, 1, 1.35), 4)
+
+
+def sword_hill():
+    """언덕: 언덕의 돌을 깎아 만든 거대한 석검. 이끼 낀 거친 돌 칼날에 작은 칼 여러 자루가 꽂혀 있다.
+    돌덩이 코등이, 나무껍질과 천으로 감은 손잡이, 바위 자루끝."""
+    L = 1.61
+    b = blade("blade", L, lambda t: 0.075 - 0.03 * t, 0.022, "stone_grey", single=False, tip=0.16)
+    K.displace(b, 0.008, 0.03, "VORONOI")
+    rnd = random.Random(8)
+    for k in range(6):
+        z = 0.25 + k * 0.2
+        sx = 1 if k % 2 else -1
+        K.sword((sx * 0.03, rnd.uniform(-0.01, 0.01), z), (rnd.uniform(-0.3, 0.3), sx * rnd.uniform(0.9, 1.3), 0), 0.12, "metal_iron", "metal_iron", 0.5)
+    g = K.ball(0.07, (0, 0, -0.02), "stone_grey", (2.4, 0.9, 0.6), 4)
+    K.displace(g, 0.01, 0.03, "VORONOI")
+    K.cyl(0.026, 0.028, 0.4, (0, 0, -0.26), "wood_old", 16)
+    grip_wrap(-0.06, -0.44, 0.028, "cloth_black", 6, 0.4)
+    p = K.ball(0.05, (0, 0, -0.5), "stone_grey", (1, 0.9, 1.1), 4)
+    K.displace(p, 0.008, 0.03, "VORONOI")
+
+
+SWORDS.update({
+    "293": sword_blood_throne,
+    "297": sword_sain,
+    "299": sword_bronze,
+    "300": sword_nameless,
+    "295": sword_oblivion,
+    "288": sword_heart,
+    "298": sword_hill,
+})
 
 if __name__ == "__main__":
     K.run_all(SWORDS, OUT, 1024, "칼")
