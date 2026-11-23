@@ -153,6 +153,7 @@ func _ready() -> void:
 	var hzv := HzView.new()   # 언덕 재설계: 검 지도의 줄·깨어남·거래 창
 	add_child(hzv)
 	hzv.setup(rules)
+	rules.hz_event.connect(_on_hz_event)
 	if meta and meta.runs == 0:   # 첫 판: 튜토리얼
 		var tut := Tutorial.new()
 		add_child(tut)
@@ -758,6 +759,19 @@ func _on_pulled(s: Sword) -> void:
 		text += " " + _pull_note
 		_pull_note = ""
 	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void: _hud.toast(text))
+
+
+## 언덕 재설계: 검을 뽑아 사건이 시작되는 순간. 땅이 갈라지고(뽑기 먼지·불똥), 쿵 울리고, 잠깐 느려진다.
+func _on_hz_event(zi: int, _kind: int) -> void:
+	var h := rules.hilt_of(zi)
+	var at: Vector3 = Grid.cells_to_world(h.pos) if h else _lord.position
+	_sfx.play(&"draw", at, 0.0, 0.85)
+	_sfx.play(&"hit_big", at, -6.0, 0.6)
+	_camera.add_shake(0.45)
+	_pull_fx.begin(at, zi)
+	_pull_fx.reveal(0, Color(0.85, 0.25, 0.15), null, at)
+	Engine.time_scale = 0.3
+	get_tree().create_timer(0.22, true, false, true).timeout.connect(func() -> void: Engine.time_scale = 1.0)
 
 
 ## 검 주인의 잔영이 나왔다(밤이 오는 순간이나 주인 있는 검을 발검한 순간).
