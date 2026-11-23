@@ -48,7 +48,9 @@ static func _recolor(src: Material, name: String, tint: Color, glow: Color, fram
 		m.emission = glow
 		m.albedo_color = glow.lerp(Color.WHITE, 0.3)
 	elif name.begins_with("metal") or (name == "" and m.metallic > 0.5):
-		m.albedo_color = frame if not name.begins_with("metal_steel") else m.albedo_color
+		if not name.begins_with("metal_steel"):
+			# 구운 질감이 있으면 밝기를 지키고 색만 입힌다
+			m.albedo_color = (frame * 2.2).clamp() if m.albedo_texture else frame
 	else:
 		m.albedo_color = m.albedo_color * tint
 	m.rim_enabled = true
@@ -224,6 +226,11 @@ static func build(obj: StringName) -> Node3D:
 		var g := (load(glb) as PackedScene).instantiate() as Node3D
 		var wrap := Node3D.new()
 		wrap.add_child(g)
+		var gl := OmniLight3D.new()   # 빛나는 틈·눈이 둘레를 조금 비춘다(색은 _decorate가)
+		gl.omni_range = 1.4
+		gl.light_energy = 0.6
+		gl.position = Vector3(0, 0.2, 0.08)
+		wrap.add_child(gl)
 		return wrap
 	var n := Node3D.new()
 	var steel := _m(Color(0.55, 0.56, 0.58), 0.85, 0.35)
