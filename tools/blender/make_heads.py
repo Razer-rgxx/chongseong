@@ -335,6 +335,17 @@ def cut(o, cutter):
     return o
 
 
+def merge(o, other):
+    """other를 o에 불리언 합집합으로 붙인다(겹친 몸을 join하면 뒤의 cut이 몸을 통째로 지우는 수가 있다, Blender 5.3 무덤 묘비)."""
+    m = o.modifiers.new("merge", "BOOLEAN")
+    m.object = other
+    m.operation = "UNION"
+    only(o)
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    bpy.data.objects.remove(other, do_unlink=True)
+    return o
+
+
 def cyl(r1, r2, h, at, m, verts=48, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=r1, radius2=r2, depth=h, location=at, rotation=rot)
     return smooth(give(obj(), m))
@@ -828,13 +839,7 @@ def head_tomb():
     """무덤 주인: 이 빠진 둥근 묘비, 금, 새긴 십자, 받침돌, 촛농 흐르는 초 셋."""
     t = box((0.26, 0.085, 0.3), (0, 0, 0.17), "stone_grey", bev=0)
     bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=0.13, depth=0.085, location=(0, 0, 0.32), rotation=(math.pi / 2, 0, 0))
-    top = obj()
-    bpy.ops.object.select_all(action="DESELECT")
-    t.select_set(True)
-    top.select_set(True)
-    bpy.context.view_layer.objects.active = t
-    bpy.ops.object.join()
-    t = obj()
+    merge(t, obj())   # 둥근 머리
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0.12, 0, 0.42), rotation=(0, 0.7, 0.3))
     ch = obj()
     ch.scale = (0.08, 0.2, 0.08)
@@ -885,5 +890,12 @@ def run_all(table, out=None, size=None, what="머리"):
     print("%s %d개를 %s에 만들었다. 실패: %s" % (what, len(made), out or OUT, ", ".join(failed) or "없음"))
 
 
+def _pick(table):
+    """블렌더 명령 끝의 -- 뒤에 이름을 주면 그것만 만든다(예: -- tomb)."""
+    import sys
+    want = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    return {k: v for k, v in table.items() if not want or k in want}
+
+
 if __name__ == "__main__":   # make_swords.py가 도구만 빌려 쓸 때는 돌지 않는다
-    run_all(HEADS)
+    run_all(_pick(HEADS))

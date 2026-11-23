@@ -477,4 +477,4 @@ SWORDS.update({
 })
 
 if __name__ == "__main__":
-    K.run_all(SWORDS, OUT, 1024, "칼")
+    K.run_all(K._pick({str(k): v for k, v in SWORDS.items()}), OUT, 1024, "칼")

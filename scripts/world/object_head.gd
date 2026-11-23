@@ -49,10 +49,11 @@ static func _recolor(src: Material, name: String, tint: Color, glow: Color, fram
 		m.albedo_color = glow.lerp(Color.WHITE, 0.3)
 	elif name.begins_with("metal") or (name == "" and m.metallic > 0.5):
 		if not name.begins_with("metal_steel"):
-			# 구운 질감이 있으면 밝기를 지키고 색만 입힌다
-			m.albedo_color = (frame * 2.2).clamp() if m.albedo_texture else frame
+			# 구운 질감이 있으면 밝기를 지키고 색만 살짝 입힌다(Blender 머리)
+			m.albedo_color = Color.WHITE.lerp((frame * 1.8).clamp(), 0.75) if m.albedo_texture else frame
 	else:
-		m.albedo_color = m.albedo_color * tint
+		# 구운 질감(돌·뼈·나무)은 씨앗 빛깔을 옅게만 얹는다: 어두운 사실풍
+		m.albedo_color = Color.WHITE.lerp(tint, 0.35) if m.albedo_texture else m.albedo_color * tint
 	m.rim_enabled = true
 	m.rim = 0.3
 	return m
@@ -73,7 +74,7 @@ static func _decorate(o: Node3D, info: Dictionary) -> void:
 			if sm:
 				mi.set_surface_override_material(si, _recolor(sm, sm.resource_name, tint, glow, frame))
 	for l in o.find_children("*", "OmniLight3D", true, false):
-		(l as OmniLight3D).light_color = glow
+		(l as OmniLight3D).light_color = glow.lerp(Color(1.0, 0.8, 0.6), 0.45)   # 쇠에 비친 빛이 형광처럼 번지지 않게 옅게
 	var gm := _m(glow)
 	gm.emission_enabled = true
 	gm.emission = glow
@@ -227,8 +228,8 @@ static func build(obj: StringName) -> Node3D:
 		var wrap := Node3D.new()
 		wrap.add_child(g)
 		var gl := OmniLight3D.new()   # 빛나는 틈·눈이 둘레를 조금 비춘다(색은 _decorate가)
-		gl.omni_range = 1.4
-		gl.light_energy = 0.6
+		gl.omni_range = 0.9
+		gl.light_energy = 0.35
 		gl.position = Vector3(0, 0.2, 0.08)
 		wrap.add_child(gl)
 		return wrap
