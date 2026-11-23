@@ -108,6 +108,7 @@ var _console := SwordConsole.new()
 func _ready() -> void:
 	data = GameData.load_default()
 	meta = Meta.load_or_new()
+	ObjectHead.lord_info = Heads.info(meta.head) if meta.head != "" else {}   # 쓴 머리
 	meta.fix_sheath(data)
 	var s: int = seed_value if seed_value != 0 else int(Time.get_unix_time_from_system())
 	Rules.events_default = true   # 언덕 재설계 시험(docs/hill_events.md): 첫 구역만
@@ -154,6 +155,10 @@ func _ready() -> void:
 	add_child(hzv)
 	hzv.setup(rules)
 	rules.hz_event.connect(_on_hz_event)
+	rules.head_found.connect(func(id: String) -> void:   # 다른 영주의 검: 그 사람 머리
+		if meta.add_head(id):
+			meta.save()
+			_hud.toast("%s를 얻었다 · 마을 성소에서 쓴다" % Heads.info(id).name))
 	if meta and meta.runs == 0:   # 첫 판: 튜토리얼
 		var tut := Tutorial.new()
 		add_child(tut)

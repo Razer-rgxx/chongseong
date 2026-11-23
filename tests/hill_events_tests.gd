@@ -158,3 +158,29 @@ static func run_starter(game: GameData, chk: Callable) -> void:
 	var r2 := Rules.new(game, 32, m)
 	Rules.events_default = false
 	chk.call(r2.slots.all(func(s): return s == null or s.data.display_name != "초보자의 검"), "네 번째 판부터는 없다")
+
+
+## 머리(Heads, 2026-11-23).
+static func run_heads(game: GameData, chk: Callable) -> void:
+	var a := Heads.info("chief_grove|0000abcd")
+	var b := Heads.info("chief_grove|0000abcd")
+	var c := Heads.info("chief_grove|1234ffff")
+	chk.call(a.name == "늑대왕의 머리" and a.fx == &"heal" and a.shape == &"wolf", "우두머리 머리: 틀·효과는 우두머리 것")
+	chk.call(a.glow == b.glow and a.frame == b.frame, "같은 씨앗이면 같은 머리")
+	chk.call(a.glow != c.glow or a.frame != c.frame or a.horns != c.horns, "씨앗이 다르면 빛·장식이 다르다")
+	var m := Meta.new()
+	var got: int = 0
+	for k in 400:
+		m.heads.clear()
+		m._drop_head("chief_tower")
+		got += m.heads.size()
+	chk.call(got > 60 and got < 140, "우두머리 머리는 확률로(%d/400)" % got)
+	chk.call(not m.heads.has("me"), "내 머리는 없다")
+	# 효과: 받는 피해 감소, 결투에서는 꺼짐
+	var r := Rules.new(game, 41, m)
+	r.head = Heads.info("chief_foot|00000001")
+	chk.call(is_equal_approx(r._head_cut(10.0, null), 8.5), "머리: 받는 피해 -15%")
+	r.duel = true
+	chk.call(is_equal_approx(r._head_cut(10.0, null), 10.0), "결투에서는 머리 효과가 꺼진다")
+	var p := Heads.info("p:누군가")
+	chk.call(p.name == "누군가의 머리" and Heads.info("p:누군가").glow == p.glow, "남의 머리: 그 사람 이름으로 같은 머리")

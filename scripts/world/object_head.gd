@@ -25,6 +25,64 @@ static func head_bone(skel: Skeleton3D) -> int:
 	return -1
 
 
+## 영주가 쓴 머리(Heads.info). 장면이 Meta에서 넣는다. 비면 기본 "검의 언덕".
+static var lord_info: Dictionary = {}
+
+
+## 쓴 머리(Heads.info)로: 틀을 짓고 바탕색·빛·장식(뿔·금·사슬)을 입힌다.
+static func attach_info(skel: Skeleton3D, info: Dictionary) -> Node3D:
+	var holder := attach(skel, info.get("shape", &"hill"))
+	if holder == null:
+		return null
+	var o: Node3D = holder.get_child(0)
+	_decorate(o, info)
+	return holder
+
+
+static func _decorate(o: Node3D, info: Dictionary) -> void:
+	var tint: Color = info.get("tint", Color.WHITE)
+	var glow: Color = info.get("glow", Color(1, 0.5, 0.2))
+	var frame: Color = {&"iron": Color(0.25, 0.25, 0.27), &"brass": Color(0.58, 0.44, 0.2), &"bone": Color(0.72, 0.68, 0.58), &"rust": Color(0.4, 0.2, 0.1)}.get(info.get("frame", &"iron"), Color(0.25, 0.25, 0.27))
+	for mi in o.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		if m == null:
+			continue
+		m = m.duplicate()
+		if m.emission_enabled:
+			m.emission = glow
+			m.albedo_color = glow.lerp(Color.WHITE, 0.3)
+		elif m.metallic > 0.5:
+			m.albedo_color = frame
+		else:
+			m.albedo_color = m.albedo_color * tint
+		(mi as MeshInstance3D).material_override = m
+	for l in o.find_children("*", "OmniLight3D", true, false):
+		(l as OmniLight3D).light_color = glow
+	var gm := _m(glow)
+	gm.emission_enabled = true
+	gm.emission = glow
+	gm.emission_energy_multiplier = 2.0
+	if info.get("horns", false):
+		for sx in [-1.0, 1.0]:
+			_cyl(o, 0.0, 0.035, 0.22, Vector3(sx * 0.13, 0.3, 0), _m(frame, 0.3, 0.6), Vector3(0, 0, -sx * 0.6))
+	if info.get("cracks", false):
+		for k in 3:
+			var a: float = float(k) * 2.1
+			_box(o, Vector3(0.008, 0.12, 0.008), Vector3(cos(a) * 0.12, 0.17, sin(a) * 0.12), gm, Vector3(0.2, -a, 0.4))
+	if info.get("chain", false):
+		for k in 7:
+			var a: float = float(k) / 7.0 * TAU
+			var link := MeshInstance3D.new()
+			var t := TorusMesh.new()
+			t.inner_radius = 0.012
+			t.outer_radius = 0.025
+			link.mesh = t
+			link.material_override = _m(frame, 0.8, 0.4)
+			link.position = Vector3(cos(a) * 0.15, 0.05, sin(a) * 0.15)
+			link.rotation = Vector3(PI / 2.0 * float(k % 2), -a, 0)
+			o.add_child(link)
+
+
 ## 머리를 물건으로 바꾼다. kind가 사람 종류면 FOR_KIND로 물건을 고른다.
 static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	if skel == null:
@@ -182,6 +240,87 @@ static func build(obj: StringName) -> Node3D:
 			gl.light_energy = 0.8
 			gl.position = Vector3(0, 0.12, 0)
 			n.add_child(gl)
+		&"tower":
+			# 망루 궁수장: 총안 있는 돌 망루, 화살 셋
+			_cyl(n, 0.12, 0.14, 0.3, Vector3(0, 0.15, 0), _m(Color(0.4, 0.38, 0.35)))
+			for k in 6:
+				var a: float = float(k) / 6.0 * TAU
+				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(cos(a) * 0.12, 0.33, sin(a) * 0.12), _m(Color(0.4, 0.38, 0.35)))
+			_box(n, Vector3(0.04, 0.08, 0.02), Vector3(0, 0.2, 0.13), _m(Color(1, 0.6, 0.2)))
+			for k in 3:
+				_cyl(n, 0.006, 0.006, 0.3, Vector3(-0.04 + k * 0.04, 0.42, -0.03), wood, Vector3(0.2, 0, -0.2 + k * 0.2))
+		&"wolf":
+			# 늑대왕: 길쭉한 늑대 두개골에 쇠 왕관
+			var bone := _m(Color(0.78, 0.74, 0.64))
+			_ball(n, 0.13, Vector3(0, 0.13, -0.02), bone, Vector3(1, 0.9, 1.1))
+			_box(n, Vector3(0.1, 0.08, 0.2), Vector3(0, 0.09, 0.12), bone)
+			for sx in [-1.0, 1.0]:
+				_ball(n, 0.03, Vector3(sx * 0.06, 0.15, 0.08), _m(Color(0.02, 0.02, 0.02)))
+				_cyl(n, 0.0, 0.04, 0.1, Vector3(sx * 0.08, 0.27, -0.04), bone, Vector3(0, 0, -sx * 0.3))
+			for k in 5:
+				var a: float = float(k) / 5.0 * TAU
+				_cyl(n, 0.0, 0.02, 0.07, Vector3(cos(a) * 0.09, 0.26, sin(a) * 0.09 - 0.02), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4))
+		&"boulder":
+			var st := _m(Color(0.36, 0.34, 0.31))
+			_ball(n, 0.17, Vector3(0, 0.15, 0), st, Vector3(1.1, 0.9, 1))
+			_ball(n, 0.09, Vector3(0.1, 0.25, 0.05), st)
+			_box(n, Vector3(0.1, 0.02, 0.02), Vector3(0, 0.17, 0.16), _m(Color(1, 0.5, 0.2)))
+		&"shield":
+			# 방패대장: 앞을 막는 큰 방패가 얼굴, 가운데 돌기
+			_box(n, Vector3(0.3, 0.36, 0.05), Vector3(0, 0.18, 0.05), wood)
+			_box(n, Vector3(0.32, 0.03, 0.06), Vector3(0, 0.36, 0.05), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4))
+			_box(n, Vector3(0.32, 0.03, 0.06), Vector3(0, 0.0, 0.05), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4))
+			_ball(n, 0.06, Vector3(0, 0.18, 0.09), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4))
+		&"marsh":
+			# 늪의 부르는 자: 이끼 낀 뿔 고리에 매달린 초록 등
+			_cyl(n, 0.04, 0.05, 0.12, Vector3(0, 0.06, 0), wood)
+			var ring := MeshInstance3D.new()
+			var tr := TorusMesh.new()
+			tr.inner_radius = 0.13
+			tr.outer_radius = 0.16
+			ring.mesh = tr
+			ring.rotation.x = PI / 2.0
+			ring.position.y = 0.26
+			ring.material_override = wood
+			n.add_child(ring)
+			var gg := _m(Color(0.5, 1, 0.6))
+			gg.emission_enabled = true
+			gg.emission = Color(0.3, 1.0, 0.5)
+			gg.emission_energy_multiplier = 2.0
+			_ball(n, 0.07, Vector3(0, 0.22, 0), gg)
+		&"pick":
+			_cyl(n, 0.03, 0.03, 0.2, Vector3(0, 0.1, 0), wood)
+			_box(n, Vector3(0.44, 0.06, 0.06), Vector3(0, 0.22, 0), _m(Color(0.25, 0.25, 0.27), 0.8, 0.4), Vector3(0, 0, 0.1))
+		&"burnt":
+			var ch := _m(Color(0.1, 0.08, 0.07))
+			_ball(n, 0.16, Vector3(0, 0.15, 0), ch, Vector3(1, 1.1, 1))
+			var hot2 := _m(Color(1, 0.4, 0.1))
+			hot2.emission_enabled = true
+			hot2.emission = Color(1, 0.35, 0.05)
+			hot2.emission_energy_multiplier = 2.5
+			for k in 6:
+				var a: float = float(k) * 1.05
+				_box(n, Vector3(0.012, 0.14, 0.012), Vector3(cos(a) * 0.15, 0.15, sin(a) * 0.15), hot2, Vector3(0.3, -a, 0.5))
+		&"raven":
+			# 까마귀 기사: 부리 같은 면갑, 깃털 장식
+			_cyl(n, 0.12, 0.13, 0.22, Vector3(0, 0.11, 0), _m(Color(0.15, 0.15, 0.17), 0.7, 0.5))
+			_cyl(n, 0.0, 0.06, 0.18, Vector3(0, 0.12, 0.17), _m(Color(0.15, 0.15, 0.17), 0.7, 0.5), Vector3(PI / 2.0, 0, 0))
+			for k in 5:
+				_box(n, Vector3(0.03, 0.2, 0.01), Vector3(0, 0.3, -0.04 - k * 0.025), _m(Color(0.05, 0.05, 0.06)), Vector3(-0.3 - k * 0.15, 0, 0))
+		&"grave_helm":
+			_cyl(n, 0.13, 0.14, 0.26, Vector3(0, 0.13, 0), _m(Color(0.3, 0.3, 0.32), 0.7, 0.5))
+			_ball(n, 0.135, Vector3(0, 0.26, 0), _m(Color(0.3, 0.3, 0.32), 0.7, 0.5), Vector3(1, 0.5, 1))
+			var eye := _m(Color(0.6, 0.8, 1.0))
+			eye.emission_enabled = true
+			eye.emission = Color(0.5, 0.7, 1.0)
+			eye.emission_energy_multiplier = 3.0
+			_box(n, Vector3(0.18, 0.02, 0.02), Vector3(0, 0.17, 0.135), eye)
+		&"tomb":
+			var gs := _m(Color(0.45, 0.44, 0.42))
+			_box(n, Vector3(0.26, 0.34, 0.08), Vector3(0, 0.17, 0), gs)
+			_cyl(n, 0.13, 0.13, 0.08, Vector3(0, 0.34, 0), gs, Vector3(PI / 2.0, 0, 0))
+			_box(n, Vector3(0.03, 0.14, 0.02), Vector3(0, 0.22, 0.045), _m(Color(0.2, 0.2, 0.2)))
+			_box(n, Vector3(0.1, 0.03, 0.02), Vector3(0, 0.25, 0.045), _m(Color(0.2, 0.2, 0.2)))
 		&"hammer":
 			_cyl(n, 0.035, 0.04, 0.12, Vector3(0, 0.06, 0), wood)
 			_cyl(n, 0.045, 0.045, 0.03, Vector3(0, 0.12, 0), iron)

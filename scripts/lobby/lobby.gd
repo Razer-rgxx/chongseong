@@ -109,6 +109,7 @@ var _storage_rect: int = -1
 func _ready() -> void:
 	data = GameData.load_default()
 	meta = Meta.load_or_new()
+	ObjectHead.lord_info = Heads.info(meta.head) if meta.head != "" else {}   # 쓴 머리
 	meta.fix_sheath(data)
 	meta.save()
 	FallenShare.sync(get_tree(), meta)   # 다른 영주의 쓰러진 검을 주고받는다(키가 없거나 실패하면 조용히, 기다리지 않는다)

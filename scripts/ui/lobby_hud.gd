@@ -624,8 +624,37 @@ func _render_shrine(msg: String) -> void:
 		else:
 			row.add_child(UiKit.label("끝", 15, UiKit.MUTED))
 		_shrine_box.add_child(row)
+	_render_heads()
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
 	_shrine_box.add_child(_msg)
+
+
+## 머리(Heads, 2026-11-23): 가진 머리를 늘어놓고 하나를 쓴다(값 없음, 바꾸기 자유).
+func _render_heads() -> void:
+	_shrine_box.add_child(UiKit.label("머리", 18, UiKit.TITLE))
+	if meta.heads.is_empty():
+		_shrine_box.add_child(UiKit.label("아직 없다. 우두머리를 쓰러뜨리면 가끔 떨어지고, 다른 영주의 검을 뽑으면 그 사람의 머리를 얻는다.", 13, UiKit.MUTED))
+		return
+	for id in meta.heads.keys():
+		var i: Dictionary = Heads.info(id)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		var sw := ColorRect.new()
+		sw.color = i.glow
+		sw.custom_minimum_size = Vector2(10, 34)
+		row.add_child(sw)
+		var txt := UiKit.label("%s\n%s" % [i.name, Heads.describe(i)], 14)
+		txt.custom_minimum_size = Vector2(380, 0)
+		row.add_child(txt)
+		var on: bool = meta.head == id
+		var b := UiKit.button("벗기" if on else "쓰기", func() -> void:
+			meta.head = "" if on else id
+			meta.save()
+			ObjectHead.lord_info = Heads.info(meta.head) if meta.head != "" else {}
+			_render_shrine("머리를 벗었다. 영주를 다시 세우면 보인다." if on else "%s를 썼다. 다음 장면부터 보인다." % i.name))
+		b.custom_minimum_size = Vector2(110, 36)
+		row.add_child(b)
+		_shrine_box.add_child(row)
 
 
 func _bless_text(i: int, lv: int) -> String:

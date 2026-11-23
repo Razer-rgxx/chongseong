@@ -84,6 +84,7 @@ var _horse: RideSwordView   ## 탈 검의 몸(규칙 이름은 39단계 말 그�
 func _ready() -> void:
 	data = GameData.load_default()
 	meta = Meta.load_or_new()
+	ObjectHead.lord_info = Heads.info(meta.head) if meta.head != "" else {}   # 쓴 머리
 	meta.fix_sheath(data)
 	meta.ensure_glints()
 	meta.ensure_mat_spots()
@@ -843,7 +844,17 @@ func _on_chief_slain(id: StringName, e: Enemy) -> void:
 	if int(r.sword) > 0:
 		t += " · 들판의 검 「%s」" % data.sword_by_id(int(r.sword)).display_name
 	_hud.toast(t)
+	_head_note()
 	_saved()
+
+
+## 우두머리 머리가 떨어졌으면 알린다(Meta.head_drop).
+func _head_note() -> void:
+	if meta.head_drop == "":
+		return
+	var n: String = Heads.info(meta.head_drop).name
+	meta.head_drop = ""
+	get_tree().create_timer(2.5).timeout.connect(func() -> void: _hud.toast("%s가 떨어졌다 · 마을 성소에서 쓴다" % n))
 
 
 ## 무덤 기사를 쓰러뜨렸다: 조각과 운 부적(Meta.boss_defeat)을 토스트로 알린다.
@@ -852,6 +863,7 @@ func _on_boss_slain(_e: Enemy) -> void:
 	_camera.add_shake(data.lord.shake_big * 2.0)
 	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
 	_hud.toast("무덤 기사를 쓰러뜨렸다. 조각 %d개%s" % [r.shards, ", 운 부적" if r.charm else ""])
+	_head_note()
 	_saved()
 
 

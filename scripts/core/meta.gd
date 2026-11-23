@@ -56,6 +56,11 @@ var fallen: Array = []
 var others: Array = []
 ## 마지막으로 올린 내 쓰러진 검("id:run:kills"). 같은 것을 두 번 올리지 않는다.
 var shared_key: String = ""
+## 머리(2026-11-23, Heads): 가진 머리 id → 1, 쓴 머리(빈 칸이면 안 씀).
+var heads: Dictionary = {}
+var head: String = ""
+## 이번에 떨어진 머리(화면이 알리고 비운다).
+var head_drop: String = ""
 const FALLEN_MAX: int = 12
 ## 의뢰판(15단계): 붙은 의뢰(VillageData.quests의 번호) 3장, 맡은 장(-1 없음).
 var quest_board: Array[int] = []
@@ -134,7 +139,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen)}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -170,6 +175,12 @@ func from_dict(d: Dictionary) -> void:
 					og.append(float(v))
 				others.append({"id": int(e["id"]), "run": 0, "zone": int(e.get("zone", 0)), "kills": int(e.get("kills", 0)), "ghost": og, "name": str(e.get("name", ""))})
 	shared_key = str(d.get("shared_key", ""))
+	heads = {}
+	for k in d.get("heads", []):
+		heads[str(k)] = 1
+	head = str(d.get("head", ""))
+	if not heads.has(head):
+		head = ""
 	lost = {}
 	var lo: Variant = d.get("lost", {})
 	if lo is Dictionary:
@@ -656,6 +667,7 @@ func boss_defeat() -> Dictionary:
 	shards += n
 	boss_first = true
 	boss_down = true
+	_drop_head("boss")
 	var charm: bool = not pack.has(FieldLayout.BOSS_CHARM)
 	if charm:
 		pack.append(FieldLayout.BOSS_CHARM)
@@ -673,6 +685,7 @@ func chief_defeat(id: String) -> Dictionary:
 	shards += r.shards
 	chiefs_first[id] = 1
 	chiefs_down[id] = 1
+	_drop_head(id)
 	if r.first:
 		r.sword = int(FieldLayout.CHIEFS[id].sword)
 		note_found(r.sword)
@@ -835,6 +848,8 @@ func recruit(game: GameData) -> Dictionary:
 ## 지하 무덤(19단계): 방을 쓰러뜨렸다(저장된다. 쓰러져도 남는다).
 func crypt_clear(id: String) -> void:
 	crypt_cleared[id] = 1
+	if id == "boss":
+		_drop_head("crypt")
 
 
 ## 돌 관을 연다. 그 방을 쓰러뜨렸고 아직 안 열었을 때만 받는다. 일반 관은 조각 CRYPT_COFFIN_MIN~MAX(Meta.rng),
@@ -1448,3 +1463,18 @@ func buy_sheath(md: MetaData) -> bool:
 	shards -= c
 	storage_lv += 1
 	return true
+
+
+## 머리(Heads): 하나를 얻는다. 처음이면 참.
+func add_head(id: String) -> bool:
+	if id == "" or heads.has(id):
+		return false
+	heads[id] = 1
+	return true
+
+
+## 우두머리를 쓰러뜨렸다: Heads.DROP 확률로 그 머리 하나(빛·장식·바탕은 씨앗마다 다르다).
+func _drop_head(chief: String) -> void:
+	var id: String = Heads.roll(chief, rng)
+	if id != "" and add_head(id):
+		head_drop = id

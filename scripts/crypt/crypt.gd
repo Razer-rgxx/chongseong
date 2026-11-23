@@ -48,6 +48,7 @@ var _t: float = 0.0
 func _ready() -> void:
 	data = GameData.load_default()
 	meta = Meta.load_or_new()
+	ObjectHead.lord_info = Heads.info(meta.head) if meta.head != "" else {}   # 쓴 머리
 	meta.fix_sheath(data)
 	meta.save()
 	rules = Rules.new(data, int(Time.get_unix_time_from_system()))
@@ -368,6 +369,9 @@ func _on_room_cleared(_id: StringName) -> void:
 	_camera.add_shake(0.3)
 	_sfx.play(&"thump", _lord.position, -2.0, 0.55)
 	_hud.flash(Color(1, 0.84, 0.42), 0.12, 0.6)
+	if meta.head_drop != "":   # 무덤 주인의 머리(Heads)
+		_hud.toast("%s가 떨어졌다 · 마을 성소에서 쓴다" % Heads.info(meta.head_drop).name)
+		meta.head_drop = ""
 	_saved()
 
 

@@ -134,6 +134,9 @@ var hz_prize: Dictionary = {}
 ## 걸린 거래 {zi, ask}. 비어 있으면 없음. ask: &"sword" | &"max_hp" | &"durability"
 var hz_offer: Dictionary = {}
 var hz_max_hp_cut: float = 0.0
+## 쓴 머리(Heads.info). 비면 없음. 결투에서는 꺼진다. save는 판마다 한 번.
+var head: Dictionary = {}
+var head_saved: bool = false
 ## 지도(HillZone 칸) → 싸움터 칸 배율.
 var hz_scale: Vector2 = Vector2.ONE
 ## 플레이 기록용: 뽑은 순서(검 번호), 사건별 승, 정산 때 온 주인 수, 거래 받음/거절.
@@ -388,6 +391,9 @@ func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
 				slots[at] = Sword.new(pick_sword(fg), data)
 				forged = at
 		_apply_pack()
+		if meta.head != "":
+			head = Heads.info(meta.head, meta)
+			lord.hp = max_hp()
 
 
 ## 산 물건을 쓴다(처음 한 번). 물건 값은 data/village.tres.
@@ -431,7 +437,11 @@ func _bless(key: String) -> float:
 
 
 func max_hp() -> float:
-	return _max_hp_base() - hz_max_hp_cut
+	return _max_hp_base() - hz_max_hp_cut + (20.0 if _head_fx(&"maxhp") else 0.0)
+
+
+func _head_fx(k: StringName) -> bool:
+	return not head.is_empty() and not duel and head.get("fx") == k
 
 
 func _max_hp_base() -> float:
@@ -904,6 +914,8 @@ func _owner_sword(h: Hilt) -> Sword:
 
 ## 주인 있는 검을 뽑았다: 밤이면 그 자리에 잔영이 바로, 낮이면 밤이 오는 순간.
 func _owner_pulled(h: Hilt) -> void:
+	if h.owner.has("name") and str(h.owner.name) != "":
+		head_found.emit("p:" + str(h.owner.name))   # 다른 영주의 검: 그 사람 머리의 사본
 	if phase == Phase.NIGHT:
 		_spawn_ghost(h.owner, h.pos)
 	else:
@@ -1216,6 +1228,8 @@ func _step_lord(input: LordInput) -> void:
 			L.air = 0.0
 			lord_landed.emit(L.pos)
 	# 돌격병에 받혀 밀려나는 중
+	if _head_fx(&"steady"):
+		L.push = Vector2.ZERO   # 머리: 밀려나지 않는다
 	if L.push.length_squared() > 0.0001:
 		L.pos = (L.pos + L.push * dt).clamp(Vector2(0.5, 0.5), Vector2(Grid.size) - Vector2(0.5, 0.5))
 		L.push *= pow(D.knock_keep, dt)
@@ -1433,6 +1447,8 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		_note_grave(e)
 		powers.on_kill(e)
 		_hz_killed(e)
+		if _head_fx(&"heal") and lord.hp > 0.0:
+			lord.hp = minf(max_hp(), lord.hp + 2.0)
 		enemy_died.emit(e)
 		# 심지가 타는 동안 쓰러진 자폭병은 바로 터진다
 		if e.act == &"fuse":
@@ -1451,6 +1467,7 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	if field_night and attacker != null and (attacker.pack != &"" or attacker.chief != &""):
 		d *= FieldLayout.FIELD_NIGHT_DAMAGE   # 29단계: 들판의 밤에는 무리 적과 곳마다 우두머리(32단계)가 더 아프게 때린다(옛 싸움터의 무덤 기사는 그대로)
 	d = powers.lord_damage(d, attacker)
+	d = _head_cut(d, attacker)
 	if attacker != null and attacker.data != null:
 		last_hit_by = attacker.data.id
 	L.hp -= d
@@ -1460,6 +1477,9 @@ func _hurt_lord(d: float, attacker: Enemy = null) -> void:
 	lord_hurt.emit(d)
 	if L.riding:   # 39단계: 탄 채 맞으면 떨어진다(때린 쪽 반대로 밀리고 짧게 휘청)
 		dismount(true, attacker.pos if attacker != null else Vector2.INF)
+	if L.hp <= 0.0 and _head_fx(&"save") and not head_saved:
+		head_saved = true
+		L.hp = 1.0
 	if L.hp <= 0.0 and not powers.save_from_death():
 		lord_died()
 
@@ -3427,3 +3447,34 @@ func _hz_reckon() -> void:
 	hz_log.reckoned = come.size()
 	for zi in come:
 		_hz_event(zi, HillZone.Event.DUEL)
+
+
+# ---------------------------------------------------------------- 머리(Heads, 2026-11-23)
+signal head_found(id: String)
+
+
+## 쓴 머리만큼 받는 피해를 줄인다(결투에서는 없음).
+func _head_cut(d: float, attacker: Enemy) -> float:
+	if head.is_empty() or duel:
+		return d
+	d *= 1.0 - float(head.get("cut", 0.0))
+	var a: EnemyData = attacker.data if attacker != null else null
+	match head.get("fx"):
+		&"arrow":
+			if a and a.aim_time > 0.0:
+				d *= 0.5
+		&"wraith":
+			if a and a.wraith:
+				d *= 0.6
+		&"charge":
+			if a and a.charge_min > 0.0:
+				d *= 0.6
+		&"low":
+			if lord.hp < max_hp() * 0.3:
+				d *= 0.75
+		&"front":
+			if attacker != null:
+				var to: Vector2 = attacker.pos - lord.pos
+				if to.length() > 0.01 and absf(Vector2.from_angle(lord.face).angle_to(to)) < deg_to_rad(60.0):
+					d *= 0.7
+	return d
