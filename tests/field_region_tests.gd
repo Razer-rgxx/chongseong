@@ -47,6 +47,7 @@ func _size_and_walk() -> void:
 	check.call(r.lord.pos.x > 225.0 and r.lord.pos.x <= 230.0, "새 지역: 영주가 원래 동쪽 끝(110)을 넘어 새 크기 끝까지 걷는다")
 	inp.move = Vector2(0.0, -1.0)
 	r.lord.pos = Vector2(140, 50)
+	r.lord.vel = Vector2.ZERO   # 2026-11-25 조작감: 순간이동하면 걷는 속도(vel)도 비운다
 	for _t in 1500:
 		r.step(inp)
 	check.call(r.lord.pos.y >= 0.5 and r.lord.pos.y < 2.0 and r.lord.pos.x == 140.0, "새 지역: 북쪽 끝도 새 크기 안에서 막힌다")

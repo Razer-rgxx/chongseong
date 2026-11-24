@@ -24,6 +24,8 @@ var dash_cooldown: float = 0.0
 var invuln: float = 0.0
 ## 밀려나는 속도(칸/초, 돌격병에 받혔을 때). 적의 넉백처럼 knock_keep으로 줄어든다.
 var push: Vector2 = Vector2.ZERO
+## 걷는 속도(칸/초). accel_time·stop_time으로 목표 속도를 따라간다.
+var vel: Vector2 = Vector2.ZERO
 ## 갈고리: 날아가는 중이면 hook_target이 있고 hook은 남은 시간. 화면이 줄과 포물선을 그린다.
 var hook: float = 0.0
 var hook_target: Enemy = null

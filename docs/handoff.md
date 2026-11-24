@@ -163,6 +163,7 @@ author는 `git -c user.name=Claude -c user.email=noreply@anthropic.com commit ..
 ## 5. 사용자가 정한 것 (반드시 지킬 것)
 
 - 화풍: **어두운 사실풍.** AI 생성 에셋 금지. 우주/Sol's RNG 느낌, 수묵화, 양산형 금지.
+- 조작감(2026-11-25): 걷기 램프·선입력·카메라·몸 돌리기 수치는 LordData "조작감" 칸(`accel_time`, `stop_time`, `reverse_mult`, `buffer_time`)과 `LordView.turn_speed`·`CameraRig.follow_speed`. 사용자가 PC에서 맞춘다. 자세한 건 GDD 1절 2026-11-25 줄.
 - 소리: 종소리, 올라가는 삐 소리, 위로 쓸어 올리는 소리 금지.
 - 확률 보장(천장) 대신 다른 비용을 낮춘다.
 - 화면 글자는 엘든 링식. 세계(3D)에 글자를 띄우지 않는다(피해 숫자만 예외). 안내는 `Band`, 곳 이름은 `AreaTitle`, 창은 `UiKit`.

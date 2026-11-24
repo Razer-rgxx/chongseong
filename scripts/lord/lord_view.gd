@@ -20,8 +20,8 @@ extends Node3D
 ## 구르기 동작을 몇 초에 끝낼지. 동작의 실제로 구르는 구간만 이 시간에 맞춰 튼다(규칙의 돌진은 0.16초).
 @export var roll_time: float = 0.45
 ## 몸을 돌리는 빠르기(클수록 빨리). 휘두르거나 구를 때는 turn_fast로 거의 바로 돌린다.
-@export var turn_speed: float = 12.0
-@export var turn_fast: float = 40.0
+@export var turn_speed: float = 30.0
+@export var turn_fast: float = 60.0
 @export_group("칼 궤적과 베기 빛")
 ## 메아리 계곡 같은 두 번째 베기 빛을 사선으로 기울이는 각(라디안).
 @export var arc_tilt: float = 0.35

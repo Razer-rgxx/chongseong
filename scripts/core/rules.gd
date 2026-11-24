@@ -1264,6 +1264,7 @@ func _step_lord(input: LordInput) -> void:
 			_try_pull()
 		if pull_hilt != null:
 			L.moving = false
+			L.vel = Vector2.ZERO
 			return
 	var mv: Vector2 = input.move if input else Vector2.ZERO
 	if mv.length() > 1.0:
@@ -1291,21 +1292,31 @@ func _step_lord(input: LordInput) -> void:
 	if input and input.hook and not busy and not aloft and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
 		_try_hook(input)
 	if L.hook > 0.0:
+		L.vel = Vector2.ZERO
 		_step_hook()
 		return
 	var v: Vector2
 	if L.dash > 0.0:
 		L.dash -= dt
 		v = L.dash_dir * D.dash_speed
+		L.vel = L.dash_dir * D.speed   # 돌진이 끝나면 여기서 이어 걷는다
 		powers.dash_tick()
 	elif busy:
 		v = Vector2.ZERO
+		L.vel = Vector2.ZERO
 		L.moving = false
 	else:
 		var walk: float = moves.walk_mult()
 		if walk < 0.0:
 			walk = D.swing_move_mult if L.swing > 0.0 else 1.0
-		v = mv * D.speed * walk
+		var want: Vector2 = mv * D.speed * walk
+		var rate: float = D.speed / maxf(D.accel_time, 0.001)
+		if want.length_squared() < 0.0001:
+			rate = D.speed / maxf(D.stop_time, 0.001)
+		elif L.vel.dot(want) < 0.0:
+			rate *= D.reverse_mult
+		L.vel = L.vel.move_toward(want, rate * dt)
+		v = L.vel
 	var lim := Vector2(Grid.size) - Vector2(0.5, 0.5)
 	L.pos = (L.pos + v * dt).clamp(Vector2(0.5, 0.5), lim)
 	if not busy:
@@ -3109,6 +3120,7 @@ func state_hash() -> int:
 		parts.append(p.travelled)
 	parts.append(tokens.cooling)
 	parts.append(lord.push)
+	parts.append(lord.vel)
 	parts.append(lord.air)
 	parts.append_array([lord.riding, lord.ride_vel, horse.state, horse.pos, horse.face, horse.speed, horse.come_t])
 	parts.append(callers_out)

@@ -67,7 +67,7 @@ var data: GameData
 var meta: Meta
 var rules: Rules
 var _acc: float = 0.0
-var _want_dash: bool = false
+var _dash_buf := PressBuffer.new()
 var _want_jump: bool = false
 var _lord: Node3D
 var _anvil_sword := Node3D.new()
@@ -219,7 +219,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb and mb.pressed and _camera.third() and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		_capture(true)
 	if event.is_action_pressed("dash"):
-		_want_dash = true
+		_dash_buf.press(rules.data.lord.buffer_time)
 	if event.is_action_pressed("jump"):
 		_want_jump = true
 	if event.is_action_pressed("pull"):
@@ -240,7 +240,7 @@ func _physics_process(delta: float) -> void:
 	while _acc >= rules.dt and n < max_ticks_per_frame:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
-		inp.dash = _want_dash
+		inp.dash = _dash_buf.on()
 		inp.jump = _want_jump and _talker == &""
 		inp.attack = _talker == &"" and Input.is_action_pressed("attack") and _in_yard()
 		if _camera.third() and inp.attack:
@@ -254,9 +254,10 @@ func _physics_process(delta: float) -> void:
 		elif _camera.third() and inp.move.length() > 0.1:
 			inp.aim_valid = true
 			inp.aim = rules.lord.pos + inp.move
+		var _c0: int = rules.powers.dash_charges
 		rules.step(inp)
+		_dash_buf.end_tick(rules.dt, rules.powers.dash_charges < _c0)
 		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
-		_want_dash = false
 		_want_jump = false
 		_acc -= rules.dt
 		n += 1

@@ -23,7 +23,8 @@ var data: GameData
 var meta: Meta
 var rules: Rules
 var _acc: float = 0.0
-var _want_dash: bool = false
+var _dash_buf := PressBuffer.new()
+var _atk_buf := PressBuffer.new()
 var _want_jump: bool = false
 ## 검 바꾸기(검 보관집이 있으면 칸이 여럿): Rules.SWAP_NEXT(Q) 또는 칸 번호, -1이면 없음.
 var _want_swap: int = -1
@@ -53,7 +54,6 @@ var _night_k: float = -1.0   ## 마지막으로 맞춘 밤의 정도(바뀔 때�
 var _ambient_day: Color = Color.WHITE
 var _ambient_day_energy: float = 0.45
 var _sky_tint: Color = Color(1.0, 0.8, 0.68)   ## 낮의 하늘빛(밤·해질녘으로 섞는다)
-var _want_attack: bool = false
 var _wfx: WeatherFx
 var _wx: Dictionary = {"fog": 1.0, "sun": 1.0, "tint": Color.WHITE, "amt": 0.0}   ## 지금 섞인 날씨(FieldLayout.WX_LOOK으로 천천히 간다)
 var _want_hook: bool = false
@@ -244,11 +244,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mb and mb.pressed and _camera.third() and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		_capture(true)
 	if event.is_action_pressed("dash"):
-		_want_dash = true
+		_dash_buf.press(rules.data.lord.buffer_time)
 	if event.is_action_pressed("jump"):
 		_want_jump = true
 	if event.is_action_pressed("attack"):
-		_want_attack = true
+		_atk_buf.press(rules.data.lord.buffer_time)
 	if event.is_action_pressed("hook"):
 		_want_hook = true
 	if event.is_action_pressed("pull"):
@@ -277,10 +277,10 @@ func _physics_process(delta: float) -> void:
 	while _acc >= rules.dt and n < max_ticks_per_frame:
 		var inp := LordInput.new()
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
-		inp.dash = _want_dash
+		inp.dash = _dash_buf.on()
 		inp.jump = _want_jump
 		inp.swap_to = _want_swap
-		inp.attack = Input.is_action_pressed("attack") or _want_attack
+		inp.attack = Input.is_action_pressed("attack") or _atk_buf.on()
 		inp.hook = _want_hook
 		if _camera.third():
 			if inp.attack or inp.hook:
@@ -294,7 +294,11 @@ func _physics_process(delta: float) -> void:
 			if g != null:
 				inp.aim_valid = true
 				inp.aim = Grid.world_to_cells(g)
+		var _c0: int = rules.powers.dash_charges
+		var _cd0: float = rules.lord.cooldown
 		rules.step(inp)
+		_dash_buf.end_tick(rules.dt, rules.powers.dash_charges < _c0)
+		_atk_buf.end_tick(rules.dt, rules.lord.cooldown > _cd0)
 		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne(), data.horse.body_r if rules.lord.riding else Blockers.BODY)
 		if rules.horse.waiting():   # 39단계: 내린 말도 나무·벽을 뚫지 않는다
 			rules.horse.pos = _push_out(rules.horse.pos, false, data.horse.body_r)
@@ -302,10 +306,8 @@ func _physics_process(delta: float) -> void:
 		if _seen_t <= 0:
 			_seen_t = FieldLayout.SEEN_TICKS
 			meta.see_field(rules.lord.pos)
-		_want_dash = false
 		_want_jump = false
 		_want_swap = -1
-		_want_attack = false
 		_want_hook = false
 		_acc -= rules.dt
 		n += 1

@@ -47,7 +47,6 @@ var rules: Rules
 var meta: Meta
 var _acc: float = 0.0
 var _want_attack: bool = false
-var _want_dash: bool = false
 var _want_jump: bool = false
 var _want_hook: bool = false
 var _want_pull: bool = false
@@ -323,8 +322,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# 틱 사이에 눌렀다 뗀 것도 놓치지 않게 모아 둔다
 	if event.is_action_pressed("attack"):
 		_want_attack = true
+		_atk_buf.press(rules.data.lord.buffer_time)
 	if event.is_action_pressed("dash"):
-		_want_dash = true
+		_dash_buf.press(rules.data.lord.buffer_time)
 	if event.is_action_pressed("jump"):
 		_want_jump = true
 	if event.is_action_pressed("hook"):
@@ -366,15 +366,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				_hud.toast("관리: 다음 뽑기 " + ("등급 굴리기" if rules.debug_grade < 0 else data.grades.names[rules.debug_grade] + "로 고정"))
 
 
+var _dash_buf := PressBuffer.new()
+var _atk_buf := PressBuffer.new()
+
+
 func _physics_process(delta: float) -> void:
 	if _console.visible:
 		return
 	_acc += delta
 	var n: int = 0
 	while _acc >= rules.dt and n < max_ticks_per_frame:
+		var _c0: int = rules.powers.dash_charges
+		var _cd0: float = rules.lord.cooldown
 		rules.step(_read_input())
+		_dash_buf.end_tick(rules.dt, rules.powers.dash_charges < _c0)
+		_atk_buf.end_tick(rules.dt, rules.lord.cooldown > _cd0)
 		_want_attack = false
-		_want_dash = false
 		_want_jump = false
 		_want_hook = false
 		_want_pull = false
@@ -388,8 +395,8 @@ func _physics_process(delta: float) -> void:
 func _read_input() -> LordInput:
 	var inp := LordInput.new()
 	inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
-	inp.attack = Input.is_action_pressed("attack") or _want_attack
-	inp.dash = _want_dash
+	inp.attack = Input.is_action_pressed("attack") or _atk_buf.on()
+	inp.dash = _dash_buf.on()
 	inp.jump = _want_jump
 	inp.hook = _want_hook
 	inp.pull = _want_pull

@@ -10,6 +10,15 @@ extends Resource
 ## 맞은 뒤 무적 시간.
 @export var hurt_invuln: float = 0.3
 
+@export_group("조작감")
+## 걷기: 0에서 최고 빠르기까지(초), 서기까지(초). 2026-11-25 이전에는 램프 없이 바로 최고 빠르기였다.
+@export var accel_time: float = 0.09
+@export var stop_time: float = 0.07
+## 반대로 꺾을 때 가속에 곱하는 배수(클수록 바로 뒤집힌다).
+@export var reverse_mult: float = 3.0
+## 돌진·좌클릭 눌림 선입력(초): 조금 일찍 눌러도 이 시간 안에 받아 주면 쓰인다(화면 쪽 PressBuffer).
+@export var buffer_time: float = 0.13
+
 @export_group("공격")
 ## 기본 피해. data/lord.tres가 13으로 둔다(2026-11-21: 검이 너무 세다는 말에 20에서 내림, 등급 배수도 평평하게).
 @export var damage: float = 20.0

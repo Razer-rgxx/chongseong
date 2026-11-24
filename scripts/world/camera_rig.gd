@@ -23,7 +23,7 @@ enum Mode { THIRD, QUARTER }
 @export_group("공통")
 @export var zoom_min: float = 0.55
 @export var zoom_max: float = 1.8
-@export var follow_speed: float = 10.0
+@export var follow_speed: float = 24.0
 ## 흔들림 1일 때 몇 m까지 흔들리는지.
 @export var shake_meters: float = 0.9
 @export var shake_decay: float = 2.5
@@ -118,7 +118,7 @@ func look(delta: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	_focus = _focus.lerp(target, minf(1.0, delta * maxf(follow_speed, follow_boost)))
+	_focus = _focus.lerp(target, 1.0 - exp(-maxf(follow_speed, follow_boost) * delta))
 	shake = maxf(0.0, shake - delta * shake_decay)
 	var sh: Vector3 = Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.5, 0.5), _rng.randf_range(-1, 1)) * shake * shake_meters
 	if mode == Mode.THIRD:

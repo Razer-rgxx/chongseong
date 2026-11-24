@@ -408,7 +408,29 @@ func _test_lord_move_dash() -> void:
 	var p0: Vector2 = r.lord.pos
 	for i in d.run.tick_rate:
 		r.step(_inp(Vector2.RIGHT))
-	check(absf(r.lord.pos.x - p0.x - d.lord.speed) < 0.05, "1초에 %.1f칸 걷는다(%.2f)" % [d.lord.speed, r.lord.pos.x - p0.x])
+	# 2026-11-25 조작감: 가속 램프(accel_time) 때문에 1초 거리가 speed * accel_time / 2만큼 모자라다(예전에는 램프 없이 정확히 speed)
+	var ramp_loss: float = d.lord.speed * d.lord.accel_time * 0.5
+	check(absf(r.lord.pos.x - p0.x - (d.lord.speed - ramp_loss)) < 0.1, "1초에 %.1f칸 걷는다(램프 %.2f 뺀 %.2f)" % [d.lord.speed, ramp_loss, r.lord.pos.x - p0.x])
+	check(r.lord.vel.x > d.lord.speed - 0.01, "최고 빠르기에 닿는다")
+	# 서면 stop_time 안에 멈춘다(미끄러지지 않는다)
+	for i in ceili(d.lord.stop_time * d.run.tick_rate) + 1:
+		r.step(_inp(Vector2.ZERO))
+	check(r.lord.vel.length() < 0.001, "손을 떼면 %.2f초 안에 선다" % d.lord.stop_time)
+	# 반대로 꺾기: 가속의 reverse_mult배라 빨리 뒤집힌다
+	r.lord.pos = Grid.middle()
+	for i in 12:
+		r.step(_inp(Vector2.RIGHT))
+	var rev: int = 0
+	while r.lord.vel.x > 0.0 and rev < 30:
+		r.step(_inp(Vector2.LEFT))
+		rev += 1
+	check(rev <= ceili(d.lord.accel_time / d.lord.reverse_mult * 2.0 * d.run.tick_rate) + 1, "반대로 꺾으면 %d틱 만에 뒤집힌다" % rev)
+	# 대각선도 같은 빠르기(정규화)
+	var rd := Rules.new(d, 10)
+	for i in 20:
+		rd.step(_inp(Vector2(1, 1)))
+	check(absf(rd.lord.vel.length() - d.lord.speed) < 0.01, "대각선 속도가 같다(%.2f)" % rd.lord.vel.length())
+	p0 = r.lord.pos
 	r.lord.pos = Vector2(1.0, 1.0)
 	for i in 60:
 		r.step(_inp(Vector2(-1, -1)))
