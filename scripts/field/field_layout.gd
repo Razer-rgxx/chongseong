@@ -7,7 +7,7 @@ const SIZE: Vector2i = Vector2i(230, 110)   ## 28단계: 동쪽으로 60칸 더(
 const WORLD_X: float = 460.0   ## m
 const WORLD_Z: float = 220.0
 
-const AREA_ORDER: PackedStringArray = ["quarry", "hamlet", "pass", "keep", "marsh", "foot", "watchtower", "grove", "old_field", "brook", "road"]
+const AREA_ORDER: PackedStringArray = ["mine", "aqueduct", "giant", "windmill", "watermill", "ravine", "quarry", "hamlet", "pass", "keep", "marsh", "foot", "watchtower", "grove", "old_field", "brook", "road"]
 const AREAS: Dictionary = {
 	&"quarry": Rect2(170, 2, 58, 42),
 	&"hamlet": Rect2(170, 44, 58, 36),
@@ -20,12 +20,17 @@ const AREAS: Dictionary = {
 	&"old_field": Rect2(58, 66, 52, 44),
 	&"brook": Rect2(0, 52, 170, 14),   # 새 곳(170~)과 겹치면 AREA_ORDER로 새 곳이 이긴다
 	&"road": Rect2(0, 0, 230, 110),
+	# 구조물(2026-11-24, docs/landmarks.md): 큰 곳 위에 겹친 작은 곳. AREA_ORDER 앞쪽이라 이긴다
+	&"mine": Rect2(160, 72, 20, 6), &"aqueduct": Rect2(38, 80, 34, 11), &"giant": Rect2(4, 72, 18, 12),
+	&"windmill": Rect2(8, 90, 14, 14), &"watermill": Rect2(28, 46, 14, 8), &"ravine": Rect2(13, 3, 14, 20),
 }
 const AREA_NAMES: Dictionary = {
 	&"road": "언덕길", &"old_field": "옛 싸움터", &"watchtower": "무너진 망루",
 	&"brook": "개울가", &"grove": "검은 숲 가장자리", &"foot": "언덕 발치",
 	&"keep": "무너진 성채", &"marsh": "안개 늪",
 		&"quarry": "버려진 채석장", &"hamlet": "불탄 마을", &"pass": "까마귀 고개",
+	&"mine": "옛 갱도", &"aqueduct": "무너진 수도교", &"giant": "거인의 뼈", &"windmill": "바람개비 언덕",
+	&"watermill": "물레방앗간", &"ravine": "흔들다리 골짜기",
 }
 
 ## 흙길이 지나는 점(남 → 북). 개울은 x 52 근처에서 돌다리로 건넌다.
@@ -51,6 +56,7 @@ const CACHES: Dictionary = {
 	"cache_9": [Vector2(127, 17), 45], "cache_10": [Vector2(151, 26), 55],
 	"cache_11": [Vector2(218, 14), 50], "cache_12": [Vector2(177.5, 47.5), 35],
 	"cache_13": [Vector2(217.5, 69), 40], "cache_14": [Vector2(222, 95), 120],
+	"cache_15": [Vector2(168.5, 75.0), 60],   # 옛 갱도 깊은 곳(2026-11-24)
 }
 ## 큰 상자(그림이 크다). 고개 끝의 상자.
 const BIG_CACHES: PackedStringArray = ["cache_14"]
@@ -110,7 +116,7 @@ const BORDER_RECTS: Array[Rect2] = [
 	Rect2(0, 108.3, 52, 2), Rect2(58, 108.3, 172, 2),
 	Rect2(107, 0, 3, 52), Rect2(107, 66, 3, 44),   # 원래 동쪽 둘레: 개울 근처(y 52~66)만 틈을 내 동쪽으로 이어진다
 	# 20단계 동쪽 둘레(x 167~170): 틈 셋(y 22~32 성채 → 채석장, 52~66 개울 → 불탄 마을, 91~99 늪 → 까마귀 고개)
-	Rect2(167, 0, 3, 22), Rect2(167, 32, 3, 20), Rect2(167, 66, 3, 25), Rect2(167, 99, 3, 11),
+	Rect2(167, 0, 3, 22), Rect2(167, 32, 3, 20), Rect2(167, 66, 3, 7.2), Rect2(167, 76.8, 3, 14.2), Rect2(167, 99, 3, 11),   # (167, 73.2~76.8)는 옛 갱도(MINE_WALLS가 양쪽을 막는다)
 ]
 ## 20단계 동쪽 둘레(x 334~340m)의 틈: Vector2(가운데 z m, 반폭 m). 땅 높이의 언덕 띠와 숲·바위가 이 틈을 비운다(BORDER_RECTS의 틈과 같다).
 const EAST_GAPS: PackedVector2Array = [Vector2(54, 10), Vector2(118, 14), Vector2(190, 8)]
@@ -315,6 +321,49 @@ const PASS_RISE: float = 5.0
 const PASS_WALL: float = 4.0
 
 
+## ---- 들판 구조물(2026-11-24, docs/landmarks.md). 자리·수치는 여기 하나에만 둔다(칸 단위, 길이는 m).
+## 상인 행렬: 장터 문에서 길을 따라 언덕 발치 쪽으로 올라갔다가 돌아온다. 들판 시계로만 정해진다(Caravan).
+const CARAVAN_CARTS: int = 4
+const CARAVAN_STARTS: PackedFloat32Array = [12.0, 205.0]   ## 한 바퀴(낮 + 밤)에서 떠나는 때(초). 하루 두 번
+const CARAVAN_FAR: float = 160.0        ## 맨 앞 수레가 서는 곳(길을 따라 문에서 m)
+const CARAVAN_SPEED: float = 2.2        ## m/초
+const CARAVAN_REST: float = 25.0        ## 먼 끝에서 쉬는 초
+const CARAVAN_SPACING: float = 8.0      ## 수레와 수레 사이(m, 소 한 마리 몫 포함)
+const CARAVAN_LANE: float = 1.5         ## 길 가운데에서 옆으로(m): 갈 때 동쪽, 올 때 서쪽 길
+const CARAVAN_ESCORTS: Array[Vector2] = [Vector2(-0.7, 1.0), Vector2(1.5, -1.0), Vector2(3.8, 1.0)]   ## 호위: (수레 번호(소수), 옆 쪽 ±1)
+## 옛 갱도: 늪(서)과 불탄 마을(동)을 잇는 굴. 걷는 길은 y 73.8~76.2, 양쪽 벽 MINE_WALLS가 막는다. 바닥은 MINE_FLOOR_Y로 평평하게 깎는다.
+const MINE_WALLS: Array[Rect2] = [Rect2(160, 73.2, 17, 0.6), Rect2(160, 76.2, 17, 0.6)]
+const MINE_Z: float = 150.0             ## 굴 가운데 z(m)
+const MINE_X: Vector2 = Vector2(320.0, 354.0)   ## 굴 입구에서 입구(m)
+const MINE_FLOOR_Y: float = 1.0
+const MINE_LANTERNS: PackedFloat32Array = [326.0, 337.0, 348.0]   ## 등불 x(m), 앞뒤 둘만 빛을 낸다
+## 무너진 수도교: y 85 줄을 따라 받침 여섯(마지막은 부러진 그루터기). 길(x 48.4)은 둘째 아치 밑을 지난다.
+const AQUEDUCT_Y: float = 85.0
+const AQUEDUCT_PIERS: PackedFloat32Array = [40.0, 45.5, 51.0, 56.5, 62.0, 67.5]
+const AQUEDUCT_SPRING: float = 3.4      ## 아치가 시작하는 높이(m)
+## 풍차(바람개비 언덕)와 물레방앗간(개울 북쪽 둑, 개울 따라 앉는다), 날개·바퀴가 도는 빠르기(rad/초)는 날씨별 풍차 배수.
+const WINDMILL_AT: Vector2 = Vector2(14, 97)
+const WINDMILL_SPEED: float = 0.7
+const WINDMILL_WIND: Dictionary = {&"clear": 1.0, &"rain": 1.5, &"fog": 0.4, &"storm": 3.2, &"ash": 1.2}
+const WATERMILL_X: float = 34.0
+const WATERMILL_SPEED: float = 0.55
+## 거인의 뼈: 움푹 팬 곳(가운데 칸, 반지름 칸, 깊이 m)에 누워 있다. 갈비뼈 사이로 걷는다.
+const GIANT_AT: Vector2 = Vector2(13, 78)
+const GIANT_R: Vector2 = Vector2(8.5, 5.0)
+const GIANT_DEPTH: float = 1.3
+const GIANT_RIBS: int = 8
+## 흔들다리: 남북으로 긴 골짜기(가운데 x m, 길이 z m, 깊이 m)를 동서로 건너는 줄다리. 건너는 줄은 z 28m(칸 y 14).
+const RAVINE_X: float = 38.0
+const RAVINE_Z: Vector2 = Vector2(2.0, 46.0)
+const RAVINE_DEPTH: float = 4.6
+const RAVINE_BRIDGE_Z: float = 28.0
+const RAVINE_BRIDGE_X: Vector2 = Vector2(31.5, 44.5)
+const RAVINE_WALLS: Array[Rect2] = [Rect2(16.6, 2.0, 4.8, 11.5), Rect2(16.6, 14.5, 4.8, 8.5)]
+const BRIDGE_SAG: float = 0.6
+## 구조물 곳(숲·바위·풀 흩뿌림이 서지 않는다).
+const LANDMARK_AREAS: Array = [&"mine", &"aqueduct", &"giant", &"windmill", &"watermill", &"ravine"]
+
+
 ## ---- 들판 낮밤과 다시 생기는 적(29단계, docs/outside.md). 수치는 여기 하나에만 둔다.
 ## 낮과 밤의 길이(초). 시계는 Rules(들판 모드)가 30Hz로 세고 한 바퀴(낮 + 밤)마다 0으로 돌아간다. 0은 아침.
 const FIELD_DAY: float = 240.0
@@ -424,6 +473,8 @@ const MAP_LABELS: Dictionary = {
 	&"road": Vector2(42, 95), &"brook": Vector2(24, 64), &"old_field": Vector2(84, 89), &"watchtower": Vector2(90, 47.5),
 	&"grove": Vector2(17, 46), &"foot": Vector2(44, 9), &"keep": Vector2(134, 30), &"marsh": Vector2(139, 80),
 	&"quarry": Vector2(198, 27), &"hamlet": Vector2(200, 60), &"pass": Vector2(200, 87),
+	&"mine": Vector2(169, 73), &"aqueduct": Vector2(54, 82), &"giant": Vector2(13, 74), &"windmill": Vector2(14, 92),
+	&"watermill": Vector2(35, 48), &"ravine": Vector2(20, 8),
 }
 
 

@@ -75,6 +75,7 @@ var _wander_step: int = 0
 var _wt: float = 0.0
 var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
 var _seen_t: int = 0   ## 38단계: 다음 밝힘까지 남은 틱
+var _lm: LandmarkView   ## 구조물의 움직임·상인 행렬(2026-11-24, docs/landmarks.md)
 var _horse: RideSwordView   ## 탈 검의 몸(규칙 이름은 39단계 말 그대로 horse)
 
 @onready var _camera: Camera3D = $Camera
@@ -135,6 +136,7 @@ func _ready() -> void:
 	rules.set_blockers(blockers.rects, blockers.circles, blockers.low_rects, blockers.low_circles)   # 37단계: 적도 같은 표로 막힘을 돌아온다
 	HillBuilder.setup(Vector2(FieldLayout.SIZE) * Grid.CELL)   # 적의 몸이 들판을 싸움터 안으로 본다(비탈에서 올라오지 않는다)
 	_build_props()
+	_lm = get_node_or_null("Landmarks") as LandmarkView
 	_build_wanderer()
 	add_child(_creatures)
 	_lord = LORD_SCENE.instantiate()
@@ -324,6 +326,8 @@ func _process(delta: float) -> void:
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
 	_boss_bar()
 	_creatures.step(delta, _lord.position)
+	if _lm:
+		_lm.update(rules.field_clock, rules.field_weather, delta)
 	_light(delta)
 	_animate_wanderer(delta)
 	var p: Vector2 = rules.lord.pos
@@ -551,6 +555,8 @@ func _spots() -> Dictionary:
 		s["horse"] = rules.horse.pos
 	if _wander != null:
 		s["wanderer"] = _wander_at
+	if _lm and _lm.trade_cell() != null:
+		s["caravan"] = _lm.trade_cell()
 	for id in FieldLayout.CACHES:
 		if not meta.field_found.has(id):
 			s[id] = FieldLayout.CACHES[id][0]
@@ -576,6 +582,8 @@ func _prompt(key: String) -> String:
 		return "언덕으로 오른다"
 	if key == "crypt":
 		return "지하 무덤으로 내려간다"
+	if key == "caravan":
+		return "행상에게 물건을 산다"
 	if key == "dropped":
 		return "떨군 검을 줍는다"
 	if key == "horse":
@@ -620,6 +628,10 @@ func _interact() -> void:
 		else:
 			meta.start_zone = 1
 			_leave(RUN_PATH)
+	elif _near == "caravan":
+		meta.fill_stock(data)   # 마을 떠돌이 상인과 같은 창·같은 물건(산 것은 다음 판 하나)
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_hud.open_shop()
 	elif _near == "dropped":
 		var id: int = meta.pick_dropped()
 		if _dropped_node:

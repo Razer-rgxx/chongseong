@@ -57,10 +57,14 @@ static func height(x: float, z: float) -> float:
 		rk = minf(rk, smoothstep(g.y - 8.0, g.y, absf(z - g.x)))
 	h += 4.5 * exp(-pow((x - 337.0) / 5.0, 2.0)) * rk
 	h += new_land(x, z)
+	h += Landmarks.land(x, z)
 	var m: float = marsh_mask(x, z)
 	if m > 0.0:   # 안개 늪: 얕은 물 높이보다 조금 높은 땅과 군데군데 웅덩이
 		var pool: float = smoothstep(0.02, 0.22, _n.get_noise_2d(x * 2.6 + 900.0, z * 2.6))
 		h = lerpf(h, 0.35 + _n.get_noise_2d(x * 5.0, z * 5.0) * 0.15 - pool * 0.9, m)
+	var mw: float = Landmarks.mine_w(x, z)
+	if mw > 0.0:   # 옛 갱도 바닥(2026-11-24): 굴 안은 평평하다
+		h = lerpf(h, FieldLayout.MINE_FLOOR_Y, mw)
 	var w: float = exp(-pow((z - brook_z(x)) / 4.5, 2.0))
 	return lerpf(h, -1.8, w * 0.95)
 
@@ -83,9 +87,19 @@ static func new_land(x: float, z: float) -> float:
 ## 걸을 때의 높이: 돌다리 위는 다리 판 높이.
 static func walk_height(x: float, z: float) -> float:
 	var h: float = height(x, z)
+	var rb: float = Landmarks.bridge_y(x, z)   # 흔들다리 위
+	if rb > -1e8:
+		return maxf(h, rb)
 	if absf(x - FieldLayout.BRIDGE_X) < 2.0 and absf(z - brook_z(FieldLayout.BRIDGE_X)) < 6.5:
 		return maxf(h, DECK_Y)
 	return h
+
+
+## 길을 촘촘히 편 점들(m, 문 쪽에서 북쪽으로). 상인 행렬(Caravan)이 따라간다.
+static func road_points() -> PackedVector2Array:
+	if _road_m.is_empty():
+		setup()
+	return _road_m
 
 
 static func road_dist(x: float, z: float) -> float:
@@ -134,7 +148,12 @@ static func build(parent: Node3D, env: Environment, decor: bool = true) -> Dicti
 	_grove(parent, rng, circles, low_circles)
 	_foot(parent, circles, low_circles)
 	_crypt_gate(parent, rects)
+	Landmarks.blockers(rects, low_rects, circles)   # 2026-11-24 들판 구조물: 막힘은 늘, 모양은 decor일 때만
 	if decor:
+		var lm := LandmarkView.new()
+		lm.name = "Landmarks"
+		parent.add_child(lm)
+		Landmarks.build(lm)
 		_palisade(parent)
 		_far_hill(parent)
 	_forest(parent, rng, circles)
@@ -828,6 +847,9 @@ static func _free(c: Vector2, gap: float = 2.5) -> bool:
 	for w in FieldLayout.WANDERER_SPOTS:   # 34단계: 떠도는 사람이 서는 자리(모닥불)
 		if c.distance_to(w.at) < 2.5:
 			return false
+	for a in FieldLayout.LANDMARK_AREAS:
+		if (FieldLayout.AREAS[a] as Rect2).grow(2.0).has_point(c):
+			return false
 	for w in FieldLayout.KEEP_WALLS:
 		if w.grow(3.0).has_point(c):
 			return false
@@ -1483,7 +1505,7 @@ static func _forest_spot(c: Vector2) -> bool:
 		return false
 	if c.y > 105.0:
 		return false
-	for id in [&"keep", &"hamlet", &"quarry", &"pass", &"marsh"]:
+	for id in [&"keep", &"hamlet", &"quarry", &"pass", &"marsh"] + FieldLayout.LANDMARK_AREAS:
 		if (FieldLayout.AREAS[id] as Rect2).grow(1.0).has_point(c):
 			return false
 	for k in FieldLayout.CACHES:

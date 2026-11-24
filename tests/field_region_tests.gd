@@ -91,7 +91,7 @@ func _areas() -> void:
 
 
 func _finds() -> void:
-	check.call(FieldLayout.CACHES.size() == 14 and FieldLayout.CACHES.has("cache_9") and FieldLayout.CACHES.has("cache_10"), "상자: 유품 상자 14개(성채에 cache_9, cache_10, 28단계 새 곳에 11~14)")
+	check.call(FieldLayout.CACHES.size() == 15 and FieldLayout.CACHES.has("cache_9") and FieldLayout.CACHES.has("cache_10"), "상자: 유품 상자 15개(성채에 cache_9, cache_10, 28단계 새 곳에 11~14, 옛 갱도 15)")
 	for id in ["cache_9", "cache_10"]:
 		var c: Array = FieldLayout.CACHES[id]
 		check.call(FieldLayout.area_at(c[0]) == &"keep" and int(c[1]) > 0, "상자: %s는 성채 안, 조각이 있다" % id)
