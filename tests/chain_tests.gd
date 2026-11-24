@@ -14,6 +14,8 @@ static func run(game: GameData, chk: Callable) -> void:
 
 func _all() -> void:
 	_chain()
+	_live()
+	_last_blow()
 	_shards()
 	_records()
 	_save()
@@ -60,6 +62,32 @@ func _chain() -> void:
 	still.data.still = true
 	yard.hurt(still, 99999.0, Vector2.ZERO, false)
 	check.call(yard.chain == 0, "연쇄: 허수아비는 세지 않는다")
+
+
+func _live() -> void:
+	var r := Rules.new(d, 8)
+	r.start_night()
+	r.debug_god = true
+	_kill(r)
+	_kill(r)
+	check.call(r.chain_live() == 2, "연쇄: 시간 안에는 지금 연쇄가 보인다")
+	for i in roundi(d.run.chain_window / r.dt) + 2:
+		r.step()
+	check.call(r.chain_live() == 0 and r.chain == 2, "연쇄: 시간이 지나면 지금 연쇄는 0(다음 처치에서 1부터)")
+	check.call(is_equal_approx(ChainMeter.pitch(2), 1.0) and ChainMeter.pitch(3) > 1.0 and is_equal_approx(ChainMeter.pitch(14), 2.0) and is_equal_approx(ChainMeter.pitch(40), 2.0), "연쇄 소리: 반음씩 올라 한 옥타브에서 멈춘다")
+
+
+func _last_blow() -> void:
+	var r := Rules.new(d, 9)
+	r.start_night()
+	r.debug_god = true
+	var got: Array = [0]
+	r.last_blow.connect(func() -> void: got[0] += 1)
+	r.step()
+	check.call(got[0] == 0, "마무리: 그냥 밤에는 오지 않는다")
+	r.hunt_killed = true
+	r.step()
+	check.call(got[0] == 1, "마무리: 사냥 우두머리를 쓰러뜨려 밤이 끝나면 한 번 온다")
 
 
 func _shards() -> void:

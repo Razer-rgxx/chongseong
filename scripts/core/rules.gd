@@ -24,6 +24,8 @@ signal run_ended(won: bool)
 ## 처치 연쇄가 이어졌다(n은 2부터. 1은 새로 시작이라 안 낸다). 화면은 HUD 연쇄 숫자와 소리(docs/dopamine.md).
 ## paid: 이 처치로 연쇄가 chain_every의 배수가 되어 붙은 조각(언덕에서 판이 끝날 때 받는다). 아니면 0.
 signal kill_chain(n: int, paid: int)
+## 처치로 밤이 끝났다(첫 구역 정산의 마지막 주인, 사냥의 우두머리). 화면은 짧은 슬로모션(docs/dopamine.md).
+signal last_blow()
 signal pull_started(hilt: Hilt, grade: int)
 signal pull_step(hilt: Hilt, step: int)
 signal pull_refused(reason: String)
@@ -1506,10 +1508,12 @@ func _step_night() -> void:
 	# 첫 구역(재설계): 밤은 정산뿐. 몰려온 주인을 다 쓰러뜨리면 새벽
 	if hz:
 		if hz_left.is_empty():
+			last_blow.emit()
 			_end_night()
 		return
 	# 사냥: 우두머리를 쓰러뜨리면 그 자리에서 새벽이 온다
 	if hunt_killed:
+		last_blow.emit()
 		_end_night()
 		return
 	night_left -= dt
@@ -2609,6 +2613,11 @@ func _step_siege() -> void:
 
 
 ## 무덤: 쓰러진 망령(우두머리·언덕지기·이미 일어난 것은 빼고)이 grave_chance로 grave_delay초 뒤 다시 일어난다.
+## 지금 이어지는 연쇄(마지막 처치에서 chain_window초가 지났으면 0). 화면이 피해 숫자·피를 키울 때 쓴다.
+func chain_live() -> int:
+	return chain if tick - chain_tick <= roundi(data.run.chain_window / dt) else 0
+
+
 ## 처치 연쇄: 앞 처치에서 chain_window초 안이면 하나 늘고, 아니면 1부터. chain_every의 배수마다 조각이 붙는다(끝에 받는다, Meta.run_shards).
 func _chain_kill() -> void:
 	var window: int = roundi(data.run.chain_window / dt)

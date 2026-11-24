@@ -19,6 +19,11 @@ var _pop: Tween
 
 
 ## parent: HUD(CanvasLayer)나 Control. 화면 오른쪽 가운데에서 조금 위.
+## 연쇄 소리의 높이(2026-11-24, 사용자가 넣으라고 함): 연쇄 2에서 1, 이을 때마다 반음씩 올라 한 옥타브(연쇄 14)에서 멈춘다.
+static func pitch(n: int) -> float:
+	return pow(2.0, float(clampi(n - 2, 0, 12)) / 12.0)
+
+
 static func make(parent: Node) -> ChainMeter:
 	var m := ChainMeter.new()
 	m.anchor_left = 1.0

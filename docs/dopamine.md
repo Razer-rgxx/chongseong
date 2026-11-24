@@ -19,8 +19,21 @@
 | **끝 화면 세어 올리기**: 조각이 큰 금빛 숫자로 0부터 세어 올라가 멈추면 한 번 튀고, 그다음 넘은 기록이 금빛 줄로 하나씩 튀어나온다(가장 높이 오름·한 판에 쓰러뜨린 적·가장 긴 연쇄). 첫 판은 기록만 남기고 "새 기록"이라 하지 않는다 | `Hud.show_over(제목, 글, 조각, 기록들)`, `Meta.best_kills/best_chain`, `record_run`의 `new_*` | 세어 올라가는 숫자, 예상 밖의 기록 |
 | **처음 뽑은 검**: 이름 알림 끝에 "처음 뽑은 검 · 도감 n/전체"를 붙이고 금빛으로 한 번 번쩍 | `main._on_pulled` | 새것(신기함)과 모으는 목표까지의 거리 |
 
+### 두 번째 묶음 (같은 날, 사용자: "다 넣어")
+
+| 무엇 | 어디 |
+| --- | --- |
+| **마을 조각 세어 올리기**: 조각 숫자가 툭 바뀌지 않고 세어 올라가며 금빛으로 한 번 튄다(줄면 세어 내리며 잠깐 붉다). 판에서 막 돌아오면 판 전의 수에서부터 세어 올린다 | `LobbyHud._count_shards`, `Meta.shards_from`(static, main이 판 끝에 적음) |
+| **마무리 슬로모션**: 처치로 밤이 끝난 순간(첫 구역 정산의 마지막 주인·사냥 우두머리), 보스, 들판 무리·무덤 방의 마지막 하나에서 시간이 잠깐 느려졌다가 풀린다. 규칙은 틱 수로만 돌아 결과는 같다 | `Rules.last_blow`, `SlowMo.hit`, `LordData.finish_slow/finish_slow_time` |
+| **연쇄가 키우는 타격**: 연쇄가 이어지는 동안 피해 숫자가 커지고(`LordData.chain_number_grow`) 뜨거운 색이 되며, 연쇄 5 이상이면 피가 크게 튄다 | `Rules.chain_live`, `main._on_enemy_hit` |
+| **단추 손맛**: 모든 단추가 마우스를 올리면 살짝 커지고 밝아지며, 누르면 쑥 들어갔다 튀어나온다 | `ButtonJuice`(GameSettings.ensure가 설치) |
+| **연쇄 소리 높이 오르기**: 이을 때마다 짧은 쇳소리가 반음씩 올라 한 옥타브(연쇄 14)에서 멈춘다. 사용자가 넣으라고 했다(삐 소리가 아니라 쇳소리) | `Sfx` `chain`, `ChainMeter.pitch` |
+
+음악은 아직 게임에 없어서 "연쇄가 길수록 음악이 두꺼워지기"는 못 넣었다(음악 파일이 들어오면 한다).
+
 ## 손맛 수치
 
 - `data/run.tres` `chain_window` (초)
 - `data/meta.tres` `chain_every`, `chain_shards`
+- `data/lord.tres` `finish_slow`, `finish_slow_time`, `chain_number_grow`
 - 흔들림·번쩍임 세기는 `main._on_chain`, `_on_pull_step`에 있다(PC에서 맞춘다).

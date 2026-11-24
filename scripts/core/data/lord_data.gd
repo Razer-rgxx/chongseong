@@ -32,6 +32,11 @@ extends Resource
 @export var hitstop_kill: float = 0.1     ## 그 베기로 적이 쓰러졌을 때(3틱)
 @export var hitstop_elite_kill: float = 0.23  ## 정예·우두머리·보스를 쓰러뜨렸을 때(7틱)
 @export var hitstop_hurt: float = 0.066   ## 영주가 맞았을 때(2틱, 결투에서는 없음)
+## 마무리 슬로모션(2026-11-24, docs/dopamine.md): 밤을 끝낸 처치·보스·무리/방을 다 쓰러뜨린 순간. 시간 배수와 실제 초.
+@export var finish_slow: float = 0.25
+@export var finish_slow_time: float = 0.55
+## 연쇄가 이어질 때마다 피해 숫자를 이만큼(비율) 키운다(연쇄 15까지). 연쇄가 chain_every 이상이면 피도 크게 튄다.
+@export var chain_number_grow: float = 0.03
 ## 휘두르는 모습이 남는 시간.
 @export var swing_time: float = 0.2
 ## 이만큼 가까운 적은 부채꼴 밖이어도 맞는다(크기에 더하는 칸).

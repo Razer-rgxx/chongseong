@@ -13,12 +13,12 @@ const SOUND_DIR: String = "res://assets/sound/"
 @export var unit_size: float = 10.0
 ## 같은 소리를 여러 번 들어도 덜 지겹게 높낮이를 이만큼(비율) 흔든다. 이름마다 따로 줄 수 있다.
 @export var pitch_jitter: float = 0.06
-@export var jitters: Dictionary = {&"hit": 0.12, &"hit_flesh": 0.1, &"hit_heavy": 0.08, &"swish": 0.08}
+@export var jitters: Dictionary = {&"hit": 0.12, &"hit_flesh": 0.1, &"hit_heavy": 0.08, &"swish": 0.08, &"chain": 0.0}
 ## 이름마다 더하는 크기(dB). 부르는 쪽의 volume_db에 더해진다.
 @export var gains: Dictionary = {
 	&"swish": -2.0, &"swish_big": 0.0, &"dash": -4.0, &"hit": 0.0, &"hit_big": 2.0,
 	&"hit_flesh": -3.0, &"hit_heavy": -4.0, &"thump": -2.0, &"anvil": 0.0, &"draw": -2.0, &"break": 0.0, &"hurt": -2.0, &"grunt": -6.0,
-	&"land": -3.0, &"hoof": -4.0, &"whistle": -3.0,
+	&"land": -3.0, &"hoof": -4.0, &"whistle": -3.0, &"chain": -6.0,
 }
 
 var _streams: Dictionary = {}   # 이름 -> Array[AudioStream]
@@ -40,6 +40,7 @@ func _ready() -> void:
 		&"night": [70.0, 40.0, 1.2, 0.5, 0.15, 600.0],
 		&"land": [85.0, 42.0, 0.11, 0.35, 0.4, 900.0],   # 점프하고 내려앉는 발소리(30단계): 짧게 내려가는 쿵과 흙 잡음
 		&"hoof": [175.0, 72.0, 0.075, 0.42, 0.62, 1500.0],   # 39단계 말발굽: 짧게 내려가는 딱 소리와 흙 잡음
+		&"chain": [520.0, 260.0, 0.09, 0.45, 0.45, 3400.0],   # 처치 연쇄(2026-11-24): 짧은 쇳소리. 부르는 쪽이 연쇄만큼 높인다
 	}
 	for name in made:
 		var files := _load_dir(str(name))

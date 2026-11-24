@@ -26,6 +26,7 @@ static func ensure() -> void:
 	if _loaded:
 		return
 	_loaded = true
+	ButtonJuice.install(Engine.get_main_loop() as SceneTree)   # 단추 손맛(2026-11-24): 트리에 붙는 단추마다
 	for a in ACTIONS:
 		var evs := InputMap.action_get_events(a[0])
 		if not evs.is_empty():

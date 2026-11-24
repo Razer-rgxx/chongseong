@@ -175,6 +175,7 @@ func _ready() -> void:
 	rules.kill_chain.connect(func(n: int, _paid: int) -> void:
 		chain_meter.bump(n, 0, data.run.chain_window, data.meta.chain_every)
 		_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
+		_sfx.play(&"chain", _lord.position, 0.0, ChainMeter.pitch(n))
 		if n % maxi(1, data.meta.chain_every) == 0:
 			_sfx.play(&"thump", _lord.position, -2.0, 0.6)
 			_camera.add_shake(0.25))
@@ -814,6 +815,7 @@ func _on_enemy_died(e: Enemy) -> void:
 
 
 func _on_pack_cleared(id: StringName) -> void:
+	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time)   # 무리의 마지막 하나
 	var n: int = meta.field_clear(String(id))
 	if n > 0:
 		_hud.toast("무리를 쓰러뜨렸다. 조각 %d개" % n)
@@ -867,6 +869,7 @@ func _head_note() -> void:
 
 ## 무덤 기사를 쓰러뜨렸다: 조각과 운 부적(Meta.boss_defeat)을 토스트로 알린다.
 func _on_boss_slain(_e: Enemy) -> void:
+	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time * 1.4)
 	var r: Dictionary = meta.boss_defeat()
 	_camera.add_shake(data.lord.shake_big * 2.0)
 	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)

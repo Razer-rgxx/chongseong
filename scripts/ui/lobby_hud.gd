@@ -37,6 +37,8 @@ signal sheath_bought(level: int)
 var data: GameData
 var meta: Meta
 var _shards: Label
+var _shown_shards: int = -1   ## 조각 숫자가 지금 보이는 값(세어 올리는 중에도, 2026-11-24)
+var _shards_tw: Tween
 var _toast: Band
 var _prompt: Band
 var _title: AreaTitle
@@ -332,9 +334,40 @@ func flash(c: Color, strength: float, time: float = 0.5) -> void:
 
 
 func refresh_top() -> void:
-	_shards.text = "조각  %s" % _num(meta.shards)
+	_count_shards(meta.shards)
 	if _mats and meta:
 		_mats.refresh(meta, data)
+
+
+## 조각 숫자를 툭 바꾸지 않고 세어 올린다(줄면 세어 내린다). 늘면 금빛으로 한 번 튀고 줄면 잠깐 붉다.
+## 판에서 막 돌아왔으면(Meta.shards_from) 그 수에서부터 조금 뒤에 세어 올린다.
+func _count_shards(to: int) -> void:
+	if _shown_shards < 0:
+		_shown_shards = to
+		if Meta.shards_from >= 0 and Meta.shards_from < to:
+			_shown_shards = Meta.shards_from
+		Meta.shards_from = -1
+		_shards.text = "조각  %s" % _num(_shown_shards)
+		if _shown_shards == to or not is_inside_tree():
+			return
+		get_tree().create_timer(0.9).timeout.connect(func() -> void: _count_shards(meta.shards))
+		return
+	if to == _shown_shards:
+		_shards.text = "조각  %s" % _num(to)
+		return
+	var up: bool = to > _shown_shards
+	var from: int = _shown_shards
+	if _shards_tw:
+		_shards_tw.kill()
+	_shards.pivot_offset = _shards.size * 0.5
+	_shards_tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_shards_tw.tween_method(func(v: float) -> void:
+		_shown_shards = roundi(v)
+		_shards.text = "조각  %s" % _num(_shown_shards), float(from), float(to), clampf(0.3 + absi(to - from) * 0.004, 0.3, 1.2)).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_shards_tw.parallel().tween_property(_shards, "modulate", ChainMeter.GOLD * 1.25 if up else Color(1.0, 0.45, 0.4), 0.12)
+	_shards_tw.tween_callback(func() -> void: _shards.scale = Vector2.ONE * (1.18 if up else 1.0))
+	_shards_tw.tween_property(_shards, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_shards_tw.parallel().tween_property(_shards, "modulate", Color.WHITE, 0.4)
 
 
 ## 주민이 늘었다(들판에서 풀어 줌): 사람 수 위에 +1.

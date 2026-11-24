@@ -171,6 +171,7 @@ func _ready() -> void:
 		_pull_fx.begin(Grid.cells_to_world(h.pos), h.id))
 	rules.pull_step.connect(_on_pull_step)
 	rules.kill_chain.connect(_on_chain)
+	rules.last_blow.connect(func() -> void: SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time))
 	rules.pull_window.connect(func(h: Hilt, o: float, c: float) -> void: _timing_fx[rules.pull_win_step % 2].on_window(Grid.cells_to_world(h.pos), o, c, rules.pull_t))
 	rules.pull_good.connect(_on_pull_good)
 	rules.pull_perfect.connect(_on_pull_perfect)
@@ -661,6 +662,7 @@ func _quest_line(r: Dictionary) -> String:
 func _on_end(won: bool) -> void:
 	var best: String = data.grades.names[rules.best_grade] if rules.best_grade >= 0 else "없음"
 	var title: String = "언덕의 정상에 섰다" if won else "%d구역에서 쓰러졌다" % (rules.zone + 1)
+	Meta.shards_from = meta.shards   # 마을의 조각 숫자가 여기서부터 세어 올라간다
 	var r := meta.record_run(rules, data.meta)
 	meta.save()
 	PlayLog.hill_end(rules, won, int(r.total))
@@ -731,6 +733,7 @@ func _on_pull_step(_h: Hilt, st: int) -> void:
 func _on_chain(n: int, paid: int) -> void:
 	_hud.chain(n, paid, data.run.chain_window, data.meta.chain_every)
 	_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
+	_sfx.play(&"chain", _lord.position, 0.0, ChainMeter.pitch(n))
 	if paid > 0:
 		_sfx.play(&"hit_big", _lord.position, -4.0, 0.7)
 		_sfx.play(&"thump", _lord.position, -2.0, 0.6)
@@ -907,11 +910,16 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 		_enemies[e.id].hit(big)
 	var chest: Vector3 = at + Vector3(0, 0.9 + Grid.cells_to_meters(e.radius) * 1.2, 0)
 	var dir: Vector3 = (at - _lord.position).normalized()
+	# 연쇄가 이어지는 동안은 피해 숫자가 커지고 뜨거운 색이 되며, chain_every 이상이면 피도 크게 튄다
+	var ch: int = rules.chain_live()
+	var gush: bool = big or ch >= data.meta.chain_every
 	if e.data.wraith:
-		_fx.wisp(chest, dir, big)
+		_fx.wisp(chest, dir, gush)
 	else:
-		_fx.blood(chest, dir, big)
-	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, big_number_size if big else hit_number_size)
+		_fx.blood(chest, dir, gush)
+	var grow: float = 1.0 + data.lord.chain_number_grow * minf(ch, 15)
+	var col: Color = Color(1, 0.86, 0.45) if big else Color.WHITE.lerp(ChainMeter.HOT, clampf((ch - 2) / 14.0, 0.0, 0.6))
+	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), col, roundi((big_number_size if big else hit_number_size) * grow))
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_hit_sound(e, big, at)
 
@@ -985,6 +993,7 @@ func _on_enemy_died(e: Enemy) -> void:
 	if e.data.boss:
 		_camera.add_shake(0.7)
 		_hud.flash(Color.WHITE, 0.6, 0.8)
+		SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time * 1.4)
 
 
 func _float(at: Vector3, text: String, c: Color, size: int) -> void:

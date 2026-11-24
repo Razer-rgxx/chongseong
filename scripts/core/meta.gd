@@ -28,6 +28,8 @@ var best: int = 0
 ## 판 하나에서 가장 많이 쓰러뜨린 수, 가장 긴 처치 연쇄(2026-11-24).
 var best_kills: int = 0
 var best_chain: int = 0
+## 판이 끝날 때 조각이 몇이었는지(마을의 조각 숫자가 여기서부터 세어 올라간다, 2026-11-24). 저장 안 함, -1은 없음.
+static var shards_from: int = -1
 var runs: int = 0
 ## 검 보관집(2026-11-21): 마을 터에 집을 짓고(storage_house), 그 집에서 검집을 단계로 산다(storage_lv).
 ## 검집 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
@@ -146,6 +148,7 @@ static func wipe(path: String = SAVE_PATH) -> void:
 	wake_at_gate = false
 	wake_note = ""
 	wake_at_crypt = false
+	shards_from = -1
 
 
 func save(path: String = SAVE_PATH) -> void:

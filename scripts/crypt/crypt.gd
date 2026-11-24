@@ -98,6 +98,7 @@ func _ready() -> void:
 	rules.kill_chain.connect(func(n: int, _paid: int) -> void:
 		chain_meter.bump(n, 0, data.run.chain_window, data.meta.chain_every)
 		_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
+		_sfx.play(&"chain", _lord.position, 0.0, ChainMeter.pitch(n))
 		if n % maxi(1, data.meta.chain_every) == 0:
 			_sfx.play(&"thump", _lord.position, -2.0, 0.6)
 			_camera.add_shake(0.25))
@@ -374,6 +375,7 @@ func _on_enemy_died(e: Enemy) -> void:
 
 ## 방을 다 쓰러뜨렸다: 문이 열리는 흔들림과 소리(돌판은 _sync_doors가 올린다). 저장한다.
 func _on_room_cleared(_id: StringName) -> void:
+	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time)   # 방의 마지막 하나
 	_camera.add_shake(0.3)
 	_sfx.play(&"thump", _lord.position, -2.0, 0.55)
 	_hud.flash(Color(1, 0.84, 0.42), 0.12, 0.6)
