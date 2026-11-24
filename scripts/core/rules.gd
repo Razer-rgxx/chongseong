@@ -74,6 +74,8 @@ signal pack_cleared(id: StringName)
 ## 들판 낮밤(29단계): 해가 졌다(밤 무리가 선다) / 날이 밝았다(쓰러뜨린 낮 무리가 다시 서고 밤 무리가 사라진다).
 signal field_dusk
 signal field_dawn
+## 들판 날씨(docs/weather.md): 날씨가 다른 것으로 바뀌었다(새벽·해질녘에만).
+signal field_weather_changed(kind: StringName)
 signal field_boss_woke(e: Enemy)
 signal field_boss_returned(e: Enemy)
 signal field_boss_slain(e: Enemy)
@@ -271,6 +273,11 @@ var packs: Dictionary = {}
 var field_clock_on: bool = false
 var field_clock: float = 0.0
 var field_night: bool = false
+## 들판 날씨(docs/weather.md): 새벽·해질녘마다 Rules.rng로 다시 굴린다(가중치 FieldLayout.WEATHER_DAY/NIGHT). 날씨마다 작은 사건 자리(weather_spots)가 하나둘 선다.
+## 자리 하나: {id, kind(glint·pilgrim·struck·cache), at, done}. 잿바람이면 불씨 땅(embers)이 영주 곁에 생긴다.
+var field_weather: StringName = &"clear"
+var weather_spots: Array[Dictionary] = []
+var _ash_t: float = 0.0
 ## 마지막으로 영주를 때린 적의 종류(플레이 기록용, state_hash에 넣지 않는다).
 var last_hit_by: StringName = &""
 ## 들판 보스(18단계): 무덤 기사 한 마리. 상태는 BOSS_*(자는 중, 깨어남, 돌아가는 중, 쓰러뜨림).
@@ -1851,8 +1858,12 @@ func spawn_dummy(p: Vector2) -> Enemy:
 
 ## 들판 모드를 켠다: 영주는 체력이 가득한 채 "밤"에 서고, 시간은 흐르지 않는다.
 ## clock가 0 이상이면 들판 시계를 그 값(초)에서 켠다(밤이면 밤 무리도 선다). 안 주면 시계 없음.
-func start_field(clock: float = -1.0) -> void:
+func start_field(clock: float = -1.0, weather: StringName = &"clear", spots: Array = []) -> void:
 	field = true
+	field_weather = weather if FieldLayout.WEATHERS.has(weather) else &"clear"
+	weather_spots.clear()
+	for sp in spots:
+		weather_spots.append(sp)
 	phase = Phase.NIGHT
 	night_left = night_total
 	hilts.clear()
@@ -1879,12 +1890,86 @@ func _step_field_clock() -> void:
 	if night == field_night:
 		return
 	field_night = night
+	_roll_weather(night)   # 날씨를 먼저 굴린다(해·새벽 신호를 받는 화면이 새 날씨를 본다)
 	if night:
 		spawn_night_packs()
 		field_dusk.emit()
 	else:
 		_field_dawn()
 		field_dawn.emit()
+
+
+## 날씨를 굴린다(해질녘이면 밤 가중치, 새벽이면 낮 가중치). 바뀌었으면 신호를 낸다. 사건 자리는 날씨가 같아도 새로 선다.
+func _roll_weather(night: bool) -> void:
+	var W: Dictionary = FieldLayout.WEATHER_NIGHT if night else FieldLayout.WEATHER_DAY
+	var total: int = 0
+	for k in FieldLayout.WEATHERS:
+		total += int(W.get(k, 0))
+	var pick: int = rng.randi_range(0, maxi(0, total - 1))
+	var kind: StringName = &"clear"
+	for k in FieldLayout.WEATHERS:
+		pick -= int(W.get(k, 0))
+		if pick < 0:
+			kind = k
+			break
+	var changed: bool = kind != field_weather
+	field_weather = kind
+	_ash_t = 0.0
+	_make_weather_spots(night)
+	if changed:
+		field_weather_changed.emit(kind)
+
+
+## 날씨의 사건 자리를 세운다: 비 = 젖은 쇳조각 둘, 안개 = 길 잃은 순례자, 폭풍 = 벼락 맞은 검, 맑은 밤 = 반딧불이 가리키는 숨은 상자. 잿바람은 불씨 땅(_step_ash).
+func _make_weather_spots(night: bool) -> void:
+	weather_spots.clear()
+	var kind: StringName = &""
+	var count: int = 0
+	match field_weather:
+		&"rain":
+			kind = &"glint"
+			count = FieldLayout.WX_RAIN_GLINTS
+		&"fog":
+			kind = &"pilgrim"
+			count = 1
+		&"storm":
+			kind = &"struck"
+			count = 1
+		&"clear":
+			if night:
+				kind = &"cache"
+				count = 1
+	if count == 0:
+		return
+	var pool: Array = (FieldLayout.WX_POOLS[kind] as Array).duplicate()
+	for i in count:
+		var j: int = rng.randi_range(0, pool.size() - 1)
+		weather_spots.append({"id": i, "kind": kind, "at": FieldLayout.GLINTS[int(pool[j])] + FieldLayout.WX_OFFSET, "done": false})
+		pool.remove_at(j)
+
+
+## 사건 자리 하나를 쓴다. 처음이면 그 자리({id, kind, at, done})를 돌려주고 끝낸 것으로 하며, 없거나 이미 썼으면 빈 사전.
+func use_weather_spot(id: int) -> Dictionary:
+	for sp in weather_spots:
+		if int(sp.id) == id and not bool(sp.done):
+			sp.done = true
+			return sp
+	return {}
+
+
+## 잿바람: WX_ASH_EVERY초마다 영주 곁 WX_ASH_RANGE칸 안에 불씨 땅이 WX_ASH_COUNT곳 선다(밤 구역 규칙의 불씨 땅과 같은 embers·피해). 날씨가 아니어도 이미 선 땅은 그대로 탄다.
+func _step_ash() -> void:
+	if field_weather == &"ash":
+		_ash_t -= dt
+		if _ash_t <= 0.0:
+			_ash_t += FieldLayout.WX_ASH_EVERY
+			var R := data.run
+			for i in FieldLayout.WX_ASH_COUNT:
+				var off := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(FieldLayout.WX_ASH_RANGE.x, FieldLayout.WX_ASH_RANGE.y)
+				var at: Vector2 = (lord.pos + off).clamp(Vector2(2, 2), Vector2(Grid.size) - Vector2(2, 2))
+				embers.append({"at": at, "warn": R.ember_warn, "burn": R.ember_burn})
+				ember_warn.emit(at, R.ember_radius, R.ember_warn)
+	_tick_embers()
 
 
 ## 날이 밝았다: 쓰러뜨린 낮 무리의 기록을 지우고 빈 자리의 무리를 다시 세운다(안 쓰러뜨린 무리는 그대로).
@@ -2008,6 +2093,7 @@ func _step_field() -> void:
 	if phase == Phase.DAY:
 		phase = Phase.NIGHT
 	_step_field_clock()
+	_step_ash()
 	_step_boss()
 	_step_chiefs()
 	var aggro: float = FieldLayout.FIELD_NIGHT_AGGRO if field_night else FieldLayout.PACK_AGGRO
@@ -2680,6 +2766,12 @@ func _step_embers() -> void:
 				var at := Vector2(rng.randf_range(2.0, size.x - 2.0), rng.randf_range(2.0, size.y - 2.0))
 				embers.append({"at": at, "warn": R.ember_warn, "burn": R.ember_burn})
 				ember_warn.emit(at, R.ember_radius, R.ember_warn)
+	_tick_embers()
+
+
+## 서 있는 불씨 땅을 한 틱 센다: 미리 보이는 동안 → 타는 동안 안에 있는 적과 영주를 태운다.
+func _tick_embers() -> void:
+	var R := data.run
 	var lit: Array[Vector2] = []
 	var keep: Array[Dictionary] = []
 	for f in embers:
@@ -3041,7 +3133,9 @@ func state_hash() -> int:
 		parts.append_array([h.omen, h.shown_omen, h.revealed])
 	parts.append_array([run_stats.kills, run_stats.zones, run_stats.elites, run_stats.perfect, run_stats.events_used, str(run_stats.kills_by_kind), str(run_stats.goals_done), str(run_stats.pulled_by_grade), pack.size()])
 	if field:
-		parts.append_array([field_clock_on, field_clock, field_night])
+		parts.append_array([field_clock_on, field_clock, field_night, str(field_weather), _ash_t])
+		for sp in weather_spots:
+			parts.append_array([sp.id, str(sp.kind), sp.at, sp.done])
 		parts.append(str(packs))
 		parts.append_array([field_boss_state, field_boss_home, field_boss.id if field_boss else -1])
 		for id in chiefs:

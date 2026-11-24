@@ -87,6 +87,9 @@ var glints_ready: bool = false
 var packs_cleared: Dictionary = {}
 ## 들판 시계(29단계, 초): 들판을 떠날 때 저장하고 다시 들어오면 이어 간다. 옛 저장은 0(아침). 들판 밖에서는 흐르지 않는다.
 var field_clock: float = 0.0
+## 들판 날씨(docs/weather.md): 시계처럼 들판을 떠날 때 저장하고 다시 들어오면 이어 간다. 사건 자리는 Rules.weather_spots 그대로({id, kind, at, done}).
+var field_weather: StringName = &"clear"
+var weather_spots: Array[Dictionary] = []
 ## 들판 보스(18단계): 이번 판에 무덤 기사를 쓰러뜨렸는지(판이 끝날 때 record_run이 비운다, 쓰러뜨렸으면 들판에 다시 와도 안 선다)와 처음 보상을 받았는지(저장).
 var boss_down: bool = false
 var boss_first: bool = false
@@ -158,7 +161,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -279,6 +282,13 @@ func from_dict(d: Dictionary) -> void:
 	for k in d.get("packs_cleared", {}):
 		packs_cleared[str(k)] = 1
 	field_clock = clampf(float(d.get("field_clock", 0.0)), 0.0, FieldLayout.FIELD_DAY + FieldLayout.FIELD_NIGHT)
+	field_weather = StringName(str(d.get("field_weather", "clear")))
+	if not FieldLayout.WEATHERS.has(field_weather):
+		field_weather = &"clear"
+	weather_spots = []
+	for a in d.get("weather_spots", []):
+		if a is Array and a.size() == 5 and FieldLayout.WX_POOLS.has(StringName(str(a[1]))):
+			weather_spots.append({"id": int(a[0]), "kind": StringName(str(a[1])), "at": Vector2(float(a[2]), float(a[3])), "done": bool(a[4])})
 	boss_down = bool(d.get("boss_down", false))
 	boss_first = bool(d.get("boss_first", false))
 	chiefs_first = {}
@@ -949,6 +959,36 @@ func read_stone(id: String) -> int:
 		shards += FieldLayout.LORE_REWARD
 		return FieldLayout.LORE_REWARD
 	return 0
+
+
+# ---------------------------------------------------------------- 날씨 사건 (docs/weather.md)
+
+## 날씨 사건 보상을 준다(조각, 종류에 따라 재료도). 규칙이 한 번만 쓰게 한 자리(Rules.use_weather_spot)에서만 부른다. {shards, mat, mat_n}.
+func weather_reward(kind: StringName) -> Dictionary:
+	var R: Dictionary = FieldLayout.WX_REWARD[kind]
+	var n: int = rng.randi_range((R.shards as Vector2i).x, (R.shards as Vector2i).y)
+	shards += n
+	var out := {"shards": n, "mat": R.mat, "mat_n": 0}
+	if R.mat != &"":
+		out.mat_n = rng.randi_range((R.mat_n as Vector2i).x, (R.mat_n as Vector2i).y)
+		add_mat(R.mat, int(out.mat_n))
+	return out
+
+
+## 잿바람이 불면 쓰지 않은 철 자리가 WX_ASH_IRON곳 더 선다. 더한 자리 번호를 돌려준다.
+func ash_iron() -> Array[int]:
+	var pool: Array[int] = []
+	for i in FieldLayout.MATS.size():
+		if FieldLayout.MATS[i][1] == &"iron" and not mat_spots.has(i):
+			pool.append(i)
+	var out: Array[int] = []
+	for _k in mini(FieldLayout.WX_ASH_IRON, pool.size()):
+		var j: int = rng.randi() % pool.size()
+		out.append(pool[j])
+		mat_spots.append(pool[j])
+		pool.remove_at(j)
+	mat_spots.sort()
+	return out
 
 
 # ---------------------------------------------------------------- 의뢰판 (docs/village.md 15.1)

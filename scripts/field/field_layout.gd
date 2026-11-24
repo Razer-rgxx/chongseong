@@ -355,6 +355,63 @@ const NIGHT_PACKS: Dictionary = {
 }
 
 
+## ---- 들판 날씨(docs/weather.md). 새벽(낮 가중치)과 해질녘(밤 가중치)마다 Rules.rng로 굴린다. 수치는 여기 하나에만 둔다.
+const WEATHERS: Array[StringName] = [&"clear", &"rain", &"fog", &"storm", &"ash"]
+const WEATHER_DAY: Dictionary = {&"clear": 40, &"rain": 22, &"fog": 14, &"storm": 8, &"ash": 16}
+const WEATHER_NIGHT: Dictionary = {&"clear": 34, &"rain": 20, &"fog": 20, &"storm": 12, &"ash": 14}
+const WEATHER_LINES: Dictionary = {&"clear": "하늘이 갠다", &"rain": "비가 내린다", &"fog": "안개가 낀다", &"storm": "폭풍이 몰아친다", &"ash": "잿바람이 분다"}
+## 사건 자리는 GLINTS 칸에서 WX_OFFSET만큼 비껴 선다(흩어진 조각과 겹치지 않게). WX_POOLS: 사건 종류 → 쓸 GLINTS 번호(걸어 닿는 곳만).
+const WX_OFFSET: Vector2 = Vector2(1.6, 1.2)
+const WX_POOLS: Dictionary = {
+	&"glint": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+	&"pilgrim": [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11],
+	&"struck": [3, 4, 5, 11, 12, 13, 15, 20, 21],
+	&"cache": [12, 13, 14, 15, 20, 21, 22],
+}
+const WX_RAIN_GLINTS: int = 2
+## 보상: 종류 → {shards: 조각 범위, mat: 재료(없으면 &""), mat_n: 재료 범위}. Meta.weather_reward가 Meta.rng로 굴린다.
+const WX_REWARD: Dictionary = {
+	&"glint": {"shards": Vector2i(3, 6), "mat": &"", "mat_n": Vector2i(0, 0)},
+	&"pilgrim": {"shards": Vector2i(12, 20), "mat": &"", "mat_n": Vector2i(0, 0)},
+	&"struck": {"shards": Vector2i(15, 25), "mat": &"iron", "mat_n": Vector2i(2, 3)},
+	&"cache": {"shards": Vector2i(25, 40), "mat": &"", "mat_n": Vector2i(0, 0)},
+}
+## 잿바람: 불씨 땅이 WX_ASH_EVERY초마다 영주 둘레 WX_ASH_RANGE(최소, 최대 칸)에 WX_ASH_COUNT곳 선다. 철 자리는 WX_ASH_IRON곳 더 생긴다.
+const WX_ASH_EVERY: float = 5.0
+const WX_ASH_COUNT: int = 2
+const WX_ASH_RANGE: Vector2 = Vector2(3.0, 9.0)
+const WX_ASH_IRON: int = 2
+## 맑은 밤에 비석을 읽으면 한 줄 더(비석 id → 글).
+const STONE_NIGHT_LINES: Dictionary = {
+	"stone_1": "달빛 아래 보니 내려온 발자국이 하나도 없다.",
+	"stone_2": "맑은 밤이면 풀 사이의 검들이 달을 되비춘다.",
+	"stone_3": "물 위에 별이 떠 있다. 맹세도 이렇게 비쳤을 것이다.",
+	"stone_4": "저 위, 꺼진 봉화 자리에 아직 재 냄새가 난다.",
+	"stone_5": "숲 안쪽에서 누가 발을 끈다. 돌아보지 마라.",
+	"stone_6": "오르는 이의 등 뒤로 마을 불빛이 작게 남는다.",
+	"stone_7": "잠긴 문 안쪽에 긁은 자국이 가득하다.",
+	"stone_8": "구덩이 밑에서 바퀴 소리가 난 것도 같다.",
+	"stone_9": "우물 자리에만 풀이 자라지 않는다.",
+}
+## 화면: 날씨마다 안개 짙기 배수, 해 밝기 배수, 안개·빛 물들임(색, 섞는 정도). 날씨가 바뀌면 WX_BLEND초에 걸쳐 섞는다.
+const WX_BLEND: float = 8.0
+const WX_LOOK: Dictionary = {
+	&"clear": {"fog": 1.0, "sun": 1.0, "tint": Color(1, 1, 1), "amt": 0.0},
+	&"rain": {"fog": 1.8, "sun": 0.55, "tint": Color(0.5, 0.56, 0.62), "amt": 0.35},
+	&"fog": {"fog": 4.0, "sun": 0.7, "tint": Color(0.62, 0.64, 0.66), "amt": 0.6},
+	&"storm": {"fog": 2.2, "sun": 0.35, "tint": Color(0.3, 0.34, 0.4), "amt": 0.5},
+	&"ash": {"fog": 2.0, "sun": 0.7, "tint": Color(0.75, 0.5, 0.32), "amt": 0.5},
+}
+
+
+## 비석 글에 날씨가 더하는 줄: 맑은 밤이면 한 줄 더.
+static func stone_text(id: String, weather: StringName, night: bool) -> String:
+	var t: String = STONES[id][2]
+	if weather == &"clear" and night and STONE_NIGHT_LINES.has(id):
+		t += "\n" + String(STONE_NIGHT_LINES[id])
+	return t
+
+
 ## ---- 들판 지도(38단계, docs/open_world2.md). M으로 여는 지도 창(FieldMap)과 가 본 곳(Meta.field_seen).
 ## 밝힘 격자 한 칸은 들판 SEEN_CELL칸이고 격자는 SEEN_SIZE(들판 크기를 덮는다, 58 × 28 = 1624비트). 걸으면 영주 둘레 SEEN_RADIUS칸에 닿는 격자 칸이
 ## 밝혀진다. 장면(field.gd)은 SEEN_TICKS틱마다 영주 자리로 밝힌다.

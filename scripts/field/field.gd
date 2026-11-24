@@ -54,6 +54,8 @@ var _ambient_day: Color = Color.WHITE
 var _ambient_day_energy: float = 0.45
 var _sky_tint: Color = Color(1.0, 0.8, 0.68)   ## 낮의 하늘빛(밤·해질녘으로 섞는다)
 var _want_attack: bool = false
+var _wfx: WeatherFx
+var _wx: Dictionary = {"fog": 1.0, "sun": 1.0, "tint": Color.WHITE, "amt": 0.0}   ## 지금 섞인 날씨(FieldLayout.WX_LOOK으로 천천히 간다)
 var _want_hook: bool = false
 var _over: bool = false
 var _enemies: Dictionary = {}
@@ -95,7 +97,7 @@ func _ready() -> void:
 	Grid.size = FieldLayout.SIZE   # Rules가 싸움터 크기로 영주를 가둔다: 들판 크기로
 	rules.memory = meta.memory_table()
 	rules.bonus_hp = meta.recruit_hp()   # 34단계: 떠돌이 약초꾼을 영입했으면 들판 체력 +
-	rules.start_field(meta.field_clock)   # 시계는 지난번 떠난 데서 이어 간다(밤이면 밤 무리도 서 있다)
+	rules.start_field(meta.field_clock, meta.field_weather, meta.weather_spots)   # 시계는 지난번 떠난 데서 이어 간다(밤이면 밤 무리도 서 있다)
 	rules.spawn_packs(meta.packs_cleared)   # 이미 쓰러뜨린 무리는 안 생긴다
 	if not meta.boss_down:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
@@ -186,6 +188,13 @@ func _ready() -> void:
 	rules.chief_woke.connect(_on_chief_woke)
 	rules.field_dusk.connect(_on_dusk)
 	rules.field_dawn.connect(_on_dawn)
+	rules.field_weather_changed.connect(_on_weather)
+	rules.ember_warn.connect(func(at: Vector2, r: float, t: float) -> void: _wfx.ember_patch(at, r, t, data.run.ember_burn))
+	_wfx = WeatherFx.make(self, _camera)
+	_wfx.flashed.connect(_on_flash)
+	_wfx.set_kind(rules.field_weather)
+	_wx = _wx_target()
+	_build_weather_props(false)
 	rules.enemy_act.connect(_on_enemy_act)
 	rules.run_ended.connect(_on_down)
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
@@ -350,24 +359,51 @@ func _light(delta: float, now: bool = false) -> void:
 	var want: float = 1.0 if FieldLayout.area_at(rules.lord.pos) == &"marsh" else 0.0
 	if now:
 		_fog_k = want
-	if is_equal_approx(k, _night_k) and is_equal_approx(_fog_k, want):
+	var wmoved: bool = _blend_weather(delta, now)
+	if is_equal_approx(k, _night_k) and is_equal_approx(_fog_k, want) and not wmoved:
 		return
 	_fog_k = move_toward(_fog_k, want, delta / FieldLayout.MARSH_FOG_TIME)
-	if not is_equal_approx(k, _night_k):
+	if not is_equal_approx(k, _night_k) or wmoved:
 		_night_k = k
 		_apply_day_night(k)
 	var mk: float = smoothstep(0.0, 1.0, _fog_k)
-	var dens: float = _fog_base * lerpf(1.0, FieldLayout.FIELD_FOG_NIGHT_MULT, k)
+	var dens: float = _fog_base * lerpf(1.0, FieldLayout.FIELD_FOG_NIGHT_MULT, k) * float(_wx.fog)
 	var col: Color = _fog_color.lerp(FieldLayout.FIELD_FOG_NIGHT, smoothstep(0.0, 1.0, k))
 	col = col.lerp(FieldLayout.FIELD_SUN_COLOR_DUSK * 0.45, sin(k * PI) * 0.5)
+	col = col.lerp((_wx.tint as Color).darkened(0.75 * k), float(_wx.amt))
 	_env.fog_density = lerpf(dens, dens * FieldLayout.MARSH_FOG_MULT, mk)
 	_env.fog_light_color = col.lerp(FieldLayout.MARSH_FOG_COLOR.darkened(0.75 * k), mk)
+
+
+func _wx_target() -> Dictionary:
+	var L: Dictionary = FieldLayout.WX_LOOK[rules.field_weather]
+	return {"fog": L.fog, "sun": L.sun, "tint": L.tint, "amt": L.amt}
+
+
+## 날씨 보임새(안개 배수, 해 배수, 물들임)를 목표 쪽으로 WX_BLEND초에 걸쳐 옮긴다. now면 바로. 아직 움직이는 중이면 true.
+func _blend_weather(delta: float, now: bool) -> bool:
+	var T: Dictionary = _wx_target()
+	if now:
+		_wx = T
+		return true
+	var s: float = clampf(delta / FieldLayout.WX_BLEND, 0.0, 1.0)
+	var moved: bool = false
+	for key in ["fog", "sun", "amt"]:
+		var cur: float = _wx[key]
+		if absf(cur - float(T[key])) > 0.002:
+			_wx[key] = move_toward(cur, float(T[key]), s * (3.0 if key == "fog" else 1.0))
+			moved = true
+	var c: Color = _wx.tint
+	if absf(c.r - (T.tint as Color).r) + absf(c.g - (T.tint as Color).g) + absf(c.b - (T.tint as Color).b) > 0.004:
+		_wx.tint = c.lerp(T.tint, minf(1.0, s * 3.0))
+		moved = true
+	return moved
 
 
 ## k(0 낮 ~ 1 밤)에 맞게 해, 하늘, 환경광, 횃불을 바꾼다. 해질녘(k 0.5 근처)은 해가 낮고 붉다.
 func _apply_day_night(k: float) -> void:
 	var E: Vector3 = FieldLayout.FIELD_SUN_ENERGY
-	_sun.light_energy = lerpf(E.x, E.y, smoothstep(0.0, 0.55, k)) if k < 0.55 else lerpf(E.y, E.z, smoothstep(0.55, 1.0, k))
+	_sun.light_energy = (lerpf(E.x, E.y, smoothstep(0.0, 0.55, k)) if k < 0.55 else lerpf(E.y, E.z, smoothstep(0.55, 1.0, k))) * float(_wx.sun)
 	var c: Color = FieldLayout.FIELD_SUN_COLOR_DAY.lerp(FieldLayout.FIELD_SUN_COLOR_NIGHT, smoothstep(0.4, 1.0, k))
 	_sun.light_color = c.lerp(FieldLayout.FIELD_SUN_COLOR_DUSK, sin(k * PI) * 0.7)
 	var T: Vector3 = FieldLayout.FIELD_SUN_TILT
@@ -376,6 +412,7 @@ func _apply_day_night(k: float) -> void:
 	if HillBuilder.sky_material:
 		HillBuilder.sky_material.set_shader_parameter("night", k)
 		var tint: Color = _sky_tint.lerp(FieldLayout.FIELD_SKY_TINT_NIGHT, smoothstep(0.3, 1.0, k))
+		tint = tint.lerp((_wx.tint as Color).darkened(0.6 * k), float(_wx.amt) * 0.8)
 		HillBuilder.sky_material.set_shader_parameter("tint", tint.lerp(FieldLayout.FIELD_SKY_TINT_DUSK, sin(k * PI) * 0.6))
 	_env.ambient_light_color = _ambient_day.lerp(FieldLayout.FIELD_AMBIENT_NIGHT, k)
 	_env.ambient_light_energy = lerpf(_ambient_day_energy, FieldLayout.FIELD_AMBIENT_NIGHT_ENERGY, k)
@@ -383,15 +420,48 @@ func _apply_day_night(k: float) -> void:
 	_lord.torch.light_energy = lerpf(FieldLayout.FIELD_TORCH_DAY, FieldLayout.FIELD_TORCH_NIGHT, smoothstep(0.2, 0.9, k))
 
 
+## 날씨가 바뀌었다(docs/weather.md): 입자를 켜고 끄고 한 줄을 띄운다. 잿바람이면 쓰지 않은 철 자리가 더 선다. 사건 자리는 해·새벽 신호(_build_weather_props)가 세운다.
+func _on_weather(kind: StringName) -> void:
+	_wfx.set_kind(kind)
+	_hud.toast(FieldLayout.WEATHER_LINES[kind])
+	if kind == &"ash":
+		for i in meta.ash_iron():
+			if not _props.has("mat_%d" % i):
+				_props["mat_%d" % i] = FieldBuilder.mat_spot(self, i)
+
+
+## 번개: 화면이 번쩍이고 멀수록 늦게 낮은 천둥이 깔린다(종소리·올라가는 소리 없음).
+func _on_flash(delay: float) -> void:
+	_hud.flash(Color(0.82, 0.88, 1.0), 0.3, 0.3)
+	get_tree().create_timer(delay).timeout.connect(func() -> void: _sfx.play(&"thump", _lord.position, -1.0, 0.35))
+
+
+## 날씨 사건 자리(Rules.weather_spots)의 몸을 다시 세운다. strike면 벼락 맞은 검에 번개가 친다.
+func _build_weather_props(strike: bool) -> void:
+	for key in _props.keys():
+		if String(key).begins_with("wx_"):
+			(_props[key] as Node).queue_free()
+			_props.erase(key)
+	for sp in rules.weather_spots:
+		if bool(sp.done):
+			continue
+		_props["wx_%d" % sp.id] = WeatherProps.build(sp.kind, sp.at, sp.id)
+		add_child(_props["wx_%d" % sp.id])
+		if strike and sp.kind == &"struck":
+			_wfx.strike(FieldBuilder.at_cell(sp.at))
+
+
 ## 해가 졌다: 밤 소리(하늘과 왼쪽 위 해·달이 보여 주니 글은 없다). 밤 무리는 Rules가 세웠다.
 func _on_dusk() -> void:
 	_sfx.play(&"night", _lord.position, -2.0)
+	_build_weather_props(true)
 
 
 ## 날이 밝았다(글 없음). 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 맞춘다(영주 곁이라 건너뛴 것만 남는다).
 ## 상자·조각·보스·무덤은 판이 끝날 때까지 그대로.
 func _on_dawn() -> void:
 	meta.packs_cleared = rules.field_cleared_ids()
+	_build_weather_props(true)
 	meta.place_wanderer()   # 34단계: 새벽마다 다른 사람이 선다
 	if _reading == "wanderer":
 		_end_read()
@@ -488,6 +558,9 @@ func _spots() -> Dictionary:
 		s[id] = FieldLayout.STONES[id][0]
 	for i in meta.glints:
 		s["glint_%d" % i] = FieldLayout.GLINTS[i]
+	for sp in rules.weather_spots:
+		if not bool(sp.done):
+			s["wx_%d" % sp.id] = sp.at
 	for i in meta.mat_spots:
 		s["mat_%d" % i] = FieldLayout.MATS[i][0]
 	for pk in meta.captive_packs:
@@ -509,6 +582,8 @@ func _prompt(key: String) -> String:
 		return "검에 올라선다"
 	if key == "wanderer":
 		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
+	if key.begins_with("wx_"):
+		return {&"glint": "젖은 쇳조각을 줍는다", &"pilgrim": "길 잃은 순례자에게 말을 건다", &"struck": "벼락 맞은 검을 거둔다", &"cache": "반딧불이가 모인 곳을 판다"}[_wx_spot(int(key.substr(3))).kind]
 	if key.begins_with("cache"):
 		return "유품을 연다"
 	if key.begins_with("stone"):
@@ -572,7 +647,7 @@ func _interact() -> void:
 	elif _near.begins_with("stone"):
 		var info: Array = FieldLayout.STONES[_near]
 		_reading = _near
-		_hud.say(info[1], info[2], true)
+		_hud.say(info[1], FieldLayout.stone_text(_near, rules.field_weather, rules.field_night), true)
 		var pay: int = 0
 		if not meta.lore_read.has(_near):
 			pay = meta.read_stone(_near)
@@ -580,6 +655,8 @@ func _interact() -> void:
 			_saved()
 		if pay > 0:
 			_hud.toast("비석을 모두 읽었다. 조각 %d개" % pay)
+	elif _near.begins_with("wx_"):
+		_use_weather(int(_near.substr(3)))
 	elif _near.begins_with("captive_"):
 		var r: Dictionary = meta.free_captive(_near.substr(8), data)
 		if not r.is_empty():
@@ -896,13 +973,43 @@ func _on_down(_won: bool) -> void:
 	PlayLog.down("field", rules, _held_id, String(FieldLayout.area_at(rules.lord.pos)))
 	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, rules.lord.pos), _held_id, meta)
 	Meta.carry_sword = -1
-	meta.field_clock = rules.field_clock
+	_store_clock()
 	meta.save()
 	Meta.wake_at_gate = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
 	await get_tree().create_timer(1.6).timeout
 	SceneLoader.go(get_tree(), VILLAGE_PATH)   # 불러오기 화면(2026-11-24)
+
+
+func _wx_spot(id: int) -> Dictionary:
+	for sp in rules.weather_spots:
+		if int(sp.id) == id:
+			return sp
+	return {}
+
+
+## 날씨 사건 하나를 쓴다: 규칙이 한 번만 허락하고(use_weather_spot) Meta가 보상을 준다.
+func _use_weather(id: int) -> void:
+	var sp: Dictionary = rules.use_weather_spot(id)
+	if sp.is_empty():
+		return
+	var got: Dictionary = meta.weather_reward(sp.kind)
+	var node: Node3D = _props.get("wx_%d" % id)
+	_props.erase("wx_%d" % id)
+	_sfx.play(&"thump", _lord.position, -4.0, 1.3 if sp.kind == &"glint" else 0.8)
+	if sp.kind == &"pilgrim":
+		_reading = "wx_%d" % id
+		_hud.say("길 잃은 순례자", "안개 속에서 길을 잃었소. 마을 쪽 불빛을 일러 주어 고맙소.\n이건 가진 전부요. 받아 주시오. (조각 %d개)" % got.shards, true)
+		get_tree().create_timer(2.5).timeout.connect(func() -> void:
+			if is_instance_valid(node):
+				FieldBuilder.take_glint(node))
+	else:
+		if node:
+			FieldBuilder.take_glint(node)
+		var extra: String = (" · 쇠 %d" % int(got.mat_n)) if int(got.mat_n) > 0 else ""
+		_hud.toast("조각 %d개%s" % [got.shards, extra])
+	_saved()
 
 
 func _end_read() -> void:
@@ -917,15 +1024,22 @@ func _end_read() -> void:
 			VillageProps.still(_wander_P)
 
 
-func _saved() -> void:
+## 시계와 날씨(와 사건 자리)를 Meta에 적는다. 저장은 호출한 쪽이 한다.
+func _store_clock() -> void:
 	meta.field_clock = rules.field_clock
+	meta.field_weather = rules.field_weather
+	meta.weather_spots = rules.weather_spots.duplicate(true)
+
+
+func _saved() -> void:
+	_store_clock()
 	meta.save()
 	_hud.refresh_top()
 
 
 func _leave(path: String) -> void:
 	Meta.carry_sword = -1   # 들판을 떠나면 검을 내려놓는다
-	meta.field_clock = rules.field_clock   # 시계는 들판 밖에서 흐르지 않고 다시 들어오면 이어 간다
+	_store_clock()   # 시계는 들판 밖에서 흐르지 않고 다시 들어오면 이어 간다
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	SceneLoader.go(get_tree(), path)   # 불러오기 화면(2026-11-24)

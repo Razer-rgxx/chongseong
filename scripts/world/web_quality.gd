@@ -8,6 +8,7 @@ const SCALE: float = 0.6            ## 3D를 그리는 해상도 배율(글자·
 const SHADOW_ATLAS: int = 2048      ## 해 그림자 지도 크기
 const SHADOW_DISTANCE: float = 45.0 ## 해 그림자가 닿는 거리(m)
 const GRASS_KEEP: float = 0.3       ## 풀 포기를 남기는 비율
+const WEATHER_KEEP: float = 0.35    ## 들판 날씨 입자(비·재·불똥·반딧불이)를 남기는 비율
 
 static var _hooked: bool = false
 
