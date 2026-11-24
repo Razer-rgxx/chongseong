@@ -18,11 +18,15 @@ var _was_mouse: Input.MouseMode = Input.MOUSE_MODE_VISIBLE
 ## 기록 모두 지우기: 한 번 누르면 묻고(_wipe_armed), 한 번 더 누르면 지운다.
 var _wipe: Button
 var _wipe_armed: bool = false
+var _account_text: Label
+var _account_btn: Button
 const TITLE_SCENE: String = "res://scenes/title/title.tscn"
 
 
 func _ready() -> void:
 	GameSettings.ensure()
+	if not Account.logged_in:
+		Account.load_state()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -72,6 +76,12 @@ func _ready() -> void:
 	box.add_child(UiKit.label("키 칸을 누르고 새 키를 누릅니다. 예비 키(화살표 등)는 그대로 남습니다.", 13, UiKit.MUTED))
 	box.add_child(UiKit.rule())
 	box.add_child(UiKit.button("기본값으로", _reset, 34))
+	box.add_child(UiKit.rule())
+	box.add_child(UiKit.label("계정", 18, UiKit.TITLE))
+	_account_text = UiKit.label("", 15)
+	box.add_child(_account_text)
+	_account_btn = UiKit.button("", _on_account, 34)
+	box.add_child(_account_btn)
 	box.add_child(UiKit.rule())
 	box.add_child(UiKit.label("기록", 18, UiKit.TITLE))
 	_wipe = UiKit.button("기록 모두 지우기", _on_wipe, 34)
@@ -166,7 +176,24 @@ func _reset() -> void:
 	_refresh()
 
 
+## 로그인 중이면 로그아웃, 아니면 시작 화면의 로그인 창으로 간다(게스트도 여기서 나온다).
+func _on_account() -> void:
+	if Account.logged_in:
+		_account_btn.disabled = true
+		await Account.logout()
+		if is_inside_tree():
+			_account_btn.disabled = false
+			_refresh()
+		return
+	Account.set_guest(false)
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	SceneLoader.go(get_tree(), TITLE_SCENE)
+
+
 func _refresh() -> void:
+	_account_text.text = Account.status_text()
+	_account_btn.text = "로그아웃" if Account.logged_in else "로그인하기"
 	_vol_text.text = "%d%%" % roundi(GameSettings.volume * 100.0)
 	_mouse_text.text = "×%.2f" % GameSettings.mouse_k
 	for a in _key_buttons:

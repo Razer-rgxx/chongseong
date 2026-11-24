@@ -20,6 +20,11 @@ static var status: String = ""
 static var _busy: bool = false
 
 
+## 순위표에 올려도 되나: 관리자 계정은 어떤 순위에도 오르지 않는다(docs/account.md).
+static func may_submit() -> bool:
+	return not Account.admin
+
+
 ## 올릴 꼴(2048바이트 안).
 static func pack(rec: Dictionary) -> Dictionary:
 	var g: Array = rec.get("ghost", [])
@@ -68,8 +73,8 @@ static func _sync(tree: SceneTree, meta: Meta) -> String:
 	if not await _login(gd):
 		return "다른 영주의 검: 계정에 들어가지 못했다(대시보드의 이메일 인증을 꺼야 한다)"
 	var me: String = _account().get("name", "")
-	# 올린 적 없는 내 마지막 쓰러진 검
-	if not meta.fallen.is_empty():
+	# 올린 적 없는 내 마지막 쓰러진 검(관리자는 순위에 올리지 않는다)
+	if not meta.fallen.is_empty() and may_submit():
 		var last: Dictionary = meta.fallen[meta.fallen.size() - 1]
 		var key: String = "%d:%d:%d" % [int(last.id), int(last.run), int(last.kills)]
 		if key != meta.shared_key:

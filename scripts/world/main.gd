@@ -247,6 +247,7 @@ func _setup_console() -> void:
 	_hud.add_child(_console)
 	_console.closed.connect(func() -> void: _capture(true))
 	_console.picked.connect(_on_console_pick)
+	_console.command.connect(func(cmd: Dictionary) -> void: _hud.toast(AdminCmd.apply(cmd, rules, meta)))
 	_console.shards_given.connect(func(n: int) -> void:
 		meta.shards = maxi(0, meta.shards + n)
 		meta.save())

@@ -50,6 +50,7 @@ func _ready() -> void:
 	_knight()
 	_build_ui()
 	_place_camera(0.0)
+	_account_gate()
 	WebQuality.apply(self, _env.environment, _sun, _camera)   # 웹판에서만 가볍게
 
 
@@ -356,7 +357,7 @@ func _show_menu() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _leaving or get_node_or_null("UiSettings"):
+	if _leaving or get_node_or_null("UiSettings") or get_node_or_null("UiAccount"):
 		return
 	var k := event as InputEventKey
 	var mb := event as InputEventMouseButton
@@ -371,6 +372,40 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if k and (k.physical_keycode == KEY_ENTER or k.physical_keycode == KEY_KP_ENTER):
 		_start()
+
+
+# ---------------------------------------------------------------- 계정
+
+## 메뉴 앞에 로그인 창: 로그인했거나 게스트를 골랐으면 건너뛴다. 저장된 이메일이 있으면 먼저 조용히 자동 로그인을 해 보고 안 되면 연다.
+func _account_gate() -> void:
+	Account.load_state()
+	if not Account.needs_window():
+		_admin_mark()
+		return
+	if Account.email != "" and Account.available():
+		var r: Dictionary = await Account.auto_login()
+		if r.ok or not is_inside_tree():
+			_admin_mark()
+			return
+	var w := AccountWindow.new()
+	w.name = "UiAccount"
+	_ui.add_child(w)
+	w.done.connect(_admin_mark)
+
+
+## 관리자 계정이면 오른쪽 위에 작은 놋쇠빛 "관리자" 표.
+func _admin_mark() -> void:
+	if not Account.admin or _ui.get_node_or_null("AdminMark") != null:
+		return
+	var m := UiKit.label("관리자", 15, UiKit.LINE)
+	m.name = "AdminMark"
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiKit.soft_shadow(m)
+	m.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	m.offset_left = -110.0
+	m.offset_top = 16.0
+	m.offset_right = -20.0
+	_ui.add_child(m)
 
 
 # ---------------------------------------------------------------- 메뉴

@@ -1920,6 +1920,19 @@ func _roll_weather(night: bool) -> void:
 		field_weather_changed.emit(kind)
 
 
+## 관리용: 날씨를 바로 바꾼다(관리자 창, docs/account.md). 굴리지 않으므로 Rules.rng를 쓰지 않는다. 들판 밖이면 아무것도 안 한다.
+func set_weather(kind: StringName) -> bool:
+	if not field or not FieldLayout.WEATHERS.has(kind):
+		return false
+	var changed: bool = kind != field_weather
+	field_weather = kind
+	_ash_t = 0.0
+	_make_weather_spots(field_night)
+	if changed:
+		field_weather_changed.emit(kind)
+	return true
+
+
 ## 날씨의 사건 자리를 세운다: 비 = 젖은 쇳조각 둘, 안개 = 길 잃은 순례자, 폭풍 = 벼락 맞은 검, 맑은 밤 = 반딧불이 가리키는 숨은 상자. 잿바람은 불씨 땅(_step_ash).
 func _make_weather_spots(night: bool) -> void:
 	weather_spots.clear()

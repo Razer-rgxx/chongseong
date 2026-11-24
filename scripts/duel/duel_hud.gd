@@ -82,7 +82,7 @@ func _ready() -> void:
 func set_online(my_seat: int) -> void:
 	_online = true
 	_names = ["", ""]
-	_names[my_seat] = ONLINE_NAMES[0]
+	_names[my_seat] = Account.display_name(ONLINE_NAMES[0])
 	_names[1 - my_seat] = ONLINE_NAMES[1]
 	for i in 2:
 		_name_labels[i].text = _names[i]

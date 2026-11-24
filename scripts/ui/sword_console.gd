@@ -8,6 +8,8 @@ extends Control
 signal picked(d: SwordData, slot: int)
 signal closed
 signal shards_given(n: int)
+## 낱말 명령(날씨·재료·머리, AdminCmd): {name, args}.
+signal command(cmd: Dictionary)
 
 const SHOW: int = 9
 
@@ -19,6 +21,7 @@ var _hits: Array[SwordData] = []
 var _sel: int = 0
 var _slot: int = -1
 var _give: int = 0   # "조각 N"이면 N, 아니면 0
+var _cmd: Dictionary = {}   # "날씨 비" 같은 명령이면 그것
 
 
 func setup(d: GameData) -> void:
@@ -115,6 +118,10 @@ func _search(q: String) -> void:
 	_sel = 0
 	_slot = -1
 	_give = 0
+	_cmd = AdminCmd.parse(q)
+	if not _cmd.is_empty():
+		_draw()
+		return
 	var words: PackedStringArray = q.strip_edges().split(" ", false)
 	if words.size() == 2 and words[0] == "조각" and words[1].is_valid_int():
 		_give = int(words[1])
@@ -150,6 +157,9 @@ func _draw() -> void:
 	if _field.text.strip_edges() == "":
 		_count.text = "찾을 말을 쓰면 여기에 나온다."
 		return
+	if not _cmd.is_empty():
+		_count.text = AdminCmd.describe(_cmd)
+		return
 	if _give != 0:
 		_count.text = "Enter: 조각 %+d" % _give
 		return
@@ -180,6 +190,11 @@ func _draw() -> void:
 
 
 func _pick() -> void:
+	if not _cmd.is_empty():
+		var c: Dictionary = _cmd
+		close()
+		command.emit(c)
+		return
 	if _give != 0:
 		var n: int = _give
 		close()
