@@ -74,6 +74,7 @@ var _wt: float = 0.0
 var _flicker := RandomNumberGenerator.new()   ## 모닥불 흔들림(꾸밈, 규칙과 따로)
 var _seen_t: int = 0   ## 38단계: 다음 밝힘까지 남은 틱
 var _horse: RideSwordView   ## 탈 검의 몸(규칙 이름은 39단계 말 그대로 horse)
+var _ride_rest: Node3D      ## 탈 검을 얻기 전 망루 아래 돌 받침과 꽂힌 검
 
 @onready var _camera: Camera3D = $Camera
 @onready var _sfx: Sfx = $Sfx
@@ -101,6 +102,9 @@ func _ready() -> void:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
 	rules.spawn_chiefs(meta.chiefs_down)   # 32단계 곳마다 우두머리: 이번 판에 쓰러뜨린 것은 안 선다
 	rules.allow_horse = true   # 39단계: 말은 들판에서만
+	rules.horse_unlocked = meta.ride_unlocked
+	if not meta.ride_unlocked:
+		_build_ride_rest()
 	rules.lord.pos = FieldLayout.START
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
@@ -419,6 +423,8 @@ func horse_key() -> void:
 		rules.dismount()
 		return
 	var why: StringName = rules.call_horse(_horse_from())
+	if why == &"locked":
+		_hud.toast("아직 탈 검이 없다. 무너진 망루 아래 검 받침에서 얻는다")
 	if why == &"fight":
 		_hud.toast("덤벼드는 적이 있어 탈 검을 부를 수 없다")
 
@@ -476,6 +482,8 @@ func _spots() -> Dictionary:
 		s["dropped"] = meta.dropped_at()
 	if rules.horse.waiting():
 		s["horse"] = rules.horse.pos
+	if not meta.ride_unlocked:
+		s["ride_rest"] = FieldLayout.RIDE_REST
 	if _wander != null:
 		s["wanderer"] = _wander_at
 	for id in FieldLayout.CACHES:
@@ -504,6 +512,8 @@ func _prompt(key: String) -> String:
 		return "떨군 검을 줍는다"
 	if key == "horse":
 		return "검에 올라선다"
+	if key == "ride_rest":
+		return "받침의 검을 깨운다(탈 검)"
 	if key == "wanderer":
 		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
 	if key.begins_with("cache"):
@@ -553,6 +563,15 @@ func _interact() -> void:
 		_saved()
 	elif _near == "horse":
 		rules.mount()
+	elif _near == "ride_rest":
+		meta.ride_unlocked = true
+		rules.horse_unlocked = true
+		_sfx.play(&"draw", Grid.cells_to_world(rules.lord.pos), -3.0, 0.8)
+		_hud.toast("탈 검을 얻었다. H로 부른다")
+		if _ride_rest:
+			_ride_rest.queue_free()
+			_ride_rest = null
+		_saved()
 	elif _near == "wanderer":
 		_wander_talk()
 	elif _near == "crypt":
@@ -1030,3 +1049,26 @@ func _on_slots() -> void:
 	_held_id = s.data.id if s and s.data else 0
 	_lord.set_sword(s, data.grades)
 	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
+
+
+## 탈 검 받침: 이끼 낀 돌 위에 검 한 자루가 비스듬히 꽂혀 있다(얻으면 사라진다).
+func _build_ride_rest() -> void:
+	_ride_rest = Node3D.new()
+	var w: Vector3 = Grid.cells_to_world(FieldLayout.RIDE_REST)
+	w.y = FieldBuilder.walk_height(w.x, w.z)
+	_ride_rest.position = w
+	add_child(_ride_rest)
+	var stone := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(1.2, 0.6, 0.9)
+	stone.mesh = bm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.32, 0.33, 0.3)
+	m.roughness = 0.95
+	stone.material_override = m
+	stone.position.y = 0.3
+	_ride_rest.add_child(stone)
+	var sw: SwordModel = SwordModel.make(data.forms[0], 2, 7, Color(0.85, 0.62, 0.3))
+	sw.position = Vector3(0, 0.55, 0)
+	sw.rotation = Vector3(PI, 0.4, 0.12)
+	_ride_rest.add_child(sw)

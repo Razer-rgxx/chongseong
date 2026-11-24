@@ -239,6 +239,8 @@ var callers_out: int = 0
 var debug_god: bool = false
 ## 39단계 말(docs/open_world2.md): 들판 장면만 allow_horse를 켠다(마을·언덕·무덤·결투에는 말이 없다). 말의 상태는 horse, 탄 상태는 lord.riding.
 var allow_horse: bool = false
+## 탈 검을 얻었나(들판 장면이 Meta.ride_unlocked를 넣는다). false면 call_horse가 &"locked".
+var horse_unlocked: bool = true
 var horse := Horse.new()
 ## 1대1 결투(21단계, docs/duel.md). 켜면 낮밤·뽑기·적이 없고 영주 둘이 서로 벤다. 각인과 고유 능력은 듣지 않는다(Powers.off).
 var duel: bool = false
@@ -2093,6 +2095,8 @@ func call_horse(from: Vector2 = Vector2.INF) -> StringName:
 	var H := data.horse
 	if not allow_horse or duel or not field or phase == Phase.OVER:
 		return &"not_here"
+	if not horse_unlocked:
+		return &"locked"
 	if lord.riding:
 		return &"riding"
 	if horse_fight():
