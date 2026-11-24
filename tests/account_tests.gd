@@ -10,6 +10,14 @@ static func run(_game: GameData, check: Callable) -> void:
 	check.call(Account.message("login", Account.ERR_NO_KEYS).contains("키가 없습니다"), "계정: 키 없음 글")
 	check.call(Account.message("login", 999).contains("999"), "계정: 모르는 번호도 글이 나옴")
 	check.call(Account.message("login", Account.ERR_NO_SERVER).contains("접속"), "계정: 서버 접속 못 함 글")
+	check.call(Account.nick_error("개발자 ID") == "" and Account.nick_error("검성_01") == "" and Account.nick_error("Lord-K") == "", "계정: 한글·영문·숫자·띄어쓰기 닉네임은 된다")
+	check.call(Account.nick_error("가") != "" and Account.nick_error("가나다라마바사아자차카타파") != "", "계정: 닉네임 길이 2~12")
+	check.call(Account.nick_error("ㅋㅋ") != "" and Account.nick_error("검@성") != "" and Account.nick_error("검  성") != "", "계정: 자모·기호·겹 띄어쓰기는 안 된다")
+	var u: String = Account.make_username()
+	var u_ok: bool = u.begins_with("lord") and u.length() == 16
+	for ch in u:
+		u_ok = u_ok and "abcdefghijklmnopqrstuvwxyz0123456789".contains(ch)
+	check.call(u_ok and Account.make_username() != u, "계정: GD-Sync 아이디는 영문·숫자 16글자, 매번 다르다 (%s)" % u)
 	for kind in ["create", "login", "verify", "resend", "logout"]:
 		var tbl: Dictionary = Account._enum_of(kind)
 		var all_ok: bool = true

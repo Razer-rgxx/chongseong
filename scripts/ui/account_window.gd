@@ -37,6 +37,7 @@ func _ready() -> void:
 	_pass = _field(box, "비밀번호", true)
 	_nick_row = _field_row(box, "닉네임")
 	_nick = _nick_row.get_meta("edit")
+	_nick.max_length = Account.NICK_MAX
 	_nick_row.visible = false
 	_code_row = _field_row(box, "인증 코드")
 	_code = _code_row.get_meta("edit")
@@ -128,7 +129,7 @@ func _on_register() -> void:
 		_register_mode = true
 		_nick_row.visible = true
 		_btn_register.text = "가입하기"
-		set_status("닉네임(3~20글자)을 적고 가입하기를 누르세요.", false)
+		set_status("닉네임(%d~%d글자, 한글 가능)을 적고 가입하기를 누르세요." % [Account.NICK_MIN, Account.NICK_MAX], false)
 		return
 	_lock(true)
 	set_status("가입하는 중…", false)

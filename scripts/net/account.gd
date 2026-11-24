@@ -14,6 +14,14 @@ const ERR_EMPTY: int = -3
 const ERR_NO_ENGINE: int = -4
 const ERR_NO_SERVER: int = -5
 
+## 한글 닉네임(2026-11-24 사용자: "한국어 지원"): GD-Sync 아이디(username)는 영문·숫자만 받아서,
+## 아이디는 가입할 때 저절로 만들고(lord + 무작위 12자) 화면 닉네임은 계정 문서 PROFILE에 따로 둔다(남도 읽을 수 있게 공개).
+## 닉네임은 겹칠 수 있다(GD-Sync가 겹침을 막는 것은 아이디뿐).
+const NICK_MIN: int = 2
+const NICK_MAX: int = 12
+const NICK_EXTRA: String = " _-"
+const PROFILE: String = "profile/main"
+
 ## 저장 자리(시험은 다른 경로를 넣는다).
 static var path: String = "user://account.cfg"
 static var email: String = ""
@@ -178,10 +186,8 @@ static func _gd() -> Array:
 	return [gd, 0]
 
 
-static func _on_logged_in(username: String) -> void:
-	logged_in = true
-	if username != "":
-		nickname = username
+static func _on_logged_in(_username: String) -> void:
+	logged_in = true   # 아이디(lord…)는 화면에 안 쓴다. 닉네임은 PROFILE 문서에서(_sync_profile)
 	guest = false
 	save_state()
 
@@ -223,16 +229,71 @@ static func _done(mail: String, nick: String) -> void:
 	save_state()
 
 
+## 닉네임 검사: 괜찮으면 "", 아니면 화면에 띄울 글. 한글(완성형)·영문·숫자·띄어쓰기·_-만.
+static func nick_error(nick: String) -> String:
+	nick = nick.strip_edges()
+	if nick.length() < NICK_MIN or nick.length() > NICK_MAX:
+		return "닉네임은 %d~%d글자로 적어 주세요." % [NICK_MIN, NICK_MAX]
+	for i in nick.length():
+		var c: int = nick.unicode_at(i)
+		var ok: bool = (c >= 0xAC00 and c <= 0xD7A3) or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or NICK_EXTRA.contains(char(c))
+		if not ok:
+			return "닉네임에는 한글·영문·숫자·띄어쓰기·_-만 쓸 수 있습니다."
+	if nick.contains("  "):
+		return "닉네임에 띄어쓰기를 두 번 연달아 쓸 수 없습니다."
+	return ""
+
+
+## GD-Sync 아이디: lord + 무작위 소문자·숫자 12자(16글자, GD-Sync 3~20글자 안).
+static func make_username() -> String:
+	var chars: String = "abcdefghijkmnpqrstuvwxyz23456789"
+	var bytes: PackedByteArray = Crypto.new().generate_random_bytes(12)
+	var out: String = "lord"
+	for b in bytes:
+		out += chars[b % chars.length()]
+	return out
+
+
+## 로그인한 뒤: 계정 문서의 닉네임을 읽어 온다. 문서가 없고 이 PC에 이 이메일로 적어 둔 닉네임(pending)이 있으면 올린다
+## (가입 직후·인증 직후). 로비에서 보일 이름도 닉네임으로.
+static func _sync_profile(pending: String) -> void:
+	var gd: Node = _tree().root.get_node_or_null(GD_NAME) if _tree() != null else null
+	if gd == null:
+		return
+	var got: Dictionary = await gd.account_get_document(PROFILE)
+	var doc: Variant = got.get("Result", null)
+	if int(got.get("Code", 1)) == 0 and doc is Dictionary and str((doc as Dictionary).get("nick", "")) != "":
+		nickname = str((doc as Dictionary).get("nick", ""))
+	elif pending != "":
+		nickname = pending
+		await gd.account_document_set(PROFILE, {"nick": pending}, true)
+	if nickname != "":
+		gd.player_set_username(nickname)
+	save_state()
+
+
+## 이 PC에 적어 둔 닉네임이 mail의 것일 때만 돌려준다(다른 계정으로 들어갈 때 남의 닉네임을 올리지 않게).
+static func _pending_for(mail: String) -> String:
+	return nickname if email.strip_edges().to_lower() == mail.strip_edges().to_lower() else ""
+
+
 ## 가입: 만들고 바로 로그인을 해 본다. 인증이 켜져 있으면 verify = true.
 static func register(mail: String, nick: String, password: String) -> Dictionary:
 	mail = mail.strip_edges()
 	nick = nick.strip_edges()
 	if mail == "" or password == "" or nick == "":
 		return _res(false, "이메일, 닉네임, 비밀번호를 모두 적어 주세요.")
+	var bad: String = nick_error(nick)
+	if bad != "":
+		return _res(false, bad)
 	var g: Array = await _gd()
 	if g[0] == null:
 		return _res(false, message("create", g[1]))
-	var code: int = await (g[0] as Node).account_create(mail, nick, password)
+	var code: int = 1
+	for i in 3:   # 아이디가 우연히 겹치면 새로 만들어 다시
+		code = await (g[0] as Node).account_create(mail, make_username(), password)
+		if code != ENUMS.ACCOUNT_CREATION_RESPONSE_CODE.USERNAME_ALREADY_EXISTS:
+			break
 	if code != 0:
 		return _res(false, message("create", code))
 	email = mail
@@ -253,8 +314,10 @@ static func login(mail: String, password: String) -> Dictionary:
 	var out: Dictionary = await (g[0] as Node).account_login(mail, password)
 	var code: int = int(out.get("Code", 1))
 	if code == ENUMS.ACCOUNT_LOGIN_RESPONSE_CODE.SUCCESS:
-		await _tree().process_frame   # 닉네임 신호가 오도록 한 틱
+		var pending: String = _pending_for(mail)
+		await _tree().process_frame
 		_done(mail, "")
+		await _sync_profile(pending)
 		return _res(true, "로그인했습니다.")
 	if code == ENUMS.ACCOUNT_LOGIN_RESPONSE_CODE.NOT_VERIFIED:
 		email = mail
@@ -273,8 +336,10 @@ static func verify(mail: String, code_text: String) -> Dictionary:
 	var code: int = await (g[0] as Node).account_verify(mail, code_text.strip_edges())
 	if code != ENUMS.ACCOUNT_VERIFICATION_RESPONSE_CODE.SUCCESS:
 		return _res(false, message("verify", code))
+	var pending: String = _pending_for(mail)
 	await _tree().process_frame
 	_done(mail, "")
+	await _sync_profile(pending)
 	return _res(true, "인증했습니다. 로그인되었습니다.")
 
 
@@ -297,8 +362,10 @@ static func auto_login() -> Dictionary:
 		return _res(false, message("login", g[1]))
 	var code: int = await (g[0] as Node).account_login_from_session()
 	if code == ENUMS.ACCOUNT_LOGIN_RESPONSE_CODE.SUCCESS:
+		var pending: String = nickname
 		await _tree().process_frame
 		_done(email, "")
+		await _sync_profile(pending)
 		return _res(true, "로그인했습니다.")
 	return _res(false, message("login", code))
 
