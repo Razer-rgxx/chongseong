@@ -114,8 +114,10 @@ static func set_guest(on: bool) -> void:
 	save_state()
 
 
-## 로그인 창을 띄워야 하나: 로그인했거나 게스트를 골랐으면 아니다.
+## 로그인 창을 띄워야 하나: 로그인했거나 게스트를 골랐으면 아니다. 웹판은 로그인 없이 한다(2026-11-24 사용자).
 static func needs_window() -> bool:
+	if OS.has_feature("web"):
+		return false
 	return not logged_in and not guest
 
 

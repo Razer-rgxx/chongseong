@@ -2,6 +2,7 @@
 
 GD-Sync 계정 API(`account_create/login/verify/login_from_session/logout`)를 감싼 `Account`(scripts/net/account.gd)와 시작 화면의 로그인 창 `AccountWindow`(scripts/ui/account_window.gd, UiKit 모양).
 
+- 웹판은 로그인 없이 한다(2026-11-24 사용자: "웹판은 로그인 없어도 됨"): 창을 안 띄우고 설정 창에 계정 칸도 없다(`OS.has_feature("web")`).
 - 창: 이메일·비밀번호(가려짐), 로그인, 가입(닉네임 칸이 생김), 인증 코드(인증이 필요할 때만 칸과 "코드 다시 받기"), 게스트로 하기, 상태 줄. 로그인했거나 게스트를 고른 적이 있으면 안 뜬다. 저장된 이메일이 있으면 먼저 저장된 세션으로 조용히 자동 로그인하고 안 되면 연다.
 - 키·연결이 없어도 열린다. 그때는 "GD-Sync 키가 없습니다" 같은 짧은 한국어 오류만 띄우고 게스트로 계속할 수 있다(응답 번호 → 글은 `Account.message`).
 - 저장: `user://account.cfg`에 이메일·닉네임·게스트 여부만. **비밀번호는 어디에도 저장하지 않는다.** 세션 토큰은 GD-Sync 플러그인이 제 키로 암호화해 `user://GD-Sync/`에 둔다.
