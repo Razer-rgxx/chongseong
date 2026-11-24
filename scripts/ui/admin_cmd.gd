@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -41,6 +41,8 @@ static func describe(cmd: Dictionary) -> String:
 			return "재료 나무 · 돌 · 쇠 [수, 기본 50]"
 		"낯선이":
 			return "낯선이 횟수 (4면 다음이 다섯 번째, 0이면 처음부터, 들판에서만 바로 선다)"
+		"미래":
+			return "미래 (낯선이 이야기를 마친 것으로 하고 다음 들판 방문부터 틈이 선다. 들판에서 바로 든다)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -76,6 +78,16 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.save()
 			Stranger.force = rules != null and rules.field and not meta.stranger_done
 			return "관리: 낯선이 만난 횟수 %d%s" % [meta.stranger_seen, " (들판이면 바로 선다)" if Stranger.force else ""]
+		"미래":
+			if meta == null:
+				return "저장 자료가 없습니다."
+			meta.stranger_done = true
+			meta.stranger_drop = -1
+			meta.note_found(Stranger.SWORD)
+			meta.save()
+			if rules != null and rules.field:
+				Meta.go_future = true
+			return "관리: 녹슨 미래로 간다" if Meta.go_future else "관리: 낯선이 이야기를 마쳤다(사이버 카타나 도감). 들판에 가면 틈이 선다."
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

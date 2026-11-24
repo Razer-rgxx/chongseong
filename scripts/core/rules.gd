@@ -370,6 +370,10 @@ var _pull_cursed: bool = false
 var bonus_hp: float = 0.0
 ## 검의 기억(Meta.memory_table): 검 번호 → 그 검으로 벨 때 피해 배수. 시작할 때 Meta에서 받는다.
 var memory: Dictionary = {}
+## 시대(docs/stranger.md 3단계). 비면 지금 시대, &"future"면 녹슨 미래 구역: 모든 검이 사거리 +15%, 마무리 베기 뒤에 짧은 데이터 메아리가 한 번 더 친다.
+## 장면이 start_field 전에 정한다. state_hash에 든다.
+const ERA_FUTURE: StringName = &"future"
+var era: StringName = &""
 
 
 func _init(game_data: GameData, p_seed: int, p_meta: Meta = null) -> void:
@@ -3112,7 +3116,7 @@ func _new_id() -> int:
 
 ## 같은 시드·같은 입력이면 같은 값이 나와야 한다(테스트용).
 func state_hash() -> int:
-	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, chain, chain_best, chain_tick, chain_paid, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
+	var parts: Array = [era, tick, zone, phase, lord.pos, lord.hp, kills, chain, chain_best, chain_tick, chain_paid, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
 	for p in projectiles:
 		parts.append(p.pos)
 	for p in enemy_projectiles:

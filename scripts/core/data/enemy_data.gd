@@ -22,6 +22,8 @@ extends Resource
 @export var token_cost: int = 1
 ## 우두머리(32단계)는 이미 있는 적의 큰 판이다: 행동(Foes)과 몸(EnemyView·EnemyArt·EnemyMotion)을 이 종류(적 id)에서 빌린다. 비면 id 그대로.
 @export var kind: StringName = &""
+## 녹슨 미래 구역의 적(docs/stranger.md 3단계): 참이면 EnemyView가 FutureEnemyArt의 도형 몸(무딘 쇠에 차가운 눈빛 하나)으로 짓는다.
+@export var future: bool = false
 ## 몸을 그리는 크기 배수(우두머리는 그 종류의 몸을 이만큼 키운다). 규칙의 크기는 radius.
 @export var view_scale: float = 1.0
 

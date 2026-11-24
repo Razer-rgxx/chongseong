@@ -168,6 +168,8 @@ func stats() -> Dictionary:
 	if ice_spear:
 		reach = maxf(reach, T.u("겨울의 끝", "reach"))
 		pierce = 0
+	if r.era == Rules.ERA_FUTURE:
+		reach *= FutureLayout.REACH_MULT   # 미래 구역: 모든 검의 사거리 +15%
 	return {"dmg": dmg, "spd": spd, "reach": reach, "arc": minf(arc, TAU), "pierce": pierce, "form": F}
 
 

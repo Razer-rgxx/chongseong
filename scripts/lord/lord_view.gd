@@ -87,6 +87,8 @@ var _state: String = ""
 var _yaw_now: float = 0.0
 var _yaw_ready: bool = false
 var _fx: SlashFx = null
+## 미래 구역(Rules.era future): 베기 빛을 차가운 푸른 디지털 빛으로 덮는다(알파 0이면 칼 등급 색). 보기만 바꾼다.
+var slash_override: Color = Color(0, 0, 0, 0)
 var _sweep: float = 1.0
 ## 지금 트는 좌클릭 동작(MoveMotion.plan의 결과)과 시작한 뒤 지난 시간. 비어 있으면 동작이 없다.
 var _plan: Dictionary = {}
@@ -180,11 +182,17 @@ func _mine() -> bool:
 
 
 ## 쥔 검이 바뀌면 부른다. null이면 맨손.
+func set_slash_override(c: Color) -> void:
+	slash_override = c
+	if _fx != null and c.a > 0.0:
+		_fx.color = c
+
+
 func set_sword(s: Sword, grades: GradeTable) -> void:
 	if character:
 		character.set_sword(s, grades)
 		if s:
-			_fx.color = Color(0.9, 0.92, 1.0) if s.grade == 0 else (grades.colors[s.grade] as Color).lightened(0.25)
+			_fx.color = slash_override if slash_override.a > 0.0 else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (grades.colors[s.grade] as Color).lightened(0.25))
 		return
 	if not _blade:
 		return

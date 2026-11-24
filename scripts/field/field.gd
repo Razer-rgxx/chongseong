@@ -14,6 +14,7 @@ extends Node3D
 const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
 const RUN_PATH: String = "res://scenes/world/main.tscn"
+const FUTURE_PATH: String = "res://scenes/future/future.tscn"
 const CRYPT_PATH: String = "res://scenes/crypt/crypt.tscn"
 
 @export var reach: float = 2.0
@@ -77,6 +78,8 @@ var _st_drop: Node3D = null
 var _say_t: float = 0.0       ## 띠 대사를 이 시간 뒤에 거둔다(0이면 없음)
 var _glitch: SwordGlitch = null
 var _glitch_fx: GlitchOverlay = null
+var _rift: FutureRift = null   ## 사이버 카타나를 얻은 뒤 서는 갈라진 틈(3단계)
+var _rifting: bool = false
 var _wander_P: Dictionary = {}
 var _wander_fire: OmniLight3D = null
 var _wander_at: Vector2 = Vector2.ZERO
@@ -120,6 +123,9 @@ func _ready() -> void:
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
 		rules.lord.pos = FieldLayout.CRYPT_WAKE
+	if Meta.wake_at_rift:   # 녹슨 미래 구역에서 돌아왔다: 틈 앞에서 깬다
+		Meta.wake_at_rift = false
+		rules.lord.pos = FutureLayout.RIFT_WAKE
 	rules.lord.prev_pos = rules.lord.pos
 	meta.see_field(rules.lord.pos)   # 38단계: 깬 자리 둘레는 처음부터 보인다
 	_hud.setup(data, meta)
@@ -571,6 +577,8 @@ func _spots() -> Dictionary:
 		s["horse"] = rules.horse.pos
 	if _wander != null:
 		s["wanderer"] = _wander_at
+	if _rift != null:
+		s["rift"] = FutureLayout.RIFT_FIELD
 	if _st_drop != null:
 		s["stranger_drop"] = FieldLayout.STRANGER_SPOTS[meta.stranger_drop]
 	if _lm and _lm.trade_cell() != null:
@@ -606,6 +614,8 @@ func _prompt(key: String) -> String:
 		return "떨군 검을 줍는다"
 	if key == "horse":
 		return "검에 올라선다"
+	if key == "rift":
+		return "갈라진 틈으로 든다"
 	if key == "stranger_drop":
 		return Stranger.OBJECT_PROMPT
 	if key == "wanderer":
@@ -667,6 +677,8 @@ func _interact() -> void:
 		_wander_talk()
 	elif _near == "stranger_drop":
 		_take_stranger_drop()
+	elif _near == "rift":
+		_enter_rift()
 	elif _near == "crypt":
 		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -752,6 +764,30 @@ func _build_stranger_drop() -> void:
 		_st_drop = StrangerView.make_drop(self, _stranger_pos3(FieldLayout.STRANGER_SPOTS[meta.stranger_drop]))
 
 
+## 3단계: 사이버 카타나를 얻었으면(Meta.stranger_done) 낯선 사람이 사라진 자리 곁에 흐릿한 틈이 선다.
+func _build_rift() -> void:
+	if meta.rift_open() and _rift == null:
+		_rift = FutureRift.make(self, _stranger_pos3(FutureLayout.RIFT_FIELD), true)
+
+
+## E: 글리치가 오르고 녹슨 미래 구역 장면으로 간다. 쥔 검(Meta.carry_sword)은 그대로 가져간다.
+func _enter_rift() -> void:
+	if _rifting or _glitch != null:
+		return
+	_rifting = true
+	meta.save()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_glitch_fx = _glitch_fx if _glitch_fx != null else GlitchOverlay.make(self)
+	_sfx.play(&"glitch", _lord.position, 0.0)
+	var t: float = 0.0
+	while t < 0.9:
+		var dt: float = get_process_delta_time()
+		t += dt
+		_glitch_fx.set_amount(minf(1.0, t / 0.9), dt)
+		await get_tree().process_frame
+	SceneLoader.go(get_tree(), FUTURE_PATH)
+
+
 func _stranger_say(text: String) -> void:
 	_hud.say("", text, true)
 	_say_t = 3.2
@@ -760,8 +796,13 @@ func _stranger_say(text: String) -> void:
 func _update_stranger(delta: float) -> void:
 	if not _st_init:
 		_st_init = true
+		_build_rift()
 		_build_stranger_drop()
 		_roll_stranger()
+	if Meta.go_future:
+		Meta.go_future = false
+		_build_rift()
+		_enter_rift()
 	if Stranger.force:
 		Stranger.force = false
 		if _st == null and _st_drop == null:

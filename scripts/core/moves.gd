@@ -92,7 +92,7 @@ func attack(input: LordInput) -> void:
 		return
 	var run := _new_run(m, step, n, big, st, pat.element)
 	run.finisher = finisher
-	run.echo_next = finisher and pat.echo
+	run.echo_next = finisher and (pat.echo or r.era == Rules.ERA_FUTURE)   # 미래 구역: 마무리 뒤에 데이터 메아리
 	_begin(run, input)
 	r.lord_swung.emit(big)
 

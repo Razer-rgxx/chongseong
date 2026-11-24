@@ -114,8 +114,10 @@ func _ready() -> void:
 	var grow: float = enemy.radius / D.radius * D.view_scale
 	var hill_boss: bool = D.boss and D.kind == &""
 	# 24단계: 이 적의 Mixamo 모델(assets/characters/enemies/<id>.fbx)이 있으면 그것으로 선다. 늑대·허수아비·방패병은 따로.
-	var own: String = "" if kind in [&"wolf", &"dummy", &"shield"] else LordCharacter.enemy_path(kind)
-	if own != "":
+	var own: String = "" if kind in [&"wolf", &"dummy", &"shield"] or D.future else LordCharacter.enemy_path(kind)
+	if D.future:   # 녹슨 미래 구역의 적: 도형 몸
+		_build_future(kind, grow, D.color)
+	elif own != "":
 		_build_knight(grow, D.color, hill_boss, own)
 	else:
 		match kind:
@@ -575,6 +577,21 @@ func _animate_wraith(delta: float) -> void:
 
 
 # ---------------------------------------------------------------- 늑대
+
+func _build_future(kind: StringName, grow: float, c: Color) -> void:
+	var f: Dictionary = FutureEnemyArt.build(kind, _body, grow, c)
+	_height = float(f.height) * grow
+	for m in f.mats:
+		_mats.append(m)
+		_base.append(m.albedo_color)
+	for mi in f.eyes:
+		var em := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		if enemy.elite:
+			em.albedo_color = Color(1.0, 0.8, 0.35)
+			em.emission = em.albedo_color
+		_eye_mats.append(em)
+		_eye_base.append(em.albedo_color)
+
 
 func _build_wolf(s: float, c: Color) -> void:
 	_height = 1.0 * s

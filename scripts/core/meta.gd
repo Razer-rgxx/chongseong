@@ -125,6 +125,10 @@ static var wake_at_gate: bool = false
 static var wake_note: String = ""
 ## 지하 무덤에서 나왔거나 쓰러졌다: 들판의 무덤 입구 앞에서 깬다(장면을 넘어 이어지는 값이라 static, 저장하지 않는다).
 static var wake_at_crypt: bool = false
+## 녹슨 미래 구역에서 돌아왔다(나왔거나 쓰러졌다): 들판의 갈라진 틈 앞에서 깬다.
+static var wake_at_rift: bool = false
+## 관리 명령 미래: 들판이 읽고 끄며 바로 녹슨 미래 구역으로 간다.
+static var go_future: bool = false
 var rng := RandomNumberGenerator.new()
 
 
@@ -155,6 +159,7 @@ static func wipe(path: String = SAVE_PATH) -> void:
 	wake_at_gate = false
 	wake_note = ""
 	wake_at_crypt = false
+	wake_at_rift = false
 	shards_from = -1
 
 
@@ -891,6 +896,24 @@ func recruit(game: GameData) -> Dictionary:
 	wanderer = ""
 	wanderer_at = -1
 	return r
+
+
+## 들판에 갈라진 틈이 서는가: 사이버 카타나를 얻어 낯선 사람 이야기를 마친 뒤부터.
+func rift_open() -> bool:
+	return stranger_done
+
+
+## 녹슨 미래 구역의 단말(E): 다음 언덕 판의 손잡이 조짐을 모두 보여 주는 쪽지(&"note")를 Meta.pack에 넣는다. 이미 들어 있으면 false.
+func future_terminal() -> bool:
+	if pack.has(FutureLayout.NOTE):
+		return false
+	pack.append(FutureLayout.NOTE)
+	return true
+
+
+## 미래 구역의 숨겨진 상자(한 번만): 조각 수를 돌려준다. 이미 열었으면 0.
+func future_cache() -> int:
+	return field_open(FutureLayout.CACHE_ID, FutureLayout.CACHE_SHARDS)
 
 
 ## 낯선 사람을 만났다(횟수를 돌려준다).
