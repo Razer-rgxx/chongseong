@@ -103,27 +103,39 @@ static func _sync(tree: SceneTree, meta: Meta) -> String:
 
 
 ## GD-Sync 노드를 올리고 접속한다(결투의 GdSyncLink와 같은 노드를 쓴다). 실패하면 null.
-static func _boot(tree: SceneTree) -> Node:
+## http_only: 계정·순위표 같은 HTTPS 요청만 할 거면 플러그인이 "켜짐"(서버 고르기까지)이면 되고,
+## 게임 서버와의 연결(client id)까지 기다리지 않는다(계정 로그인이 오래 걸리던 것, 2026-11-24).
+static var _pending: Node = null
+
+
+static func _boot(tree: SceneTree, http_only: bool = false) -> Node:
 	var gd: Node = tree.root.get_node_or_null(GdSyncLink.NODE_NAME)
+	if gd == null and _pending != null and is_instance_valid(_pending):
+		gd = _pending   # 다른 곳이 막 올리는 중(같은 노드를 두 번 올리지 않는다)
 	if gd == null:
 		gd = (load(GdSyncLink.PLUGIN_SCRIPT) as GDScript).new() as Node
 		gd.name = GdSyncLink.NODE_NAME
+		_pending = gd
 		tree.root.add_child.call_deferred(gd)
+	while not gd.is_inside_tree():
 		await tree.process_frame
-		await tree.process_frame
+	await tree.process_frame
 	var keys: Dictionary = GdSyncLink.load_keys()
 	var cc: Variant = gd.get("_connection_controller")
 	if cc != null and (str(cc.get("_PUBLIC_KEY")) == "" or str(cc.get("_PRIVATE_KEY")) == ""):
 		cc.set("_PUBLIC_KEY", keys.public)
 		cc.set("_PRIVATE_KEY", keys.private)
-	if bool(gd.call("is_active")) and int(gd.call("get_client_id")) >= 0:
+	var ok_now := func() -> bool:
+		return bool(gd.call("is_active")) and (http_only or int(gd.call("get_client_id")) >= 0)
+	if ok_now.call():
 		return gd
-	gd.call("start_multiplayer")
+	if int(gd.get("_connection_controller").get("status")) == ENUMS.CONNECTION_STATUS.DISABLED:
+		gd.call("start_multiplayer")
 	var t: float = 0.0
 	while t < WAIT:
-		await tree.create_timer(0.25).timeout
-		t += 0.25
-		if bool(gd.call("is_active")) and int(gd.call("get_client_id")) >= 0:
+		await tree.create_timer(0.1).timeout
+		t += 0.1
+		if ok_now.call():
 			return gd
 	return null
 

@@ -21,6 +21,7 @@ var _btn_resend: Button
 
 
 func _ready() -> void:
+	Account.warm()   # 미리 접속(2026-11-24: 로그인이 너무 오래 걸렸다)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()

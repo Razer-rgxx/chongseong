@@ -105,6 +105,12 @@ static func save_state() -> void:
 	cfg.save(path)
 
 
+## 로그인 창이 열릴 때 미리 접속해 둔다(이메일·비밀번호를 치는 동안 접속이 끝나 로그인이 바로 간다). 기다리지 않는다.
+static func warm() -> void:
+	if available():
+		_gd()
+
+
 ## 게스트로 하기(또는 그만두기)를 적는다.
 static func set_guest(on: bool) -> void:
 	guest = on
@@ -163,7 +169,7 @@ static func _gd() -> Array:
 		OS.set_environment("GDSYNC_PRIVATE_KEY", k.private)
 	# 계정 요청은 플러그인이 접속해 있어야 간다(start_multiplayer 전에는 플러그인이 바로 "응답 없음"을 돌려준다).
 	# 노드 올리기와 접속 기다리기는 다른 영주의 검(FallenShare)과 같은 것을 쓴다.
-	var gd: Node = await FallenShare._boot(tree)
+	var gd: Node = await FallenShare._boot(tree, true)
 	if gd == null:
 		return [null, ERR_NO_SERVER]
 	if not gd.account_logged_in.is_connected(_on_logged_in):
