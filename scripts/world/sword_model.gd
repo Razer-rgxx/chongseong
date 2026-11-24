@@ -50,6 +50,9 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 		if grade >= 4:
 			_aura(col, grade)
 		return
+	if seed == KATANA_SEED:
+		_katana(blade_length)
+		return
 	var mats := _materials(grade, col)
 	add_child(_blade(kind, blade_length, width, mats[0]))
 	if grade >= 2:
@@ -61,6 +64,40 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 	_pommel(rng.randi() % 3, guard_w, mats[1], mats[3])
 	if grade >= 4:
 		_aura(col, grade)
+
+
+## 사이버 카타나(311, docs/stranger.md): 가늘고 곧은 칼날, 날을 따라 차가운 푸른 줄. 도형만으로 짓는다.
+const KATANA_SEED: int = 311
+const KATANA_BLUE: Color = Color(0.35, 0.72, 1.0)
+
+
+func _katana(L: float) -> void:
+	glow_color = KATANA_BLUE
+	grip_length = 0.28
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color(0.1, 0.11, 0.14)
+	steel.metallic = 0.9
+	steel.roughness = 0.3
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.05, 0.05, 0.07)
+	dark.roughness = 0.8
+	var line := StandardMaterial3D.new()
+	line.albedo_color = KATANA_BLUE
+	line.emission_enabled = true
+	line.emission = KATANA_BLUE
+	line.emission_energy_multiplier = 2.2
+	_box(Vector3(0.036, L, 0.011), Vector3(0, L / 2.0, 0), steel)
+	_box(Vector3(0.036, 0.07, 0.011), Vector3(0, L + 0.025, 0), steel)
+	_box(Vector3(0.006, L * 0.9, 0.013), Vector3(0, L * 0.47, 0), line)   # 날을 따라 도는 푸른 줄
+	for i in 4:
+		_box(Vector3(0.04, 0.008, 0.013), Vector3(0, L * (0.2 + 0.2 * i), 0), line)   # 줄에 걸린 가로 마디
+	_cyl(0.05, 0.05, 0.012, Vector3(0, 0, 0), dark)
+	_cyl(0.052, 0.052, 0.004, Vector3(0, 0.007, 0), line)
+	_cyl(0.017, 0.017, grip_length, Vector3(0, -grip_length / 2.0, 0), dark)
+	for i in 4:
+		_cyl(0.019, 0.019, 0.007, Vector3(0, -0.04 - i * 0.06, 0), line)
+	_ball(0.024, Vector3(0, -grip_length - 0.02, 0), dark)
+	_aura(KATANA_BLUE, 4)
 
 
 ## Blender 칼의 glow_·ghost_ 재질을 등급 빛깔로.

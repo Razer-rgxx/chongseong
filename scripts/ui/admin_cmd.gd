@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -39,6 +39,8 @@ static func describe(cmd: Dictionary) -> String:
 			if a.size() >= 1 and MAT_ALIAS.has(a[0]):
 				return "Enter: %s %+d" % [a[0], int(a[1]) if a.size() > 1 and a[1].is_valid_int() else 50]
 			return "재료 나무 · 돌 · 쇠 [수, 기본 50]"
+		"낯선이":
+			return "낯선이 횟수 (4면 다음이 다섯 번째, 0이면 처음부터, 들판에서만 바로 선다)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -64,6 +66,16 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.add_mat(MAT_ALIAS[a[0]], n)
 			meta.save()
 			return "관리: %s %+d" % [a[0], n]
+		"낯선이":
+			if meta == null or a.is_empty() or not a[0].is_valid_int():
+				return "낯선이 횟수(0~)를 적으세요."
+			meta.stranger_seen = maxi(0, int(a[0]))
+			if meta.stranger_seen == 0:
+				meta.stranger_done = false
+				meta.stranger_drop = -1
+			meta.save()
+			Stranger.force = rules != null and rules.field and not meta.stranger_done
+			return "관리: 낯선이 만난 횟수 %d%s" % [meta.stranger_seen, " (들판이면 바로 선다)" if Stranger.force else ""]
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

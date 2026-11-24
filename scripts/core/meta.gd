@@ -101,6 +101,10 @@ var chiefs_down: Dictionary = {}
 var recruits: Array[String] = []
 var wanderer: String = ""
 var wanderer_at: int = -1
+## 총 든 낯선 사람(docs/stranger.md): 만난 횟수, 다섯 번째 만남을 마쳤는가, 떨군 물건의 자리(FieldLayout.STRANGER_SPOTS 번호, -1이면 없음). 저장.
+var stranger_seen: int = 0
+var stranger_done: bool = false
+var stranger_drop: int = -1
 ## 들판 지도(38단계): 가 본 곳. FieldLayout.SEEN_SIZE 격자의 비트(한 칸 = 들판 SEEN_CELL칸, j * 너비 + i 번째 비트). 저장은 base64, 옛 저장은 아무것도 안 본 상태.
 var field_seen: PackedByteArray = PackedByteArray()
 ## 지하 무덤(19단계): 이번 판에 쓰러뜨린 방 id(→ 1)와 연 관 id(→ 1). 판이 끝날 때(record_run) 비운다. 옛 저장은 빈 값으로 읽힌다.
@@ -161,7 +165,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -306,6 +310,11 @@ func from_dict(d: Dictionary) -> void:
 	if not FieldLayout.WANDERERS.has(wanderer) or recruits.has(wanderer) or wanderer_at < 0 or wanderer_at >= FieldLayout.WANDERER_SPOTS.size():
 		wanderer = ""
 		wanderer_at = -1
+	stranger_seen = maxi(0, int(d.get("stranger_seen", 0)))
+	stranger_done = bool(d.get("stranger_done", false))
+	stranger_drop = int(d.get("stranger_drop", -1))
+	if stranger_drop < 0 or stranger_drop >= FieldLayout.STRANGER_SPOTS.size() or stranger_done:
+		stranger_drop = -1
 	crypt_cleared = {}
 	for k in d.get("crypt_cleared", {}):
 		crypt_cleared[str(k)] = 1
@@ -882,6 +891,22 @@ func recruit(game: GameData) -> Dictionary:
 	wanderer = ""
 	wanderer_at = -1
 	return r
+
+
+## 낯선 사람을 만났다(횟수를 돌려준다).
+func see_stranger() -> int:
+	stranger_seen += 1
+	return stranger_seen
+
+
+## 낯선 사람의 물건을 주웠다: 사이버 카타나를 도감에 넣고 이야기를 마친다. 한 번만 참.
+func take_stranger_sword() -> bool:
+	if stranger_done or stranger_drop < 0:
+		return false
+	stranger_done = true
+	stranger_drop = -1
+	note_found(Stranger.SWORD)
+	return true
 
 
 ## 지하 무덤(19단계): 방을 쓰러뜨렸다(저장된다. 쓰러져도 남는다).

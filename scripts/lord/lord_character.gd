@@ -377,6 +377,11 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 	_grip.add_child(_sword)
 
 
+## 지금 쥔 칼 모델(없으면 null). 글리치 연출이 곁에 사본을 단다.
+func sword_model() -> SwordModel:
+	return _sword
+
+
 ## 손의 칼을 숨기거나 다시 보인다(칼 던지기: 던지는 순간 숨기고, 던진 칼이 돌아오면 보인다). 칼을 바꿔 쥐어도 이어진다.
 func set_sword_visible(on: bool) -> void:
 	_sword_visible = on

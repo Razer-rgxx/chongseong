@@ -35,8 +35,8 @@ func _table() -> void:
 		for k in s.inscriptions:
 			ins_ok = ins_ok and d.inscriptions.has(k)
 		text_ok = text_ok and s.story != "" and s.field_only and not s.unbreakable
-	check.call(ids == [301, 302, 303, 304, 305, 306, 307, 308, 309, 310], "한정 검: 301~310이 field_only %s" % [ids])
-	check.call(per == [0, 0, 6, 3, 1, 0], "한정 검: 전설 6 · 신화 3 · 초월 1 %s" % [per])
+	check.call(ids == [301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311], "한정 검: 301~311이 field_only %s" % [ids])
+	check.call(per == [0, 0, 6, 3, 2, 0], "한정 검: 전설 6 · 신화 3 · 초월 2 %s" % [per])
 	check.call(band_ok, "한정 검: 공격 방식은 이미 있는 150가지 중 제 등급대의 것(손으로 정함)")
 	check.call(ins_ok and text_ok, "한정 검: 각인이 표에 있고 이야기가 있다")
 	var hill_only: bool = true

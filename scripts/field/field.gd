@@ -66,6 +66,17 @@ var _move_fx := MoveFx.new()
 var _enemy_fx := EnemyFx.new()
 ## 떠도는 사람(34단계): 몸(VillageProps 주민 모양), 곁의 작은 모닥불 빛, 선 자리(칸), 막힘 원, 말 상대 id와 말 단계(0 없음, 1 인사, 2 조건, 3 영입한 뒤).
 var _wander: Node3D = null
+# 총 든 낯선 사람(docs/stranger.md)
+var _st: StrangerView = null
+var _st_info: Dictionary = {}
+var _st_phase: StringName = &""
+var _st_t: float = 0.0
+var _st_shown: bool = false   ## 이번 들판 방문에 이미 나타났다
+var _st_init: bool = false
+var _st_drop: Node3D = null
+var _say_t: float = 0.0       ## 띠 대사를 이 시간 뒤에 거둔다(0이면 없음)
+var _glitch: SwordGlitch = null
+var _glitch_fx: GlitchOverlay = null
 var _wander_P: Dictionary = {}
 var _wander_fire: OmniLight3D = null
 var _wander_at: Vector2 = Vector2.ZERO
@@ -332,6 +343,7 @@ func _process(delta: float) -> void:
 		_lm.update(rules.field_clock, rules.field_weather, delta)
 	_light(delta)
 	_animate_wanderer(delta)
+	_update_stranger(delta)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
 	if a != _area:
@@ -461,6 +473,7 @@ func _build_weather_props(strike: bool) -> void:
 func _on_dusk() -> void:
 	_sfx.play(&"night", _lord.position, -2.0)
 	_build_weather_props(true)
+	_roll_stranger()
 
 
 ## 날이 밝았다(글 없음). 쓰러뜨린 낮 무리는 Rules가 다시 세웠으니 기록(Meta.packs_cleared)도 맞춘다(영주 곁이라 건너뛴 것만 남는다).
@@ -468,6 +481,7 @@ func _on_dusk() -> void:
 func _on_dawn() -> void:
 	meta.packs_cleared = rules.field_cleared_ids()
 	_build_weather_props(true)
+	_roll_stranger()
 	meta.place_wanderer()   # 34단계: 새벽마다 다른 사람이 선다
 	if _reading == "wanderer":
 		_end_read()
@@ -557,6 +571,8 @@ func _spots() -> Dictionary:
 		s["horse"] = rules.horse.pos
 	if _wander != null:
 		s["wanderer"] = _wander_at
+	if _st_drop != null:
+		s["stranger_drop"] = FieldLayout.STRANGER_SPOTS[meta.stranger_drop]
 	if _lm and _lm.trade_cell() != null:
 		s["caravan"] = _lm.trade_cell()
 	for id in FieldLayout.CACHES:
@@ -590,6 +606,8 @@ func _prompt(key: String) -> String:
 		return "떨군 검을 줍는다"
 	if key == "horse":
 		return "검에 올라선다"
+	if key == "stranger_drop":
+		return Stranger.OBJECT_PROMPT
 	if key == "wanderer":
 		return "%s에게 말을 건다" % FieldLayout.WANDERERS[_wander_id].name
 	if key.begins_with("wx_"):
@@ -647,6 +665,8 @@ func _interact() -> void:
 		rules.mount()
 	elif _near == "wanderer":
 		_wander_talk()
+	elif _near == "stranger_drop":
+		_take_stranger_drop()
 	elif _near == "crypt":
 		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -699,6 +719,149 @@ func _interact() -> void:
 			_sfx.play(&"thump", _lord.position, -10.0, 1.6)
 			_hud.toast("쇳조각 조각 %d개" % got)
 			_saved()
+
+
+# ---------------------------------------------------------------- 총 든 낯선 사람 (docs/stranger.md)
+
+func _stranger_pos3(cell: Vector2) -> Vector3:
+	var p: Vector3 = Grid.cells_to_world(cell)
+	p.y = FieldBuilder.walk_height(p.x, p.z)
+	return p
+
+
+## 한 번 굴려 나타나게 한다. 이번 방문에 이미 나타났거나 서 있거나 글리치 중이면 건너뛴다.
+func _roll_stranger(forced: bool = false) -> void:
+	if _st != null or _st_shown or _glitch != null:
+		return
+	var r: Dictionary = Stranger.roll(rules.rng, meta.stranger_seen, meta.stranger_done, meta.stranger_drop, rules.field_weather, rules.lord.pos, forced)
+	if r.is_empty():
+		return
+	_st_info = r
+	_st_shown = true
+	_st = StrangerView.make(self, _stranger_pos3(FieldLayout.STRANGER_SPOTS[int(r.spot)]), _lord.position)
+	_st_phase = &"wait"
+	_st_t = 0.0
+	_st.gone.connect(_stranger_gone)
+
+
+func _build_stranger_drop() -> void:
+	if _st_drop != null:
+		_st_drop.queue_free()
+		_st_drop = null
+	if meta.stranger_drop >= 0:
+		_st_drop = StrangerView.make_drop(self, _stranger_pos3(FieldLayout.STRANGER_SPOTS[meta.stranger_drop]))
+
+
+func _stranger_say(text: String) -> void:
+	_hud.say("", text, true)
+	_say_t = 3.2
+
+
+func _update_stranger(delta: float) -> void:
+	if not _st_init:
+		_st_init = true
+		_build_stranger_drop()
+		_roll_stranger()
+	if Stranger.force:
+		Stranger.force = false
+		if _st == null and _st_drop == null:
+			_st_shown = false
+			_roll_stranger(true)
+	if _say_t > 0.0:
+		_say_t -= delta
+		if _say_t <= 0.0 and _reading == "":
+			_hud.say_end()
+	if _glitch != null:
+		_glitch.update(delta)
+		var k: float = clampf(_glitch.t / _glitch.length, 0.0, 1.0)
+		_glitch_fx.set_amount(0.35 + 0.65 * sin(k * PI), delta)
+		if _glitch.done():
+			_finish_glitch()
+	if _st == null:
+		return
+	_st.update(delta)
+	_st_t += delta
+	var at: Vector2 = FieldLayout.STRANGER_SPOTS[int(_st_info.spot)]
+	var near: bool = rules.lord.pos.distance_to(at) <= Stranger.NEAR
+	match _st_phase:
+		&"wait":
+			if near:
+				meta.see_stranger()
+				meta.save()
+				_stranger_say(String(_st_info.line))
+				if bool(_st_info.final):
+					_st.aim_at(_lord.position)
+					_st_phase = &"aim"
+				else:
+					_st.turn_away(_lord.position)
+					_st_phase = &"turn"
+				_st_t = 0.0
+		&"turn":
+			if _st_t > 1.3:
+				_st.fade(1.4)
+				_st_phase = &"fade"
+		&"aim":
+			if _st_t > 1.1:
+				_stranger_shoot()
+				_st_phase = &"after"
+				_st_t = 0.0
+		&"after":
+			if _st_t > 0.6:
+				_st.fade(1.2)
+				_st_phase = &"fade"
+
+
+## 쏜다: 번쩍임, 날카로운 총성, 작은 피해(죽지는 않는다).
+func _stranger_shoot() -> void:
+	_st.shoot()
+	_sfx.play(&"crack", _st.muzzle_point(), 2.0)
+	var dmg: float = Stranger.shot_damage(rules.lord.hp)
+	if dmg > 0.0:
+		rules.lord.hp -= dmg
+		rules.lord_hurt.emit(dmg)
+
+
+func _stranger_gone() -> void:
+	if _st == null:
+		return
+	var final: bool = bool(_st_info.final)
+	var spot: int = int(_st_info.spot)
+	_st.queue_free()
+	_st = null
+	_st_phase = &""
+	if final:
+		meta.stranger_drop = spot
+		_build_stranger_drop()
+	meta.save()
+
+
+## E로 낯선 물건을 줍는다: 쥔 검이 글리치로 깨지며 사이버 카타나로 바뀐다.
+func _take_stranger_drop() -> void:
+	if _glitch != null or not meta.take_stranger_sword():
+		return
+	if _st_drop != null:
+		_st_drop.queue_free()
+		_st_drop = null
+	_saved()
+	_glitch_fx = _glitch_fx if _glitch_fx != null else GlitchOverlay.make(self)
+	_glitch = SwordGlitch.start(_lord.character.sword_model() if _lord.character else null, data.forms[3], data.grades)
+	_sfx.play(&"glitch", _lord.position, 0.0)
+
+
+func _finish_glitch() -> void:
+	_glitch.finish()
+	_glitch = null
+	_glitch_fx.set_amount(0.0)
+	var s: Sword = meta.unbreakable_sword(data, Stranger.SWORD)
+	rules.slots[rules.active] = s
+	if rules.active == 0:
+		Meta.carry_sword = Stranger.SWORD
+	_held_id = Stranger.SWORD
+	_lord.set_sword(s, data.grades)
+	_move_fx.tint = (data.grades.colors[s.grade] as Color).lightened(0.25)
+	_hud.flash(Color(0.45, 0.8, 1.0), 0.6, 0.5)
+	_stranger_say(Stranger.FOUND_LINE)
+	_saved()
 
 
 # ---------------------------------------------------------------- 떠도는 사람 (34단계)

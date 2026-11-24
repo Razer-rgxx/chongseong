@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 311
+display_name = "사이버 카타나"
+grade = 4
+form = 3
+attack = 132
+inscriptions = PackedStringArray("연격", "버팀")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "총 든 낯선 사람이 떨군 칼. 날을 따라 차가운 푸른 줄이 깜빡인다. 이 시간의 쇠가 아니다."
+field_only = true

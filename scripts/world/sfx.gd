@@ -18,7 +18,7 @@ const SOUND_DIR: String = "res://assets/sound/"
 @export var gains: Dictionary = {
 	&"swish": -2.0, &"swish_big": 0.0, &"dash": -4.0, &"hit": 0.0, &"hit_big": 2.0,
 	&"hit_flesh": -3.0, &"hit_heavy": -4.0, &"thump": -2.0, &"anvil": 0.0, &"draw": -2.0, &"break": 0.0, &"hurt": -2.0, &"grunt": -6.0,
-	&"land": -3.0, &"hoof": -4.0, &"whistle": -3.0, &"chain": -6.0,
+	&"land": -3.0, &"hoof": -4.0, &"whistle": -3.0, &"chain": -6.0, &"crack": 2.0, &"glitch": -4.0,
 }
 
 var _streams: Dictionary = {}   # 이름 -> Array[AudioStream]
@@ -40,6 +40,7 @@ func _ready() -> void:
 		&"night": [70.0, 40.0, 1.2, 0.5, 0.15, 600.0],
 		&"land": [85.0, 42.0, 0.11, 0.35, 0.4, 900.0],   # 점프하고 내려앉는 발소리(30단계): 짧게 내려가는 쿵과 흙 잡음
 		&"hoof": [175.0, 72.0, 0.075, 0.42, 0.62, 1500.0],   # 39단계 말발굽: 짧게 내려가는 딱 소리와 흙 잡음
+		&"crack": [1800.0, 260.0, 0.09, 0.3, 0.95, 5200.0],   # 낯선 사람의 총성(docs/stranger.md): 짧고 날카로운 딱
 		&"chain": [520.0, 260.0, 0.09, 0.45, 0.45, 3400.0],   # 처치 연쇄(2026-11-24): 짧은 쇳소리. 부르는 쪽이 연쇄만큼 높인다
 	}
 	for name in made:
@@ -52,6 +53,7 @@ func _ready() -> void:
 	if wh.is_empty():
 		wh.append(_make_whistle())
 	_streams[&"whistle"] = wh
+	_streams[&"glitch"] = [_make_glitch()]   # 지지지지직: 낯선 물건이 검을 바꿀 때
 	for extra in ["grunt", "hit_flesh", "hit_heavy"]:
 		var files := _load_dir(extra)
 		if not files.is_empty():
@@ -101,6 +103,41 @@ func play(name: StringName, at: Vector3, volume_db: float = 0.0, pitch: float = 
 	var j: float = float(jitters.get(name, pitch_jitter))
 	p.pitch_scale = pitch * (1.0 + _rng.randf_range(-j, j))
 	p.play()
+
+
+## 지지지지직(docs/stranger.md): 짧게 끊기는 잡음 덩이와 낮은 네모 소리를 1.5초. 덩이 길이와 음이 제멋대로 바뀌고 오르거나 내려가는 흐름이 없다. 끝에서 조금 잦아든다.
+static func _make_glitch() -> AudioStreamWAV:
+	var dur: float = 1.5
+	var n: int = int(dur * RATE)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 311
+	var left: int = 0
+	var on: bool = true
+	var freq: float = 110.0
+	var phase: float = 0.0
+	var held: float = 0.0
+	for i in n:
+		if left <= 0:
+			left = int(rng.randf_range(0.012, 0.055) * RATE)
+			on = rng.randf() < 0.78
+			freq = rng.randf_range(70.0, 190.0)
+		left -= 1
+		var env: float = 1.0 - smoothstep(0.75, 1.0, float(i) / n)
+		var s: float = 0.0
+		if on:
+			phase += TAU * freq / RATE
+			if i % 6 == 0:   # 거칠게 듬성듬성 고른 잡음
+				held = rng.randf_range(-1.0, 1.0)
+			s = ((0.45 if sin(phase) >= 0.0 else -0.45) + held * 0.5) * env
+		data.encode_s16(i * 2, int(clampf(s, -1.0, 1.0) * 24000.0))
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = RATE
+	w.stereo = false
+	w.data = data
+	return w
 
 
 ## 말 부르는 휘파람(39단계): 짧은 높은 음 하나와 조금 낮은 긴 음 하나. 두 음 다 조금씩 내려가기만 한다(올라가는 소리는 쓰지 않는다).

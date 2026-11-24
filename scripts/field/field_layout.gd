@@ -213,6 +213,11 @@ const WANDERER_SPOTS: Array[Dictionary] = [
 	{"at": Vector2(192, 40), "pack": "quarry_pit"},
 	{"at": Vector2(167, 95), "pack": "marsh_east"},
 ]
+## 총 든 낯선 사람(docs/stranger.md)이 서는 후보 자리(칸). 영주에게서 먼 자리만 뽑는다.
+const STRANGER_SPOTS: Array[Vector2] = [
+	Vector2(52, 101), Vector2(48, 72), Vector2(56, 50), Vector2(55, 14),
+	Vector2(100, 61), Vector2(141, 56), Vector2(192, 40), Vector2(167, 95),
+]
 ## 다섯 사람 id → {name, cond(영입 조건: shards 조각을 낸다 · field_sword 한정 검을 가졌다 · pack 근처 무리를 쓰러뜨렸다 · stones 비석을 읽었다 · chiefs 우두머리를 쓰러뜨렸다), n,
 ## gift(영입하면 생기는 일, 토스트), 말(Band 한 줄씩): greet 처음, ask 조건을 말함, ready 조건이 맞음, join 영입할 때, village 마을에서(돌아가며 한 줄)}.
 const WANDERERS: Dictionary = {
