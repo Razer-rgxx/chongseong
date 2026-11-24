@@ -25,6 +25,9 @@ var bless: Dictionary = {}
 var found: Dictionary = {}
 ## 가장 높이 오른 구역(1부터). 정상을 넘으면 구역 수 + 1.
 var best: int = 0
+## 판 하나에서 가장 많이 쓰러뜨린 수, 가장 긴 처치 연쇄(2026-11-24).
+var best_kills: int = 0
+var best_chain: int = 0
 var runs: int = 0
 ## 검 보관집(2026-11-21): 마을 터에 집을 짓고(storage_house), 그 집에서 검집을 단계로 산다(storage_lv).
 ## 검집 0 없음, 1 검 칸 3, 2 검 칸 4. 언덕 판은 기본 2칸, 들판·무덤은 기본 1칸.
@@ -152,7 +155,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -211,6 +214,8 @@ func from_dict(d: Dictionary) -> void:
 	for k in f:
 		found[str(k)] = int(f[k])
 	best = int(d.get("best", 0))
+	best_kills = int(d.get("best_kills", 0))
+	best_chain = int(d.get("best_chain", 0))
 	runs = int(d.get("runs", 0))
 	storage_lv = clampi(int(d.get("storage_lv", 0)), 0, 2)
 	storage_house = bool(d.get("storage_house", storage_lv > 0))
@@ -600,8 +605,9 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 		"melt": melted,
 		"goal": rules.goal_shards,
 		"path": rules.path_shards,
+		"chain": rules.chain_paid,
 	}
-	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal + r.path
+	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal + r.path + r.chain
 	return r
 
 
@@ -638,7 +644,14 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	chiefs_down = {}
 	crypt_cleared = {}
 	crypt_opened = {}
-	best = maxi(best, rules.zone_count() + 1 if rules.won else rules.zone + 1)
+	# 새 기록(2026-11-24): 끝 화면이 "새 기록"을 붙인다
+	var reached: int = rules.zone_count() + 1 if rules.won else rules.zone + 1
+	r["new_best"] = reached > best and runs > 0
+	r["new_kills"] = rules.kills > best_kills and best_kills > 0
+	r["new_chain"] = rules.chain_best > best_chain and best_chain > 0
+	best_kills = maxi(best_kills, rules.kills)
+	best_chain = maxi(best_chain, rules.chain_best)
+	best = maxi(best, reached)
 	runs += 1
 	return r
 

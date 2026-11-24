@@ -9,6 +9,9 @@ extends Resource
 @export var per_zone: int = 10
 ## 정상까지 올랐을 때 더 주는 조각.
 @export var win_bonus: int = 60
+## 처치 연쇄(2026-11-24): 연쇄가 chain_every의 배수가 될 때마다 조각 chain_shards(언덕에서 판이 끝날 때 받는다).
+@export var chain_every: int = 5
+@export var chain_shards: int = 3
 ## 등급별(흔함 … 무한): 판 안에서 부러진 검, 제단에서 녹인 검.
 @export var broken: PackedInt32Array = PackedInt32Array([1, 3, 10, 30, 100, 500])
 @export var melt: PackedInt32Array = PackedInt32Array([2, 6, 20, 60, 200, 1000])

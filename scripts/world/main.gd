@@ -170,6 +170,7 @@ func _ready() -> void:
 		_sfx.play(&"thump", _lord.position, -10.0)
 		_pull_fx.begin(Grid.cells_to_world(h.pos), h.id))
 	rules.pull_step.connect(_on_pull_step)
+	rules.kill_chain.connect(_on_chain)
 	rules.pull_window.connect(func(h: Hilt, o: float, c: float) -> void: _timing_fx[rules.pull_win_step % 2].on_window(Grid.cells_to_world(h.pos), o, c, rules.pull_t))
 	rules.pull_good.connect(_on_pull_good)
 	rules.pull_perfect.connect(_on_pull_perfect)
@@ -668,11 +669,20 @@ func _on_end(won: bool) -> void:
 	_clear_night_view()
 	_clear_event_view()
 	_hud.set_goal("")
+	_hud.set_prompt("", "")
 	var got_mats: Array[String] = []
 	for id in Meta.MAT_IDS:
 		if int(r.mats[id]) > 0:
 			got_mats.append("%s +%d" % [Meta.MAT_NAMES[id], int(r.mats[id])])
-	_hud.show_over(title, (" · ".join(got_mats) + "\n" if not got_mats.is_empty() else "") + "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 높은 등급 %s\n조각 +%d  (처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, best, r.total, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "")] + _quest_line(r))
+	# 조각은 큰 숫자로 세어 올리고(Hud.show_over), 새 기록은 금빛 줄로 하나씩(docs/dopamine.md)
+	var records: Array[String] = []
+	if bool(r.get("new_best", false)):
+		records.append("새 기록 · 가장 높이 오름 " + ("정상" if won else "%d구역" % (rules.zone + 1)))
+	if bool(r.get("new_kills", false)):
+		records.append("새 기록 · 한 판에 쓰러뜨린 적 %d" % rules.kills)
+	if bool(r.get("new_chain", false)):
+		records.append("새 기록 · 가장 긴 연쇄 ×%d" % rules.chain_best)
+	_hud.show_over(title, (" · ".join(got_mats) + "\n" if not got_mats.is_empty() else "") + "뽑은 검 %d자루 · 쓰러뜨린 적 %d · 가장 긴 연쇄 ×%d · 가장 높은 등급 %s\n(처치 %d · 구역 %d · 부러진 검 %d · 정예 %d · 녹인 검 %d%s)" % [rules.pulls, rules.kills, rules.chain_best, best, r.kills, r.zone, r.broken, r.elite, r.melt, (" · 사냥 %d" % r.goal if r.goal > 0 else "") + (" · 갈림길 %d" % r.path if r.path > 0 else "") + (" · 연쇄 %d" % r.chain if r.chain > 0 else "")] + _quest_line(r), int(r.total), records)
 	_capture(false)
 
 
@@ -706,10 +716,27 @@ func _on_move_area(move: StringName, info: Dictionary) -> void:
 			pass
 
 
+## 버팀 하나를 넘겼다 = 등급이 st 이상이다. 틈의 빛이 등급 st의 색으로 한 단 오르고 화면이 그 색으로 살짝 번쩍인다
+## (가챠의 "색이 오르는" 기대. 소리는 같은 높이의 쿵이 커지기만 한다).
 func _on_pull_step(_h: Hilt, st: int) -> void:
+	var c: Color = data.grades.colors[clampi(st, 0, data.grades.colors.size() - 1)]
 	_camera.add_shake(0.12 + 0.07 * st)
+	_camera.kick(1.5 + st)
 	_sfx.play(&"thump", _lord.position, -6.0 + st)
-	_pull_fx.step(st)
+	_pull_fx.step(st, c)
+	_hud.flash(c, 0.06 + 0.035 * st, 0.25)
+
+
+## 처치 연쇄(2026-11-24): 이어질 때마다 숫자가 튀고 흔들림이 조금씩 세진다. chain_every의 배수에서는 금빛·묵직한 쿵·조각.
+func _on_chain(n: int, paid: int) -> void:
+	_hud.chain(n, paid, data.run.chain_window, data.meta.chain_every)
+	_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
+	if paid > 0:
+		_sfx.play(&"hit_big", _lord.position, -4.0, 0.7)
+		_sfx.play(&"thump", _lord.position, -2.0, 0.6)
+		_camera.add_shake(0.3)
+		_camera.kick(4.0)
+		_hud.flash(ChainMeter.GOLD, 0.16, 0.35)
 
 
 ## 제대로 당김(14단계): 고리가 닫히며 불똥, 영주가 한 번 크게 젖힌다(LordView), 짧은 쿵.
@@ -741,6 +768,7 @@ func _reveal_video(grade: int) -> String:
 func _on_pulled(s: Sword) -> void:
 	for fx in _timing_fx:
 		fx.clear()
+	var first: bool = not meta.has_found(s.data.id)   # 처음 뽑은 검: 이름 알림에 도감이 몇 자루 찼는지 붙이고 금빛으로 한 번 번쩍인다
 	meta.note_found(s.data.id)
 	meta.log_pull(s.data.id, _perfect_pull)
 	_perfect_pull = false
@@ -764,7 +792,12 @@ func _on_pulled(s: Sword) -> void:
 	if _pull_note != "":
 		text += " " + _pull_note
 		_pull_note = ""
-	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void: _hud.toast(text))
+	if first:
+		text += " 처음 뽑은 검 · 도감 %d/%d" % [meta.found.size(), data.swords.size()]
+	get_tree().create_timer(hold, true, false, true).timeout.connect(func() -> void:
+		_hud.toast(text)
+		if first:
+			_hud.flash(ChainMeter.GOLD, 0.14, 0.4))
 
 
 ## 언덕 재설계: 검을 뽑아 사건이 시작되는 순간. 땅이 갈라지고(뽑기 먼지·불똥), 쿵 울리고, 잠깐 느려진다.

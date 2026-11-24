@@ -40,6 +40,9 @@ var _choice_t: float = 0.0
 var _over: Control
 var _over_title: Label
 var _over_text: Label
+var _over_shards: Label
+var _over_records: VBoxContainer
+var _chain: ChainMeter
 var _night_button: Button
 var _altar: Control
 var _altar_list: VBoxContainer
@@ -145,6 +148,8 @@ func _ready() -> void:
 	add_child(_help_hint)
 	# 늘 떠 있으면 화면 소음: 처음 몇 초만 보이고 사라진다(F1은 그대로 된다)
 	create_tween().tween_property(_help_hint, "modulate:a", 0.0, 1.5).set_delay(8.0)
+
+	_chain = ChainMeter.make(self)
 
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -304,10 +309,44 @@ func pick_path(i: int) -> void:
 	_map.pick(i)
 
 
-func show_over(title: String, text: String) -> void:
+## 끝 화면. shards > 0이면 큰 조각 숫자가 0부터 세어 올라가고(멈춘 뒤 한 번 튄다), 그다음 새 기록 줄이 하나씩 금빛으로 튀어나온다.
+func show_over(title: String, text: String, shards: int = 0, records: Array[String] = []) -> void:
 	_over_title.text = title
 	_over_text.text = text
 	_over.visible = true
+	_chain.modulate.a = 0.0
+	_over_shards.visible = shards > 0
+	for c in _over_records.get_children():
+		c.queue_free()
+	var count: float = clampf(0.5 + shards * 0.012, 0.6, 1.6)
+	var tw := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if shards > 0:
+		_over_shards.text = "조각 +0"
+		_over_shards.scale = Vector2.ONE
+		tw.tween_interval(0.35)
+		tw.tween_method(func(v: float) -> void: _over_shards.text = "조각 +%d" % roundi(v), 0.0, float(shards), count).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(func() -> void:
+			_over_shards.pivot_offset = _over_shards.size * 0.5
+			_over_shards.scale = Vector2.ONE * 1.25)
+		tw.tween_property(_over_shards, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for t in records:
+		var l := _label(t, 19)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.add_theme_color_override("font_color", ChainMeter.GOLD)
+		l.modulate.a = 0.0
+		_over_records.add_child(l)
+		tw.tween_interval(0.18)
+		tw.tween_callback(func() -> void:
+			l.pivot_offset = l.size * 0.5
+			l.scale = Vector2.ONE * 1.4
+			l.modulate.a = 1.0
+			flash(ChainMeter.GOLD, 0.12, 0.3))
+		tw.tween_property(l, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 처치 연쇄(2026-11-24): 연쇄 숫자를 띄운다(ChainMeter).
+func chain(n: int, paid: int, window: float, every: int) -> void:
+	_chain.bump(n, paid, window, every)
 
 
 func _build_choice() -> void:
@@ -423,9 +462,16 @@ func _build_over() -> void:
 	_over_title.add_theme_color_override("font_color", UiKit.TITLE)
 	_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_over_title)
+	_over_shards = _label("", 40)
+	_over_shards.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_over_shards.add_theme_color_override("font_color", ChainMeter.GOLD)
+	box.add_child(_over_shards)
 	_over_text = _label("", 17)
 	_over_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_over_text)
+	_over_records = VBoxContainer.new()
+	_over_records.add_theme_constant_override("separation", 4)
+	box.add_child(_over_records)
 	var again := Button.new()
 	again.text = "  마을로 (R)  "
 	again.focus_mode = Control.FOCUS_NONE

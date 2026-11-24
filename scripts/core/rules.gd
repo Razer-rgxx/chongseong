@@ -21,6 +21,9 @@ signal hz_done(zi: int, won: bool)
 signal hz_woke(zi: int)
 signal night_started(zone: int)
 signal run_ended(won: bool)
+## 처치 연쇄가 이어졌다(n은 2부터. 1은 새로 시작이라 안 낸다). 화면은 HUD 연쇄 숫자와 소리(docs/dopamine.md).
+## paid: 이 처치로 연쇄가 chain_every의 배수가 되어 붙은 조각(언덕에서 판이 끝날 때 받는다). 아니면 0.
+signal kill_chain(n: int, paid: int)
 signal pull_started(hilt: Hilt, grade: int)
 signal pull_step(hilt: Hilt, step: int)
 signal pull_refused(reason: String)
@@ -210,6 +213,11 @@ var best_grade: int = -1
 var broken_by_grade: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 var melted_by_grade: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
 var elites_killed: int = 0
+## 처치 연쇄(2026-11-24): 지금 연쇄, 판의 가장 긴 연쇄, 앞 처치의 틱.
+var chain: int = 0
+var chain_best: int = 0
+var chain_tick: int = -100000
+var chain_paid: int = 0
 ## 체력을 쓰지 않는 뽑기(정예가 준다).
 var free_pulls: int = 0
 var elite_out: bool = false
@@ -1435,6 +1443,7 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		if not e.data.still:
 			kills += 1
 			run_stats.kills += 1
+			_chain_kill()
 			run_stats.kills_by_kind[e.data.id] = int(run_stats.kills_by_kind.get(e.data.id, 0)) + 1
 		if e.elite:
 			elites_killed += 1
@@ -2600,6 +2609,21 @@ func _step_siege() -> void:
 
 
 ## 무덤: 쓰러진 망령(우두머리·언덕지기·이미 일어난 것은 빼고)이 grave_chance로 grave_delay초 뒤 다시 일어난다.
+## 처치 연쇄: 앞 처치에서 chain_window초 안이면 하나 늘고, 아니면 1부터. chain_every의 배수마다 조각이 붙는다(끝에 받는다, Meta.run_shards).
+func _chain_kill() -> void:
+	var window: int = roundi(data.run.chain_window / dt)
+	chain = chain + 1 if tick - chain_tick <= window else 1
+	chain_tick = tick
+	chain_best = maxi(chain_best, chain)
+	var paid: int = 0
+	var every: int = data.meta.chain_every if data.meta else 0
+	if every > 0 and chain % every == 0:
+		paid = data.meta.chain_shards
+		chain_paid += paid
+	if chain >= 2:
+		kill_chain.emit(chain, paid)
+
+
 func _note_grave(e: Enemy) -> void:
 	var R := data.run
 	if rule != &"graves" or phase != Phase.NIGHT or not e.data.wraith or e.risen or e.hunt or e.data.boss:
@@ -2959,7 +2983,7 @@ func _new_id() -> int:
 
 ## 같은 시드·같은 입력이면 같은 값이 나와야 한다(테스트용).
 func state_hash() -> int:
-	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
+	var parts: Array = [tick, zone, phase, lord.pos, lord.hp, kills, chain, chain_best, chain_tick, chain_paid, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
 	for p in projectiles:
 		parts.append(p.pos)
 	for p in enemy_projectiles:

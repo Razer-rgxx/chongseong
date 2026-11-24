@@ -94,6 +94,13 @@ func _ready() -> void:
 	rules.lord_hurt.connect(_on_lord_hurt)
 	rules.enemy_hit.connect(_on_enemy_hit)
 	rules.enemy_died.connect(_on_enemy_died)
+	var chain_meter := ChainMeter.make(_hud)   # 처치 연쇄(2026-11-24): 숫자만. 조각은 언덕에서만 붙는다
+	rules.kill_chain.connect(func(n: int, _paid: int) -> void:
+		chain_meter.bump(n, 0, data.run.chain_window, data.meta.chain_every)
+		_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
+		if n % maxi(1, data.meta.chain_every) == 0:
+			_sfx.play(&"thump", _lord.position, -2.0, 0.6)
+			_camera.add_shake(0.25))
 	rules.enemy_act.connect(_on_enemy_act)
 	rules.run_ended.connect(_on_down)
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))

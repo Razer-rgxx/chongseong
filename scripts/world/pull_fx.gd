@@ -15,7 +15,9 @@ void fragment() {
 	if (UV.x > grow) { discard; }
 	float core = 1.0 - abs(UV.y - 0.5) * 2.0;
 	float tip = smoothstep(grow, grow - 0.08, UV.x);
-	vec3 c = mix(vec3(0.015, 0.01, 0.008), glow * (0.6 + energy * 3.0), smoothstep(0.35, 0.9, core) * clamp(energy, 0.0, 1.0));
+	// 빛은 등급 색이 보이게 너무 세게 곱하지 않고(하얗게 타 버린다), 한가운데만 살짝 희게
+	vec3 hot = mix(glow * (0.75 + min(energy, 2.0) * 0.6), vec3(1.0, 0.96, 0.88) * (1.0 + energy * 0.4), smoothstep(0.88, 1.0, core) * 0.45);
+	vec3 c = mix(vec3(0.015, 0.01, 0.008), hot, smoothstep(0.35, 0.9, core) * clamp(energy, 0.0, 1.0));
 	ALBEDO = c;
 	ALPHA = smoothstep(0.0, 0.35, core) * tip * fade * 0.95;
 }
@@ -69,14 +71,18 @@ func begin(at: Vector3, seed: int) -> void:
 	_dust(at, 8, 0.8, 0.25)
 
 
-## 한 번 더 버텼다(step번째). 틈이 더 뻗고 빛이 세진다.
-func step(n: int) -> void:
+## 한 번 더 버텼다(step번째). 틈이 더 뻗고 빛이 세진다. color를 주면 틈의 빛이 그 색으로 바뀐다:
+## 버팀 n번째까지 왔다는 것은 등급이 n 이상이라는 뜻이라, main이 등급 n의 색을 준다(색이 한 단씩 올라가는 기대, docs/dopamine.md).
+func step(n: int, color: Color = Color(0, 0, 0, 0)) -> void:
 	if _crack_mat == null:
 		return
 	var k: float = clampf(0.18 + n * 0.17, 0.0, 1.0)
 	var tw := create_tween().set_parallel()
+	if color.a > 0.0:
+		tw.tween_property(_crack_mat, "shader_parameter/glow", color, 0.16)
+		_sparks(_at, 4 + n * 4, color.lerp(Color(1.0, 0.9, 0.7), 0.35))
 	tw.tween_property(_crack_mat, "shader_parameter/grow", k, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(_crack_mat, "shader_parameter/energy", 0.22 * n, 0.18)
+	tw.tween_property(_crack_mat, "shader_parameter/energy", 0.3 + 0.2 * n, 0.18)   # 첫 버팀부터 색이 보이게
 	_dust(_at, 10 + n * 4, 1.0 + n * 0.3, 0.3)
 	_pebbles(_at, 3 + n)
 

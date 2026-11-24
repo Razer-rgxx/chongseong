@@ -105,7 +105,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	var on: bool = rules != null and rules.hz != null
 	visible = on
-	_panel.visible = on and not rules.hz_offer.is_empty()
+	_panel.visible = on and not rules.hz_offer.is_empty() and rules.phase != Rules.Phase.OVER   # 판이 끝나면 끝 화면 위로 안 뜬다
 	if _map:
 		_map.visible = on
 	if not on:

@@ -237,3 +237,7 @@ func extra_chance(kind: StringName, zone: int) -> float:
 ## 잔영의 베기 사거리(칸)와 부채꼴(라디안).
 @export var ghost_reach: float = 1.7
 @export var ghost_arc: float = 2.0
+
+@export_group("처치 연쇄 (2026-11-24, docs/dopamine.md)")
+## 앞 처치에서 이 초 안에 또 쓰러뜨리면 연쇄가 이어진다(허수아비는 안 센다). 몇 번마다 조각이 붙는지는 MetaData.chain_*.
+@export var chain_window: float = 3.0
