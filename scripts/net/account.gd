@@ -12,6 +12,7 @@ const ERR_NO_PLUGIN: int = -1
 const ERR_NO_KEYS: int = -2
 const ERR_EMPTY: int = -3
 const ERR_NO_ENGINE: int = -4
+const ERR_NO_SERVER: int = -5
 
 ## 저장 자리(시험은 다른 경로를 넣는다).
 static var path: String = "user://account.cfg"
@@ -55,6 +56,7 @@ const OWN: Dictionary = {
 	ERR_NO_KEYS: "GD-Sync 키가 없습니다. 게스트로 하거나 키를 넣어 주세요.",
 	ERR_EMPTY: "이메일과 비밀번호를 적어 주세요.",
 	ERR_NO_ENGINE: "지금은 계정을 쓸 수 없습니다.",
+	ERR_NO_SERVER: "GD-Sync 서버에 접속하지 못했습니다. 인터넷 연결을 확인하세요.",
 }
 
 
@@ -149,9 +151,6 @@ static func _gd() -> Array:
 	var tree := _tree()
 	if tree == null:
 		return [null, ERR_NO_ENGINE]
-	var gd: Node = tree.root.get_node_or_null(GD_NAME)
-	if gd != null:
-		return [gd, 0]
 	if not GdSyncLink.plugin_present():
 		return [null, ERR_NO_PLUGIN]
 	if not GdSyncLink.has_keys():
@@ -160,13 +159,14 @@ static func _gd() -> Array:
 	if OS.get_environment("GDSYNC_PUBLIC_KEY") == "":
 		OS.set_environment("GDSYNC_PUBLIC_KEY", k.public)
 		OS.set_environment("GDSYNC_PRIVATE_KEY", k.private)
-	gd = (load(GdSyncLink.PLUGIN_SCRIPT) as GDScript).new() as Node
-	gd.name = GD_NAME
-	tree.root.add_child.call_deferred(gd)
-	await tree.process_frame
-	await tree.process_frame
-	gd.account_logged_in.connect(_on_logged_in)
-	gd.account_logged_out.connect(_on_logged_out)
+	# 계정 요청은 플러그인이 접속해 있어야 간다(start_multiplayer 전에는 플러그인이 바로 "응답 없음"을 돌려준다).
+	# 노드 올리기와 접속 기다리기는 다른 영주의 검(FallenShare)과 같은 것을 쓴다.
+	var gd: Node = await FallenShare._boot(tree)
+	if gd == null:
+		return [null, ERR_NO_SERVER]
+	if not gd.account_logged_in.is_connected(_on_logged_in):
+		gd.account_logged_in.connect(_on_logged_in)
+		gd.account_logged_out.connect(_on_logged_out)
 	return [gd, 0]
 
 

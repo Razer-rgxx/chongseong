@@ -9,6 +9,7 @@ static func run(_game: GameData, check: Callable) -> void:
 	check.call(Account.message("verify", ENUMS.ACCOUNT_VERIFICATION_RESPONSE_CODE.INCORRECT_CODE).contains("코드"), "계정: 코드 틀림 글")
 	check.call(Account.message("login", Account.ERR_NO_KEYS).contains("키가 없습니다"), "계정: 키 없음 글")
 	check.call(Account.message("login", 999).contains("999"), "계정: 모르는 번호도 글이 나옴")
+	check.call(Account.message("login", Account.ERR_NO_SERVER).contains("접속"), "계정: 서버 접속 못 함 글")
 	for kind in ["create", "login", "verify", "resend", "logout"]:
 		var tbl: Dictionary = Account._enum_of(kind)
 		var all_ok: bool = true
