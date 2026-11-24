@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"stable"
+display_name = "검 받침터"
+desc = "탈 검을 깨워 둔다. 들판에서 H로 불러 타고 달린다."
+cost_wood = 15
+cost_stone = 10
+plot = Vector2(48.5, 19.5)
+size = Vector2(4.0, 3.4)
+facing = Vector2(-1, 0)
+kind = &"cottage"
+min_tier = 1

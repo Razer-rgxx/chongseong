@@ -5,7 +5,7 @@ extends RefCounted
 
 static func run(d: GameData, check: Callable) -> void:
 	var ids: Array = d.buildings.map(func(b: BuildingData) -> StringName: return b.id)
-	check.call(ids == [&"cottage", &"woodcutter", &"mason", &"cottage2", &"longhouse", &"wall", &"tower", &"forge"], "건물(파일 이름 순서): 오두막·나무꾼 움막·석공 마당·작은 집·긴 집·돌담·망루·풀무간 %s" % [ids])
+	check.call(ids == [&"cottage", &"woodcutter", &"mason", &"cottage2", &"longhouse", &"wall", &"tower", &"forge", &"stable"], "건물(파일 이름 순서): 오두막·나무꾼 움막·석공 마당·작은 집·긴 집·돌담·망루·풀무간·검 받침터 %s" % [ids])
 	var ok: bool = true
 	for b in d.buildings:
 		ok = ok and b.plot.x > 34.0 and b.plot.x < 50.0 and b.plot.y > 3.5 and b.plot.y < 21.0 and b.cost().size() > 0 and b.desc != ""

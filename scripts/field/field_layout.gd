@@ -41,8 +41,6 @@ const GATE_GAP: Vector2 = Vector2(52, 58)   ## 목책이 비는 x 범위
 
 const BRIDGE_X: float = 104.0   ## 돌다리 가운데(m)
 const TOWER: Vector2 = Vector2(92, 36)
-## 탈 검 받침: 무너진 망루 남쪽 발치. E로 탈 검(H)을 얻는다.
-const RIDE_REST: Vector2 = Vector2(92, 41.5)
 
 ## 유품 상자 id → [칸 자리, 조각]. 한 번 찾으면 끝.
 const CACHES: Dictionary = {

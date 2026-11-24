@@ -85,12 +85,7 @@ func _call_rules() -> void:
 	check.call(r.horse_fight() and r.call_horse() == &"fight", "부르기: 깨어 덤비는 적이 있으면 못 부른다")
 	r = _field()
 	r.horse_unlocked = false
-	check.call(r.call_horse() == &"locked" and not r.horse.present(), "부르기: 탈 검을 얻기 전(망루 받침)에는 못 부른다")
-	var mt := Meta.new()
-	mt.ride_unlocked = true
-	var mt2 := Meta.new()
-	mt2.from_dict(mt.to_dict())
-	check.call(mt2.ride_unlocked and not Meta.new().ride_unlocked, "탈 검 얻음이 저장되고, 새 저장은 잠겨 있다")
+	check.call(r.call_horse() == &"locked" and not r.horse.present(), "부르기: 검 받침터를 짓기 전에는 못 부른다")
 	r = _field()
 	check.call(r.call_horse() == &"" and r.horse.state == Horse.COMING, "부르기: 들판에서 부르면 달려오기 시작한다")
 	check.call(r.horse.pos.distance_to(r.lord.pos) > d.horse.call_from - 0.5, "부르기: 말은 call_from칸 떨어진 곳에서 나타난다")
