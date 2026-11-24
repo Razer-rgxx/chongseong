@@ -1085,7 +1085,7 @@ func _apply_yard_sword() -> void:
 func _on_field_go(id: int) -> void:
 	Meta.carry_sword = id
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(FIELD_PATH)
+	SceneLoader.go(get_tree(), FIELD_PATH)   # 불러오기 화면(2026-11-24)
 
 
 ## 결투 말뚝에서 1P·2P의 검을 골랐다: 결투 장면으로(고른 검은 Meta.duel_picks로 넘어간다).
@@ -1093,7 +1093,7 @@ func _on_duel_go(a: int, b: int) -> void:
 	Meta.duel_picks = [a, b]
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(DUEL_PATH)
+	SceneLoader.go(get_tree(), DUEL_PATH)   # 불러오기 화면(2026-11-24)
 
 
 ## 모르는 사람과 겨루기(22단계): 검을 골랐다. 접속하고 방을 찾아 둘이 모이면 결투 장면으로 간다.
@@ -1117,7 +1117,7 @@ func _on_online_ready() -> void:
 	_online = null   # 결투 장면이 OnlineDuel.current로 이어받는다
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(DUEL_PATH)
+	SceneLoader.go(get_tree(), DUEL_PATH)   # 불러오기 화면(2026-11-24)
 
 
 func _cancel_online() -> void:

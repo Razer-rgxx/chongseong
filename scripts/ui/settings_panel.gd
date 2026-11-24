@@ -156,7 +156,7 @@ func _on_wipe() -> void:
 	GameSettings.save()
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(TITLE_SCENE)
+	SceneLoader.go(get_tree(), TITLE_SCENE)   # 불러오기 화면(2026-11-24)
 
 
 func _reset() -> void:

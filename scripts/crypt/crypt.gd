@@ -394,7 +394,7 @@ func _on_down(_won: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
 	await get_tree().create_timer(1.6).timeout
-	get_tree().change_scene_to_file(FIELD_PATH)
+	SceneLoader.go(get_tree(), FIELD_PATH)   # 불러오기 화면(2026-11-24)
 
 
 func _saved() -> void:
@@ -406,7 +406,7 @@ func _leave() -> void:
 	meta.save()
 	Meta.wake_at_crypt = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(FIELD_PATH)
+	SceneLoader.go(get_tree(), FIELD_PATH)   # 불러오기 화면(2026-11-24)
 
 
 ## 검의 기억 단계를 넘었다: 한 줄과 낮은 울림(올라가는 소리 없음). 피해 배수는 다음에 쥐고 나갈 때부터.

@@ -550,7 +550,7 @@ func _interact() -> void:
 	elif _near == "crypt":
 		meta.save()   # 쥔 검(Meta.carry_sword)은 그대로 무덤으로 가져간다
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		get_tree().change_scene_to_file(CRYPT_PATH)
+		SceneLoader.go(get_tree(), CRYPT_PATH)   # 불러오기 화면(2026-11-24)
 	elif _near.begins_with("cache"):
 		var got: int = meta.field_open(_near, FieldLayout.CACHES[_near][1])
 		if got > 0:
@@ -889,7 +889,7 @@ func _on_down(_won: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
 	await get_tree().create_timer(1.6).timeout
-	get_tree().change_scene_to_file(VILLAGE_PATH)
+	SceneLoader.go(get_tree(), VILLAGE_PATH)   # 불러오기 화면(2026-11-24)
 
 
 func _end_read() -> void:
@@ -915,7 +915,7 @@ func _leave(path: String) -> void:
 	meta.field_clock = rules.field_clock   # 시계는 들판 밖에서 흐르지 않고 다시 들어오면 이어 간다
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(path)
+	SceneLoader.go(get_tree(), path)   # 불러오기 화면(2026-11-24)
 
 
 ## 막힌 곳에서 밀어낸다(Blockers). 공중이면 낮은 막힘(울타리·무너진 낮은 벽 …)은 지나간다. r: 몸 반지름(칸, 말은 HorseData.body_r).

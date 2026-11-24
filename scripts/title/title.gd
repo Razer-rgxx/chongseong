@@ -381,7 +381,7 @@ func _start() -> void:
 	_leaving = true
 	var tw := create_tween()
 	tw.tween_property(_fade, "color:a", 1.0, 0.7)
-	tw.tween_callback(func() -> void: get_tree().change_scene_to_file(LOBBY))
+	tw.tween_callback(func() -> void: SceneLoader.go(get_tree(), LOBBY))   # 불러오기 화면(2026-11-24)
 
 
 func _settings() -> void:

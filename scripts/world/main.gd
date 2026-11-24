@@ -266,7 +266,7 @@ func _capture(on: bool) -> void:
 
 func _to_lobby() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(LOBBY_PATH)
+	SceneLoader.go(get_tree(), LOBBY_PATH)   # 불러오기 화면(2026-11-24)
 
 
 ## 27단계: F10으로 설정 창(게임을 멈춘다).

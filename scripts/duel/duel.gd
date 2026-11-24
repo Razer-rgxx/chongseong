@@ -377,4 +377,4 @@ func _leave() -> void:
 		_net.close()   # 방을 나가고 접속을 끊는다
 	_left = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(LOBBY_PATH)
+	SceneLoader.go(get_tree(), LOBBY_PATH)   # 불러오기 화면(2026-11-24)
