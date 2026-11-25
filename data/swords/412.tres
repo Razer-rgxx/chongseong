@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 412
+display_name = "중장도 Mk.XVII 「차가운 궤도」"
+grade = 3
+form = 2
+attack = 106
+inscriptions = PackedStringArray("서리", "숫돌")
+unique_text = "산탄: 큰 베기 끝에 앞으로 산탄이 퍼진다(부채꼴, 멀수록 약하지 않다).\nEMP: 큰 베기가 전자기 파동을 낸다. 드론·기계는 기절하고 나머지는 느려진다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "중장도"
+cyber_powers = PackedStringArray("산탄", "EMP")

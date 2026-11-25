@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 482
+display_name = "오니마루 Mk.XII 「백귀야행」"
+grade = 5
+form = 1
+attack = 149
+inscriptions = PackedStringArray("숫돌", "등 뒤")
+unique_text = "해킹: 4번 맞힐 때마다 그 적이 잠깐 아군이 되어 가까운 적을 친다.\nEMP: 큰 베기가 전자기 파동을 낸다. 드론·기계는 기절하고 나머지는 느려진다."
+unique_ready = true
+unbreakable = false
+story = "쓰러진 기계들이 줄지어 주인을 따른다."
+field_only = false
+cyber = true
+sub_type = "오니마루"
+cyber_powers = PackedStringArray("해킹", "EMP")

@@ -75,7 +75,7 @@ func _meta() -> void:
 func _sword() -> void:
 	var s: SwordData = d.sword_by_id(Stranger.SWORD)
 	check.call(s != null and s.display_name == "사이버 카타나" and s.field_only and d.is_field_sword(311), "사이버 카타나: 오픈월드 한정 검 311")
-	check.call(not s.unique_ready and s.unique_text == "", "사이버 카타나: 고유 능력 없음")
+	check.call(s.unique_ready and s.cyber and s.cyber_powers == PackedStringArray(["글리치 순간베기"]), "사이버 카타나: 고유 능력은 글리치 순간베기(docs/cyber_swords.md)")
 	var m := Meta.new()
 	m.note_found(Stranger.SWORD)
 	var sw: Sword = m.unbreakable_sword(d, Stranger.SWORD)

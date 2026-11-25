@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 353
+display_name = "대검 Mk.VII 「검은 암호」"
+grade = 2
+form = 2
+attack = 94
+inscriptions = PackedStringArray("버팀")
+unique_text = "레일: 큰 베기에 화면 가로지르는 긴 선을 맞힌다.\n관통탄: 큰 베기마다 적을 모두 꿰뚫는 탄이 곧게 날아간다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "대검"
+cyber_powers = PackedStringArray("레일", "관통탄")

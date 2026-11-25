@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 383
+display_name = "대검 Type-65 「방전 새벽」"
+grade = 1
+form = 2
+attack = 58
+inscriptions = PackedStringArray("연격")
+unique_text = "방벽: 6명 쓰러뜨릴 때마다 방어막이 생긴다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "대검"
+cyber_powers = PackedStringArray("방벽")

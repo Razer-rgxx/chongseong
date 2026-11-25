@@ -60,12 +60,15 @@ var _dash_hit: Dictionary = {}
 var _snapshot: Dictionary = {}
 ## 아군·벽·날아가는 칼·운명 베기(Uniques).
 var U: Uniques
+## 사이버 검의 새 능력 14가지(docs/cyber_swords.md).
+var C: CyberPowers
 
 
 func _init(rules: Rules) -> void:
 	r = rules
 	T = rules.data.powers
 	U = Uniques.new(self)
+	C = CyberPowers.new(self)
 
 
 # ---------------------------------------------------------------- 묻기
@@ -136,7 +139,7 @@ func stats() -> Dictionary:
 	var dmg: float = D.damage * F.damage * g_mult * (1.0 + ins("날") / 100.0)
 	if ins("투박함") > 0.0:
 		dmg *= T.i("투박함_피해")
-	var spd: float = F.speed * (1.0 + ins("가벼움") / 100.0)
+	var spd: float = F.speed * (1.0 + ins("가벼움") / 100.0) * C.speed_mult()
 	if ins("무거움") > 0.0:
 		spd *= T.i("무거움_속도")
 	var hp_k: float = clampf(r.lord.hp / r.max_hp(), 0.0, 1.0)
@@ -219,6 +222,7 @@ func knock_mult() -> float:
 func after_swing(hit: Array[Enemy], st: Dictionary, dmg: float, big: bool) -> void:
 	var L := r.lord
 	U.on_swing(dmg, st, big)
+	C.on_swing(st, dmg, big)
 	ice_spear = false
 	if using("메아리 계곡"):
 		pending.append({"kind": "echo", "t": T.u("메아리 계곡", "delay"), "pos": L.pos, "face": L.face, "reach": st.reach, "arc": st.arc, "dmg": dmg, "big": big})
@@ -272,6 +276,7 @@ func strike(e: Enemy, dmg: float, knock: Vector2) -> Dictionary:
 		d *= 1.0 + ins("망령 베기") / 100.0
 	if e.vuln > 0.0:
 		d *= 2.0
+	d *= C.strike_mult(e)
 	if using("상처 세는 자") and e.bleed_t > 0.0:
 		d += e.bleed * e.bleed_t
 		e.bleed_t = 0.0
@@ -315,6 +320,7 @@ func strike(e: Enemy, dmg: float, knock: Vector2) -> Dictionary:
 ## 벤 뒤(흡혈, 잔상, 번개, 천둥). d: 이 적에게 들어간 피해, base: 휘두르기의 피해.
 func after_strike(e: Enemy, d: float, base: float) -> void:
 	heal(d * ins("흡혈") / 100.0)
+	C.on_hit(e, d, base)
 	if ins("잔상") > 0.0 and not e.dead and r.rng.randf() < ins("잔상") / 100.0:
 		r.hurt(e, d, Vector2.ZERO, false)
 	if ins("번개") > 0.0:
@@ -348,6 +354,7 @@ func on_damage(e: Enemy, d: float) -> void:
 func on_kill(e: Enemy) -> void:
 	night_kills += 1
 	U.on_kill(e)
+	C.on_kill(e)
 	heal(ins("사냥"))
 	var s := r.current()
 	if s and s.breakable():
@@ -469,6 +476,7 @@ func dash_tick() -> void:
 func on_night_start() -> void:
 	night_used.clear()
 	U.on_night_start()
+	C.clear()
 	night_kills = 0
 	shield = 0.0
 	undying = 0.0
@@ -529,8 +537,10 @@ func tick(dt: float) -> void:
 			dash_recharge = dash_cooldown()
 	if r.phase != Rules.Phase.NIGHT:
 		U.clear()
+		C.clear()
 		return
 	U.tick(dt)
+	C.tick(dt)
 	if using("굶주린 칼"):
 		starve += dt
 		if starve > T.u("굶주린 칼", "starve") and L.hp > 1.0:

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 430
+display_name = "중장도 Mk.XX 「네온 낙인」"
+grade = 0
+form = 2
+attack = 17
+inscriptions = PackedStringArray("연격")
+unique_text = "방벽: 6명 쓰러뜨릴 때마다 방어막이 생긴다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "중장도"
+cyber_powers = PackedStringArray("방벽")

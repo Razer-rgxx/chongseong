@@ -21,10 +21,12 @@ var hill_zone: HillZoneData
 var horse: HorseData
 ## 파일 이름 순서(0 단검, 1 장검, 2 대검, 3 세검).
 var forms: Array[FormData] = []
-## 파일 이름 순서(001 … 310).
+## 파일 이름 순서(001 … 511).
 var swords: Array[SwordData] = []
 ## 등급마다 그 등급 검의 swords 번호. 언덕에서 뽑히는 후보라 오픈월드 한정 검(field_only)은 들지 않는다.
 var swords_by_grade: Array[PackedInt32Array] = []
+## 사이버 검(312~511)의 등급별 swords 번호. 언덕 뽑기에는 Meta.rift_open 뒤에만 일부 섞인다(Rules.pick_pull_sword).
+var cyber_by_grade: Array[PackedInt32Array] = []
 ## 오픈월드 한정 검(33단계)의 swords 번호(id 순서).
 var field_swords: PackedInt32Array = PackedInt32Array()
 ## 각인 이름 → InscriptionData
@@ -71,10 +73,13 @@ static func load_default() -> GameData:
 		d.patterns[pat.id] = pat
 	for g in d.grades.names.size():
 		d.swords_by_grade.append(PackedInt32Array())
+		d.cyber_by_grade.append(PackedInt32Array())
 	for path in _tres_in(DIR + "swords/"):
 		var s := load(path) as SwordData
 		if s.field_only:
 			d.field_swords.append(d.swords.size())
+		elif s.cyber:
+			d.cyber_by_grade[s.grade].append(d.swords.size())
 		else:
 			d.swords_by_grade[s.grade].append(d.swords.size())
 		d.swords.append(s)
@@ -88,7 +93,7 @@ func building(id: StringName) -> BuildingData:
 	return null
 
 
-## SwordData.id는 1부터 310까지이고 swords 순서와 같다.
+## SwordData.id는 1부터 511까지이고 swords 순서와 같다.
 func sword_by_id(id: int) -> SwordData:
 	if id >= 1 and id <= swords.size() and swords[id - 1].id == id:
 		return swords[id - 1]

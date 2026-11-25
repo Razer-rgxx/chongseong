@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 423
+display_name = "환도-00 「전류」"
+grade = 5
+form = 1
+attack = 145
+inscriptions = PackedStringArray("행운", "번개")
+unique_text = "관통탄: 큰 베기마다 적을 모두 꿰뚫는 탄이 곧게 날아간다.\n오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시)."
+unique_ready = true
+unbreakable = false
+story = "한 줄로 선 것은 한 발로 끝난다."
+field_only = false
+cyber = true
+sub_type = "환도"
+cyber_powers = PackedStringArray("관통탄", "오버클럭")

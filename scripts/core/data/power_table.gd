@@ -66,6 +66,34 @@ extends Resource
 }
 
 
+## 사이버 능력(docs/cyber_swords.md): 이름 → 수치들. 피해 배수(mult)는 등급마다 `grade_scale`만큼씩 오른다(무한 ×1.6).
+@export var cyber: Dictionary = {
+	"산탄": {"reach": 5.0, "arc": 1.2, "mult": 0.9, "knock": 1.4},
+	"관통탄": {"mult": 1.6, "speed": 34.0, "width": 0.7, "dist": 16.0},
+	"과열": {"stacks": 4, "radius": 1.8, "mult": 2.0, "burn": 2.0, "keep": 4.0},
+	"EMP": {"radius": 4.0, "stun": 1.4, "slow": 0.5, "slow_t": 2.5},
+	"해킹": {"every": 4, "time": 3.0},
+	"글리치 순간베기": {"range": 7.0, "cd": 4.0, "mult": 2.2, "behind": 1.1},
+	"플라즈마 칼날": {"time": 2.0, "radius": 1.1, "burn": 2.0, "max": 12},
+	"탄창": {"every": 4, "mult": 0.9, "speed": 30.0, "width": 0.5, "dist": 12.0},
+	"반동 돌진": {"mult": 1.4, "speed": 34.0, "width": 0.6, "dist": 14.0, "push": 16.0},
+	"레일": {"reach": 18.0, "width": 0.9, "mult": 2.4},
+	"연사": {"count": 2, "gap": 0.09, "mult": 0.35, "speed": 38.0, "width": 0.4, "dist": 9.0},
+	"오버클럭": {"step": 0.07, "max": 6, "time": 4.0},
+	"방벽": {"every": 6, "shield": 12.0, "max": 40.0},
+	"조준": {"mult": 1.5, "hp": 0.9},
+}
+## 사이버 능력 피해 배수가 등급(0~5)마다 이만큼씩 오른다(1 + 이 값 × 등급).
+@export var cyber_grade_scale: float = 0.12
+## 낯선 사람 이야기를 마친 뒤 언덕 뽑기에서 사이버 검이 나올 확률.
+@export var cyber_pull_share: float = 0.25
+
+
+func cy(name: String, key: String) -> float:
+	var d: Dictionary = cyber.get(name, {})
+	return float(d.get(key, 0.0))
+
+
 func i(key: String) -> float:
 	return float(ins.get(key, 0.0))
 

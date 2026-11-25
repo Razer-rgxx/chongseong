@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 352
+display_name = "중장도 「폐허의 왕」"
+grade = 5
+form = 2
+attack = 147
+inscriptions = PackedStringArray("무리 베기", "가시")
+unique_text = "산탄: 큰 베기 끝에 앞으로 산탄이 퍼진다(부채꼴, 멀수록 약하지 않다).\n과열: 같은 적을 4번 맞히면 과열해 터진다(둘레에 피해와 불)."
+unique_ready = true
+unbreakable = false
+story = "무너진 도시를 한 칼로 다시 무너뜨린다."
+field_only = false
+cyber = true
+sub_type = "중장도"
+cyber_powers = PackedStringArray("산탄", "과열")

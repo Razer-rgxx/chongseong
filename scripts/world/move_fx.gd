@@ -211,6 +211,8 @@ func on_projectile_spawned(p: Projectile) -> void:
 	if _shots.has(key):
 		return
 	var c: Color = _col(p.element)
+	if p.kind == &"bullet":   # 사이버 검의 탄(docs/cyber_swords.md): 차가운 청록의 가는 빛
+		c = Color(0.35, 0.85, 0.95)
 	var root := Node3D.new()
 	_shot_layer.add_child(root)
 	var v: Dictionary = {

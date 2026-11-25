@@ -881,7 +881,7 @@ func _try_draw() -> void:
 		if not h.owner.is_empty():
 			s = _owner_sword(h)
 		else:
-			s = Sword.new(pick_sword(debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))), data)
+			s = Sword.new(pick_pull_sword(debug_grade if debug_grade >= 0 else roll_grade(pull_luck(h))), data)
 		if free_pull:
 			free_pulls -= 1
 		L.hp -= cost
@@ -1100,7 +1100,7 @@ func _step_pull(input: LordInput = null) -> void:
 	pulls += 1
 	run_stats.pulled_by_grade[pull_grade] += 1
 	best_grade = maxi(best_grade, pull_grade)
-	var s := Sword.new(pick_sword(pull_grade), data)
+	var s := Sword.new(pick_pull_sword(pull_grade), data)
 	powers.on_pulled(s)
 	# 모두 제대로 당겼다: 최대 내구 +10%(반올림, 적어도 1). 언덕의 첫 검 뒤, 저주의 절반 앞
 	if pull_all_good and s.breakable():
@@ -1130,6 +1130,17 @@ func starter_sword() -> Sword:
 	s.max_durability *= 2.0
 	s.durability = s.max_durability
 	return s
+
+
+## 언덕에서 뽑는 검 하나. 낯선 사람 이야기를 마쳐 Meta.rift_open이면 뽑을 때마다 `PowerTable.cyber_pull_share`(25%) 확률로 같은 등급의
+## 사이버 검(312~511)이 나온다. 그 전이나 들판·결투·수련장에서는 rng를 더 쓰지 않아 예전과 똑같다(docs/cyber_swords.md).
+func pick_pull_sword(grade: int) -> SwordData:
+	if meta != null and not field and not duel and not yard and meta.rift_open():
+		if rng.randf() < data.powers.cyber_pull_share:
+			var list: PackedInt32Array = data.cyber_by_grade[grade]
+			if not list.is_empty():
+				return data.swords[list[rng.randi_range(0, list.size() - 1)]]
+	return pick_sword(grade)
 
 
 func pick_sword(grade: int) -> SwordData:
@@ -3179,6 +3190,7 @@ func state_hash() -> int:
 		for e in enemies:
 			parts.append_array([e.pack, e.home, e.wander_to, e.wander_t])
 	parts.append_array(powers.U.hash_parts())
+	parts.append_array(powers.C.hash_parts())
 	parts.append_array([pull_t, pull_steps, pull_judged, pull_goods, pull_win_step, pull_all_good])
 	if duel:
 		parts.append_array([duel_phase, duel_timer, duel_left, duel_round, duel_wins[0], duel_wins[1], duel_winner, cur_seat])
@@ -3516,7 +3528,7 @@ func _hz_event(zi: int, kind: int) -> void:
 	var h := hilt_of(zi)
 	var at: Vector2 = h.pos if h else lord.pos
 	if not hz_prize.has(zi):
-		hz_prize[zi] = Sword.new(pick_sword(hz.blades[zi].final_grade(data.grades.names.size() - 1)), data)
+		hz_prize[zi] = Sword.new(pick_pull_sword(hz.blades[zi].final_grade(data.grades.names.size() - 1)), data)
 	hz_event.emit(zi, kind)
 	match kind:
 		HillZone.Event.TRADE:

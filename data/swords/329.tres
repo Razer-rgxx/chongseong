@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 329
+display_name = "대검 Tyrant 「도시를 가르는 자」"
+grade = 5
+form = 2
+attack = 145
+inscriptions = PackedStringArray("거인 베기", "가벼운 손")
+unique_text = "관통탄: 큰 베기마다 적을 모두 꿰뚫는 탄이 곧게 날아간다.\n반동 돌진: 큰 베기에 탄을 쏘고 반동으로 뒤로 밀려난다."
+unique_ready = true
+unbreakable = false
+story = "한 발에 한 구역이 갈라지고 쏜 자도 물러난다."
+field_only = false
+cyber = true
+sub_type = "대검"
+cyber_powers = PackedStringArray("관통탄", "반동 돌진")

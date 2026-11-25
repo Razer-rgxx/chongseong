@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 326
+display_name = "오니마루 ON-44 「푸른 신호」"
+grade = 3
+form = 1
+attack = 107
+inscriptions = PackedStringArray("번개", "꿰뚫기")
+unique_text = "과열: 같은 적을 4번 맞히면 과열해 터진다(둘레에 피해와 불).\n해킹: 4번 맞힐 때마다 그 적이 잠깐 아군이 되어 가까운 적을 친다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "오니마루"
+cyber_powers = PackedStringArray("과열", "해킹")

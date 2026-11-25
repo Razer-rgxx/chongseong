@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 470
+display_name = "오니마루 Mk.IX 「적귀」"
+grade = 5
+form = 1
+attack = 148
+inscriptions = PackedStringArray("행운", "가벼운 손")
+unique_text = "산탄: 큰 베기 끝에 앞으로 산탄이 퍼진다(부채꼴, 멀수록 약하지 않다).\n플라즈마 칼날: 휘두르는 길에 플라즈마가 남아 닿은 적이 탄다."
+unique_ready = true
+unbreakable = false
+story = "붉은 눈 하나가 총구를 겸한다."
+field_only = false
+cyber = true
+sub_type = "오니마루"
+cyber_powers = PackedStringArray("산탄", "플라즈마 칼날")

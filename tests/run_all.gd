@@ -108,6 +108,7 @@ func _init() -> void:
 	(load("res://tests/field_chief_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/wanderer_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/stranger_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/cyber_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/future_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/story_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/past_tests.gd") as GDScript).call("run", d, check)
@@ -238,7 +239,7 @@ func _test_grid() -> void:
 
 
 func _test_data() -> void:
-	check(d.swords.size() == 311, "검 311종(언덕 300 + 오픈월드 한정 11) (지금 %d)" % d.swords.size())
+	check(d.swords.size() == 511, "검 511종(언덕 300 + 오픈월드 한정 11 + 사이버 200) (지금 %d)" % d.swords.size())
 	var per: Array[int] = []
 	for g in 6:
 		per.append(d.swords_by_grade[g].size())
@@ -247,7 +248,7 @@ func _test_data() -> void:
 	var names := {}
 	for s in d.swords:
 		names[s.display_name] = true
-	check(names.size() == 311, "검 이름이 겹치지 않는다")
+	check(names.size() == 511, "검 이름이 겹치지 않는다")
 	var missing: Array[String] = []
 	for s in d.swords:
 		for k in s.inscriptions:
@@ -1079,6 +1080,8 @@ func _named(name: String, k: int = 0) -> Rules:
 func _test_uniques() -> void:
 	var ready: Array = []
 	for sw in d.swords:
+		if sw.cyber:   # 사이버 검의 능력은 이름이 아니라 cyber_powers로 찾는다(tests/cyber_tests.gd)
+			continue
 		if sw.unique_ready:
 			ready.append(sw.display_name)
 		if sw.unique_ready != Powers.READY.has(sw.display_name) and sw.unique_text != "":
@@ -1310,6 +1313,8 @@ func _test_patterns() -> void:
 	check(shape_ok, "등급대의 모양(이음 수, 속성, 메아리, 마지막은 마무리)")
 	var hook_swords: int = 0
 	for s in d.swords:
+		if s.cyber:   # 사이버 검(312~)은 같은 방식을 가져다 쓴다
+			continue
 		hook_swords += 1 if d.pattern_for(s).has_hook() else 0
 	check(hook_swords >= 20 and hook_swords <= 28, "갈고리 검은 약 24자루(%d)" % hook_swords)
 	var sw := Sword.new(d.sword_by_name("녹슨 단검"), d)

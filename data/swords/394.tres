@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 394
+display_name = "중장도 Mk.XIV 「과열 도시」"
+grade = 4
+form = 2
+attack = 142
+inscriptions = PackedStringArray("등 뒤", "바꿔 쥐기")
+unique_text = "과열: 같은 적을 4번 맞히면 과열해 터진다(둘레에 피해와 불).\nEMP: 큰 베기가 전자기 파동을 낸다. 드론·기계는 기절하고 나머지는 느려진다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "중장도"
+cyber_powers = PackedStringArray("과열", "EMP")

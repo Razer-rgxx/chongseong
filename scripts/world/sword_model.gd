@@ -14,6 +14,8 @@ var blade_length: float = 1.0
 var grip_length: float = 0.2
 var grade: int = 0
 var glow_color: Color = Color.WHITE
+## 형태 표의 칼날 너비(m). 사이버 검(CyberModel)이 종류마다 곱해 쓴다.
+var form_width: float = 0.0
 ## 칼끝의 x(m). 곧은 칼은 0, 휜 사이버 카타나(Blender)는 칼등 쪽으로 조금 비켜난다. 베기 궤적이 칼끝을 따라가게.
 var tip_x: float = 0.0
 
@@ -44,6 +46,7 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 	var width: float = form.blade_width if form else 0.08
 	grip_length = {"dagger": 0.11, "longsword": 0.2, "greatsword": 0.36, "rapier": 0.14}.get(kind, 0.2)
 	# Blender로 지은 칼(tools/blender/make_swords.py → assets/swords/<번호>.glb)이 있으면 그것(최고 등급 몇 자루, 사이버 카타나)
+	form_width = width
 	var glb: String = "res://assets/swords/%d.glb" % seed
 	if ResourceLoader.exists(glb):
 		var g := (load(glb) as PackedScene).instantiate() as Node3D
@@ -60,6 +63,9 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 		return
 	if seed == KATANA_SEED:
 		_katana(blade_length)
+		return
+	if seed > KATANA_SEED and CyberSwords.is_cyber(seed):   # 사이버 검 312~511: 종류마다 다른 총검 모양
+		CyberModel.build(self, grade, seed, col)
 		return
 	var mats := _materials(grade, col)
 	add_child(_blade(kind, blade_length, width, mats[0]))

@@ -7,6 +7,10 @@ var rules: Rules
 var _rng := RandomNumberGenerator.new()
 var _zone_views: Array[MeshInstance3D] = []
 var _bolt_mat := StandardMaterial3D.new()
+## 사이버 검(docs/cyber_swords.md): 차가운 청록의 총구 불꽃·탄 줄·플라즈마 자리. 총성은 짧고 날카로운 딱(Sfx crack), 올라가는 소리나 종소리는 쓰지 않는다.
+const CYBER: Color = Color(0.35, 0.85, 0.95)
+var _trail_views: Array[MeshInstance3D] = []
+var _sfx: Sfx = null
 
 
 func setup(r: Rules) -> void:
@@ -40,6 +44,99 @@ func _on_effect(kind: StringName, at: Vector2, info: Dictionary) -> void:
 			_ring(p, Grid.cells_to_meters(info.radius), Color(1.0, 0.25, 0.2), 0.45, true)
 		&"fall":
 			_fall(p, Grid.cells_to_meters(info.radius))
+		&"cy_shot":
+			_muzzle(p, float(info.face))
+			_crack(p, 0.0, 1.0)
+		&"cy_blast":
+			_blast(p, float(info.face), Grid.cells_to_meters(info.reach), float(info.arc))
+			_crack(p, 2.0, 0.8)
+		&"cy_rail":
+			var to := Grid.cells_to_world(info.to)
+			_tracer(p + Vector3(0, 1.1, 0), to + Vector3(0, 1.1, 0), 0.16, 0.22)
+			_muzzle(p, (info.to - at).angle())
+			_crack(p, 3.0, 0.65)
+		&"cy_blink":
+			var to2 := Grid.cells_to_world(info.to)
+			_ring(p, 1.1, CYBER, 0.3)
+			_ring(to2, 1.1, CYBER, 0.3)
+			_tracer(p + Vector3(0, 1.0, 0), to2 + Vector3(0, 1.0, 0), 0.05, 0.12)
+			_crack(to2, -3.0, 1.3)
+
+
+## 총구 불꽃: 짧은 청록 번쩍임(공 하나와 앞으로 뻗는 십자 빛).
+func _muzzle(at: Vector3, face: float) -> void:
+	var root := Node3D.new()
+	root.position = at + Vector3(0, 1.1, 0)
+	root.rotation.y = -face + PI / 2.0
+	add_child(root)
+	var mat := _cyber_mat(1.0)
+	var core := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.16
+	sm.height = 0.32
+	core.mesh = sm
+	core.material_override = mat
+	root.add_child(core)
+	for k in 2:
+		var bar := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.05, 0.05, 0.8)
+		bar.mesh = bm
+		bar.material_override = mat
+		bar.position = Vector3(0, 0, -0.35)
+		bar.rotation.z = k * PI / 2.0
+		root.add_child(bar)
+	var light := OmniLight3D.new()
+	light.light_color = CYBER
+	light.light_energy = 2.0
+	light.omni_range = 4.0
+	root.add_child(light)
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.09)
+	tw.tween_property(root, "scale", Vector3(1.5, 1.5, 1.5), 0.09)
+	tw.chain().tween_callback(root.queue_free)
+
+
+## 산탄: 부채꼴로 퍼지는 가는 빛줄 다섯과 바닥의 부채꼴 번쩍임.
+func _blast(at: Vector3, face: float, reach: float, arc: float) -> void:
+	_muzzle(at, face)
+	for k in 5:
+		var a: float = face + (float(k) / 4.0 - 0.5) * arc
+		var dir := Vector3(cos(a), 0, sin(a))
+		_tracer(at + Vector3(0, 1.1, 0), at + dir * reach + Vector3(0, 0.6, 0), 0.05, 0.14)
+
+
+## 탄이 지나간 줄(a에서 b로) 짧게 남는 가는 빛.
+func _tracer(a: Vector3, b: Vector3, width: float, time: float) -> void:
+	var m := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(width, width, maxf(0.01, a.distance_to(b)))
+	m.mesh = bm
+	var mat := _cyber_mat(0.9)
+	m.material_override = mat
+	add_child(m)
+	m.look_at_from_position((a + b) / 2.0, b, Vector3.UP if absf((b - a).normalized().y) < 0.99 else Vector3.RIGHT)
+	var tw := create_tween()
+	tw.tween_property(mat, "albedo_color:a", 0.0, time)
+	tw.tween_callback(m.queue_free)
+
+
+func _cyber_mat(alpha: float) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.albedo_color = Color(CYBER.lightened(0.35), alpha)
+	return mat
+
+
+## 총성: 짧고 날카로운 딱(Sfx crack). 높낮이는 흔들리기만 하고 오르지 않는다.
+func _crack(at: Vector3, db: float, pitch: float) -> void:
+	if _sfx == null:
+		_sfx = Sfx.new()
+		add_child(_sfx)
+	_sfx.play(&"crack", at, db - 6.0, pitch)
 
 
 ## 지그재그 번개 한 줄기(짧게 남는다).
@@ -137,6 +234,7 @@ func _process(_delta: float) -> void:
 	if rules == null:
 		return
 	_sync_uniques()
+	_sync_trails()
 	var zones: Array[Dictionary] = rules.powers.zones
 	while _zone_views.size() < zones.size():
 		var m := MeshInstance3D.new()
@@ -318,6 +416,32 @@ func _sync_uniques() -> void:
 		v.position = Grid.cells_to_world(b.pos, 1.0)
 		v.rotation.y = -b.dir.angle() + PI / 2.0
 		v.rotation.z = Time.get_ticks_msec() * 0.03
+
+
+## 플라즈마 칼날이 남긴 자리(CyberPowers.trails)를 청록 빛 판으로.
+func _sync_trails() -> void:
+	var trails: Array[Dictionary] = rules.powers.C.trails
+	while _trail_views.size() < trails.size():
+		var m := MeshInstance3D.new()
+		var c := CylinderMesh.new()
+		c.top_radius = 1.0
+		c.bottom_radius = 1.0
+		c.height = 0.03
+		c.radial_segments = 20
+		m.mesh = c
+		m.material_override = _cyber_mat(0.5)
+		add_child(m)
+		_trail_views.append(m)
+	for i in _trail_views.size():
+		var m := _trail_views[i]
+		m.visible = i < trails.size()
+		if not m.visible:
+			continue
+		var tr: Dictionary = trails[i]
+		var r: float = Grid.cells_to_meters(rules.data.powers.cy("플라즈마 칼날", "radius"))
+		m.position = Grid.cells_to_world(tr.pos, 0.05 + 0.002 * i)
+		m.scale = Vector3(r, 1, r)
+		(m.material_override as StandardMaterial3D).albedo_color.a = clampf(tr.t / 0.8, 0.0, 1.0) * 0.5
 
 
 func _sync_pool(pool: Array[Node3D], n: int, make: Callable) -> void:

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 474
+display_name = "단검 CZ-70 「마지막 전류」"
+grade = 3
+form = 0
+attack = 112
+inscriptions = PackedStringArray("잔상", "연격")
+unique_text = "조준: 체력이 거의 가득한 적에게 첫 타 피해가 크다.\n오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시)."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("조준", "오버클럭")

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 405
+display_name = "환도-16 「폐허 혜성」"
+grade = 3
+form = 1
+attack = 119
+inscriptions = PackedStringArray("무리 베기", "불씨")
+unique_text = "해킹: 4번 맞힐 때마다 그 적이 잠깐 아군이 되어 가까운 적을 친다.\n관통탄: 큰 베기마다 적을 모두 꿰뚫는 탄이 곧게 날아간다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "환도"
+cyber_powers = PackedStringArray("해킹", "관통탄")

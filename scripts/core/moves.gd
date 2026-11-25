@@ -589,6 +589,32 @@ func _shoot(run: MoveRun, origin: Vector2, face: float) -> void:
 		_schedule(r.data.lord.echo_delay, _echo_run(run), a, "shot")
 
 
+## 사이버 검의 탄(CyberPowers, docs/cyber_swords.md): 검기와 같은 날아가는 것(종류 bullet)이다. 큰 베기가 아니고 내구도 안 깎으며(swung·wore),
+## 피해는 쥔 검의 휘두르기 피해(stats.dmg) × mult. 맞힌 적마다 Powers.strike를 거친다. 휘두르기용 소모(바꿔 쥐기, 핏빛 맹세)는 건드리지 않는다.
+func shoot_bullet(origin: Vector2, face: float, mult: float, speed: float, width: float, distance: float) -> void:
+	var st: Dictionary = r.powers.stats()
+	var m: MoveData = r.data.move(&"wave").duplicate() as MoveData
+	m.id = &"bullet"
+	m.damage = mult
+	m.speed = speed
+	m.distance = distance
+	m.shot_width = width
+	m.shot_max_time = 2.0
+	var run := MoveRun.new()
+	_serial += 1
+	run.id = _serial
+	run.move = m
+	run.st = st
+	run.sword = r.current()
+	run.base = float(st.dmg) * r.memory_mult(run.sword)
+	run.knock = r.data.lord.knockback * (st.form as FormData).knockback * r.powers.knock_mult()
+	run.at = origin
+	run.face = face
+	run.swung = true
+	run.wore = true
+	_shoot(run, origin, face)
+
+
 func _step_shots(dt: float) -> void:
 	var lim := Vector2(Grid.size)
 	for p in r.projectiles.duplicate():
