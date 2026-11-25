@@ -832,6 +832,7 @@ func open_rack() -> void:
 			names.append(sd.display_name + ("" if int(meta.found.get(str(sd.id), 0)) < 2 else " ×%d" % int(meta.found[str(sd.id)])) if meta.has_found(sd.id) else "[color=#4d4740]???[/color]")
 		t += "  ·  ".join(names) + "\n\n"
 	t += _field_row()
+	t += _cyber_row()
 	_rack_text.text = t
 	var best: String = "없음" if meta.best == 0 else ("정상" if meta.best > data.run.zone_names.size() else "%d구역" % meta.best)
 	_rack_head.text = "도감 %d / %d  ·  최고 기록 %s  ·  오른 횟수 %d" % [meta.found.size(), data.swords.size(), best, meta.runs]
@@ -886,6 +887,24 @@ func _field_row() -> String:
 			names.append("[color=#4d4740]???[/color]")
 	var t: String = "[b][color=#%s]들판의 검[/color][/b]  [color=#99917f]%d / %d · 언덕에서는 뽑히지 않는다[/color]\n" % [UiKit.TITLE.to_html(false), n, ids.size()]
 	return t + "  ·  ".join(names) + "\n"
+
+
+## 도감의 "사이버 검" 줄(docs/cyber_swords.md): 찾은 검만 제 등급 빛으로 쓴다(200자루라 못 찾은 것은 개수로만).
+func _cyber_row() -> String:
+	var n: int = 0
+	var total: int = 0
+	var names: Array[String] = []
+	for g in data.cyber_by_grade.size():
+		for i in data.cyber_by_grade[g]:
+			total += 1
+			var sd := data.swords[i]
+			if meta.has_found(sd.id):
+				n += 1
+				names.append("[color=#%s]%s[/color]" % [(data.grades.colors[sd.grade] as Color).to_html(false), sd.display_name])
+	if total == 0 or (n == 0 and not meta.rift_open()):
+		return ""
+	var t: String = "\n[b][color=#%s]사이버 검[/color][/b]  [color=#99917f]%d / %d · 낯선 사람 이야기를 마친 뒤 언덕 뽑기와 미래 구역에서[/color]\n" % [UiKit.TITLE.to_html(false), n, total]
+	return t + ("  ·  ".join(names) if not names.is_empty() else "[color=#4d4740]???[/color]") + "\n"
 
 
 ## 수련장 위 가운데 줄("5초 피해 N"). 빈 글이면 숨긴다.

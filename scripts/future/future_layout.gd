@@ -18,6 +18,8 @@ const REACH_MULT: float = 1.15
 ## 이 구역에서만 하는 일: 단말(E)은 다음 언덕 판 손잡이 조짐을 모두 보여 주고(Meta.pack의 &"note"), 상자는 조각을 한 번 준다.
 const NOTE: StringName = &"note"
 const TERMINAL_AT: Vector2 = Vector2(68, 21.5)
+## 꽂힌 낯선 검 셋의 자리(시작 자리 북쪽의 트인 곳, 한 무더기). docs/cyber_swords.md.
+const CYBER_HILTS: Array[Vector2] = [Vector2(38.0, 50.0), Vector2(40.5, 48.8), Vector2(43.0, 50.0)]
 const CACHE_ID: String = "future_cache"
 const CACHE_AT: Vector2 = Vector2(10, 40.5)
 const CACHE_SHARDS: int = 90

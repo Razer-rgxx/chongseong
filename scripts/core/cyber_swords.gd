@@ -67,3 +67,25 @@ static func text_for(powers: PackedStringArray) -> String:
 	for p in powers:
 		lines.append("%s: %s" % [p, TEXT.get(p, "")])
 	return "\n".join(PackedStringArray(lines))
+
+
+## 미래 구역의 꽂힌 낯선 검(docs/cyber_swords.md): 한 번 들를 때마다 이만큼 서고, 사이버 검만 나온다. 뽑으면 도감에 오르고(Meta.note_found) 마을 걸이·검집에서 쓴다.
+const FUTURE_HILTS: int = 3
+## 등급을 굴리는 운(언덕 첫 구역의 뽑기 운과 비슷하게). 뽑기 체력은 들지 않는다.
+const FUTURE_LUCK: float = 4.0
+
+
+## 미래 구역에 설 사이버 검 번호 FUTURE_HILTS개(서로 다르다). rules.rng만 쓴다.
+static func roll_future(rules: Rules) -> Array[int]:
+	var out: Array[int] = []
+	var tries: int = 0
+	while out.size() < FUTURE_HILTS and tries < 100:
+		tries += 1
+		var g: int = rules.roll_grade(FUTURE_LUCK)
+		var list: PackedInt32Array = rules.data.cyber_by_grade[g]
+		if list.is_empty():
+			continue
+		var id: int = rules.data.swords[list[rules.rng.randi_range(0, list.size() - 1)]].id
+		if not out.has(id):
+			out.append(id)
+	return out

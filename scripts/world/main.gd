@@ -972,7 +972,7 @@ func _on_effect(kind: StringName, at: Vector2, info: Dictionary) -> void:
 			_hud.toast("산 자의 몫: 공짜 뽑기 +1")
 		&"dex_all":
 			for sw in data.swords:
-				if not sw.field_only:   # 언덕의 검만(오픈월드 한정 검은 들판에서만 얻는다)
+				if not sw.field_only and not sw.cyber:   # 언덕의 검만(오픈월드 한정 검은 들판에서, 사이버 검은 미래 구역과 이야기 뒤 뽑기에서만)
 					meta.note_found(sw.id)
 			meta.save()
 			_hud.toast("언덕의 모든 검이 함께 뽑혀 나왔다. 도감이 다 채워졌다.")

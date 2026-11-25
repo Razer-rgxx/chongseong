@@ -195,11 +195,11 @@ static func _guard(m: SwordModel, sub: String, W: float, mats: Dictionary, rng: 
 ## 재질: 등급이 오를수록 총기처럼 검고 매끈해지고 빛이 세진다. 빛은 늘 청록이고 등급 빛은 장식(accent)에만 쓴다.
 static func _materials(g: int, col: Color) -> Dictionary:
 	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color(0.3, 0.32, 0.36).lerp(Color(0.12, 0.14, 0.18), clampf(g / 5.0, 0.0, 1.0))
-	steel.metallic = 0.85
-	steel.roughness = lerpf(0.55, 0.22, clampf(g / 5.0, 0.0, 1.0))
+	steel.albedo_color = Color(0.58, 0.62, 0.68).lerp(Color(0.27, 0.31, 0.38), clampf(g / 5.0, 0.0, 1.0))
+	steel.metallic = 0.6
+	steel.roughness = lerpf(0.55, 0.3, clampf(g / 5.0, 0.0, 1.0))
 	var plate := steel.duplicate() as StandardMaterial3D
-	plate.albedo_color = steel.albedo_color.lightened(0.12)
+	plate.albedo_color = steel.albedo_color.lightened(0.18)
 	plate.roughness = steel.roughness + 0.08
 	var dark := StandardMaterial3D.new()
 	dark.albedo_color = Color(0.04, 0.045, 0.055)
@@ -219,3 +219,19 @@ static func _materials(g: int, col: Color) -> Dictionary:
 	accent.emission = col
 	accent.emission_energy_multiplier = 2.0
 	return {"steel": steel, "plate": plate, "dark": dark, "grip": grip, "glow": glow, "accent": accent}
+
+
+## Blender 무한 모델(glow_kat_* 재질)의 빛 세기: 날 끝은 은은하게, 총구 고리와 홈은 네온처럼. 색은 모델의 청록 그대로(빨강 눈 glow_fire도 그대로).
+const GLOW: Dictionary = {"glow_kat_edge": 1.6, "glow_kat_line": 3.0, "glow_kat_rim": 2.8, "glow_fire": 3.0}
+
+
+static func glow_boost(n: Node) -> void:
+	for node in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for si in mi.mesh.get_surface_count():
+			var mt := mi.mesh.surface_get_material(si) as StandardMaterial3D
+			if mt and GLOW.has(mt.resource_name):
+				var d := mt.duplicate() as StandardMaterial3D
+				d.emission_enabled = true
+				d.emission_energy_multiplier = GLOW[mt.resource_name]
+				mi.set_surface_override_material(si, d)

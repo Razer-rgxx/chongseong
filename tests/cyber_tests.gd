@@ -17,6 +17,7 @@ func _all() -> void:
 	_powers()
 	_determinism()
 	_pull_gate()
+	_future_hilts()
 	_save()
 
 
@@ -342,6 +343,31 @@ func _pull_gate() -> void:
 	for i in 200:
 		fn += 1 if f.pick_pull_sword(i % 6).cyber else 0
 	check.call(fn == 0, "사이버 뽑기: 들판에서는 섞이지 않는다")
+
+
+func _future_hilts() -> void:
+	var a: Array[int] = CyberSwords.roll_future(Rules.new(d, 21))
+	var b: Array[int] = CyberSwords.roll_future(Rules.new(d, 21))
+	var ok: bool = a.size() == CyberSwords.FUTURE_HILTS and a == b
+	for id in a:
+		var s: SwordData = d.sword_by_id(id)
+		ok = ok and s != null and s.cyber and not s.field_only and id >= CyberSwords.FIRST
+	check.call(ok and a[0] != a[1] and a[1] != a[2] and a[0] != a[2], "미래 꽂힌 검: 사이버 검만 서로 다른 셋, 같은 시드면 같다 %s" % [a])
+	var free: bool = FutureLayout.CYBER_HILTS.size() == CyberSwords.FUTURE_HILTS
+	var bl: Dictionary = FutureLayout.blockers()
+	for p in FutureLayout.CYBER_HILTS:
+		for rc in bl.rects:
+			free = free and not (rc as Rect2).grow(0.6).has_point(p)
+		for rc in bl.low_rects:
+			free = free and not (rc as Rect2).grow(0.6).has_point(p)
+		for c in bl.circles:
+			free = free and p.distance_to(c[0]) > float(c[1]) + 0.6
+	check.call(free, "미래 꽂힌 검: 세 자리가 막힘 밖의 트인 곳이다")
+	var counts: Dictionary = {}
+	for i in 300:
+		for id in CyberSwords.roll_future(Rules.new(d, i)):
+			counts[d.sword_by_id(id).grade] = true
+	check.call(counts.has(0) and counts.has(1), "미래 꽂힌 검: 낮은 등급부터 나온다(운이 높아도 대부분 낮다)")
 
 
 func _save() -> void:

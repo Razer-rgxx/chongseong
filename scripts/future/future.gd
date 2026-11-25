@@ -35,6 +35,7 @@ var _chest: Node3D
 var _ui: TimeUi
 var _vault: Node3D
 var _shard_nodes: Dictionary = {}
+var _cyber_hilts: Array[Hilt] = []
 var _final_st: StrangerView = null
 var _final_on: bool = false
 var _glitch_fx: GlitchOverlay
@@ -79,6 +80,7 @@ func _ready() -> void:
 	HillBuilder.setup(Vector2(FutureLayout.SIZE) * Grid.CELL)   # 적의 몸이 구역을 싸움터 안으로 본다
 	FutureRift.make(self, Grid.cells_to_world(FutureLayout.EXIT_AT))
 	_build_story()
+	_build_cyber_hilts()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -249,6 +251,9 @@ func _spots() -> Dictionary:
 	for i in Story.SHARDS.size():
 		if _shard_nodes.has(i):
 			s["shard%d" % i] = Story.SHARDS[i].at
+	for i in _cyber_hilts.size():
+		if not _cyber_hilts[i].gone:
+			s["hilt%d" % i] = _cyber_hilts[i].pos
 	s["vault"] = Story.VAULT_AT
 	s["lock"] = Story.TIME_LOCK_AT
 	return s
@@ -266,6 +271,8 @@ func _prompt(key: String) -> String:
 			return "시간 고정 단말을 건드린다"
 	if key.begins_with("shard"):
 		return "자료 조각을 줍는다"
+	if key.begins_with("hilt"):
+		return "꽂힌 낯선 검을 뽑는다"
 	return "녹슨 함을 연다"
 
 
@@ -287,6 +294,8 @@ func _interact() -> void:
 			_hud.toast("단말은 이미 같은 말을 했다")
 	elif _near.begins_with("shard"):
 		_take_shard(int(_near.substr(5)))
+	elif _near.begins_with("hilt"):
+		_pull_cyber_hilt(int(_near.substr(4)))
 	elif _near == "vault":
 		_use_vault()
 	elif _near == "lock":
@@ -485,6 +494,36 @@ func _build_story() -> void:
 	_vault = StoryProps.vault(self, Grid.cells_to_world(Story.VAULT_AT), meta.vault_open)
 	if meta.vault_open and not meta.time_traveller:
 		_spawn_guardian()
+
+
+## 꽂힌 낯선 검 셋(docs/cyber_swords.md): 들를 때마다 사이버 검 셋이 서고(CyberSwords.roll_future), 무엇인지 보인다. E로 뽑으면 도감에 오른다.
+func _build_cyber_hilts() -> void:
+	var ids: Array[int] = CyberSwords.roll_future(rules)
+	for i in ids.size():
+		var h := Hilt.new()
+		h.id = 900 + i
+		h.pos = FutureLayout.CYBER_HILTS[i]
+		h.tilt = 0.12 * float(i - 1)
+		h.sword = Sword.new(data.sword_by_id(ids[i]), data)
+		_cyber_hilts.append(h)
+		var v := HiltView.new()
+		v.setup(rules, h)
+		add_child(v)
+
+
+func _pull_cyber_hilt(i: int) -> void:
+	if i < 0 or i >= _cyber_hilts.size() or _cyber_hilts[i].gone:
+		return
+	var h: Hilt = _cyber_hilts[i]
+	h.gone = true
+	var sd: SwordData = h.sword.data
+	var fresh: bool = not meta.has_found(sd.id)
+	meta.note_found(sd.id)
+	var col: Color = data.grades.colors[sd.grade]
+	_sfx.play(&"crack", Grid.cells_to_world(h.pos), -2.0, 0.8)
+	_hud.flash(Color(0.4, 0.75, 1.0), 0.25, 0.5)
+	_hud.toast("%s · %s%s" % [sd.display_name, data.grades.names[sd.grade], "  처음 뽑은 검, 도감에 올랐다" if fresh else "  도감에 이미 있다"])
+	_saved()
 
 
 func _spawn_guardian() -> void:

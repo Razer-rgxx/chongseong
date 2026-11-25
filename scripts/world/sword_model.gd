@@ -57,6 +57,13 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 			tip_x = KATANA_TIP_X
 			_katana_glow(g)
 			return
+		if CyberSwords.is_cyber(seed):   # 사이버 무한(tools/blender/make_cyber_swords.py): 빛은 늘 청록이고 등급 색으로 안 바꾼다. 손잡이·칼끝은 종류를 따른다
+			var S: Dictionary = CyberModel.SHAPE[CyberSwords.sub_of(seed)]
+			glow_color = CyberModel.TEAL
+			grip_length = float(S.grip)
+			tip_x = -float(S.sori) * blade_length
+			CyberModel.glow_boost(g)
+			return
 		_tint_glow(g, col)
 		if grade >= 4:
 			_aura(col, grade)
