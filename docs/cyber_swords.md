@@ -40,14 +40,14 @@
 
 ## 모양
 - **코드 모양(`CyberModel`, 200자루 모두):** 종류마다 칼날 휘어짐·폭·칼끝·코등이(막대, 둥근 판과 청록 고리, 뿔, 꽃잎, 블록, 날개)·손잡이 길이가 다르고, 총열(대검은 둘)과 청록 총구 고리, 탄창 상자, 날 쪽 청록 빛 줄, 전설부터 방열창, 무한과 큰 칼에는 등의 레일. 재질은 등급이 오를수록 총기처럼 검어진다. 빛은 늘 청록이고 등급 색은 자루끝 장식에만 쓴다. 초월 이상은 청록 빛 알갱이.
-- **무한 12자루는 Blender(`tools/blender/make_cyber_swords.py`):** 사이버 카타나(311)의 재질·도구(`make_swords.py`)를 빌려 `assets/swords/<번호>.glb`를 만든다(질감 512, 311은 1K). 이 기계에는 Blender가 없어서 pip의 `bpy` 모듈(5.3)로 돌렸다(`python tools/blender/make_cyber_swords.py [번호…]`). 파일이 없으면 코드 모양이 대신한다. 게임에서는 빛을 청록으로 고정하고(`CyberModel.glow_boost`) 손잡이·칼끝을 종류에 맞춘다.
+- **무한 12자루는 Blender(`tools/blender/make_cyber_swords.py`, 2026-11-25 다시 지음):** 사이버 카타나(311)와 같은 방식으로 bmesh에 직접 지어 자루마다 정점 3천 개 아래(1,949~2,887), 질감 1K, 재질은 311의 것(짙은 건메탈 `kat_*`, 빛은 날 끝 `glow_kat_edge` 청록·홈과 네온관 `glow_kat_line` 파랑·총구와 고리 `glow_kat_rim` 청록, 빨강 없음). 길이·손잡이·칼끝은 스크립트가 게임 값을 그대로 읽는다(칼날 길이 `data/forms`, 손잡이 길이·휨 `CyberModel.SHAPE`): 칼끝은 정확히 (−sori × 칼날 길이, 칼날 길이)라 `SwordModel.tip_x`·`blade_points`와 같고, 손잡이는 코등이 아래부터 자루끝까지가 `grip`이다. 공통: 칼뿌리 기계 덮개(겹친 판과 틈의 네온관), 칼날 아래(+Y, Godot -Z) 총몸·탄창·총열과 청록 총구 고리, 날 끝의 좁은 면만 빛. 종류 비율: 단검(짧고 두툼), 카타나(세검 길이, 휨), 오니마루(넓고 크게 휜 태도), 환도(곧은 외날), 중장도(넓고 긴 외날, 칼끝을 안으로 깎음), 대검(아주 두꺼운 양날). 능력마다 포인트(`make_cyber_swords.py` 머리말 표): 산탄은 넓은 총구, 레일은 긴 레일 두 줄, 플라즈마는 날 속 빛 홈, EMP는 코일·접시, 해킹은 칼날 위 회로 네온, 글리치는 어긋난 네온 토막, 관통탄은 송곳 탄두, 반동 돌진은 분사구·제동기, 과열은 방열판·빛 틈·열 고리, 오버클럭은 축전 코일, 방벽은 방패 코등이·갑판, 조준은 조준경, 연사는 두 줄 총열, 탄창은 탄알 창. 돌리기: `blender -b -P tools/blender/make_cyber_swords.py [-- 번호…]`. 파일이 없으면 코드 모양이 대신한다. 게임은 빛 세기만 `CyberModel.GLOW`로 맞춘다(날 끝 1.3).
 - **효과(`PowerFx`, `MoveFx`):** 총구 불꽃(청록 공과 십자 빛)과 탄 줄, 산탄 부채꼴, 레일 빔, 순간베기 고리와 선, 플라즈마 자리 빛 판. 탄은 가는 청록 빛(`MoveFx`의 bullet). 총성은 짧고 날카로운 딱(`Sfx` crack)이고 높낮이만 흔든다. 올라가는 소리와 종소리는 없다.
 
 ## 테스트
 `tests/cyber_tests.gd`: 개수와 등급 분포, 종류·형태·능력 칸, 무한 조합 유일, 사이버 능력 14가지 각각(결과와 재사용 대기, 시간), 311, 같은 시드 상태 해시, 뽑기 문(닫힘·열림·25%·들판), 미래 꽂힌 검, 저장. 기존 테스트의 311종·300종 가정과 유니크 일치 검사는 사이버 검을 빼도록 고쳤다.
 
 ## 확인 그림
-`scripts/debug/shots/shot_cyber.gd` → `/home/claude/shots/cyber_swords.png`(위 줄 여섯 종류 여러 등급, 아래 줄 종류마다 무한).
+`scripts/debug/shots/shot_cyber.gd` → `/home/claude/shots/cyber_swords.png`(위 줄 여섯 종류 여러 등급, 아래 줄 종류마다 무한). 무한 12자루만: `scripts/debug/shots/shot_cyber_inf.gd` → `cyber_inf.png`(12자루 한 장, 손잡이·칼끝이 종류 값과 같은지 출력)와 가까이 `cyber_inf_470.png`·`cyber_inf_377.png`.
 
 ## PC에서 볼 것
 - 사이버 검 모양이 어두운 게임 화면에서도 보이는지, 무한 Blender 모델의 빛 세기(`CyberModel.GLOW`)

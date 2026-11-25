@@ -221,8 +221,8 @@ static func _materials(g: int, col: Color) -> Dictionary:
 	return {"steel": steel, "plate": plate, "dark": dark, "grip": grip, "glow": glow, "accent": accent}
 
 
-## Blender 무한 모델(glow_kat_* 재질)의 빛 세기: 날 끝은 은은하게, 총구 고리와 홈은 네온처럼. 색은 모델의 청록 그대로(빨강 눈 glow_fire도 그대로).
-const GLOW: Dictionary = {"glow_kat_edge": 1.6, "glow_kat_line": 3.0, "glow_kat_rim": 2.8, "glow_fire": 3.0}
+## Blender 무한 모델(glow_kat_* 재질)의 빛 세기: 날 끝은 사이버 카타나(311)처럼 은은하게, 홈·총구 고리는 네온처럼. 색은 모델의 청록·파랑 그대로(빨강 없음).
+const GLOW: Dictionary = {"glow_kat_edge": 1.3, "glow_kat_line": 3.0, "glow_kat_rim": 2.8, "glow_fire": 3.0}
 
 
 static func glow_boost(n: Node) -> void:
