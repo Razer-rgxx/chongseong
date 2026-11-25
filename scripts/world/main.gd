@@ -198,6 +198,11 @@ func _ready() -> void:
 	rules.choice_needed.connect(_on_choice_needed)
 	rules.slots_changed.connect(_refresh_cards)
 	rules.sword_broke.connect(_on_broke)
+	rules.anchor_saved.connect(func(_k: int) -> void:   # 과거 3막 축복 「닻의 손」(StoryPast)
+		_hud.toast(StoryPast.ANCHOR_SAVED)
+		_hud.flash(PastLayout.GOLD, 0.25, 0.6)
+		_sfx.play(&"thump", _lord.position, -2.0, 0.6)
+		_camera.add_shake(0.2))
 	rules.lord_swung.connect(_on_swung)
 	rules.lord_dashed.connect(func() -> void:
 		_sfx.play(&"dash", _lord.position, -6.0)

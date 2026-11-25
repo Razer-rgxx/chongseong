@@ -1444,8 +1444,18 @@ func break_slot(k: int) -> void:
 		_break(k)
 
 
+## 과거 3막 축복 「닻의 손」(Meta.anchor_hand, StoryPast): 언덕 판마다 처음 부러질 검을 한 번 붙잡아 내구 ANCHOR_KEEP 몫으로 남긴다.
+var anchor_used: bool = false
+signal anchor_saved(slot: int)
+
+
 func _break(k: int) -> void:
 	var s := slots[k]
+	if meta and meta.anchor_hand and not anchor_used and not field and not duel and not yard and s.max_durability > 0.0:
+		anchor_used = true
+		s.durability = maxf(1.0, ceilf(s.max_durability * StoryPast.ANCHOR_KEEP))
+		anchor_saved.emit(k)
+		return
 	slots[k] = null
 	broken_by_grade[s.grade] += 1
 	powers.on_break(s)
@@ -3136,7 +3146,7 @@ func _new_id() -> int:
 
 ## 같은 시드·같은 입력이면 같은 값이 나와야 한다(테스트용).
 func state_hash() -> int:
-	var parts: Array = [era, tick, zone, phase, lord.pos, lord.hp, kills, chain, chain_best, chain_tick, chain_paid, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
+	var parts: Array = [era, tick, zone, phase, lord.pos, lord.hp, kills, chain, chain_best, chain_tick, chain_paid, anchor_used, pulls, active, enemies.size(), hilts.size(), rng.state, free_pulls, elites_killed, altar.used if altar else null, lord.combo, lord.move, moves.events.size()]
 	for p in projectiles:
 		parts.append(p.pos)
 	for p in enemy_projectiles:

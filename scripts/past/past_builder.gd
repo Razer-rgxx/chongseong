@@ -170,7 +170,7 @@ static func _far_forest(root: Node3D, rng: RandomNumberGenerator, w: float, d: f
 	var xs: Array[Transform3D] = []
 	var ys: Array[Transform3D] = []
 	var tries: int = 0
-	while xs.size() < 90 and tries < 2000:
+	while xs.size() < 170 and tries < 4000:
 		tries += 1
 		var p := Vector2(rng.randf_range(-70.0, w + 70.0), rng.randf_range(-70.0, d + 70.0))
 		if p.x > -4.0 and p.x < w + 4.0 and p.y > -4.0 and p.y < d + 4.0:

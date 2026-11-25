@@ -115,6 +115,9 @@ var harvest_down: bool = false
 ## 미래 구역의 꽂힌 검(2026-11-26): 지금 선 번호들(뽑으면 빠진다)과 굴린 때의 판 수(runs). 판이 늘면 다시 굴린다.
 var future_hilts: Array[int] = []
 var future_roll_run: int = -1
+## 과거 3막 「첫 닻」(2026-11-26, StoryPast): 읽은 기억의 돌, 짐승을 쓰러뜨렸나(= 닻의 손 축복).
+var past_memories: Array[int] = []
+var anchor_hand: bool = false
 ## 과거 신화 구역(5단계): 다시 벼린 검 번호(문자열) → 1. 검마다 한 번, 검집에서 꺼낸 검의 내구 +PastLayout.REFORGE_DUR.
 var reforged: Dictionary = {}
 var time_lock: bool = false
@@ -187,7 +190,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "time_lock": time_lock, "reforged": reforged}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "time_lock": time_lock, "reforged": reforged}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -353,6 +356,12 @@ func from_dict(d: Dictionary) -> void:
 		if CyberSwords.is_cyber(int(k)):
 			future_hilts.append(int(k))
 	future_roll_run = int(d.get("future_roll_run", -1))
+	past_memories = []
+	for k in d.get("past_memories", []):
+		var pi: int = int(k)
+		if pi >= 0 and pi < StoryPast.MEMORIES.size() and not past_memories.has(pi):
+			past_memories.append(pi)
+	anchor_hand = bool(d.get("anchor_hand", false)) and harvest_down
 	time_lock = bool(d.get("time_lock", false))
 	reforged = {}
 	for k in d.get("reforged", {}):
@@ -1021,6 +1030,28 @@ func future_set(rules: Rules) -> Array[int]:
 ## 미래의 꽂힌 검 하나를 뽑았다: 다음 판까지 다시 안 선다.
 func take_future_hilt(id: int) -> void:
 	future_hilts.erase(id)
+
+
+## 과거 3막: 기억의 돌 i를 읽는다(처음이면 참, 저장은 부른 쪽이).
+func read_memory(i: int) -> bool:
+	if i < 0 or i >= StoryPast.MEMORIES.size() or past_memories.has(i):
+		return false
+	past_memories.append(i)
+	return true
+
+
+## 짐승을 깨울 수 있는가: 기억 셋 + 미래 2막(대수확자)을 마쳤고 아직 안 쓰러뜨렸다.
+func beast_ready() -> bool:
+	return past_memories.size() >= StoryPast.MEMORIES.size() and harvest_down and not anchor_hand
+
+
+## 짐승을 쓰러뜨렸다: 깨울 수 있었을 때만 한 번, 닻의 손과 조각.
+func beast_slain() -> bool:
+	if not beast_ready():
+		return false
+	anchor_hand = true
+	shards += StoryPast.REWARD_SHARDS
+	return true
 
 
 ## 미래 2막: 기록 단말 i를 읽는다(처음이면 참, 저장은 부른 쪽이).

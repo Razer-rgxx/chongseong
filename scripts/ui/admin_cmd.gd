@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -49,6 +49,8 @@ static func describe(cmd: Dictionary) -> String:
 			return "이야기 0~4 (0 처음, 1 조각 하나, 2 조각 셋, 3 금고 엶, 4 장치를 받음)"
 		"닻":
 			return "닻 0~6 (미래 2막: 0 처음, 1~5 기록을 그만큼 읽음, 6 대수확자를 쓰러뜨림. 1 이상이면 1막도 마친 것으로)"
+		"첫닻":
+			return "첫닻 0~4 (과거 3막: 0 처음, 1~3 기억의 돌을 그만큼 읽음, 4 짐승을 쓰러뜨림 = 닻의 손. 4면 미래 2막도 마친 것으로)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -136,6 +138,19 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.harvest_down = n > StoryNeon.LOGS.size()
 			meta.save()
 			return "관리: 닻 공사 기록 %d/%d%s (다음에 미래 구역에 들면 맞춰 선다)" % [meta.neon_logs.size(), StoryNeon.LOGS.size(), ", 대수확자 쓰러뜨림" if meta.harvest_down else ""]
+		"첫닻":
+			if meta == null or a.is_empty() or not a[0].is_valid_int():
+				return "첫닻 0~4를 적으세요."
+			var m: int = clampi(int(a[0]), 0, StoryPast.MEMORIES.size() + 1)
+			meta.past_memories.clear()
+			for i in mini(m, StoryPast.MEMORIES.size()):
+				meta.past_memories.append(i)
+			meta.anchor_hand = m > StoryPast.MEMORIES.size()
+			if meta.anchor_hand:
+				meta.set_story(4)
+				meta.harvest_down = true
+			meta.save()
+			return "관리: 첫 닻 기억 %d/%d%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), StoryPast.MEMORIES.size(), ", 닻의 손" if meta.anchor_hand else ""]
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."
