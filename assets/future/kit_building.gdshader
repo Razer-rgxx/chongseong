@@ -8,6 +8,15 @@ uniform float tile_m = 6.0;
 uniform vec3 tint : source_color = vec3(0.62, 0.68, 0.85);
 uniform float lit_energy = 2.6;
 uniform float seed = 3.0;
+// 켜진 창의 몫(차례로 누적). 옛 폐허는 기본값, 네온 시가(2026-11-25)는 FutureBuilder가 크게 준다.
+uniform float warm_r = 0.09;
+uniform float cool_r = 0.17;
+uniform float pink_r = 0.17;
+uniform float dark_r = 0.32;
+uniform vec3 pink_col : source_color = vec3(1.0, 0.35, 0.75);
+uniform float flicker = 0.0;   // 0보다 크면 몇 창이 느리게 꺼졌다 켜진다
+// 0보다 크면 유리 칸이 아닌 벽에도 월드 격자 창을 그린다(네온 시가: 고층 건물의 켜진 창 벽). 켜진 몫.
+uniform float grid_lit = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnrm;
@@ -32,7 +41,8 @@ void fragment() {
 	vec3 n = normalize(wnrm);
 	float mx = max(c.r, max(c.g, c.b));
 	float mn = min(c.r, min(c.g, c.b));
-	bool glass = (mx - mn) > 0.28 && c.b > c.g + 0.04 && c.g > c.r + 0.04;
+	// 격자 창을 쓰면(네온 시가) 모델의 유리 칸은 늘어나 보여서 쓰지 않고 벽과 같이 격자 창을 그린다
+	bool glass = grid_lit <= 0.0 && (mx - mn) > 0.28 && c.b > c.g + 0.04 && c.g > c.r + 0.04;
 	float along = abs(n.x) > abs(n.z) ? wpos.z : wpos.x;
 	float side = n.x * 5.0 + n.z * 9.0;
 	vec3 conc = tri(conc_diff, wpos, n);
@@ -55,17 +65,46 @@ void fragment() {
 		alb = vec3(0.03, 0.04, 0.065);
 		rough = 0.12;
 		metal = 0.6;
-		if (r < 0.09) {
-			emit = vec3(1.0, 0.6, 0.26) * lit_energy * (0.75 + 0.25 * h21(cell));
+		float on = 1.0;
+		if (flicker > 0.0) {
+			on = step(0.12, h21(cell + vec2(floor(TIME * flicker + r * 37.0), 3.0)));
+		}
+		if (r < warm_r) {
+			emit = vec3(1.0, 0.6, 0.26) * lit_energy * (0.75 + 0.25 * h21(cell)) * on;
 			alb = vec3(0.3, 0.2, 0.1);
-		} else if (r < 0.17) {
-			emit = vec3(0.3, 0.6, 0.9) * lit_energy * (0.75 + 0.25 * h21(cell));
+		} else if (r < cool_r) {
+			emit = vec3(0.3, 0.6, 0.9) * lit_energy * (0.75 + 0.25 * h21(cell)) * on;
 			alb = vec3(0.1, 0.18, 0.28);
-		} else if (r < 0.32) {
+		} else if (r < pink_r) {
+			emit = pink_col * lit_energy * (0.7 + 0.3 * h21(cell)) * on;
+			alb = pink_col * 0.2;
+		} else if (r < dark_r) {
 			alb = vec3(0.006);
 			rough = 0.9;
 			metal = 0.0;
 		}
+	}
+	if (grid_lit > 0.0 && !glass && vertical > 0.7 && wpos.y > 4.5) {
+		vec2 g = vec2(along / 2.4, wpos.y / 3.4);
+		vec2 cell2 = floor(g);
+		vec2 f = fract(g);
+		float win = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
+		float r2 = h21(cell2 + vec2(side * 3.0, 41.0));
+		float band2 = h21(vec2(floor(wpos.y / 17.0), side + floor(along / 23.0)));   // 층 무리마다 켜짐이 다르다
+		// 멀어서 창 한 칸이 몇 화소보다 작으면 무늬 대신 평균 빛으로(지글거림 막기)
+		vec2 fw = fwidth(g);
+		float near = clamp(1.6 - max(fw.x, fw.y) * 3.0, 0.0, 1.0);
+		vec3 far_glow = mix(vec3(1.0, 0.66, 0.32), vec3(0.35, 0.75, 1.0), 0.4) * lit_energy * 0.55 * grid_lit * (0.4 + band2) * 0.3;
+		vec3 near_glow = vec3(0.0);
+		if (win > 0.5) {
+			if (r2 < grid_lit * (0.4 + band2)) {
+				vec3 wc = r2 < grid_lit * 0.25 ? vec3(0.35, 0.75, 1.0) : (r2 < grid_lit * 0.4 ? pink_col : vec3(1.0, 0.66, 0.32));
+				near_glow = wc * lit_energy * 0.55 * (0.6 + 0.4 * h21(cell2 + 5.0));
+			}
+		}
+		alb *= mix(0.55, win > 0.5 ? 0.35 : 1.0, near);
+		rough = mix(rough, win > 0.5 ? 0.15 : rough, near);
+		emit += mix(far_glow, near_glow, near);
 	}
 	ALBEDO = alb;
 	ROUGHNESS = clamp(rough, 0.05, 1.0);

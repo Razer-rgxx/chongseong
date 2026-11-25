@@ -19,15 +19,18 @@ static func environment(env: Environment) -> void:
 	env.ambient_light_energy = 1.1
 	env.fog_enabled = true
 	env.fog_light_color = FutureLayout.FOG
-	env.fog_density = 0.023
+	env.fog_density = 0.012   # 2026-11-25: 넓어진 도시의 높은 건물이 보이게 옅게
 	env.fog_sky_affect = 1.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.05
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
-	env.glow_bloom = 0.05
+	env.glow_intensity = 0.85
+	env.glow_bloom = 0.08
+	env.glow_hdr_threshold = 0.9
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 0.78
+	env.adjustment_saturation = 1.0
+	env.ssr_enabled = true   # 젖은 길·웅덩이에 네온이 비친다(Forward+에서만, 웹판은 그냥 넘어간다)
+	env.ssr_max_steps = 48
 
 
 ## 질감 한 벌(색·법선·거칠기). 파일이 없으면 null을 돌려준다(기본 색으로 돌아간다).
@@ -114,6 +117,12 @@ static func _kit_building_mat() -> Material:
 	sm.set_shader_parameter("colormap", load(KIT_C + "Textures/colormap.png"))
 	sm.set_shader_parameter("conc_diff", load(TEX_DIR + "concrete_wall_004/diff.jpg"))
 	sm.set_shader_parameter("conc_rough", load(TEX_DIR + "concrete_wall_004/rough.jpg"))
+	# 2026-11-25 "미래들은 다 이런 느낌으로": 폐허 블록도 창이 조금 더 켜지고 분홍 창이 섞인다(네온 시가보다는 어둡게)
+	sm.set_shader_parameter("warm_r", 0.12)
+	sm.set_shader_parameter("cool_r", 0.22)
+	sm.set_shader_parameter("pink_r", 0.27)
+	sm.set_shader_parameter("dark_r", 0.42)
+	sm.set_shader_parameter("flicker", 0.03)
 	_tex["kit_bld"] = sm
 	return sm
 
@@ -202,6 +211,7 @@ static func build(parent: Node3D) -> Dictionary:
 		_tower(groups, t, rng)
 	_flush(root, groups, _kit_building_mat())
 	_skyline(root, rng, W, D)
+	NeonDistrict.build(root, rng)   # 2026-11-25 네온 시가(동쪽·남쪽으로 넓힌 곳)
 	_overpass(root)
 	_cars(root, rng)
 	_puddles(root, rng)
@@ -330,16 +340,17 @@ static func _put_raw(groups: Dictionary, path: String, xf_with_aabb_space: Trans
 ## 구역 밖의 먼 건물: 저해상도 Kenney 모델을 크게 키워 안개에 묻는다. LOW_FROM보다 가까우면 안 그린다(가까운 쪽은 진짜 건물).
 static func _skyline(root: Node3D, rng: RandomNumberGenerator, w: float, d: float) -> void:
 	var g: Dictionary = {}
-	for i in 16:
+	# 2026-11-25: 구역이 넓어져 둘레를 촘촘한 높은 건물 벽으로(창이 켜진 네온 시가 재질)
+	for i in 64:
 		var side: int = i % 4
-		var hh: float = rng.randf_range(30.0, 70.0)
-		var ww: float = rng.randf_range(10.0, 22.0)
+		var hh: float = rng.randf_range(40.0, 130.0)
+		var ww: float = rng.randf_range(12.0, 26.0)
 		var p := Vector3.ZERO
 		match side:
-			0: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, -30.0 - rng.randf_range(0.0, 30.0))
-			1: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, d + 30.0 + rng.randf_range(0.0, 30.0))
-			2: p = Vector3(-30.0 - rng.randf_range(0.0, 30.0), 0.0, rng.randf_range(-20.0, d + 20.0))
-			_: p = Vector3(w + 30.0 + rng.randf_range(0.0, 30.0), 0.0, rng.randf_range(-20.0, d + 20.0))
+			0: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, -18.0 - rng.randf_range(0.0, 40.0))
+			1: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, d + 18.0 + rng.randf_range(0.0, 40.0))
+			2: p = Vector3(-18.0 - rng.randf_range(0.0, 40.0), 0.0, rng.randf_range(-20.0, d + 20.0))
+			_: p = Vector3(w + 18.0 + rng.randf_range(0.0, 40.0), 0.0, rng.randf_range(-20.0, d + 20.0))
 		var path: String = KIT_C + "low-detail-building-%s.glb" % LOW_MODELS[rng.randi() % LOW_MODELS.size()]
 		var info: Dictionary = _kit(path)
 		if info.is_empty():
@@ -348,7 +359,7 @@ static func _skyline(root: Node3D, rng: RandomNumberGenerator, w: float, d: floa
 		var c: Vector3 = ab.position + ab.size * 0.5
 		var body := Basis(Vector3.UP, float(rng.randi() % 4) * PI / 2.0) * Basis.from_scale(Vector3(ww / ab.size.x, hh / ab.size.y, ww / ab.size.z))
 		_put_raw(g, path, Transform3D(body, p) * Transform3D(Basis(), Vector3(-c.x, -ab.position.y, -c.z)))
-	_flush(root, g, _kit_building_mat(), LOW_FROM)
+	_flush(root, g, NeonDistrict.mat_buildings(), LOW_FROM)
 
 
 ## 서 있는 고가 상판과 기둥, 무너져 누운 상판.

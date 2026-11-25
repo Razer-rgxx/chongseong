@@ -36,6 +36,10 @@ var _ch_new: RichTextLabel
 var _ch_slots: HBoxContainer
 var _discard: Button
 var _discard_armed: bool = false
+## 버릴까요?(2026-11-25): 한 번 누른 칸(-1은 두고 가기, -99는 없음). 버려질 검의 등급이 GameSettings.discard_ask 이상일 때만.
+var _armed: int = -99
+var _choice_grades: Array = []   # [새 검 등급, 칸0 등급, 칸1 등급, ...]
+var _slot_btns: Array[Button] = []
 var _choice_t: float = 0.0
 var _over: Control
 var _over_title: Label
@@ -254,8 +258,11 @@ func flash(c: Color, strength: float = 0.7, time: float = 0.5) -> void:
 
 
 ## 새 검(위)과 칸마다 지금 든 검(아래 한 줄, 칸 수만큼). 칸 버튼이나 1~4로 바꾼다.
-func open_choice(new_text: String, slot_texts: Array) -> void:
+## grades: [새 검 등급, 칸0 등급, …](버릴까요?를 물을지 정한다). 비우면 늘 묻는다.
+func open_choice(new_text: String, slot_texts: Array, grades: Array = []) -> void:
 	_ch_new.text = new_text
+	_choice_grades = grades
+	_slot_btns.clear()
 	for c in _ch_slots.get_children():
 		c.queue_free()
 	var n: int = slot_texts.size()
@@ -273,8 +280,10 @@ func open_choice(new_text: String, slot_texts: Array) -> void:
 		var slot: int = k
 		b.pressed.connect(func() -> void: pick(slot))
 		col.add_child(b)
+		_slot_btns.append(b)
 		_ch_slots.add_child(col)
 	_discard_armed = false
+	_armed = -99
 	_discard.text = "두고 간다 (X)"
 	_choice_t = 0.0
 	_choice.visible = true
@@ -284,16 +293,31 @@ func choice_open() -> bool:
 	return _choice.visible
 
 
-## 키보드나 버튼에서. -1은 두고 가기(두 번 눌러야 한다).
+## 키보드나 버튼에서. -1은 두고 가기. 버려질 검(바꾸기면 그 칸의 검, 두고 가기면 새 검)의 등급이
+## GameSettings.discard_ask 이상이면 "버릴까요?"로 한 번 더 누르게 한다(같은 것을 두 번).
 func pick(k: int) -> void:
 	if not _choice.visible or _choice_t < choice_guard:
 		return
-	if k < 0 and not _discard_armed:
-		_discard_armed = true
-		_discard.text = "정말 버리기 (X)"
+	if _ask_discard(k) and _armed != k:
+		_arm(k)
 		return
 	_choice.visible = false
 	chose.emit(k)
+
+
+## 이 고르기에서 버려질 검을 한 번 더 물어야 하나.
+func _ask_discard(k: int) -> bool:
+	var i: int = 0 if k < 0 else k + 1
+	var g: int = int(_choice_grades[i]) if i < _choice_grades.size() else 99
+	return g >= GameSettings.discard_ask
+
+
+func _arm(k: int) -> void:
+	_armed = k
+	_discard_armed = k < 0
+	_discard.text = "버릴까요? 한 번 더 (X)" if k < 0 else "두고 간다 (X)"
+	for j in _slot_btns.size():
+		_slot_btns[j].text = ("이 검을 버릴까요? 한 번 더 (%d)" if j == k else "바꾸기 (%d)") % (j + 1)
 
 
 ## 갈림길 지도 창(13단계). 글과 아이콘 id는 main이 만든다(PathMap.open).

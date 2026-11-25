@@ -858,9 +858,11 @@ func _open_choice(s: Sword) -> void:
 	if rules.pending != s:
 		return
 	var slot_texts: Array = []
+	var grades: Array = [s.grade]
 	for k in rules.slots.size():
 		slot_texts.append(_card(rules.slots[k], k, false))
-	_hud.open_choice(_card(s, -1, false), slot_texts)
+		grades.append(rules.slots[k].grade if rules.slots[k] else -1)
+	_hud.open_choice(_card(s, -1, false), slot_texts, grades)
 	_capture(false)
 
 

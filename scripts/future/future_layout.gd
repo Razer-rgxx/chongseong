@@ -2,8 +2,11 @@ class_name FutureLayout
 extends RefCounted
 ## 녹슨 미래 구역(docs/stranger.md 3단계)의 자리와 값. 자리는 여기 하나에만 둔다. 칸 좌표(1칸 = 2m), 위쪽(y 작은 쪽)이 북쪽.
 ## 폐허가 된 도시 한 블록: 둘레에 무너진 탑 일곱, 가운데는 트인 거리, 거리 위에 부서진 고가.
+## 2026-11-25 네온 시가(사용자: "미래 오픈월드 규모 늘려", "건물 촘촘하게"): 옛 블록(OLD) 동쪽과 남쪽으로 넓혀 살아 있는 네온 도시를 붙였다.
 
-const SIZE: Vector2i = Vector2i(80, 60)
+const SIZE: Vector2i = Vector2i(180, 110)
+## 옛 폐허 블록(원래 구역 80 × 60과 그 남쪽 가장자리). 네온 시가 블록은 여기와 겹치지 않는다.
+const OLD: Rect2 = Rect2(0, 0, 80, 64)
 const START: Vector2 = Vector2(40, 54.5)
 ## 돌아가는 틈(구역 안)과 들판에서 틈이 서는 자리. 들판 쪽은 낯선 사람이 처음 서던 자리 곁(FieldLayout.STRANGER_SPOTS[0])이다.
 const EXIT_AT: Vector2 = Vector2(40, 57.4)
@@ -85,9 +88,58 @@ const PACKS: Dictionary = {
 	"husks_e": {"at": Vector2(56, 22), "wander": 3.5, "zone": 7, "foes": [[&"husk", 3], [&"drone", 2]]},
 }
 
+## 네온 시가: X_SPANS × Y_SPANS(칸, [시작, 끝])의 사각형마다 건물 한 무더기(막힘 하나), 사이는 길(6~10칸).
+## OLD와 겹치는 것과 PLAZAS(광장, 비움)는 빼고 블록이 된다. 모양(건물 나누기·네온·광고판)은 FutureBuilder._district.
+const X_SPANS: Array[Vector2] = [Vector2(4, 18), Vector2(24, 38), Vector2(44, 58), Vector2(64, 78), Vector2(88, 102), Vector2(110, 124), Vector2(132, 146), Vector2(154, 168), Vector2(174, 180)]
+const Y_SPANS: Array[Vector2] = [Vector2(4, 18), Vector2(24, 38), Vector2(44, 58), Vector2(68, 84), Vector2(92, 106)]
+## 광장으로 비울 블록(그 블록 사각형 안의 한 점).
+const PLAZAS: Array[Vector2] = [Vector2(117, 51), Vector2(139, 76), Vector2(31, 99)]
+## 네온 시가 무리(옛 PACKS와 따로 센다, 같은 모양). 광장과 큰길에 선다.
+const NEON_PACKS: Dictionary = {
+	"plaza": {"at": Vector2(117, 51), "wander": 4.0, "zone": 7, "foes": [[&"drone", 3], [&"husk", 2]]},
+	"market": {"at": Vector2(139, 76), "wander": 4.0, "zone": 8, "foes": [[&"husk", 3], [&"drone", 2]]},
+	"south": {"at": Vector2(31, 99), "wander": 4.0, "zone": 7, "foes": [[&"drone", 4]]},
+	"boulevard": {"at": Vector2(95, 63), "wander": 5.0, "zone": 7, "foes": [[&"husk", 2], [&"drone", 2]]},
+}
+## 들어서면 "네온 시가" 이름이 뜬다(OLD 밖).
+const NEON_NAME: String = "네온 시가"
+
+
+## 네온 시가의 건물 블록 사각형들(칸). 막힘과 모양이 같은 것을 쓴다.
+static func neon_blocks() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for xs in X_SPANS:
+		for ys in Y_SPANS:
+			var r := Rect2(xs.x, ys.x, xs.y - xs.x, ys.y - ys.x)
+			if r.intersects(OLD):
+				continue
+			var plaza: bool = false
+			for p in PLAZAS:
+				plaza = plaza or r.has_point(p)
+			if not plaza:
+				out.append(r)
+	return out
+
+
+## 광장 사각형들(칸), PLAZAS 차례대로(0 가운데 광장 = 홀로그램, 1 시장, 2 네온 문).
+static func plaza_rects() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for p in PLAZAS:
+		for xs in X_SPANS:
+			for ys in Y_SPANS:
+				var r := Rect2(xs.x, ys.x, xs.y - xs.x, ys.y - ys.x)
+				if r.has_point(p):
+					out.append(r)
+	return out
+
+
+static func in_neon(at: Vector2) -> bool:
+	return not OLD.has_point(at)
+
+
 ## 빛깔: 가라앉은 차가운 파랑에 보라 조금. 채도 낮게.
-const BG: Color = Color(0.035, 0.045, 0.075)
-const FOG: Color = Color(0.095, 0.11, 0.175)
+const BG: Color = Color(0.025, 0.035, 0.06)
+const FOG: Color = Color(0.07, 0.11, 0.16)   ## 2026-11-25 네온 시가: 청록 안개
 const AMBIENT: Color = Color(0.36, 0.42, 0.58)
 const MOON: Color = Color(0.58, 0.68, 0.95)
 const CONCRETE: Color = Color(0.26, 0.29, 0.36)
@@ -104,6 +156,8 @@ static func blockers() -> Dictionary:
 	var low: Array = []
 	for t in TOWERS:
 		rects.append(t.rect)
+	for r in neon_blocks():
+		rects.append(r)
 	for p in PILLARS:
 		circles.append([Vector2(p.x, p.y), p.z])
 	for f in FALLEN:

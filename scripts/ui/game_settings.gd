@@ -14,6 +14,9 @@ const ACTIONS: Array = [
 
 static var volume: float = 0.8
 static var mouse_k: float = 1.0
+## 버릴까요?(2026-11-25 사용자): 언덕에서 칸이 꽉 차 검을 버리게 될 때(바꾸기로 밀려나는 검, 두고 가는 새 검),
+## 그 검의 등급이 이 값 이상이면 한 번 더 묻는다. 0 = 늘 묻기, 6 = 묻지 않기.
+static var discard_ask: int = 0
 ## 행동 → 바꾼 첫 입력({"key": 코드} 또는 {"mouse": 버튼}). 없으면 프로젝트 기본값.
 static var keys: Dictionary = {}
 static var _loaded: bool = false
@@ -35,6 +38,7 @@ static func ensure() -> void:
 	if cf.load(PATH) == OK:
 		volume = clampf(float(cf.get_value("sound", "volume", volume)), 0.0, 1.0)
 		mouse_k = clampf(float(cf.get_value("mouse", "sensitivity", mouse_k)), 0.2, 3.0)
+		discard_ask = clampi(int(cf.get_value("play", "discard_ask", discard_ask)), 0, 6)
 		var k: Variant = cf.get_value("keys", "map", {})
 		if k is Dictionary:
 			keys = k
@@ -71,6 +75,7 @@ static func save() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("sound", "volume", volume)
 	cf.set_value("mouse", "sensitivity", mouse_k)
+	cf.set_value("play", "discard_ask", discard_ask)
 	cf.set_value("keys", "map", keys)
 	cf.save(PATH)
 

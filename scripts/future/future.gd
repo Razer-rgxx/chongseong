@@ -118,6 +118,8 @@ func _ready() -> void:
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
 	for id in FutureLayout.PACKS:
 		rules.spawn_pack(StringName(id), FutureLayout.PACKS[id])
+	for id in FutureLayout.NEON_PACKS:   # 네온 시가(2026-11-25)
+		rules.spawn_pack(StringName(id), FutureLayout.NEON_PACKS[id])
 	_flick.seed = 311
 	_camera.target = Grid.cells_to_world(rules.lord.pos)
 	_camera.yaw = 0.0
@@ -130,6 +132,7 @@ func _ready() -> void:
 	if not _titled:
 		_titled = true
 		_hud.area_title("녹슨 미래")
+		get_tree().create_timer(3.5).timeout.connect(func() -> void: _hud.toast("Tab: 내 검 목록"))
 	WebQuality.apply(self, env, built.sun, _camera)
 
 
@@ -169,6 +172,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		elif k.physical_keycode == KEY_T and not _over:
 			_toggle_era_window()
+		elif k.physical_keycode == KEY_TAB and not _over and _swords == null:
+			_open_sword_list()
+			get_viewport().set_input_as_handled()
 		elif k.physical_keycode == KEY_V:
 			_camera.toggle_mode()
 			_capture(true)
@@ -221,6 +227,10 @@ func _process(delta: float) -> void:
 	_sync_enemies(alpha, delta)
 	_flicker(delta)
 	_glitch(delta)
+	var neon_now: bool = FutureLayout.in_neon(rules.lord.pos)   # 네온 시가에 들어서면 이름(2026-11-25)
+	if neon_now and not _in_neon:
+		_hud.area_title(FutureLayout.NEON_NAME)
+	_in_neon = neon_now
 	if _final_st != null:
 		_final_st.update(delta)
 	if _say_t > 0.0:
@@ -310,6 +320,23 @@ func _interact() -> void:
 
 
 ## 고른 검을 칸 0에 쥔다(부러지지 않는다, 들판과 같다). 미래 구역에서는 베기 빛과 동작 빛이 차가운 푸른빛이다.
+## 내 검 목록(2026-11-25 사용자, Tab): 가진 검을 등급 순으로 보고 카드를 읽는다. 보기만 한다.
+var _swords: SwordList = null
+var _in_neon: bool = false
+
+
+func _open_sword_list() -> void:
+	var held: Array[int] = []
+	for s in rules.slots:
+		if s and s.data:
+			held.append(s.data.id)
+	_swords = SwordList.open(_hud, data, meta, held)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_swords.closed.connect(func() -> void:
+		_swords = null
+		_capture(true))
+
+
 func _hold_sword() -> void:
 	var id: int = Meta.carry_sword if Meta.carry_sword >= 0 else meta.sheath_id
 	if not meta.usable(id):

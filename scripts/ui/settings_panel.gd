@@ -58,6 +58,22 @@ func _ready() -> void:
 	r2.add_child(_mouse_text)
 	box.add_child(r2)
 
+	box.add_child(UiKit.label("버릴까요? 묻기", 18, UiKit.TITLE))
+	var ask := OptionButton.new()
+	ask.focus_mode = Control.FOCUS_NONE
+	ask.custom_minimum_size = Vector2(0, 34)
+	var gnames: PackedStringArray = (load("res://data/grades.tres") as GradeTable).names
+	ask.add_item("늘 묻기", 0)
+	for g in range(1, gnames.size()):
+		ask.add_item("%s 이상만 묻기" % gnames[g], g)
+	ask.add_item("묻지 않기", gnames.size())
+	ask.select(ask.get_item_index(clampi(GameSettings.discard_ask, 0, gnames.size())))
+	ask.item_selected.connect(func(i: int) -> void:
+		GameSettings.discard_ask = ask.get_item_id(i)
+		GameSettings.save())
+	box.add_child(ask)
+	box.add_child(UiKit.label("언덕에서 칸이 꽉 차 검을 버리게 될 때(바꾸기로 밀려나는 검, 두고 가는 새 검) 이 등급 이상이면 한 번 더 묻는다.", 13, UiKit.MUTED))
+
 	box.add_child(UiKit.rule())
 	box.add_child(UiKit.label("키", 18, UiKit.TITLE))
 	var grid := GridContainer.new()
