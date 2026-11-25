@@ -221,19 +221,17 @@ static func city_mat(nm: String) -> Material:
 		sm.set_shader_parameter("win", wins[nm])
 		sm.set_shader_parameter("cells", 1.0 if nm == "shop" else 4.0)
 		sm.set_shader_parameter("shop", 1.0 if nm == "shop" else 0.0)
-		sm.set_shader_parameter("lit", {"fa_a": 0.3, "fa_b": 0.26, "fa_c": 0.28}.get(nm, 1.0))
+		sm.set_shader_parameter("lit", {"fa_a": 0.24, "fa_b": 0.2, "fa_c": 0.22}.get(nm, 1.0))
 		sm.set_shader_parameter("wall_rough", {"fa_a": 0.85, "fa_b": 0.3, "fa_c": 0.45}.get(nm, 0.6))
-		sm.set_shader_parameter("lit_energy", {"fa_b": 2.0, "shop": 1.4}.get(nm, 2.6))
+		sm.set_shader_parameter("lit_energy", {"fa_b": 1.7, "shop": 1.4}.get(nm, 2.0))
 		m = sm
-	elif neon.has(nm):
-		var nmat := StandardMaterial3D.new()
-		var c: Color = neon[nm]
-		nmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		nmat.albedo_color = c
-		nmat.emission_enabled = true
-		nmat.emission = c
-		nmat.emission_energy_multiplier = 3.5 if nm == "beacon" else 3.0
-		m = nmat
+	elif neon.has(nm):   # 네온관(가운데가 흰빛으로 달아오르고 관마다 밝기가 조금씩 다르다, 몇 개는 지직거린다)
+		var tm := ShaderMaterial.new()
+		tm.shader = load("res://assets/future/neon_tube.gdshader")
+		tm.set_shader_parameter("tint", neon[nm])
+		tm.set_shader_parameter("energy", 3.0 if nm == "beacon" else 2.2)
+		tm.set_shader_parameter("buzz", 0.0 if nm == "beacon" else 0.08)
+		m = tm
 	elif nm == "trim":
 		m = FutureBuilder._pbr("city_trim", "concrete_wall_004", 3.0, Color(0.5, 0.52, 0.6))
 	elif nm == "metal":

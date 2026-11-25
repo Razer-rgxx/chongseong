@@ -310,11 +310,13 @@ def tower(sp):
     for side in sp.get("awn", ["f"]):
         if side == "f":
             box(g, (0.0, -fd / 2 - 0.65, 3.9), (fw * 0.86, 1.3, 0.22), "metal")
-            box(g, (0.0, -fd / 2 - 1.3, 3.72), (fw * 0.86, 0.12, 0.12), neon[0])
+            # 차양 끝 네온은 가게마다 있지 않다(절반쯤). 없으면 차양 밑 따뜻한 등 줄 자리에 어두운 테
+            box(g, (0.0, -fd / 2 - 1.3, 3.74), (fw * rnd.uniform(0.4, 0.86), 0.07, 0.07), neon[0] if rnd.random() < 0.5 else "metal")
         else:
             sx = 1.0 if side == "r" else -1.0
             box(g, (sx * (fw / 2 + 0.55), 0.0, 3.9), (1.1, fd * 0.7, 0.2), "metal")
-            box(g, (sx * (fw / 2 + 1.1), 0.0, 3.72), (0.12, fd * 0.7, 0.12), neon[-1])
+            if rnd.random() < 0.4:
+                box(g, (sx * (fw / 2 + 1.1), 0.0, 3.74), (0.07, fd * rnd.uniform(0.3, 0.7), 0.07), neon[-1])
     tops = []
     for si, stack in enumerate(sp["stacks"]):
         z = ph
@@ -332,7 +334,7 @@ def tower(sp):
                 while zz < z1 - 2.0:
                     lit = t.get("neon_band") and k % 2 == 1
                     if lit:
-                        prism(g, grow(poly, 0.16), zz - 0.1, zz + 0.1, neon[(si + k) % len(neon)])
+                        prism(g, grow(poly, 0.12), zz - 0.05, zz + 0.05, neon[(si + k) % len(neon)])
                     else:
                         prism(g, grow(poly, 0.14), zz - 0.16, zz + 0.16, "trim", "trim", "trim")
                     zz += band * WIN_H
@@ -342,8 +344,9 @@ def tower(sp):
                 xs = [p[0] for p in poly]
                 ys = [p[1] for p in poly]
                 fy = min(ys)
-                for cx in (min(xs) + 0.15, max(xs) - 0.15):
-                    box(g, (cx, fy - 0.12, (z + 1.5 + z1 - 1.0) / 2.0), (0.2, 0.2, z1 - z - 2.5), neon[ti % len(neon)])
+                for cx in (min(xs) + 0.15, max(xs) - 0.15)[: 1 if rnd.random() < 0.5 else 2]:   # 한쪽 모서리만인 것도
+                    top_n = z1 - rnd.uniform(2.0, (z1 - z) * 0.4)
+                    box(g, (cx, fy - 0.1, (z + 1.5 + top_n) / 2.0), (0.1, 0.1, top_n - z - 1.5), neon[ti % len(neon)])
             # 발코니 줄(앞면)
             if t.get("balc"):
                 xs = [p[0] for p in poly]
@@ -470,41 +473,41 @@ def specs():
     S = {}
     # --- 10 × 10
     S["s10_shop"] = dict(fw=10, fd=10, ph=7.0, neon=[A, M], awn=["f", "r"], stacks=[[_t("box", 9.6, 9.6, 19.0, "fa_c", band=2, boards=[{"z": 12.0, "w": 6.0, "h": 3.4}])]], roof=["ac", "tank"])
-    S["s10_round"] = dict(fw=10, fd=10, ph=7.0, neon=[C, V], stacks=[[_t("round", 9.4, 9.4, 38.0, "fa_a", band=3, neon_band=True)]], roof=["ac", "antenna"])
+    S["s10_round"] = dict(fw=10, fd=10, ph=7.0, neon=[C, V], stacks=[[_t("round", 9.4, 9.4, 38.0, "fa_a", band=3)]], roof=["ac", "antenna"])
     S["s10_pencil"] = dict(fw=10, fd=10, ph=7.0, neon=[M, C], stacks=[[_t("cham", 9.0, 9.0, 40.0, "fa_b", band=4, corners=True, boards=[{"z": 18.0, "w": 2.4, "h": 10.0, "side": "r"}]),
                                                                       _t("cham", 7.4, 7.4, 64.0, "fa_b", band=4)]], roof=["spire"])
     S["s10_slim"] = dict(fw=10, fd=10, ph=7.0, neon=[C, A], stacks=[[_t("box", 9.4, 9.4, 70.0, "fa_c", band=5, pipes=1, boards=[{"z": 20.0, "w": 6.5, "h": 4.0}]),
-                                                                    _t("cham", 8.0, 8.0, 100.0, "fa_c", band=5, corners=True)]], roof=["antenna", "ac"])
+                                                                    _t("cham", 8.0, 8.0, 100.0, "fa_c", band=5)]], roof=["antenna", "ac"])
     # --- 10 × 12 (가로 10, 깊이 12)
     S["r1012_balc"] = dict(fw=10, fd=12, ph=4.6, neon=[L, M], stacks=[[_t("box", 9.6, 11.6, 26.0, "fa_a", balc=1, band=0)]], roof=["ac", "tank"])
-    S["r1012_glass"] = dict(fw=10, fd=12, ph=7.0, neon=[C, V], stacks=[[_t("box", 9.6, 11.6, 30.0, "fa_b", band=3, corners=True, boards=[{"z": 15.0, "w": 6.5, "h": 4.0}]),
+    S["r1012_glass"] = dict(fw=10, fd=12, ph=7.0, neon=[C, V], stacks=[[_t("box", 9.6, 11.6, 30.0, "fa_b", band=3, boards=[{"z": 15.0, "w": 6.5, "h": 4.0}]),
                                                                       _t("box", 8.0, 9.6, 44.0, "fa_b", band=3)]], roof=["ac"])
-    S["r1012_oct"] = dict(fw=10, fd=12, ph=7.0, neon=[V, C], stacks=[[_t("oct", 9.4, 11.4, 76.0, "fa_c", band=4, neon_band=True, boards=[{"z": 16.0, "w": 2.4, "h": 9.0, "side": "r"}])]], roof=["antenna", "ac"])
-    S["r1012_step"] = dict(fw=10, fd=12, ph=7.0, neon=[M, A], stacks=[[_t("box", 9.6, 11.6, 52.0, "fa_b", band=4, corners=True, boards=[{"z": 22.0, "w": 6.0, "h": 3.6}]),
-                                                                     _t("box", 8.4, 10.0, 84.0, "fa_b", band=4), _t("box", 6.8, 8.0, 112.0, "fa_b", band=4, corners=True)]], roof=["spire"])
+    S["r1012_oct"] = dict(fw=10, fd=12, ph=7.0, neon=[V, C], stacks=[[_t("oct", 9.4, 11.4, 76.0, "fa_c", band=4, boards=[{"z": 16.0, "w": 2.4, "h": 9.0, "side": "r"}])]], roof=["antenna", "ac"])
+    S["r1012_step"] = dict(fw=10, fd=12, ph=7.0, neon=[M, A], stacks=[[_t("box", 9.6, 11.6, 52.0, "fa_b", band=4, boards=[{"z": 22.0, "w": 6.0, "h": 3.6}]),
+                                                                     _t("box", 8.4, 10.0, 84.0, "fa_b", band=4), _t("box", 6.8, 8.0, 112.0, "fa_b", band=4)]], roof=["spire"])
     # --- 12 × 12
     S["s12_shophouse"] = dict(fw=12, fd=12, ph=4.6, neon=[A, L], awn=["f", "l"], stacks=[[_t("box", 11.6, 11.6, 18.0, "fa_a", balc=2, boards=[{"z": 11.0, "w": 7.0, "h": 3.4}])]], roof=["tank", "ac"])
-    S["s12_oct"] = dict(fw=12, fd=12, ph=7.0, neon=[C, M], stacks=[[_t("oct", 11.0, 11.0, 48.0, "fa_b", band=3, neon_band=True)]], roof=["ring", "ac"])
+    S["s12_oct"] = dict(fw=12, fd=12, ph=7.0, neon=[C, M], stacks=[[_t("oct", 11.0, 11.0, 48.0, "fa_b", band=3)]], roof=["ring", "ac"])
     S["s12_round"] = dict(fw=12, fd=12, ph=7.0, neon=[V, C], stacks=[[_t("box", 11.6, 11.6, 16.0, "fa_c", band=2, boards=[{"z": 11.5, "w": 8.0, "h": 4.0}]),
                                                                     _t("round", 10.6, 10.6, 88.0, "fa_b", band=5)]], roof=["ring", "antenna"])
-    S["s12_twin"] = dict(fw=12, fd=12, ph=7.0, neon=[M, C], stacks=[[_t("box", 4.8, 10.0, 116.0, "fa_b", dx=-3.3, band=5, corners=True)],
-                                                                   [_t("box", 4.8, 10.0, 100.0, "fa_b", dx=3.3, band=5, corners=True)]],
+    S["s12_twin"] = dict(fw=12, fd=12, ph=7.0, neon=[M, C], stacks=[[_t("box", 4.8, 10.0, 116.0, "fa_b", dx=-3.3, band=5)],
+                                                                   [_t("box", 4.8, 10.0, 100.0, "fa_b", dx=3.3, band=5)]],
                          bridges=[(60.0, -0.9, 0.9, 0.0), (86.0, -0.9, 0.9, 0.0)], roof=["antenna"], roof2=["heli"])
     # --- 12 × 14
     S["r1214_cham"] = dict(fw=12, fd=14, ph=7.0, neon=[A, C], stacks=[[_t("cham", 11.6, 13.6, 32.0, "fa_a", band=3, pipes=2, boards=[{"z": 15.0, "w": 7.5, "h": 4.2}])]], roof=["ac", "tank"])
     S["r1214_canti"] = dict(fw=12, fd=14, ph=7.0, neon=[C, M], stacks=[[_t("box", 11.6, 13.6, 30.0, "fa_c", band=3, boards=[{"z": 17.0, "w": 7.0, "h": 4.0}]),
-                                                                      _t("box", 10.0, 11.0, 56.0, "fa_b", dy=-0.8, band=3, corners=True)]], roof=["ac", "fins"])
-    S["r1214_twin"] = dict(fw=12, fd=14, ph=7.0, neon=[V, A], stacks=[[_t("cham", 5.0, 12.0, 94.0, "fa_a", dx=-3.2, band=4, neon_band=True)],
-                                                                     [_t("cham", 5.0, 12.0, 80.0, "fa_a", dx=3.2, band=4, neon_band=True)]],
+                                                                      _t("box", 10.0, 11.0, 56.0, "fa_b", dy=-0.8, band=3)]], roof=["ac", "fins"])
+    S["r1214_twin"] = dict(fw=12, fd=14, ph=7.0, neon=[V, A], stacks=[[_t("cham", 5.0, 12.0, 94.0, "fa_a", dx=-3.2, band=4)],
+                                                                     [_t("cham", 5.0, 12.0, 80.0, "fa_a", dx=3.2, band=4)]],
                            bridges=[(48.0, -0.8, 0.8, 0.0)], roof=["antenna"], roof2=["ac"])
-    S["r1214_crown"] = dict(fw=12, fd=14, ph=7.0, neon=[C, V], stacks=[[_t("box", 11.6, 13.6, 64.0, "fa_b", band=5, corners=True, boards=[{"z": 24.0, "w": 8.0, "h": 4.5}]),
+    S["r1214_crown"] = dict(fw=12, fd=14, ph=7.0, neon=[C, V], stacks=[[_t("box", 11.6, 13.6, 64.0, "fa_b", band=5, boards=[{"z": 24.0, "w": 8.0, "h": 4.5}]),
                                                                       _t("cham", 9.6, 11.0, 114.0, "fa_b", band=5)]], roof=["crown", "antenna"])
     # --- 14 × 14
     S["s14_zig"] = dict(fw=14, fd=14, ph=4.6, neon=[L, A], awn=["f", "r", "l"], stacks=[[_t("box", 13.6, 13.6, 14.0, "fa_c", band=0, boards=[{"z": 10.0, "w": 9.0, "h": 3.4}]),
                                                                                        _t("box", 11.6, 11.6, 20.0, "fa_c"), _t("box", 9.0, 9.0, 24.0, "fa_a")]], roof=["tank", "ac"])
     S["s14_setback"] = dict(fw=14, fd=14, ph=7.0, neon=[M, C], stacks=[[_t("box", 13.6, 13.6, 36.0, "fa_a", band=3, pipes=2, boards=[{"z": 16.0, "w": 9.0, "h": 4.8}]),
-                                                                       _t("box", 11.6, 11.6, 60.0, "fa_a", band=3, corners=True)]], roof=["ac", "antenna"])
-    S["s14_heli"] = dict(fw=14, fd=14, ph=7.0, neon=[C, A], stacks=[[_t("cham", 13.6, 13.6, 58.0, "fa_c", band=4, neon_band=True, boards=[{"z": 20.0, "w": 9.0, "h": 5.0}]),
+                                                                       _t("box", 11.6, 11.6, 60.0, "fa_a", band=3)]], roof=["ac", "antenna"])
+    S["s14_heli"] = dict(fw=14, fd=14, ph=7.0, neon=[C, A], stacks=[[_t("cham", 13.6, 13.6, 58.0, "fa_c", band=4, boards=[{"z": 20.0, "w": 9.0, "h": 5.0}]),
                                                                     _t("cham", 12.0, 12.0, 106.0, "fa_c", band=4)]], roof=["heli"])
     S["s14_mega"] = dict(fw=14, fd=14, ph=7.0, neon=[V, M, C], stacks=[[_t("box", 13.6, 13.6, 40.0, "fa_a", band=3, boards=[{"z": 20.0, "w": 10.0, "h": 5.4}, {"z": 30.0, "w": 2.6, "h": 12.0, "side": "r"}]),
                                                                        _t("cham", 12.0, 12.0, 80.0, "fa_b", band=4, corners=True),
@@ -514,8 +517,8 @@ def specs():
     S["r1014_twin"] = dict(fw=10, fd=14, ph=7.0, neon=[M, L], stacks=[[_t("box", 9.0, 5.6, 52.0, "fa_c", dy=-3.6, band=3, corners=True, boards=[{"z": 20.0, "w": 6.0, "h": 3.6}])],
                                                                      [_t("box", 9.0, 5.6, 44.0, "fa_c", dy=3.6, band=3)]],
                            bridges=[], roof=["ac"], roof2=["tank"])
-    S["r1014_slab"] = dict(fw=10, fd=14, ph=7.0, neon=[C, M], stacks=[[_t("box", 9.6, 13.6, 82.0, "fa_c", band=4, neon_band=True, pipes=2, boards=[{"z": 18.0, "w": 2.4, "h": 10.0, "side": "r"}])]], roof=["ac", "antenna"])
-    S["r1014_fins"] = dict(fw=10, fd=14, ph=7.0, neon=[V, C], stacks=[[_t("cham", 9.6, 13.6, 100.0, "fa_b", band=5, corners=True, boards=[{"z": 24.0, "w": 6.5, "h": 4.0}])]], roof=["fins", "ac"])
+    S["r1014_slab"] = dict(fw=10, fd=14, ph=7.0, neon=[C, M], stacks=[[_t("box", 9.6, 13.6, 82.0, "fa_c", band=4, pipes=2, boards=[{"z": 18.0, "w": 2.4, "h": 10.0, "side": "r"}])]], roof=["ac", "antenna"])
+    S["r1014_fins"] = dict(fw=10, fd=14, ph=7.0, neon=[V, C], stacks=[[_t("cham", 9.6, 13.6, 100.0, "fa_b", band=5, boards=[{"z": 24.0, "w": 6.5, "h": 4.0}])]], roof=["fins", "ac"])
     return S
 
 
