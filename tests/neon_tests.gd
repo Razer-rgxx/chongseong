@@ -17,6 +17,7 @@ func _all() -> void:
 	_packs()
 	_discard()
 	_story2()
+	_future_balance()
 
 
 func _blocks() -> void:
@@ -111,3 +112,39 @@ func _story2() -> void:
 	for i in 6:
 		lines = lines and StoryNeon.fixer_line(mini(i, 5), i > 4, false) != ""
 	check.call(lines and StoryNeon.fixer_line(5, true, true) != StoryNeon.fixer_line(5, true, false), "닻 공사: 정보상의 말이 단계마다 바뀐다")
+
+
+## 미래 검 밸런스(2026-11-26): 꽂힌 검은 언덕 판 하나 마칠 때마다 새로, 뽑은 것은 빠지고, 대수확자 뒤엔 운이 좋아지고, 사이버 검은 내구가 적다.
+func _future_balance() -> void:
+	var m := Meta.new()
+	var r := Rules.new(d, 77)
+	var a: Array[int] = m.future_set(r)
+	var b: Array[int] = m.future_set(Rules.new(d, 78))
+	check.call(a.size() == CyberSwords.FUTURE_HILTS and a == b, "미래 검: 같은 판 사이에는 드나들어도 같은 검이 선다")
+	m.take_future_hilt(a[0])
+	check.call(m.future_set(r).size() == CyberSwords.FUTURE_HILTS - 1, "미래 검: 뽑은 검은 다음 판까지 안 선다")
+	m.runs += 1
+	check.call(m.future_set(Rules.new(d, 79)).size() == CyberSwords.FUTURE_HILTS, "미래 검: 언덕 판을 마치면 새로 선다")
+	var lo: float = 0.0
+	var hi: float = 0.0
+	for i in 300:
+		for id in CyberSwords.roll_future(Rules.new(d, 1000 + i)):
+			lo += d.sword_by_id(id).grade
+		for id in CyberSwords.roll_future(Rules.new(d, 1000 + i), CyberSwords.FUTURE_LUCK_FREED):
+			hi += d.sword_by_id(id).grade
+	check.call(hi > lo * 1.1, "미래 검: 대수확자 뒤에는 평균 등급이 오른다 (%.2f → %.2f)" % [lo / 900.0, hi / 900.0])
+	var m2 := Meta.new()
+	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
+	check.call(m2.future_hilts == m.future_hilts and m2.future_roll_run == m.runs, "미래 검: 선 검과 굴린 판 수가 저장된다")
+	var normal: SwordData = null
+	var cyber: SwordData = null
+	for sw in d.swords:
+		if sw.grade == 2 and sw.form == 1 and not sw.unbreakable and sw.inscriptions.is_empty():
+			if sw.cyber and cyber == null:
+				cyber = sw
+			elif not sw.cyber and not sw.field_only and normal == null:
+				normal = sw
+	if normal and cyber:
+		var sn := Sword.new(normal, d)
+		var sc := Sword.new(cyber, d)
+		check.call(is_equal_approx(sc.max_durability, maxf(1.0, roundf(sn.max_durability * d.powers.cyber_durability))), "사이버 검: 내구가 같은 등급·형태의 %.0f%%" % (d.powers.cyber_durability * 100.0))

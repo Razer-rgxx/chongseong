@@ -73,15 +73,18 @@ static func text_for(powers: PackedStringArray) -> String:
 const FUTURE_HILTS: int = 3
 ## 등급을 굴리는 운(언덕 첫 구역의 뽑기 운과 비슷하게). 뽑기 체력은 들지 않는다.
 const FUTURE_LUCK: float = 4.0
+## 대수확자를 쓰러뜨린 뒤(Meta.harvest_down)의 운(2026-11-26 미래 2막 보상).
+const FUTURE_LUCK_FREED: float = 9.0
 
 
-## 미래 구역에 설 사이버 검 번호 FUTURE_HILTS개(서로 다르다). rules.rng만 쓴다.
-static func roll_future(rules: Rules) -> Array[int]:
+## 미래 구역에 설 사이버 검 번호 FUTURE_HILTS개(서로 다르다). rules.rng만 쓴다. luck을 안 주면 FUTURE_LUCK.
+## 2026-11-26 밸런스: 들를 때마다 새로 서던 것을 언덕 판 하나 마칠 때마다 새로 서게 바꿨다(Meta.future_set, 드나들며 공짜로 도감 채우기 막음).
+static func roll_future(rules: Rules, luck: float = FUTURE_LUCK) -> Array[int]:
 	var out: Array[int] = []
 	var tries: int = 0
 	while out.size() < FUTURE_HILTS and tries < 100:
 		tries += 1
-		var g: int = rules.roll_grade(FUTURE_LUCK)
+		var g: int = rules.roll_grade(luck)
 		var list: PackedInt32Array = rules.data.cyber_by_grade[g]
 		if list.is_empty():
 			continue

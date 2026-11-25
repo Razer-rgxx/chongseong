@@ -546,8 +546,9 @@ func _build_story() -> void:
 
 ## 꽂힌 낯선 검 셋(docs/cyber_swords.md): 들를 때마다 사이버 검 셋이 서고(CyberSwords.roll_future), 무엇인지 보인다. E로 뽑으면 도감에 오른다.
 func _build_cyber_hilts() -> void:
-	var ids: Array[int] = CyberSwords.roll_future(rules)
-	for i in ids.size():
+	var ids: Array[int] = meta.future_set(rules)   # 2026-11-26: 언덕 판 하나 마칠 때마다 새로(드나들어도 같다)
+	_saved()
+	for i in mini(ids.size(), FutureLayout.CYBER_HILTS.size()):
 		var h := Hilt.new()
 		h.id = 900 + i
 		h.pos = FutureLayout.CYBER_HILTS[i]
@@ -567,6 +568,7 @@ func _pull_cyber_hilt(i: int) -> void:
 	var sd: SwordData = h.sword.data
 	var fresh: bool = not meta.has_found(sd.id)
 	meta.note_found(sd.id)
+	meta.take_future_hilt(sd.id)
 	var col: Color = data.grades.colors[sd.grade]
 	_sfx.play(&"crack", Grid.cells_to_world(h.pos), -2.0, 0.8)
 	_hud.flash(Color(0.4, 0.75, 1.0), 0.25, 0.5)
