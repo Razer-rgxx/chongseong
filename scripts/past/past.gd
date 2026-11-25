@@ -49,6 +49,7 @@ var _ship: Node3D
 var _ship_base: Vector3
 var _dragons: Array[Node3D] = []
 var _hoard: Node3D
+var _cap_talk: float = 0.0
 var _region: String = ""
 var _say_t: float = 0.0
 var _final_on: bool = false
@@ -251,6 +252,10 @@ func _process(delta: float) -> void:
 	if _captain and _captain.position.distance_to(_lord.position) < 24.0:
 		_captain.rotation.y = lerp_angle(_captain.rotation.y, atan2(_captain.position.x - _lord.position.x, _captain.position.z - _lord.position.z), 1.0 - exp(-3.0 * delta))
 	_animate_sky(delta)
+	if _cap_talk > 0.0:
+		_cap_talk -= delta
+		if _cap_talk <= 0.0:
+			PastWorld.captain_talk(_captain, false)
 	_blend_look(delta)
 	if _say_t > 0.0:
 		_say_t -= delta
@@ -393,7 +398,8 @@ func _talk_captain() -> void:
 	var line: String = StoryPast.captain_line(meta.past_memories.size(), meta.harvest_down, meta.captain_oath, meta.anchor_hand)
 	_hud.say(StoryPast.CAPTAIN_NAME, line, true)
 	_say_t = 7.0
-	PastWorld.captain_greet(_captain)
+	PastWorld.captain_talk(_captain, true)
+	_cap_talk = 7.0
 	if meta.swear_oath():
 		_saved()
 		_hud.flash(PastLayout.GOLD, 0.2, 0.7)

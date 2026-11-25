@@ -715,70 +715,31 @@ static func _dock(root: Node3D) -> void:
 	PastBuilder._box(boat, Vector3(1.3, 0.08, 0.3), Vector3(0, 0.45, 0.4), wood)
 
 
-## 닻의 선장 모델(2026-11-26 사용자: "선장 모델 다운 받아"): Quaternius 「Pirate Kit」의 Captain Barbarossa(CC0, 동작 14개, CREDITS.md).
-## 앞이 +Z라 반 바퀴 돌려 세우고, 머리는 이 게임의 다른 사람들처럼 오브젝트헤드: 닻(ObjectHead "anchor", 사용자: "머리는 원래처럼 닻으로",
-## "원래 오브젝트헤드잖아"). 모델이 없으면 도형 선장.
-const CAPTAIN_MODEL: String = "res://assets/past/models/captain/Characters_Captain_Barbarossa.gltf"
-const CAPTAIN_SCALE: float = 1.1
-
-
-## 닻의 선장: 받은 모델(있으면) 또는 긴 남색 외투·세모 모자의 도형. 사람(혼 아님). past.gd가 영주 쪽으로 돌린다.
+## 닻의 선장(2026-11-26): 마을 사람과 같은 몸(NpcModel: Quaternius 순찰자, CC0, Universal Animation Library 동작)에
+## 머리는 오브젝트헤드 닻(ObjectHead "captain" → "anchor"), 옷은 남색 연미복(NpcModel.COSTUME). 사용자: "머리는 원래처럼 닻으로",
+## "원래 오브젝트헤드잖아", "원래랑 맞는 모델을 써야지". 몸 모델이 없으면 도형 선장(머리는 같은 닻).
 static func captain(root: Node3D, at: Vector3) -> Node3D:
 	var g := Node3D.new()
 	g.name = "Captain"
 	g.position = at
 	root.add_child(g)
-	if ResourceLoader.exists(CAPTAIN_MODEL):
-		var ps := load(CAPTAIN_MODEL) as PackedScene
-		if ps != null:
-			var m := ps.instantiate() as Node3D
-			m.name = "Model"
-			m.rotation.y = PI
-			m.scale = Vector3.ONE * CAPTAIN_SCALE
-			g.add_child(m)
-			var holder := ObjectHead.attach(m.find_child("Skeleton3D", true, false) as Skeleton3D, &"captain")
-			if holder != null:
-				_captain_collar(holder)
-			var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
-			if ap != null and ap.has_animation("Idle"):
-				ap.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
-				ap.play("Idle")
-				g.set_meta("anim", ap)
-			return g
+	if NpcModel.available():
+		var npc := NpcModel.new()
+		npc.name = "Model"
+		npc.model = "man"
+		npc.head = &"captain"
+		g.add_child(npc)
+		g.set_meta("npc", npc)
+		return g
 	_captain_shapes(g)
 	return g
 
 
-## 받은 모델은 머리가 커서 줄인 얼굴이 목에 조금 남는다: 외투 빛 높은 깃과 붉은 목수건으로 가리고 닻을 키운다.
-static func _captain_collar(holder: Node3D) -> void:
-	var o := holder.get_child(0) as Node3D
-	o.scale = Vector3.ONE * 1.35
-	o.position = Vector3(0, 0.06, 0)
-	var leather := PastBuilder._plain("cap_collar", Color(0.26, 0.17, 0.11), 0.85)
-	var scarf := PastBuilder._plain("cap_scarf", Color(0.5, 0.08, 0.07), 0.9)
-	var col := CylinderMesh.new()
-	col.top_radius = 0.17
-	col.bottom_radius = 0.21
-	col.height = 0.22
-	col.radial_segments = 12
-	PastBuilder._put(holder, col, leather, Vector3(0, -0.04, 0))
-	var knot := TorusMesh.new()
-	knot.inner_radius = 0.16
-	knot.outer_radius = 0.24
-	knot.rings = 16
-	var t := PastBuilder._put(holder, knot, scarf, Vector3(0, 0.02, 0))
-	t.scale = Vector3(1.0, 0.6, 1.0)
-	PastBuilder._box(holder, Vector3(0.09, 0.14, 0.05), Vector3(0.05, -0.06, 0.21), scarf, Vector3(0, 0, 12))   # 목수건 끝(앞)
-	PastBuilder._box(holder, Vector3(0.08, 0.12, 0.05), Vector3(-0.05, -0.07, 0.21), scarf, Vector3(0, 0, -16))
-
-
-## 말을 걸면 손을 흔들고 다시 서 있는다(모델이 있을 때만).
-static func captain_greet(cap: Node3D) -> void:
-	var ap: AnimationPlayer = cap.get_meta("anim", null)
-	if ap == null or not ap.has_animation("Wave"):
-		return
-	ap.play("Wave", 0.2)
-	ap.queue("Idle")
+## 말을 걸면 말하는 동작, 말이 끝나면 다시 서 있기(past.gd가 부른다). 몸 모델이 없으면 아무것도 안 한다.
+static func captain_talk(cap: Node3D, talking: bool) -> void:
+	var npc: NpcModel = cap.get_meta("npc", null)
+	if npc != null:
+		npc.play("talk" if talking else "idle")
 
 
 static func _captain_shapes(g: Node3D) -> void:

@@ -88,7 +88,7 @@ func _add_skin() -> void:
 
 
 ## 머리 물건에 맞춘 옷(사진 속 등불머리의 연미복처럼): 옷감 색, 장식 색, 덧옷 한 벌.
-## 덧옷: apron(앞치마), tails(연미복 꼬리), cloak(망토), sash(띠), vest(조끼)
+## 덧옷: apron(앞치마), tails(연미복 꼬리), cloak(망토), sash(띠), vest(조끼), coat(선장 외투: 앞판·금 단추·견장·꼬리)
 const COSTUME: Dictionary = {
 	&"smith": [Color(0.26, 0.2, 0.15), Color(0.55, 0.4, 0.2), &"apron"],
 	&"apprentice": [Color(0.3, 0.24, 0.18), Color(0.5, 0.36, 0.2), &"apron"],
@@ -105,6 +105,7 @@ const COSTUME: Dictionary = {
 	&"peasant2": [Color(0.4, 0.34, 0.2), Color(0.5, 0.4, 0.22), &"vest"],
 	&"peasant3": [Color(0.3, 0.28, 0.26), Color(0.4, 0.36, 0.3), &"apron"],
 	&"peasant4": [Color(0.42, 0.36, 0.22), Color(0.55, 0.45, 0.22), &"sash"],
+	&"captain": [Color(0.1, 0.13, 0.26), Color(0.75, 0.6, 0.28), &"coat"],   # 2026-11-26 닻의 선장(과거): 남색 선장 외투, 금빛 단
 }
 
 var _piece: Node3D
@@ -137,6 +138,16 @@ func _dress() -> void:
 			_pbox(Vector3(0.5, 0.06, 0.24), Vector3(0, h * 0.8, 0.04), cloth)
 		&"sash":
 			_pbox(Vector3(0.08, 0.7, 0.3), Vector3(0, h * 0.62, 0), trim, Vector3(0, 0, 0.75))
+		&"coat":
+			for sx in [-1.0, 1.0]:
+				_pbox(Vector3(0.16, 0.46, 0.025), Vector3(sx * 0.082, h * 0.68, -0.13), cloth)   # 앞판
+				_pbox(Vector3(0.022, 0.44, 0.03), Vector3(sx * 0.016, h * 0.68, -0.145), trim)   # 금빛 단
+				_pbox(Vector3(0.15, 0.035, 0.13), Vector3(sx * 0.2, h * 0.815, 0.0), trim)   # 견장
+				_pbox(Vector3(0.18, 0.66, 0.02), Vector3(sx * 0.1, h * 0.36, 0.15), cloth, Vector3(0.12, 0, sx * 0.08))   # 뒤 꼬리
+				_pbox(Vector3(0.15, 0.46, 0.02), Vector3(sx * 0.12, h * 0.4, -0.12), cloth, Vector3(-0.1, 0, sx * 0.1))   # 앞 자락
+				for k in 3:   # 단추
+					_pbox(Vector3(0.022, 0.022, 0.02), Vector3(sx * 0.06, h * (0.76 - k * 0.06), -0.146), trim)
+			_pbox(Vector3(0.36, 0.05, 0.27), Vector3(0, h * 0.5, 0), _mat(Color(0.12, 0.08, 0.05)))   # 허리띠
 		&"vest":
 			for sx in [-1.0, 1.0]:
 				_pbox(Vector3(0.15, 0.36, 0.02), Vector3(sx * 0.09, h * 0.63, -0.13), cloth)
