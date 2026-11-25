@@ -57,6 +57,8 @@ extends Resource
 @export var spawn_drop: float = 0.8
 @export var spawn_zone: float = 0.16
 @export var spawn_first: float = 1.5
+## 첫 구역 밤만 나타남 간격을 이만큼 늘린다(2026-11-26, 손맛 맞추기용 손잡이. 봇 시험에서 1.35는 피하지 않는 봇만 돕고 피하는 봇은 오히려 덜 가서 1로 둔다. docs/balance.md).
+@export var first_night_gap: float = 1.0
 @export var max_enemies: int = 70
 ## 늑대와 거인이 나올 확률(구역마다 오르고 상한이 있다). 나머지는 망령.
 @export var wolf_chance: Vector3 = Vector3(0.3, 0.03, 0.55)

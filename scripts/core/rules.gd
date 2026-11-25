@@ -1577,6 +1577,8 @@ func _step_night() -> void:
 	_spawn_t -= dt
 	if _spawn_t <= 0.0 and enemies.size() < R.max_enemies and (night_left > 0.0 or last_zone()):
 		_spawn_t = (R.spawn_start - R.spawn_drop * minf(1.0, prog)) / (1.0 + R.spawn_zone * zone)
+		if zone == 0:
+			_spawn_t *= R.first_night_gap
 		if goal == &"siege":
 			_spawn_t /= maxf(0.01, R.siege_spawn)
 		var r: float = rng.randf()

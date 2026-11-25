@@ -57,6 +57,10 @@ func _run(id: int, era: StringName, zone: int, packs: int) -> Dictionary:
 	var limit: int = roundi(90.0 * packs / r.dt)
 	var done: int = 0
 	var def: Dictionary = PACK.duplicate(true)
+	if era == &"future":
+		def = FutureLayout.NEON_PACKS["plaza"].duplicate(true)
+	elif era == &"past":
+		def = PastLayout.PACKS[PastLayout.PACKS.keys()[2]].duplicate(true)
 	def["zone"] = zone
 	def["at"] = Vector2(17, 4)
 	r.spawn_pack(&"p0", def)
