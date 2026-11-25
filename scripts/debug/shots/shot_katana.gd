@@ -1,6 +1,7 @@
 extends SceneTree
 ## 사이버 카타나(311, Blender assets/swords/311.glb) 확인 그림. /home/claude/shots/에 남긴다.
 ##   katana.png: 제품 사진처럼 비스듬히(어두운 배경, 앞빛과 뒤의 찬 테두리빛). katana_detail.png·katana_tip.png: 같은 자세로 가까이.
+##   katana_full.png: 칼 전체를 가로로 크게(3200×1000).
 ##   katana_check.png: 정면 직교 투영. 왼쪽이 Blender 모델, 오른쪽이 코드 카타나(파일이 없을 때 쓰는 것).
 ##     둘 다 원점(코등이)이 가로줄 위에 있고, 주황 점은 blade_points(베기 궤적의 두 끝)다.
 ## 돌리기: xvfb-run -a godot --path . --rendering-driver opengl3 --rendering-method gl_compatibility --resolution 1600x900 -s scripts/debug/shots/shot_katana.gd
@@ -56,6 +57,22 @@ func _init() -> void:
 		root.get_texture().get_image().save_png(OUT + str(shot[0]) + ".png")
 		print("shot ", shot[0])
 	cam.look_at_from_position(Vector3(0.0, 0.05, 4.4), Vector3(0.0, 0.0, 0.0))
+	# 전체: 칼 한 자루를 가로로 눕혀 넓은 그림(3200×1000) 가득(katana_full.png). 칼끝 오른쪽, 날 아래, 제 축으로 돌려 덮개 판이 보이게
+	pivot.basis = Basis(Vector3.RIGHT, 0.3) * Basis(Vector3.BACK, -PI / 2.0) * Basis(Vector3.UP, 0.5)
+	var vp := SubViewport.new()
+	vp.size = Vector2i(3200, 1000)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	w.add_child(vp)
+	var wide := Camera3D.new()
+	wide.fov = 12.0
+	vp.add_child(wide)
+	wide.look_at_from_position(Vector3(0.0, 0.02, 2.95), Vector3(0.0, 0.0, 0.0))
+	wide.current = true
+	for k in 10:
+		await process_frame
+	vp.get_texture().get_image().save_png(OUT + "katana_full.png")
+	print("shot katana_full")
+	vp.queue_free()
 	# 맞춤 확인: 정면 직교, 왼쪽 Blender, 오른쪽 코드 카타나
 	pivot.visible = false
 	var glb := SwordModel.make(form, 4, SwordModel.KATANA_SEED, d.grades.colors[4])
