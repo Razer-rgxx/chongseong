@@ -19,6 +19,7 @@
 ## 정한 것
 - 같은 검은 같은 자료를 두고, 미래 모습과 능력 변형은 나중에 얹는다. 새 검 300자루를 만들지 않는다.
 - 사이버 카타나는 오픈월드 한정 검(`field_only`) 311. 고유 능력은 없다.
+- **모양(2026-11-25, Blender):** `tools/blender/make_swords.py`의 `sword_cyber_katana`로 지은 `assets/swords/311.glb`(정점 2,601개, 질감 1K). 진짜 카타나 비율의 곧은 외날(칼끝이 칼등 쪽으로 3.5cm, 휜 깊이 0.9cm)에 시노기·칼등 마루·각진 킷사키(요코테 선), 짙은 건메탈. 날 끝의 좁은 면만 은은한 청록. 칼뿌리 기계 덮개(날 길이의 1/5, 겹친 판, 홈의 파란 네온관과 판 위의 글자 없는 네온 무늬), 둥글고 두툼한 코등이의 청록 네온 고리, 칼날 1/4 길이의 두 손 손잡이(검은 끈 마름모 감김은 구운 질감), 옅은 고리 둘, 네모 끝마개의 네온 줄. 빛 알갱이 없음. 원점·방향·칼날 길이(세검 1.42m)는 그대로이고 손잡이 길이 `SwordModel.KATANA_GRIP`(0.355)과 칼끝 x `KATANA_TIP_X`(베기 궤적 `blade_points`가 따라간다)를 새로 맞췄다. 빛 세기는 `SwordModel.KATANA_GLOW`(날 끝 1.3, 네온 3.2·2.8), 빛 색에 빨강이 없어 세게 켜도 하얗게 날지 않는다. 파일이 없으면 예전 코드 모양(`SwordModel._katana`). 확인 그림 `scripts/debug/shots/shot_katana.gd`.
 
 ## 3단계: 녹슨 미래 구역 (2026-11-25)
 - **가는 길:** `Meta.rift_open()`(= `stranger_done`)이면 들판의 `FutureLayout.RIFT_FIELD`(낯선 사람이 처음 서던 자리 곁)에 흐릿한 틈(`FutureRift`)이 선다. E → `GlitchOverlay`가 0.9초 오르고 `scenes/future/future.tscn`으로(`SceneLoader`). 미래 안 `EXIT_AT`의 같은 틈에서 E → 글리치 → 들판 틈 앞에서 깬다(`Meta.wake_at_rift`). 쓰러지면 쥔 검을 들판 틈 앞에 떨군다(무덤과 같다).

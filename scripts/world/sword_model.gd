@@ -14,6 +14,8 @@ var blade_length: float = 1.0
 var grip_length: float = 0.2
 var grade: int = 0
 var glow_color: Color = Color.WHITE
+## 칼끝의 x(m). 곧은 칼은 0, 휜 사이버 카타나(Blender)는 칼등 쪽으로 조금 비켜난다. 베기 궤적이 칼끝을 따라가게.
+var tip_x: float = 0.0
 
 
 ## form: FormData(칼날 길이·너비), grade: 0~5, seed: 칼 번호, col: 등급 색. form이 null이면 그냥 장검.
@@ -29,7 +31,7 @@ static func for_sword(sw: Sword, grades: GradeTable) -> SwordModel:
 
 ## 칼날의 손잡이 쪽 끝과 칼끝(세계 좌표).
 func blade_points() -> Array[Vector3]:
-	return [global_transform * Vector3(0, 0.05, 0), global_transform * Vector3(0, blade_length, 0)]
+	return [global_transform * Vector3(0, 0.05, 0), global_transform * Vector3(tip_x, blade_length, 0)]
 
 
 func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
@@ -41,11 +43,17 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 	blade_length = form.blade_length if form else 1.1
 	var width: float = form.blade_width if form else 0.08
 	grip_length = {"dagger": 0.11, "longsword": 0.2, "greatsword": 0.36, "rapier": 0.14}.get(kind, 0.2)
-	# Blender로 지은 칼(tools/blender/make_swords.py → assets/swords/<번호>.glb)이 있으면 그것(최고 등급 몇 자루)
+	# Blender로 지은 칼(tools/blender/make_swords.py → assets/swords/<번호>.glb)이 있으면 그것(최고 등급 몇 자루, 사이버 카타나)
 	var glb: String = "res://assets/swords/%d.glb" % seed
 	if ResourceLoader.exists(glb):
 		var g := (load(glb) as PackedScene).instantiate() as Node3D
 		add_child(g)
+		if seed == KATANA_SEED:   # 사이버 카타나: 등급 색 대신 제 청록빛, 빛 알갱이 없음, 두 손 손잡이
+			glow_color = KATANA_BLUE
+			grip_length = KATANA_GRIP
+			tip_x = KATANA_TIP_X
+			_katana_glow(g)
+			return
 		_tint_glow(g, col)
 		if grade >= 4:
 			_aura(col, grade)
@@ -66,10 +74,17 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 		_aura(col, grade)
 
 
-## 사이버 카타나(311, docs/stranger.md): 휘어진 외날 칼날, 날과 칼등을 따라 도는 차가운 청록빛 줄, 칼뿌리의 기계 덮개.
-## 칼날은 +Y로 길이 L, 휜 쪽(날 쪽)은 +X. 손잡이는 -Y. 메시 여섯 개와 공유 재질만 쓴다.
+## 사이버 카타나(311, docs/stranger.md). 보통은 Blender 모델(assets/swords/311.glb, tools/blender/make_swords.py의
+## sword_cyber_katana)을 쓰고, 그 파일이 없을 때만 아래 _katana가 코드로 짓는다.
+## 칼날은 +Y로 길이 L, 날 쪽은 +X. 손잡이는 -Y.
 const KATANA_SEED: int = 311
 const KATANA_BLUE: Color = Color(0.35, 0.85, 0.95)
+## Blender 카타나의 손잡이 길이(코등이 아래 ~ 끝마개, 칼날 1.42m의 1/4)와 칼끝 x. make_swords.py의 KAT_GRIP·KAT_TIP_X와 같다.
+const KATANA_GRIP: float = 0.355
+const KATANA_TIP_X: float = -0.064
+## Blender 카타나의 빛 세기: 날 끝은 은은하게, 덮개의 네온관(파랑)과 코등이·끝마개의 네온 고리(청록)는 네온사인처럼.
+## 빛 색에 빨강이 없어서 세게 켜도 하얗게 날지 않고 번짐(glow)만 생긴다.
+const KATANA_GLOW: Dictionary = {"glow_kat_edge": 1.3, "glow_kat_line": 3.2, "glow_kat_rim": 2.8}
 const KATANA_SORI: float = 0.08    ## 휨(칼날 길이에 대한 비율)
 const KATANA_N: int = 12           ## 칼날 마디 수
 
@@ -217,12 +232,6 @@ func _katana(L: float) -> void:
 	_sbox(cg, Vector3(0, cap_y, 0), Vector3(0.039, 0.0028, 0.039))
 	cg.generate_normals()
 	_mesh_node(cg, glow)
-	_aura(KATANA_BLUE, 4)
-	var motes := get_child(get_child_count() - 1) as CPUParticles3D
-	if motes:
-		motes.amount = 6
-		motes.scale_amount_max = 0.3
-		motes.scale_amount_min = 0.12
 
 
 ## 마디 하나의 단면 5점: 날, 윗 시노기, 윗 등, 아랫 등, 아랫 시노기.
@@ -311,6 +320,19 @@ func _cyl_n(top: float, bottom: float, h: float, at: Vector3, m: Material, segs:
 	mi.position = at
 	add_child(mi)
 	return mi
+
+
+## Blender 사이버 카타나의 빛 재질(glow_kat_*): 색은 모델의 청록 그대로 두고 세기만 KATANA_GLOW로.
+static func _katana_glow(n: Node) -> void:
+	for node in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for si in mi.mesh.get_surface_count():
+			var m := mi.mesh.surface_get_material(si) as StandardMaterial3D
+			if m and KATANA_GLOW.has(m.resource_name):
+				var d := m.duplicate() as StandardMaterial3D
+				d.emission_enabled = true
+				d.emission_energy_multiplier = KATANA_GLOW[m.resource_name]
+				mi.set_surface_override_material(si, d)
 
 
 ## Blender 칼의 glow_·ghost_ 재질을 등급 빛깔로.

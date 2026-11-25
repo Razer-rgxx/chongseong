@@ -81,5 +81,9 @@ func _sword() -> void:
 	var sw: Sword = m.unbreakable_sword(d, Stranger.SWORD)
 	check.call(sw != null and sw.data.id == 311 and not sw.breakable(), "사이버 카타나: 부러지지 않는 검으로 쥔다")
 	var model: SwordModel = SwordModel.make(d.forms[3], 4, 311, d.grades.colors[4])
-	check.call(model.get_child_count() > 8 and model.glow_color == SwordModel.KATANA_BLUE, "사이버 카타나: 모양이 따로 있다")
+	# Blender 모델(assets/swords/311.glb)이 있으면 그것(두 손 손잡이, 칼끝이 칼등 쪽으로 조금), 없으면 코드로 지은 모양
+	var from_glb: bool = ResourceLoader.exists("res://assets/swords/311.glb")
+	var own_look: bool = (model.grip_length == SwordModel.KATANA_GRIP and model.tip_x == SwordModel.KATANA_TIP_X) if from_glb else model.get_child_count() > 8
+	check.call(own_look and model.glow_color == SwordModel.KATANA_BLUE, "사이버 카타나: 모양이 따로 있다")
+	check.call(model.find_children("*", "CPUParticles3D", true, false).is_empty(), "사이버 카타나: 떠다니는 빛 알갱이 없음")
 	model.free()

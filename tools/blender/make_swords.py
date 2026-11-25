@@ -23,6 +23,8 @@
 #   295 망각              → 빛으로만 남은 컵 손잡이 레이피어
 #   288 언덕의 심장       → 창살 속 심장이 뛰는 두 손 대검(핏줄 같은 빛)
 #   298 언덕              → 이끼 낀 돌 대검에 작은 칼들이 꽂혔다
+#   311 사이버 카타나     → (2026-11-25, 들판 한정) 곧은 외날, 날 끝 청록, 기계 덮개와 네온관, 네온 고리 코등이, 두 손 손잡이.
+#                            아래 "사이버 카타나" 절. 하나만 다시 만들기: blender -b -P tools/blender/make_swords.py -- 311
 
 import bpy
 import bmesh
@@ -475,6 +477,443 @@ SWORDS.update({
     "288": sword_heart,
     "298": sword_hill,
 })
+
+# ------------------------------------------------------------------ 2026-11-25 사이버 카타나(311, docs/stranger.md)
+# 총 든 낯선 사람이 떨군 칼. 진짜 카타나 비율의 곧은 외날(소리는 아주 조금), 날 끝을 따라서만 은은한 청록 빛,
+# 칼뿌리를 감싼 기계 덮개(겹친 판과 홈, 홈 안의 가는 네온관, 판 위의 글자 없는 네온사인 무늬), 둥글고 두툼한 코등이와
+# 네온 고리 테, 검은 끈을 마름모로 감은 두 손 손잡이(칼날의 1/4), 옅은 고리 둘, 네모 끝마개와 네온 줄.
+# 네온은 빨강을 뺀 청록·파랑이라 밝아도 하얗게 날지 않는다. 빛 알갱이 없음. 정점 3천 개 아래(bmesh로 직접 짓는다), 질감 1K.
+# 손잡이의 마름모 감김은 모양이 아니라 구운 질감(색·노멀)이다.
+# 길이·원점·방향은 SwordModel의 약속 그대로: 코등이 가운데가 원점, 칼날 +Z(세검 1.42m), 날 +X, 칼끝은 (KAT_TIP_X, 0, 1.42).
+# 게임 쪽 값: SwordModel.KATANA_GRIP(= KAT_GRIP), KATANA_TIP_X(= KAT_TIP_X). 바꾸면 같이 바꾼다.
+KAT_L = 1.42                     # 칼날 길이(data/forms/3_rapier.tres, 311은 세검 형태)
+KAT_GRIP = 0.355                 # 코등이 아래부터 끝마개까지(칼날의 1/4)
+KAT_COVER = 0.285                # 기계 덮개 끝(날 길이의 1/5)
+KAT_SORI = 0.035                 # 칼끝이 칼등(-X) 쪽으로 비켜나는 양(m). 휜 깊이(소리)는 그 1/4인 0.9cm쯤
+KAT_W0, KAT_WY = 0.058, 0.041    # 칼날 너비: 덮개 끝(모토하바), 요코테(사키하바)
+KAT_T0, KAT_TY = 0.0062, 0.0044  # 시노기의 반두께
+KAT_KISSAKI = 0.08               # 킷사키 길이
+KAT_M0 = -KAT_W0 / 2.0           # 덮개 속 칼등 자리(칼날이 덮개 가운데에 오게)
+KAT_TIP_X = KAT_M0 - KAT_SORI    # 칼끝 x
+
+K.GLOWS.update({
+    "glow_kat_edge": ((0.0, 0.42, 0.5), (0.0, 0.8, 1.0), 2.4),      # 날 끝(청록)
+    "glow_kat_line": ((0.0, 0.22, 0.6), (0.04, 0.42, 1.0), 4.0),    # 덮개의 네온관(파랑)
+    "glow_kat_rim": ((0.0, 0.45, 0.55), (0.0, 0.85, 1.0), 3.5),     # 코등이 네온 고리, 끝마개 네온 줄(청록)
+})
+
+
+def _kat_mat(name, base, rough, metal, kind):
+    """사이버 카타나 재질(굽기용). OUT_COLOR·OUT_ROUGH와 노멀을 make_heads._bake가 굽는다."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    m["metal"] = metal
+    nt = m.node_tree
+    p = nt.nodes.get("Principled BSDF")
+    co = nt.nodes.new("ShaderNodeTexCoord").outputs["Object"]
+    big = K._noise(nt, co, 5.0, 6.0, 0.55)
+    fine = K._noise(nt, co, 80.0, 4.0, 0.5)
+    dark = tuple(c * 0.55 for c in base)
+    lite = tuple(min(1.0, c * 1.6 + 0.04) for c in base)
+    color = K._mix(nt, (*dark, 1), (*base, 1), K._ramp(nt, big, 0.2, 0.7))
+    color = K._mix(nt, color, (*base, 1), 0.6)
+    height = K._math(nt, "MULTIPLY", fine, 0.08, False)
+    r = K._math(nt, "ADD", rough, K._math(nt, "MULTIPLY", K._math(nt, "SUBTRACT", fine, 0.5, False), 0.08, False))
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    normal_in = None
+    if kind in ("blade", "shin"):
+        # 길이 방향으로 간 결: 좌표를 Z만 늘린 잡음
+        vm = nt.nodes.new("ShaderNodeVectorMath")
+        vm.operation = "MULTIPLY"
+        nt.links.new(co, vm.inputs[0])
+        vm.inputs[1].default_value = (520.0, 520.0, 3.0)
+        streak = K._noise(nt, vm.outputs["Vector"], 1.0, 3.0, 0.5)
+        amt = 0.22 if kind == "blade" else 0.12
+        color = K._mix(nt, color, (*lite, 1), K._math(nt, "MULTIPLY", K._ramp(nt, streak, 0.45, 0.8), amt))
+        r = K._math(nt, "ADD", r, K._math(nt, "MULTIPLY", K._math(nt, "SUBTRACT", streak, 0.5, False), 0.1, False))
+        height = K._math(nt, "ADD", height, K._math(nt, "MULTIPLY", streak, 0.12, False), False)
+    elif kind in ("plate", "dark", "pale"):
+        # 깎은 모서리(베벨 노멀)를 노멀에 굽고, 모서리는 닳아 밝게·매끈하게, 틈은 어둡게
+        bev = nt.nodes.new("ShaderNodeBevel")
+        bev.samples = 8
+        bev.inputs["Radius"].default_value = 0.0012
+        normal_in = bev.outputs["Normal"]
+        dot = nt.nodes.new("ShaderNodeVectorMath")
+        dot.operation = "DOT_PRODUCT"
+        nt.links.new(bev.outputs["Normal"], dot.inputs[0])
+        nt.links.new(geo.outputs["Normal"], dot.inputs[1])
+        edge = K._math(nt, "SUBTRACT", 1.0, K._ramp(nt, dot.outputs["Value"], 0.93, 0.995))
+        edge = K._math(nt, "MULTIPLY", edge, K._ramp(nt, fine, 0.3, 0.55))
+        ao_n = nt.nodes.new("ShaderNodeAmbientOcclusion")
+        ao_n.samples = 16
+        ao_n.inputs["Distance"].default_value = 0.01
+        color = K._mix(nt, K._mix(nt, color, (*dark, 1), 0.8), color, K._ramp(nt, ao_n.outputs["AO"], 0.3, 0.95))
+        color = K._mix(nt, color, (*lite, 1), K._math(nt, "MULTIPLY", edge, 0.7))
+        r = K._math(nt, "SUBTRACT", r, K._math(nt, "MULTIPLY", edge, 0.15))
+        r = K._math(nt, "ADD", r, K._math(nt, "MULTIPLY", K._math(nt, "SUBTRACT", 1.0, ao_n.outputs["AO"]), 0.15))
+    elif kind == "wrap":
+        # 마름모 감김: 손잡이 축(Z) 둘레 각도와 높이로 엇갈린 두 나선 끈. 끈 사이 마름모 창은 어두운 쇠빛 가죽.
+        xyz = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(co, xyz.inputs[0])
+        th = K._math(nt, "ARCTAN2", xyz.outputs["Y"], xyz.outputs["X"], False)
+        tp = K._math(nt, "DIVIDE", th, math.pi, False)
+        zq = K._math(nt, "DIVIDE", xyz.outputs["Z"], 0.0342, False)   # 마름모 하나의 길이
+        w = 0.24   # 끈의 반너비(마름모 한 칸에 대한 비율). 작을수록 마름모 창이 크다
+        hs = []
+        for sgn in (1.0, -1.0):
+            a = K._math(nt, "ADD", zq, K._math(nt, "MULTIPLY", tp, sgn, False), False)
+            d = K._math(nt, "ABSOLUTE", K._math(nt, "SUBTRACT", a, K._math(nt, "ROUND", a, 0.0, False), False), 0.0, False)
+            q = K._math(nt, "DIVIDE", d, w, False)
+            hs.append(K._math(nt, "SUBTRACT", 1.0, K._math(nt, "MULTIPLY", q, q, False)))   # 끈의 둥근 단면(0~1)
+        cord = K._math(nt, "MAXIMUM", hs[0], hs[1])
+        on = K._ramp(nt, cord, 0.0, 0.08)
+        fiber = K._noise(nt, co, 900.0, 2.0, 0.5)
+        cord_col = K._mix(nt, (0.006, 0.006, 0.008, 1), (0.03, 0.031, 0.036, 1), K._math(nt, "MULTIPLY", K._math(nt, "MULTIPLY", cord, cord), fiber))
+        dots = K._voronoi(nt, co, 900.0)
+        win_col = K._mix(nt, (0.035, 0.038, 0.045, 1), (0.075, 0.08, 0.09, 1), K._ramp(nt, dots, 0.0, 0.5))
+        color = K._mix(nt, win_col, cord_col, on)
+        r = K._mix(nt, (0.5, 0.5, 0.5, 1), (0.82, 0.82, 0.82, 1), on)
+        height = K._math(nt, "ADD", K._math(nt, "MULTIPLY", cord, 0.9, False), K._math(nt, "MULTIPLY", K._ramp(nt, dots, 0.0, 0.4), 0.08, False), False)
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = {"wrap": 1.0, "blade": 0.15, "shin": 0.1}.get(kind, 0.3)
+    bump.inputs["Distance"].default_value = 0.0025 if kind == "wrap" else 0.001
+    nt.links.new(height, bump.inputs["Height"])
+    if normal_in is not None:
+        nt.links.new(normal_in, bump.inputs["Normal"])
+    nt.links.new(K._reroute(nt, color, "OUT_COLOR"), p.inputs["Base Color"])
+    nt.links.new(K._reroute(nt, r, "OUT_ROUGH"), p.inputs["Roughness"])
+    nt.links.new(bump.outputs["Normal"], p.inputs["Normal"])
+    p.inputs["Metallic"].default_value = metal
+    return m
+
+
+def _kat_materials():
+    _kat_mat("kat_blade", (0.105, 0.112, 0.128), 0.26, 1.0, "blade")    # 짙은 건메탈, 살짝 광
+    _kat_mat("kat_shin", (0.07, 0.075, 0.087), 0.22, 1.0, "shin")       # 시노기지·칼등: 조금 더 짙고 매끈
+    _kat_mat("kat_plate", (0.2, 0.212, 0.235), 0.4, 1.0, "plate")       # 덮개 판, 끝마개
+    _kat_mat("kat_dark", (0.045, 0.048, 0.056), 0.42, 1.0, "dark")      # 덮개 속, 코등이
+    _kat_mat("kat_pale", (0.56, 0.6, 0.64), 0.32, 1.0, "pale")          # 옅은 고리
+    _kat_mat("kat_wrap", (0.03, 0.03, 0.035), 0.8, 0.0, "wrap")         # 검은 끈과 마름모 창
+
+
+def _kat_obj(name, bm, mats, round_all=False):
+    """bmesh를 물체로(재질 여러 개는 면의 material_index). 모서리는 35도로 매끈/각지게. round_all이면 모두 매끈(네온관)."""
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    for mn in mats:
+        me.materials.append(K.mat(mn))
+    if round_all:
+        me.shade_smooth()
+    else:
+        K.smooth(o)
+    return o
+
+
+def _kat_round(pts, d):
+    """꺾인 점마다 모서리를 d만큼 둥글게(네온관을 구부린 자리)."""
+    P = [Vector(p) for p in pts]
+    out = [P[0]]
+    for i in range(1, len(P) - 1):
+        a, c, b = P[i - 1], P[i], P[i + 1]
+        p0 = c + (a - c).normalized() * min(d, (a - c).length * 0.45)
+        p2 = c + (b - c).normalized() * min(d, (b - c).length * 0.45)
+        out += [p0, p0 * 0.25 + c * 0.5 + p2 * 0.25, p2]
+    out.append(P[-1])
+    return out
+
+
+def _kat_tube(bm, pts, r, mi, segs=6, closed=False):
+    """점들을 따라가는 둥근 네온관(closed면 고리). 끝은 막는다."""
+    P = [Vector(p) for p in pts]
+    n = len(P)
+    rings = []
+    nrm = None
+    for i in range(n):
+        if closed:
+            t = (P[(i + 1) % n] - P[i - 1]).normalized()
+        else:
+            t = (P[min(i + 1, n - 1)] - P[max(i - 1, 0)]).normalized()
+        ref = nrm if nrm is not None else (Vector((0, 0, 1)) if abs(t.z) < 0.9 else Vector((1, 0, 0)))
+        nrm = (ref - t * ref.dot(t)).normalized()
+        bi = t.cross(nrm)
+        rings.append([bm.verts.new(P[i] + (nrm * math.cos(k / segs * math.tau) + bi * math.sin(k / segs * math.tau)) * r) for k in range(segs)])
+    for i in range(n if closed else n - 1):
+        a, b = rings[i], rings[(i + 1) % n]
+        mid = (P[i] + P[(i + 1) % n]) / 2.0
+        for k in range(segs):
+            _kat_face(bm, [a[k], a[(k + 1) % segs], b[(k + 1) % segs], b[k]], mi, mid)
+    if not closed:
+        _kat_face(bm, rings[0], mi, P[0] + (P[1] - P[0]).normalized() * r)
+        _kat_face(bm, rings[-1], mi, P[-1] + (P[-2] - P[-1]).normalized() * r)
+
+
+def _kat_face(bm, vs, mi, inside):
+    """면 하나. inside(안쪽 한 점)에서 멀어지는 쪽이 앞면이 되게 뒤집는다."""
+    f = bm.faces.new(vs)
+    f.normal_update()
+    c = f.calc_center_median()
+    if f.normal.dot(c - Vector(inside)) < 0:
+        f.normal_flip()
+    f.material_index = mi
+    return f
+
+
+def _kat_revolve(bm, prof, segs, sx, sy, mats, sharp=()):
+    """옆모습 [(반지름, z)]을 Z축 둘레로 돌린다(sx·sy로 타원). 반지름 0인 끝은 한 점으로 닫는다.
+    mats[i]: i번째와 i+1번째 점 사이 띠의 재질 번호. sharp: 각지게 할 점 번호. 앞면은 몸 가운데(축 위)에서 바깥쪽."""
+    mid = (0.0, 0.0, (prof[0][1] + prof[-1][1]) / 2.0)
+    rings = []
+    for r, z in prof:
+        if r <= 0.0:
+            rings.append([bm.verts.new((0.0, 0.0, z))])
+        else:
+            rings.append([bm.verts.new((math.cos(k / segs * math.tau) * r * sx, math.sin(k / segs * math.tau) * r * sy, z)) for k in range(segs)])
+    for i in range(len(rings) - 1):
+        a, b = rings[i], rings[i + 1]
+        for k in range(segs):
+            k2 = (k + 1) % segs
+            if len(a) == 1:
+                vs = [a[0], b[k], b[k2]]
+            elif len(b) == 1:
+                vs = [a[k], a[k2], b[0]]
+            else:
+                vs = [a[k], a[k2], b[k2], b[k]]
+            _kat_face(bm, vs, mats[i], mid)
+    for i in sharp:
+        ring = rings[i]
+        for k in range(len(ring)):
+            e = bm.edges.get((ring[k], ring[(k + 1) % len(ring)]))
+            if e:
+                e.smooth = False
+
+
+def _kat_inset(poly, c):
+    """볼록한 2D 다각형을 안쪽으로 c만큼 줄인다."""
+    n = len(poly)
+    cx = sum(p[0] for p in poly) / n
+    cy = sum(p[1] for p in poly) / n
+    lines = []
+    for i in range(n):
+        a, b = Vector(poly[i]), Vector(poly[(i + 1) % n])
+        d = (b - a).normalized()
+        nrm = Vector((-d.y, d.x))
+        if nrm.dot(Vector((cx, cy)) - a) < 0:
+            nrm = -nrm
+        lines.append((a + nrm * c, d))
+    out = []
+    for i in range(n):
+        p1, d1 = lines[i - 1]
+        p2, d2 = lines[i]
+        den = d1.x * d2.y - d1.y * d2.x
+        if abs(den) < 1e-9:
+            out.append(tuple(p2))
+            continue
+        t = ((p2.x - p1.x) * d2.y - (p2.y - p1.y) * d2.x) / den
+        out.append(tuple(p1 + d1 * t))
+    return out
+
+
+def _kat_slab(bm, poly, base_y, t, c, sy, mi):
+    """면(XZ) 위에 얹는 판: 바깥 면은 c만큼 줄이고 t만큼 띄운다(비스듬한 옆면). base_y(z)는 붙는 면의 |y|, sy는 ±1."""
+    top = _kat_inset(poly, c)
+    inner = [bm.verts.new((x, sy * base_y(z), z)) for x, z in poly]
+    outer = [bm.verts.new((x, sy * (base_y(z) + t), z)) for x, z in top]
+    cx = sum(p[0] for p in poly) / len(poly)
+    cz = sum(p[1] for p in poly) / len(poly)
+    ins = (cx, sy * (base_y(cz) - 0.004), cz)
+    _kat_face(bm, outer, mi, ins)
+    n = len(poly)
+    for i in range(n):
+        j = (i + 1) % n
+        _kat_face(bm, [inner[i], inner[j], outer[j], outer[i]], mi, ins)
+
+
+def _kat_blade():
+    """칼날: 마디마다 단면 10점(날, 빛 경계, 지 가운데, 시노기, 칼등 어깨, 칼등 마루 … 반대쪽).
+    날 끝의 좁은 면만 glow_kat_edge. 킷사키는 평평한 면으로 각지게 접고(요코테 선), 칼끝은 칼등 선에서 모인다."""
+    L, zc, zy = KAT_L, KAT_COVER, KAT_L - KAT_KISSAKI
+
+    def M(z):
+        s = max(0.0, (z - zc) / (L - zc))
+        return KAT_M0 - KAT_SORI * s * s
+
+    def lin(a, b, z):
+        s = min(1.0, max(0.0, (z - zc) / (zy - zc)))
+        return a + (b - a) * s
+
+    def main(z):
+        m, w, t = M(z), lin(KAT_W0, KAT_WY, z), lin(KAT_T0, KAT_TY, z)
+        g, tg = lin(0.0048, 0.0038, z), lin(0.0009, 0.0007, z)
+        return [(m + w, 0.0), (m + w - g, tg), (m + 0.62 * w, 0.6 * t + 0.2 * tg), (m + 0.3 * w, t), (m, 0.68 * t), (m - 0.3 * t, 0.0)]
+
+    def kiss(u):
+        z = zy + u * KAT_KISSAKI
+        m, w, t = M(z), KAT_WY, KAT_TY * (1.0 - u)
+        ex = m + w * (1.0 - u ** 1.4)               # 후쿠라: 날이 칼등 선으로 오른다(거의 곧게, 각진 끝)
+        sx = m + 0.3 * w * (1.0 - u)                # 고시노기
+        g = 0.0038 * (1.0 - 0.6 * u)
+        gx, gy = ex - g, 0.0007 * (1.0 - u)
+        return [(ex, 0.0), (gx, gy), ((sx + gx) / 2.0, (t + gy) / 2.0), (sx, t), (m, 0.68 * t), (m - 0.3 * t, 0.0)]
+
+    zs = [zc - 0.045, zc] + [zc + (zy - zc) * k / 8.0 for k in range(1, 9)]
+    kus = (0.14, 0.28, 0.42, 0.56, 0.69, 0.8, 0.89, 0.96)
+    secs = [(z, main(z)) for z in zs] + [(zy + u * KAT_KISSAKI, kiss(u)) for u in kus]
+    yokote = len(zs) - 1
+    bm = bmesh.new()
+    rings = []
+    for z, s in secs:
+        e, g, j, sh, mu, pk = s
+        pts = [e, g, j, sh, mu, pk, (mu[0], -mu[1]), (sh[0], -sh[1]), (j[0], -j[1]), (g[0], -g[1])]
+        rings.append([bm.verts.new((x, y, z)) for x, y in pts])
+    tip = bm.verts.new((M(L), 0.0, L))
+    mats = [0, 1, 1, 2, 2, 2, 2, 1, 1, 0]   # 0 빛, 1 지, 2 시노기지·칼등
+    kmats = [0, 2, 2, 2, 2, 2, 2, 2, 2, 0]  # 킷사키는 지도 짙게: 요코테에서 빛깔이 끊겨 각져 보인다
+    for i in range(len(rings) - 1):
+        a, b = rings[i], rings[i + 1]
+        mid = sum((v.co for v in a + b), Vector()) / 20.0   # 단면이 볼록해서 두 마디의 무게중심은 늘 안쪽
+        for k in range(10):
+            k2 = (k + 1) % 10
+            _kat_face(bm, [a[k], a[k2], b[k2], b[k]], (kmats if i >= yokote else mats)[k], mid)
+    last = rings[-1]
+    mid = (sum((v.co for v in last), Vector()) + tip.co) / 11.0
+    for k in range(10):
+        _kat_face(bm, [last[k], last[(k + 1) % 10], tip], kmats[k], mid)
+    # 날·시노기·칼등의 긴 모서리와 요코테 선은 각지게
+    for i in range(len(rings) - 1):
+        for k in (0, 3, 4, 5, 6, 7):
+            e = bm.edges.get((rings[i][k], rings[i + 1][k]))
+            if e:
+                e.smooth = False
+    for k in range(10):
+        e = bm.edges.get((rings[yokote][k], rings[yokote][(k + 1) % 10]))
+        if e:
+            e.smooth = False
+    return _kat_obj("blade", bm, ["glow_kat_edge", "kat_blade", "kat_shin"])
+
+
+def _kat_cover():
+    """칼뿌리 기계 덮개(코등이 위 ~ 날 길이의 1/5): 칼날 꼴의 어두운 속, 위로 좁아지는 밝은 칼코(하바키),
+    양면에 겹친 판(바닥 판 위에 판 셋), 판 사이와 칼등 쪽 홈에 가는 네온관, 가운데 판 위에 꺾인 네온관 무늬(글자 없음)."""
+    z0, z1, z2 = 0.0085, 0.248, KAT_COVER
+    sec = [(0.043, 0.0), (0.030, 0.0165), (-0.034, 0.0165), (-0.040, 0.0065), (-0.040, -0.0065), (-0.034, -0.0165), (0.030, -0.0165)]
+
+    def sc(z):   # 위로 갈수록 조금 좁아진다
+        s = (z - z0) / (z1 - z0)
+        return 1.0 - 0.05 * s, 1.0 - 0.1 * s
+
+    bm = bmesh.new()
+    rings = []
+    for z, (kx, ky) in ((z0, sc(z0)), (z1, sc(z1)), (z2, (0.76, 0.55))):
+        rings.append([bm.verts.new((x * kx, y * ky, z)) for x, y in sec])
+    n = len(sec)
+    for i in range(2):
+        cz = (rings[i][0].co.z + rings[i + 1][0].co.z) / 2.0
+        for k in range(n):
+            _kat_face(bm, [rings[i][k], rings[i][(k + 1) % n], rings[i + 1][(k + 1) % n], rings[i + 1][k]], 0 if i == 0 else 1, (0.0, 0.0, cz))
+    _kat_face(bm, rings[2], 1, (0.0, 0.0, z2 - 0.01))
+    for ring in rings[1:2]:
+        for k in range(n):
+            e = bm.edges.get((ring[k], ring[(k + 1) % n]))
+            if e:
+                e.smooth = False
+
+    def face_y(z):   # 덮개 넓은 면의 |y|
+        return 0.0165 * sc(z)[1]
+
+    glows = bmesh.new()
+    for sy in (1.0, -1.0):
+        a_t = 0.0022
+        _kat_slab(bm, [(-0.0315, 0.018), (0.027, 0.018), (0.027, 0.205), (0.012, 0.238), (-0.0315, 0.238)], face_y, a_t, 0.0012, sy, 0)
+
+        def on_a(z, add=0.0):
+            return face_y(z) + a_t + add
+
+        for poly in ([(-0.026, 0.026), (0.022, 0.026), (0.022, 0.082), (-0.026, 0.098)],
+                     [(-0.026, 0.108), (0.022, 0.092), (0.022, 0.158), (-0.026, 0.172)],
+                     [(-0.026, 0.182), (0.022, 0.168), (0.022, 0.19), (0.008, 0.226), (-0.026, 0.226)]):
+            _kat_slab(bm, poly, on_a, 0.0026, 0.0014, sy, 2)
+        # 판 사이 두 홈과 칼등 쪽 세로 홈의 네온관(바닥 판 위에 반쯤 묻힌다)
+        r = 0.0012
+        for (xa, za), (xb, zb) in (((-0.0262, 0.103), (0.0222, 0.087)), ((-0.0262, 0.177), (0.0222, 0.163))):
+            _kat_tube(glows, [(xa, sy * on_a(za, r * 0.5), za), (xb, sy * on_a(zb, r * 0.5), zb)], r, 0)
+        _kat_tube(glows, [(-0.0289, sy * on_a(z, r * 0.4), z) for z in (0.03, 0.226)], 0.001, 0)
+
+        # 가운데 판 위의 네온사인 무늬: 기운 ∩ 꼴로 꺾은 관과 작은 고리(글자 아님)
+        def on_b(z, add=0.0):
+            return on_a(z) + 0.0026 + add
+        r2 = 0.0011
+        sign = _kat_round([(-0.019, 0.12), (-0.019, 0.151), (0.013, 0.138), (0.013, 0.117)], 0.004)
+        _kat_tube(glows, [(p.x, sy * on_b(p.y, r2 * 0.7), p.y) for p in sign], r2, 0)
+        dot = [(-0.003 + math.cos(k / 10 * math.tau) * 0.0034, 0.1285 + math.sin(k / 10 * math.tau) * 0.0034) for k in range(10)]
+        _kat_tube(glows, [(x, sy * on_b(z, r2 * 0.7), z) for x, z in dot], 0.0009, 0, closed=True)
+    # 칼등의 평평한 면을 따라 가는 빛
+    _kat_tube(glows, [(-0.040 * sc(z)[0] + 0.0004, 0.0, z) for z in (0.03, 0.235)], 0.0013, 0)
+    _kat_obj("cover", bm, ["kat_dark", "kat_plate", "kat_plate"])
+    _kat_obj("cover_glow", glows, ["glow_kat_line"], True)
+
+
+def _kat_guard():
+    """코등이: 둥글고 두툼한 어두운 쇠. 둘레 가운데 얕은 홈에 청록 네온 고리, 칼 쪽 면에도 가는 네온 고리."""
+    prof = [(0.0, 0.0085), (0.05, 0.0085), (0.0572, 0.0079), (0.0601, 0.0066), (0.0614, 0.0045), (0.0616, 0.0025),
+            (0.0607, 0.0019), (0.0607, -0.0019), (0.0616, -0.0025), (0.0614, -0.0045), (0.0601, -0.0066), (0.0572, -0.0079), (0.05, -0.0085), (0.0, -0.0085)]
+    bm = bmesh.new()
+    _kat_revolve(bm, prof, 36, 1.0, 1.0, [0] * 13, sharp=(5, 6, 7, 8))
+    _kat_obj("guard", bm, ["kat_dark"])
+    gb = bmesh.new()
+    _kat_tube(gb, [(math.cos(k / 36 * math.tau) * 0.0611, math.sin(k / 36 * math.tau) * 0.0611, 0.0) for k in range(36)], 0.0016, 0, closed=True)
+    _kat_tube(gb, [(math.cos(k / 30 * math.tau) * 0.047, math.sin(k / 30 * math.tau) * 0.047, 0.0091) for k in range(30)], 0.001, 0, segs=5, closed=True)
+    _kat_obj("guard_glow", gb, ["glow_kat_rim"], True)
+
+
+def _kat_hilt():
+    """손잡이: 타원 단면, 가운데가 살짝 잘록. 위아래 옅은 고리, 네모 끝마개와 가는 빛 줄."""
+    g = KAT_GRIP
+    zt, zb = -0.0085, -g - 0.0085            # 코등이 아래 ~ 끝마개 끝
+    bm = bmesh.new()
+    prof = [(0.0186, -0.02), (0.0181, -0.1), (0.0176, -0.18), (0.0179, -0.26), (0.0184, zb + 0.03)]
+    _kat_revolve(bm, prof, 20, 1.0, 0.82, [0, 0, 0, 0])
+    _kat_obj("grip", bm, ["kat_wrap"])
+    rb = bmesh.new()
+    for top, bot, r in ((zt, -0.027, 0.0204), (zb + 0.034, zb + 0.026, 0.0197)):
+        h = top - bot
+        prof = [(0.0, top), (r - 0.0012, top), (r - 0.0003, top - 0.0006), (r, top - min(0.0022, h * 0.25)),
+                (r, bot + min(0.0022, h * 0.25)), (r - 0.0003, bot + 0.0006), (r - 0.0012, bot), (0.0, bot)]
+        _kat_revolve(rb, prof, 20, 1.0, 0.84, [0] * 7)
+    _kat_obj("rings", rb, ["kat_pale"])
+    # 네모 끝마개(모서리를 깎은 상자)
+    cb = bmesh.new()
+    bmesh.ops.create_cube(cb, size=1.0)
+    hx, hy, hz = 0.0215, 0.0188, 0.013
+    zc = zb + 0.013
+    for v in cb.verts:
+        v.co = Vector((v.co.x * 2 * hx, v.co.y * 2 * hy, v.co.z * 2 * hz + zc))
+    bmesh.ops.bevel(cb, geom=list(cb.edges), offset=0.0026, segments=1, affect="EDGES", profile=0.5)
+    for f in cb.faces:
+        f.material_index = 0
+    bmesh.ops.recalc_face_normals(cb, faces=cb.faces)
+    _kat_obj("cap", cb, ["kat_plate"])
+    # 끝마개 둘레를 한 바퀴 도는 네온 줄(깎은 네모를 따라)
+    gb = bmesh.new()
+    c = 0.0026
+    oct_ = [(hx, -hy + c), (hx, hy - c), (hx - c, hy), (-hx + c, hy), (-hx, hy - c), (-hx, -hy + c), (-hx + c, -hy), (hx - c, -hy)]
+    zg = zc + 0.002
+    _kat_tube(gb, [(x, y, zg) for x, y in oct_], 0.0012, 0, closed=True)
+    _kat_obj("cap_glow", gb, ["glow_kat_rim"], True)
+
+
+def sword_cyber_katana():
+    """사이버 카타나(311). 위 KAT_* 설명."""
+    _kat_materials()
+    _kat_blade()
+    _kat_cover()
+    _kat_guard()
+    _kat_hilt()
+
+
+SWORDS["311"] = sword_cyber_katana
 
 if __name__ == "__main__":
     K.run_all(K._pick({str(k): v for k, v in SWORDS.items()}), OUT, 1024, "칼")
