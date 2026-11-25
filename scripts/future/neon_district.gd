@@ -5,7 +5,9 @@ extends RefCounted
 ## 길 쪽 면에 네온 줄·광고판(글자 없는 움직이는 도형)·지붕 붉은 등을 붙인다. 하늘길에는 차가 지나고 광장에는 홀로그램.
 ## 모두 MultiMesh와 셰이더 TIME으로 움직여서 프레임마다 돌리는 코드가 없다. 꾸밈 난수는 지역 RandomNumberGenerator.
 
-const PALETTE: Array[Color] = [Color(0.15, 0.95, 1.0), Color(1.0, 0.2, 0.75), Color(1.0, 0.62, 0.18), Color(0.55, 0.35, 1.0), Color(0.35, 1.0, 0.45)]
+## LED·네온 색(2026-11-25 사용자: "led 색이랑 디자인이 별로임"): 형광 청록·자홍·보라·연두 대신 실제 거리의 LED 색.
+## 차가운 흰빛, 빨강, 호박, 파랑, 따뜻한 흰빛.
+const PALETTE: Array[Color] = [Color(0.82, 0.9, 1.0), Color(1.0, 0.2, 0.14), Color(1.0, 0.55, 0.12), Color(0.22, 0.42, 1.0), Color(1.0, 0.8, 0.55)]
 const CENTER: Vector2 = Vector2(128, 54)   ## 가장 높은 건물이 모이는 곳(칸)
 const LOT_M: Vector2 = Vector2(9.0, 15.0)  ## 건물 한 채의 가로 범위(m)
 const H_MIN: float = 16.0
@@ -542,7 +544,7 @@ static func _plazas(city: Node3D, rng: RandomNumberGenerator) -> void:
 		var col: Color = PALETTE[i % PALETTE.size()]
 		for k in 2:
 			var l := OmniLight3D.new()
-			l.light_color = PALETTE[(i + k * 2) % PALETTE.size()]
+			l.light_color = [PALETTE[4], PALETTE[2]][k]   # 따뜻한 흰빛·호박(빨강·파랑이면 경찰차 불빛 같다)
 			l.light_energy = 2.2
 			l.omni_range = 20.0
 			l.shadow_enabled = false
@@ -559,11 +561,7 @@ static func _plazas(city: Node3D, rng: RandomNumberGenerator) -> void:
 					var nm: String = ["detail-awning", "detail-parasol-a", "detail-parasol-b", "detail-awning-wide"][k % 4]
 					FutureBuilder._put(g, FutureBuilder.KIT_C + nm + ".glb", Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(s), at))
 				FutureBuilder._flush(city, g, mat_buildings(), 0.0, FutureBuilder.SMALL_RANGE * 1.5)
-				var lights: Array = []
-				for k in 6:
-					var z: float = c.z - 12.0 + k * 4.8
-					lights.append([Transform3D(Basis.from_scale(Vector3(r.size.x * Grid.CELL * 0.9, 0.08, 0.08)), Vector3(c.x, 4.6 + 0.3 * sin(k), z)), PALETTE[(k + 1) % PALETTE.size()]])
-				_multi(city, BoxMesh.new(), lights, _strip_mat(0.0), BOARD_RANGE)
+				_string_lights(city, c, r.size.x * Grid.CELL * 0.9, rng)
 			_:
 				var gate: Array = []
 				var w: float = 14.0
@@ -572,6 +570,41 @@ static func _plazas(city: Node3D, rng: RandomNumberGenerator) -> void:
 				gate.append([Transform3D(Basis.from_scale(Vector3(w + 0.5, 0.5, 0.5)), c + Vector3(0, 9.0, 0)), PALETTE[(i + 1) % PALETTE.size()]])
 				gate.append([Transform3D(Basis.from_scale(Vector3(w - 3.0, 0.25, 0.25)), c + Vector3(0, 7.6, 0)), col])
 				_multi(city, BoxMesh.new(), gate, _strip_mat(0.0), BOARD_RANGE)
+
+
+## 시장 광장의 줄 등: 광장을 가로질러 처진 검은 전선에 따뜻한 전구 알(몇 개는 꺼졌고 밝기가 조금씩 다르다).
+static func _string_lights(city: Node3D, c: Vector3, span: float, rng: RandomNumberGenerator) -> void:
+	var wires: Array[Transform3D] = []
+	var bulbs: Array = []
+	for k in 6:
+		var z: float = c.z - 12.0 + k * 4.8 + rng.randf_range(-0.6, 0.6)
+		var y0: float = 4.9 + rng.randf_range(-0.3, 0.3)
+		var sag: float = rng.randf_range(0.7, 1.2)
+		var seg: int = 12
+		var prev := Vector3(c.x - span * 0.5, y0, z)
+		for i in range(1, seg + 1):
+			var t: float = float(i) / seg
+			var p := Vector3(c.x - span * 0.5 + span * t, y0 - sag * 4.0 * t * (1.0 - t), z)
+			var d: Vector3 = p - prev
+			wires.append(Transform3D(Basis(Quaternion(Vector3.RIGHT, d.normalized())).scaled(Vector3(d.length(), 0.025, 0.025)), (p + prev) * 0.5))
+			prev = p
+		var n: int = int(span / 0.75)
+		for i in n:
+			var t: float = (i + 0.5) / n
+			if rng.randf() < 0.08:
+				continue   # 나간 전구
+			var p := Vector3(c.x - span * 0.5 + span * t, y0 - sag * 4.0 * t * (1.0 - t) - 0.12, z)
+			var warm := Color(1.0, 0.72, 0.42).lerp(Color(1.0, 0.85, 0.65), rng.randf())
+			warm.a = 1.0
+			bulbs.append([Transform3D(Basis.from_scale(Vector3.ONE * 0.13), p), warm * rng.randf_range(0.55, 1.0)])
+	var cable := BoxMesh.new()
+	FutureBuilder._multi(city, cable, wires, FutureBuilder._plain("cable", Color(0.02, 0.02, 0.025), 0.6), BOARD_RANGE)
+	var ball := SphereMesh.new()
+	ball.radius = 0.5
+	ball.height = 1.0
+	ball.radial_segments = 8
+	ball.rings = 4
+	_multi(city, ball, bulbs, _strip_mat(0.0), BOARD_RANGE)
 
 
 ## 빛기둥 하나와 서로 다르게 도는 고리 셋(더하는 빛).
