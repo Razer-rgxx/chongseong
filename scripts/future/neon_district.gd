@@ -16,9 +16,9 @@ const CITY: String = "res://assets/future/models/neon_city/"
 const FIT: float = 0.15                    ## Blender 건물을 조각에 맞춰 늘리고 줄이는 한도(±, 가로·깊이·높이)
 const CUT_M: Vector2 = Vector2(8.6, 16.1)  ## Blender 건물이 있을 때 블록을 자르는 조각 범위(m): 발자국 10·12·14m의 ±15% 안
 
-## Blender 건물의 LED 줄 색(2026-11-25 사용자: "건물 led만 바꾸라고"): 형광 청록·자홍·보라·연두 대신 실제 건물 LED 색.
-## 모델의 재질 이름(neon_c·m·a·v·l) → 차가운 흰빛·빨강·호박·파랑·따뜻한 흰빛. 거리의 다른 네온·광장은 PALETTE 그대로.
-const CITY_LED: Dictionary = {"neon_c": Color(0.82, 0.9, 1.0), "neon_m": Color(1.0, 0.22, 0.16), "neon_a": Color(1.0, 0.58, 0.16), "neon_v": Color(0.3, 0.48, 1.0), "neon_l": Color(1.0, 0.8, 0.56)}
+## Blender 건물의 LED 줄 색(2026-11-25 "사이버펑크 조사보고 건물 led 재질 색 모양 손봐"): Night City처럼 어두운 건물에 선명한 색 둘씩.
+## 모델의 재질 이름 → 청록(c)·자홍(m)·노랑(a, 사이버펑크의 노랑)·전기 보라(v)·빨강(l). 형광 파스텔이 아니라 짙고 선명하게. 거리의 다른 네온·광장은 PALETTE 그대로.
+const CITY_LED: Dictionary = {"neon_c": Color(0.0, 0.78, 1.0), "neon_m": Color(1.0, 0.08, 0.5), "neon_a": Color(1.0, 0.76, 0.06), "neon_v": Color(0.5, 0.2, 1.0), "neon_l": Color(1.0, 0.1, 0.14)}
 
 static var _index: Dictionary = {}
 
@@ -230,12 +230,13 @@ static func city_mat(nm: String) -> Material:
 		sm.set_shader_parameter("wall_rough", {"fa_a": 0.85, "fa_b": 0.3, "fa_c": 0.45}.get(nm, 0.6))
 		sm.set_shader_parameter("lit_energy", {"fa_b": 1.7, "shop": 1.4}.get(nm, 2.0))
 		m = sm
-	elif neon.has(nm):   # 건물 LED 줄(확산판 든 알루미늄 홈처럼 고르게, 몇 토막은 나갔다)
+	elif neon.has(nm):   # 건물 LED 줄(둥근 네온 플렉스 관: 부드럽게 퍼지는 빛, 건물마다 실선·점선, 몇 토막은 나갔다)
 		var tm := ShaderMaterial.new()
 		tm.shader = load("res://assets/future/neon_tube.gdshader")
 		tm.set_shader_parameter("tint", neon[nm])
-		tm.set_shader_parameter("energy", 3.0 if nm == "beacon" else 1.6)
-		tm.set_shader_parameter("dead", 0.0 if nm == "beacon" else 0.07)
+		tm.set_shader_parameter("energy", 3.0 if nm == "beacon" else 2.6)
+		tm.set_shader_parameter("dead", 0.0 if nm == "beacon" else 0.04)
+		tm.set_shader_parameter("dash", 0.0 if nm == "beacon" else 0.4)
 		m = tm
 	elif nm == "trim":
 		m = FutureBuilder._pbr("city_trim", "concrete_wall_004", 3.0, Color(0.5, 0.52, 0.6))

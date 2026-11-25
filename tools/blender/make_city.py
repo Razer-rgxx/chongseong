@@ -296,9 +296,53 @@ def shape(t):
 
 
 # ================================================================== 건물 한 채
+# ================================================================== 건물 LED(2026-11-25 사용자: "사이버펑크 조사보고 건물 led 재질 색 모양 손봐")
+# Night City(홍콩·도쿄의 네온)와 실제 외벽 선형 조명처럼: 둥근 네온 플렉스 관(PMMA)이 건물의 윤곽(지붕선, 들어간 단의 처마,
+# 모서리)을 따라간다. 건물의 절반쯤만 꾸미고(나머지는 LED 없음), 꾸미는 방식은 건물마다 다르다.
+LED_R = 0.065
+LED_STYLES = ["outline", "outline", "corners", "double", "none", "none", "none"]
+
+
+def ledline(g, p0, p1, mat, r=LED_R, n=6):
+    """p0→p1을 따라가는 둥근 관(6각, 매끈하게)과 막힌 두 끝."""
+    a, b = Vector(p0), Vector(p1)
+    d = b - a
+    if d.length < 1e-4:
+        return
+    t = d.normalized()
+    ref = Vector((0, 0, 1)) if abs(t.z) < 0.9 else Vector((1, 0, 0))
+    u = (ref - t * ref.dot(t)).normalized()
+    v = t.cross(u)
+    ring_a = [g.bm.verts.new(a + (u * math.cos(k / n * math.tau) + v * math.sin(k / n * math.tau)) * r) for k in range(n)]
+    ring_b = [g.bm.verts.new(b + (u * math.cos(k / n * math.tau) + v * math.sin(k / n * math.tau)) * r) for k in range(n)]
+    for k in range(n):
+        k2 = (k + 1) % n
+        f = g.face(None, mat, None, True, [ring_a[k], ring_a[k2], ring_b[k2], ring_b[k]])
+        f.normal_update()
+        if f.normal.dot(((ring_a[k].co + ring_b[k2].co) / 2) - (a + b) / 2) < 0:
+            f.normal_flip()
+    fa = g.face(None, mat, None, False, list(reversed(ring_a)))
+    fa.normal_update()
+    if fa.normal.dot(-t) < 0:
+        fa.normal_flip()
+    fb = g.face(None, mat, None, False, ring_b)
+    fb.normal_update()
+    if fb.normal.dot(t) < 0:
+        fb.normal_flip()
+
+
+def ledloop(g, poly, z, mat, r=LED_R):
+    """다각형 윤곽을 따라 한 바퀴(지붕선·처마)."""
+    n = len(poly)
+    for i in range(n):
+        a, b = poly[i], poly[(i + 1) % n]
+        ledline(g, (a[0], a[1], z), (b[0], b[1], z), mat, r)
+
+
 def tower(sp):
     """sp: 짓는 법(아래 SPECS). 돌려주는 값: (G, index 항목)."""
     rnd = random.Random(sp["seed"])
+    led = sp.get("led") or random.Random(sp["seed"] * 7 + 1).choice(LED_STYLES)   # 다른 모양의 난수는 그대로 두려고 따로 굴린다
     g = G()
     fw, fd = sp["fw"], sp["fd"]
     ph = sp.get("ph", 7.0)
@@ -311,12 +355,17 @@ def tower(sp):
         if side == "f":
             box(g, (0.0, -fd / 2 - 0.65, 3.9), (fw * 0.86, 1.3, 0.22), "metal")
             # 차양 끝 네온은 가게마다 있지 않다(절반쯤). 없으면 차양 밑 따뜻한 등 줄 자리에 어두운 테
-            box(g, (0.0, -fd / 2 - 1.3, 3.74), (fw * rnd.uniform(0.4, 0.86), 0.07, 0.07), neon[0] if rnd.random() < 0.5 else "metal")
+            aw = fw * rnd.uniform(0.4, 0.86)
+            if rnd.random() < 0.5:
+                ledline(g, (-aw / 2, -fd / 2 - 1.3, 3.74), (aw / 2, -fd / 2 - 1.3, 3.74), neon[0], 0.05)
+            else:
+                box(g, (0.0, -fd / 2 - 1.3, 3.74), (aw, 0.07, 0.07), "metal")
         else:
             sx = 1.0 if side == "r" else -1.0
             box(g, (sx * (fw / 2 + 0.55), 0.0, 3.9), (1.1, fd * 0.7, 0.2), "metal")
             if rnd.random() < 0.4:
-                box(g, (sx * (fw / 2 + 1.1), 0.0, 3.74), (0.07, fd * rnd.uniform(0.3, 0.7), 0.07), neon[-1])
+                al = fd * rnd.uniform(0.3, 0.7)
+                ledline(g, (sx * (fw / 2 + 1.1), -al / 2, 3.74), (sx * (fw / 2 + 1.1), al / 2, 3.74), neon[-1], 0.05)
     tops = []
     for si, stack in enumerate(sp["stacks"]):
         z = ph
@@ -334,7 +383,7 @@ def tower(sp):
                 while zz < z1 - 2.0:
                     lit = t.get("neon_band") and k % 2 == 1
                     if lit:
-                        prism(g, grow(poly, 0.12), zz - 0.05, zz + 0.05, neon[(si + k) % len(neon)])
+                        ledloop(g, grow(poly, 0.12), zz, neon[(si + k) % len(neon)])
                     else:
                         prism(g, grow(poly, 0.14), zz - 0.16, zz + 0.16, "trim", "trim", "trim")
                     zz += band * WIN_H
@@ -346,7 +395,25 @@ def tower(sp):
                 fy = min(ys)
                 for cx in (min(xs) + 0.15, max(xs) - 0.15)[: 1 if rnd.random() < 0.5 else 2]:   # 한쪽 모서리만인 것도
                     top_n = z1 - rnd.uniform(2.0, (z1 - z) * 0.4)
-                    box(g, (cx, fy - 0.1, (z + 1.5 + top_n) / 2.0), (0.1, 0.1, top_n - z - 1.5), neon[ti % len(neon)])
+                    ledline(g, (cx, fy - 0.1, z + 1.5), (cx, fy - 0.1, top_n), neon[ti % len(neon)])
+            # 건물마다 다른 LED 꾸밈: 윤곽(처마마다 한 바퀴와 꼭대기 모서리), 모서리 세로선, 두 줄 모서리
+            if led != "none" and t.get("shape", "box") != "round":
+                xs = [p[0] for p in poly]
+                ys = [p[1] for p in poly]
+                corners_xy = [(min(xs) + 0.05, min(ys) - 0.05), (max(xs) - 0.05, min(ys) - 0.05), (max(xs) + 0.05, max(ys) - 0.05), (min(xs) - 0.05, max(ys) - 0.05)]
+                if led == "outline":
+                    ledloop(g, grow(poly, 0.32), z1 + 0.56, neon[0])
+                    if ti == len(stack) - 1:
+                        for cx, cy in corners_xy:
+                            ledline(g, (cx, cy, max(z, z1 - 12.0)), (cx, cy, z1 - 0.3), neon[-1])
+                elif led in ("corners", "double"):
+                    for cx, cy in corners_xy[:2]:
+                        ledline(g, (cx, cy, z + 1.0), (cx, cy, z1 - 1.0), neon[ti % len(neon)])
+                        if led == "double":
+                            dx = 0.35 if cx > 0 else -0.35
+                            ledline(g, (cx - dx, cy, z + 1.0), (cx - dx, cy, z1 - 1.0), neon[(ti + 1) % len(neon)])
+            elif led == "outline" and t.get("shape") == "round":
+                ledloop(g, grow(poly, 0.32), z1 + 0.56, neon[0])
             # 발코니 줄(앞면)
             if t.get("balc"):
                 xs = [p[0] for p in poly]
@@ -396,8 +463,8 @@ def tower(sp):
         z0, x0, x1, y = br
         box(g, ((x0 + x1) / 2, y, z0), (x1 - x0, 3.0, 3.4), "glass")
         box(g, ((x0 + x1) / 2, y, z0 - 1.85), (x1 - x0, 3.4, 0.3), "trim")
-        box(g, ((x0 + x1) / 2, y - 1.6, z0 - 1.6), (x1 - x0, 0.12, 0.12), neon[1 % len(neon)])
-        box(g, ((x0 + x1) / 2, y + 1.6, z0 - 1.6), (x1 - x0, 0.12, 0.12), neon[1 % len(neon)])
+        ledline(g, (x0, y - 1.6, z0 - 1.6), (x1, y - 1.6, z0 - 1.6), neon[1 % len(neon)])
+        ledline(g, (x0, y + 1.6, z0 - 1.6), (x1, y + 1.6, z0 - 1.6), neon[1 % len(neon)])
     # 지붕 위
     top_z = 0.0
     peak = 0.0
@@ -444,15 +511,15 @@ def tower(sp):
                     for s in (-1.0, 1.0):
                         x = cx - hw + (2 * hw) * (k + 0.5) / 4
                         box(g, (x, cy + s * (hd + 1.2), z + 3.0), (0.35, 0.35, 6.0), "trim")
-                        box(g, (x, cy + s * (hd + 1.4), z + 3.0), (0.12, 0.12, 5.6), neon[k % len(neon)])
+                        ledline(g, (x, cy + s * (hd + 1.4), z + 0.2), (x, cy + s * (hd + 1.4), z + 5.8), neon[k % len(neon)])
                 peak = max(peak, z + 6.0)
             elif f == "ring":   # 꼭대기 네온 띠
-                prism(g, grow(poly, 0.4), z - 2.4, z - 2.1, neon[-1])
-                prism(g, grow(poly, 0.4), z - 1.4, z - 1.1, neon[0])
+                ledloop(g, grow(poly, 0.4), z - 2.25, neon[-1])
+                ledloop(g, grow(poly, 0.4), z - 1.25, neon[0])
             elif f == "crown":  # 층층이 줄어드는 왕관 꼭대기
                 p2 = grow(poly, -1.2)
                 prism(g, p2, z, z + 3.4, "glass", "roof")
-                prism(g, grow(p2, 0.2), z + 3.4, z + 3.8, neon[0])
+                ledloop(g, grow(p2, 0.2), z + 3.6, neon[0])
                 p3 = grow(p2, -1.0)
                 prism(g, p3, z + 3.8, z + 6.0, "trim", "roof")
                 peak = max(peak, z + 6.0)
