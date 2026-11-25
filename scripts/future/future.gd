@@ -32,6 +32,11 @@ var _move_fx := MoveFx.new()
 var _enemy_fx := EnemyFx.new()
 var _neons: Array = []
 var _chest: Node3D
+var _ui: TimeUi
+var _vault: Node3D
+var _shard_nodes: Dictionary = {}
+var _final_st: StrangerView = null
+var _final_on: bool = false
 var _glitch_fx: GlitchOverlay
 var _glitch_t: float = -1.0       ## 들어올 때: 0에서 GLITCH_IN까지 가라앉는다
 var _leaving: float = -1.0        ## 나갈 때: 0에서 GLITCH_IN까지 오른다
@@ -58,6 +63,9 @@ func _ready() -> void:
 	rules.lord.pos = FutureLayout.START
 	rules.lord.prev_pos = rules.lord.pos
 	_hud.setup(data, meta)
+	_ui = TimeUi.make(_hud, meta, TimeTravel.ERA_FUTURE)
+	_ui.picked.connect(_on_era_picked)
+	_ui.closed.connect(func() -> void: _capture(true))
 	var env: Environment = ($Environment as WorldEnvironment).environment
 	FutureBuilder.environment(env)
 	var built: Dictionary = FutureBuilder.build(self)
@@ -70,6 +78,7 @@ func _ready() -> void:
 	_blockers = b
 	HillBuilder.setup(Vector2(FutureLayout.SIZE) * Grid.CELL)   # 적의 몸이 구역을 싸움터 안으로 본다
 	FutureRift.make(self, Grid.cells_to_world(FutureLayout.EXIT_AT))
+	_build_story()
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
@@ -102,6 +111,7 @@ func _ready() -> void:
 		_camera.add_shake(minf(0.04 + 0.01 * n, 0.2))
 		_sfx.play(&"chain", _lord.position, 0.0, ChainMeter.pitch(n)))
 	rules.enemy_act.connect(_on_enemy_act)
+	rules.field_boss_slain.connect(_on_guardian)
 	rules.run_ended.connect(_on_down)
 	rules.move_area.connect(func(_m: StringName, info: Dictionary) -> void: _sfx.play(&"thump", Grid.cells_to_world(info.get("at", rules.lord.pos)), -6.0, 0.8))
 	for id in FutureLayout.PACKS:
@@ -155,6 +165,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if k and k.pressed and not k.echo:
 		if k.physical_keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		elif k.physical_keycode == KEY_T and not _over:
+			_toggle_era_window()
 		elif k.physical_keycode == KEY_V:
 			_camera.toggle_mode()
 			_capture(true)
@@ -207,6 +219,16 @@ func _process(delta: float) -> void:
 	_sync_enemies(alpha, delta)
 	_flicker(delta)
 	_glitch(delta)
+	if _final_st != null:
+		_final_st.update(delta)
+	if _say_t > 0.0:
+		_say_t -= delta
+		if _say_t <= 0.0 and not _final_on:
+			_hud.say_end()
+	if Meta.go_present:   # 관리 명령 `시대 현재`
+		Meta.go_present = false
+		if not _over and _leaving < 0.0:
+			_leave()
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
 	_near = ""
 	var best_d: float = reach
@@ -224,6 +246,11 @@ func _spots() -> Dictionary:
 	var s := {"exit": FutureLayout.EXIT_AT, "terminal": FutureLayout.TERMINAL_AT}
 	if not meta.field_found.has(FutureLayout.CACHE_ID):
 		s["cache"] = FutureLayout.CACHE_AT
+	for i in Story.SHARDS.size():
+		if _shard_nodes.has(i):
+			s["shard%d" % i] = Story.SHARDS[i].at
+	s["vault"] = Story.VAULT_AT
+	s["lock"] = Story.TIME_LOCK_AT
 	return s
 
 
@@ -233,6 +260,12 @@ func _prompt(key: String) -> String:
 			return "틈으로 돌아간다"
 		"terminal":
 			return "단말을 건드린다"
+		"vault":
+			return "봉인 단말을 건드린다"
+		"lock":
+			return "시간 고정 단말을 건드린다"
+	if key.begins_with("shard"):
+		return "자료 조각을 줍는다"
 	return "녹슨 함을 연다"
 
 
@@ -249,6 +282,12 @@ func _interact() -> void:
 			meta.save()
 		else:
 			_hud.toast("단말은 이미 같은 말을 했다")
+	elif _near.begins_with("shard"):
+		_take_shard(int(_near.substr(5)))
+	elif _near == "vault":
+		_use_vault()
+	elif _near == "lock":
+		_use_lock()
 	elif _near == "cache":
 		var got: int = meta.future_cache()
 		if got > 0:
@@ -420,3 +459,115 @@ func _on_slots() -> void:
 	_held_id = s.data.id if s and s.data else 0
 	_lord.set_sword(s, data.grades)
 	_move_fx.tint = FutureLayout.TRAIL
+
+
+# ---------------------------------------------------------------- 타임트래블러 이야기 (docs/stranger.md 4단계)
+
+func _build_story() -> void:
+	for i in Story.SHARDS.size():
+		if not meta.story_shards.has(i):
+			_shard_nodes[i] = StoryProps.shard(self, Grid.cells_to_world(Story.SHARDS[i].at))
+	_vault = StoryProps.vault(self, Grid.cells_to_world(Story.VAULT_AT), meta.vault_open)
+	if meta.vault_open and not meta.time_traveller:
+		_spawn_guardian()
+
+
+func _spawn_guardian() -> void:
+	rules.spawn_field_boss(Story.GUARDIAN_AT, Story.GUARDIAN_ID, Story.GUARDIAN_ZONE)
+
+
+func _take_shard(i: int) -> void:
+	if not meta.take_shard(i):
+		return
+	if _shard_nodes.has(i):
+		(_shard_nodes[i] as Node).queue_free()
+		_shard_nodes.erase(i)
+	_sfx.play(&"glitch", Grid.cells_to_world(Story.SHARDS[i].at), -6.0)
+	_hud.flash(Color(0.4, 0.75, 1.0), 0.2, 0.5)
+	_hud.say("", String(Story.SHARDS[i].text), true)
+	_say_t = 5.0
+	_saved()
+
+
+var _say_t: float = 0.0
+
+
+func _use_vault() -> void:
+	if meta.time_traveller:
+		_hud.toast(Story.VAULT_DONE)
+	elif meta.open_vault():
+		StoryProps.set_open(_vault, true)
+		_sfx.play(&"thump", Grid.cells_to_world(Story.VAULT_AT), -2.0, 0.6)
+		_hud.flash(Color(0.4, 0.75, 1.0), 0.3, 0.8)
+		_hud.say("", Story.VAULT_OPEN, true)
+		_say_t = 4.0
+		_spawn_guardian()
+		_saved()
+	elif meta.vault_open:
+		_hud.toast("금고는 열려 있다. 지키는 것이 깨어 있다.")
+	else:
+		_hud.toast(Story.VAULT_SEALED % meta.story_shards.size())
+
+
+func _use_lock() -> void:
+	if meta.time_lock:
+		_hud.toast(Story.LOCK_HELD)
+	elif meta.buy_time_lock():
+		_sfx.play(&"glitch", Grid.cells_to_world(Story.TIME_LOCK_AT), -4.0)
+		_hud.flash(Color(0.4, 0.75, 1.0), 0.25, 0.6)
+		_hud.toast(Story.LOCK_DONE)
+		_saved()
+	elif meta.shards < Story.TIME_LOCK_COST:
+		_hud.toast(Story.LOCK_POOR % Story.TIME_LOCK_COST)
+
+
+## 금고지기가 쓰러졌다: 낯선 사람이 마지막으로 서서 말하고 타임트래블러를 준다(한 번만).
+func _on_guardian(_e: Enemy) -> void:
+	if _final_on or not meta.guardian_slain():
+		return
+	_final_on = true
+	meta.save()
+	var st := StrangerView.make(self, Grid.cells_to_world(Story.FINAL_AT), _lord.position)
+	_final_st = st
+	_ui.refresh()
+	_final_scene(st)
+
+
+func _final_scene(st: StrangerView) -> void:
+	for line in Story.FINAL_LINES:
+		if not is_inside_tree():
+			return
+		_hud.say("", line, true)
+		await get_tree().create_timer(3.0).timeout
+	if not is_inside_tree():
+		return
+	_hud.say("", Story.GOT_LINE, true)
+	_sfx.play(&"glitch", _lord.position, -2.0)
+	_hud.flash(Color(0.4, 0.75, 1.0), 0.3, 0.9)
+	st.fade()
+	await get_tree().create_timer(3.2).timeout
+	if is_inside_tree():
+		_hud.say_end()
+		_ui.refresh()
+
+
+func _toggle_era_window() -> void:
+	if not meta.time_traveller or _leaving >= 0.0:
+		return
+	if _ui.is_open():
+		_ui.close()
+		return
+	if TimeTravel.in_combat(rules):
+		_hud.toast("싸움 중에는 시간이 열리지 않는다.")
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_ui.toggle()
+
+
+func _on_era_picked(era: StringName) -> void:
+	_ui.close()
+	if era == TimeTravel.ERA_NOW and not _over and _leaving < 0.0:
+		if meta.can_travel(rules):
+			_leave()
+		else:
+			_hud.toast("싸움 중에는 시간이 열리지 않는다.")

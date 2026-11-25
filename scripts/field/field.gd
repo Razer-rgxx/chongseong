@@ -78,6 +78,7 @@ var _st_drop: Node3D = null
 var _say_t: float = 0.0       ## 띠 대사를 이 시간 뒤에 거둔다(0이면 없음)
 var _glitch: SwordGlitch = null
 var _glitch_fx: GlitchOverlay = null
+var _time_ui: TimeUi
 var _rift: FutureRift = null   ## 사이버 카타나를 얻은 뒤 서는 갈라진 틈(3단계)
 var _rifting: bool = false
 var _wander_P: Dictionary = {}
@@ -129,6 +130,9 @@ func _ready() -> void:
 	rules.lord.prev_pos = rules.lord.pos
 	meta.see_field(rules.lord.pos)   # 38단계: 깬 자리 둘레는 처음부터 보인다
 	_hud.setup(data, meta)
+	_time_ui = TimeUi.make(_hud, meta, TimeTravel.ERA_NOW)
+	_time_ui.picked.connect(_on_era_picked)
+	_time_ui.closed.connect(func() -> void: _capture(true))
 	_build_dropped()
 	_field_hud = FieldHud.make(_hud, data, meta, rules, _camera)
 	if Meta.wake_note != "":   # 무덤에서 쓰러져 검을 떨궜다
@@ -283,6 +287,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if k and k.pressed and not k.echo:
 		if k.physical_keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		elif k.physical_keycode == KEY_T and not _over:
+			_toggle_era_window()
 		elif k.physical_keycode == KEY_V:
 			_camera.toggle_mode()
 			_capture(true)
@@ -1366,3 +1372,28 @@ func _on_slots() -> void:
 	_lord.set_sword(s, data.grades)
 	_move_fx.tint = MoveArt.STEEL if s == null else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (data.grades.colors[s.grade] as Color).lightened(0.25))
 
+
+
+# ---------------------------------------------------------------- 시대 고르기 (docs/stranger.md 4단계)
+
+func _toggle_era_window() -> void:
+	if not meta.time_traveller or _rifting:
+		return
+	if _time_ui.is_open():
+		_time_ui.close()
+		return
+	if TimeTravel.in_combat(rules):
+		_hud.toast("싸움 중에는 시간이 열리지 않는다.")
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_time_ui.toggle()
+
+
+## 미래를 고르면 틈과 같은 글리치로 건넌다(틈이 없어도 된다).
+func _on_era_picked(era: StringName) -> void:
+	_time_ui.close()
+	if era == TimeTravel.ERA_FUTURE and not _over:
+		if meta.can_travel(rules):
+			_enter_rift()
+		else:
+			_hud.toast("싸움 중에는 시간이 열리지 않는다.")

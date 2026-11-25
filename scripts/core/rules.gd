@@ -425,6 +425,11 @@ func _apply_pack() -> void:
 	for id in meta.pack:
 		pack.append(StringName(id))
 	meta.pack.clear()
+	if meta.time_lock:   # 미래의 시간 고정(docs/stranger.md 4단계): 첫 손잡이의 조짐을 3으로, 한 번만
+		meta.time_lock = false
+		if not hilts.is_empty():
+			hilts[0].omen = 3
+			hilts[0].shown_omen = 3
 	var V := data.village
 	for id in pack:
 		var g := V.goods_by_id(id)
