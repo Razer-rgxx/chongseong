@@ -139,9 +139,9 @@ static func in_neon(at: Vector2) -> bool:
 
 ## 빛깔: 가라앉은 차가운 파랑에 보라 조금. 채도 낮게.
 const BG: Color = Color(0.025, 0.035, 0.06)
-const FOG: Color = Color(0.07, 0.11, 0.16)   ## 2026-11-25 네온 시가: 청록 안개
-const AMBIENT: Color = Color(0.36, 0.42, 0.58)
-const MOON: Color = Color(0.58, 0.68, 0.95)
+const FOG: Color = Color(0.08, 0.095, 0.12)   ## 2026-11-25 네온 시가: 옅은 회청 안개(진한 청록이면 그린 것 같다)
+const AMBIENT: Color = Color(0.34, 0.36, 0.43)   ## 2026-11-25 "더 ai 스럽지 않게": 덜 파랗게(건물마다 벽 빛깔이 보이게)
+const MOON: Color = Color(0.62, 0.66, 0.78)
 const CONCRETE: Color = Color(0.26, 0.29, 0.36)
 const ASPHALT: Color = Color(0.085, 0.095, 0.125)
 const RUST: Color = Color(0.3, 0.21, 0.17)

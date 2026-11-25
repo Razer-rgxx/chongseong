@@ -294,6 +294,7 @@ static func _streets(city: Node3D, rng: RandomNumberGenerator) -> void:
 	var zl: Array[float] = _lanes(FutureLayout.Y_SPANS, FutureLayout.SIZE.y)
 	var old: Rect2 = Rect2(FutureLayout.OLD.position * Grid.CELL, FutureLayout.OLD.size * Grid.CELL)
 	var rs := Vector3(M, M, M)
+	var pools: Array = []   # 가로등 밑 빛 웅덩이 자리(m)
 	for x in xl:   # 남북 길
 		var z: float = M * 0.5
 		while z < D:
@@ -305,6 +306,7 @@ static func _streets(city: Node3D, rng: RandomNumberGenerator) -> void:
 				_put(g, cross if on_cross else straight, Transform3D((Basis() if on_cross else Basis(Vector3.UP, PI / 2.0)) * flat, p))
 				if int(z / M) % 3 == 1:
 					_put(lamps, FutureBuilder.KIT_R + "light-square-double.glb", Transform3D(Basis(Vector3.UP, 0.0).scaled(rs), Vector3(x - M * 0.62, 0, z)))
+					pools.append(Vector3(x - M * 0.3, 0.16, z))
 			z += M
 	for zz in zl:   # 동서 길(교차로는 위에서 깔았다)
 		var x: float = M * 0.5
@@ -317,9 +319,29 @@ static func _streets(city: Node3D, rng: RandomNumberGenerator) -> void:
 				_put(g, straight, Transform3D(flat, p))
 				if int(x / M) % 3 == 1:
 					_put(lamps, FutureBuilder.KIT_R + "light-square-double.glb", Transform3D(Basis(Vector3.UP, PI / 2.0).scaled(rs), Vector3(x, 0, zz - M * 0.62)))
+					pools.append(Vector3(x, 0.16, zz - M * 0.3))
 			x += M
 	FutureBuilder._flush(city, g, FutureBuilder._kit_road_mat())
 	FutureBuilder._flush(city, lamps, FutureBuilder._kit_road_mat(), 0.0, FutureBuilder.SMALL_RANGE * 1.8)
+	_pools(city, pools, rng)
+
+
+## 가로등 밑 땅의 빛 웅덩이: 대부분 나트륨등 주황, 몇은 흰 LED, 몇은 꺼졌거나 흐리다(더하기로 칠하는 판, MultiMesh 하나).
+static func _pools(city: Node3D, pools: Array, rng: RandomNumberGenerator) -> void:
+	var items: Array = []
+	for p in pools:
+		var k: float = rng.randf()
+		if k < 0.12:
+			continue   # 꺼진 등
+		var c: Color = Color(1.0, 0.62, 0.3) if k < 0.72 else Color(0.85, 0.9, 1.0)
+		c.a = rng.randf_range(0.55, 1.0)
+		var s: float = rng.randf_range(8.0, 11.0)
+		items.append([Transform3D(Basis(Vector3.RIGHT, -PI / 2.0) * Basis.from_scale(Vector3(s, s, 1.0)), p), c])
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	var m := ShaderMaterial.new()
+	m.shader = load("res://assets/future/light_pool.gdshader")
+	_multi(city, quad, items, m, FutureBuilder.SMALL_RANGE * 2.5)
 
 
 ## 블록 사이 길들의 가운데(m). 마지막 블록 뒤의 길(지도 끝)까지.
@@ -422,7 +444,7 @@ static func _city_boards(boards: Array, lot: Dictionary, rng: RandomNumberGenera
 		var nl := Vector3(float(b.n[0]), float(b.n[1]), float(b.n[2]))
 		var nw: Vector3 = (xf.basis * nl).normalized()
 		var n2 := Vector2(roundf(nw.x), roundf(nw.z))
-		if not (lot.faces as Array).has(n2):
+		if not (lot.faces as Array).has(n2) or rng.randf() < 0.45:   # 길 쪽 면이라도 절반쯤만(모든 벽에 광고판이 있지 않다)
 			continue
 		var bw: float = float(b.s[0]) * (s.x if absf(nl.z) > 0.5 else s.z)
 		var bh: float = float(b.s[1]) * s.y
@@ -563,10 +585,10 @@ static func _holo(city: Node3D, c: Vector3, col: Color) -> void:
 	cyl.cap_bottom = false
 	beam.mesh = cyl
 	beam.position = c + Vector3(0, 13.0, 0)
-	beam.material_override = _holo_mat(col, 0.0, 0.35)
+	beam.material_override = _holo_mat(col, 0.0, 0.09)
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	city.add_child(beam)
-	for k in 3:
+	for k in 1:   # 고리는 하나만, 흐리게(2026-11-25 "더 ai 스럽지 않게")
 		var ring := MeshInstance3D.new()
 		var tor := TorusMesh.new()
 		tor.inner_radius = 4.0 + k * 1.6
@@ -575,7 +597,7 @@ static func _holo(city: Node3D, c: Vector3, col: Color) -> void:
 		ring.mesh = tor
 		ring.position = c + Vector3(0, 8.0 + k * 4.5, 0)
 		ring.rotation_degrees = Vector3(18.0 * (k - 1), 0, 12.0 * k)
-		ring.material_override = _holo_mat(PALETTE[(k + 1) % PALETTE.size()], 0.3 + 0.25 * k * (1.0 if k % 2 == 0 else -1.0), 0.7)
+		ring.material_override = _holo_mat(PALETTE[(k + 1) % PALETTE.size()], 0.3 + 0.25 * k * (1.0 if k % 2 == 0 else -1.0), 0.3)
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		city.add_child(ring)
 

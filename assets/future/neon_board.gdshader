@@ -3,7 +3,7 @@ render_mode unshaded, cull_disabled;
 // 네온 시가 광고판(2026-11-25): 글자 없이 움직이는 도형만(세계에 글자를 띄우지 않는다).
 // 판마다 INSTANCE_CUSTOM: r = 무늬(0~1을 넷으로), g = 색(팔레트 자리), b = 빠르기, a = 위상.
 // 무늬: 흐르는 가로 띠 · 퍼지는 고리 · 오르내리는 막대 · 비껴가는 빛과 칸. 주사선과 테두리가 얹힌다.
-uniform float energy = 1.6;
+uniform float energy = 1.25;
 uniform float dim = 1.0;   // 웹판 등에서 줄일 때
 
 varying vec4 cust;
@@ -29,8 +29,8 @@ void fragment() {
 	float pat = floor(cust.r * 3.999);
 	float t = TIME * (0.25 + cust.b * 0.8) + cust.a * 31.0;
 	vec2 uv = UV;
-	vec3 a = mix(pal(cust.g), vec3(0.7), 0.22);
-	vec3 b = mix(pal(cust.g + 0.37), vec3(0.7), 0.3);
+	vec3 a = mix(pal(cust.g), vec3(0.62), 0.42);
+	vec3 b = mix(pal(cust.g + 0.37), vec3(0.62), 0.48);
 	vec3 col;
 	if (pat < 0.5) {          // 천천히 흐르는 두 빛깔 그라데이션과 빛 번짐
 		float w = 0.5 + 0.5 * sin(uv.x * 2.2 + uv.y * 1.3 - t * 0.5);
@@ -54,6 +54,9 @@ void fragment() {
 	float led = 0.55 + 0.45 * smoothstep(0.5, 0.2, length(px));
 	float lvl = 0.55 + 0.45 * h11(cust.a * 17.0 + cust.g);
 	float bezel = step(0.025, uv.x) * step(uv.x, 0.975) * step(0.04, uv.y) * step(uv.y, 0.96);
+	if (h11(cust.a * 5.3 + 1.7) < 0.18) {   // 꺼진 화면(검은 유리에 희미한 비침)
+		col = vec3(0.012, 0.014, 0.02) + vec3(0.03) * smoothstep(0.3, 0.0, abs(uv.x - uv.y * 0.6 - 0.2));
+	}
 	col = mix(vec3(0.015, 0.016, 0.02), col * led * lvl, bezel);
 	ALBEDO = col * energy * dim;
 }
