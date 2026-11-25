@@ -333,6 +333,11 @@ func _flicker(delta: float) -> void:
 		var f: float = 0.55 + 0.45 * sin(_t * float(n.rate) + float(n.phase))
 		if _flick.randf() < 0.012:
 			f = 0.0   # 툭 꺼졌다 켜진다
+		match String(n.get("mode", "flicker")):
+			"half":   # 대부분 죽어 있다가 가끔 지직 켜진다
+				f = 1.0 if fposmod(_t * 0.23 + float(n.phase), 1.0) < 0.12 and _flick.randf() < 0.7 else 0.05
+			"steady":
+				f = 0.8 + 0.2 * f
 		var m: StandardMaterial3D = n.mat
 		m.emission_energy_multiplier = 2.2 * f
 		var l: OmniLight3D = n.light

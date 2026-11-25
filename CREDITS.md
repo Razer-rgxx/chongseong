@@ -20,6 +20,9 @@
 | Medieval Melee Weapon SFX (소리, 다듬음) | Gravity Sound | itch.io 무료 배포, 팩 안에 약관 문구 없음(팔기 전에 작가에게 확인) | https://gravity-sound.itch.io/medieval-melee-weapon-sfx | 휘두르기, 망치질, 뽑기, 부러짐 (저장소에는 없음) |
 | Sword Combat Sound Effects Pack Free Version (소리, 다듬음) | Hove Audio | itch.io 무료 배포(Royalty Free 표시, 작가가 출처 표기는 안 해도 된다고 함) | https://hoveaudio.itch.io/sword-combat-sound-effects-pack-free-version | 베기, 구르기, 기합, 맞는 소리 (저장소에는 없음) |
 | GD-Sync 1.0.2 (멀티플레이 플러그인, 소스 그대로) | GD-Sync | 소스 형태 재배포 허용(저작권·면책 문구 유지, 이름을 홍보에 쓰지 않음). BSD-2가 아니라 비슷한 자체 글이다: `addons/GD-Sync/LICENSE` | https://github.com/GD-Sync/GD-Sync · https://www.gd-sync.com | 온라인 결투 매칭과 입력 전달(22단계, `scripts/net/gdsync_link.gd`). 키는 저장소에 없다 |
+| Asphalt 02, Concrete Wall 004, Cracked Concrete, Rusty Metal 02 (질감, 1k jpg) | Poly Haven 작가들 | CC0 | https://polyhaven.com/a/asphalt_02 · https://polyhaven.com/a/concrete_wall_004 · https://polyhaven.com/a/cracked_concrete · https://polyhaven.com/a/rusty_metal_02 | 녹슨 미래 구역의 바닥, 건물 벽, 포장 조각, 자동차·철근 (`assets/future/textures/`) |
+| City Kit (Commercial) 2.1 | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 건물·먼 건물 (`assets/future/models/city_commercial/`, 어둡게 덮어 씀) |
+| City Kit (Roads) | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 길 조각과 길가 소품 (`assets/future/models/city_roads/`) |
 
 ## 불러오기 화면 그림
 
