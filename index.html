@@ -38,7 +38,7 @@ body {
 }
 
 #status {
-	background-color: #242424;
+	background-color: #080605;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -89,6 +89,33 @@ body {
 	text-align: center;
 	z-index: 1;
 }
+
+@font-face { font-family: 'DNFForgedBlade'; src: url('fonts/DNFForgedBlade-Medium.otf') format('opentype'); font-display: swap; }
+#status { display: none !important; }
+#status.gh-fail { display: flex !important; background: rgba(8,6,5,0.85); z-index: 30; }
+#gh-load { position: fixed; inset: 0; z-index: 20; background: #080605; color: #ddd4c4; overflow: hidden;
+	font-family: 'DNFForgedBlade', 'Noto Serif KR', 'Batang', serif; transition: opacity 0.6s ease; user-select: none; }
+#gh-load.gone { opacity: 0; pointer-events: none; }
+#gh-load .bg { position: absolute; inset: -2%; background: url('loading.jpg') center/cover no-repeat; filter: brightness(0.42) saturate(0.85);
+	animation: gh-drift 40s ease-in-out infinite alternate; }
+#gh-load .vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 35%, rgba(0,0,0,0.85) 100%),
+	linear-gradient(to bottom, rgba(0,0,0,0.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.9)); }
+#gh-embers { position: absolute; inset: 0; width: 100%; height: 100%; }
+#gh-load .title { position: absolute; top: 30%; width: 100%; text-align: center; font-size: clamp(40px, 7vw, 92px); letter-spacing: 0.18em;
+	color: #eddcb0; text-shadow: 0 0 24px rgba(0,0,0,0.9), 0 2px 2px rgba(0,0,0,0.8); }
+#gh-load .orn { position: absolute; top: calc(30% + clamp(62px, 10vw, 128px)); left: 50%; transform: translateX(-50%); width: min(520px, 70vw); height: 9px; }
+#gh-load .orn::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; height: 1px;
+	background: linear-gradient(to right, rgba(168,143,97,0), rgba(168,143,97,0.75), rgba(168,143,97,0)); }
+#gh-load .orn::after { content: ''; position: absolute; left: 50%; top: 0; width: 7px; height: 7px; background: #a88f61; transform: translateX(-50%) rotate(45deg); }
+#gh-load .low { position: absolute; bottom: 9%; left: 50%; transform: translateX(-50%); width: min(760px, 88vw); text-align: center; }
+#gh-what { font-size: 22px; color: #eddcb0; letter-spacing: 0.06em; text-shadow: 0 2px 6px #000; }
+#gh-load .bar { margin: 14px auto 8px; width: min(440px, 70vw); height: 3px; background: rgba(168,143,97,0.2); position: relative; }
+#gh-fill { position: absolute; left: 0; top: -1px; height: 5px; width: 0; background: linear-gradient(to right, #7d6640, #d8bb7a);
+	box-shadow: 0 0 10px rgba(255,170,80,0.55); transition: width 0.25s linear; }
+#gh-num { font-size: 14px; color: #9a917f; letter-spacing: 0.04em; min-height: 18px; }
+#gh-tip { margin-top: 22px; font-size: 16px; color: #b8ad98; min-height: 44px; transition: opacity 0.6s ease; text-shadow: 0 2px 4px #000; }
+#gh-note { margin-top: 10px; font-size: 13px; color: #7a7262; }
+@keyframes gh-drift { from { transform: scale(1.0) translateX(0); } to { transform: scale(1.06) translateX(-1.5%); } }
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
@@ -103,6 +130,18 @@ body {
 			Your browser does not support JavaScript.
 		</noscript>
 
+
+		<div id="gh-load">
+			<div class="bg"></div><div class="vig"></div><canvas id="gh-embers"></canvas>
+			<div class="title">검의 언덕</div><div class="orn"></div>
+			<div class="low">
+				<div id="gh-what">언덕으로 가는 길을 여는 중</div>
+				<div class="bar"><div id="gh-fill"></div></div>
+				<div id="gh-num"></div>
+				<div id="gh-tip"></div>
+				<div id="gh-note"></div>
+			</div>
+		</div>
 		<div id="status">
 			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
 			<progress id="status-progress"></progress>
@@ -111,7 +150,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":239603432,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":431931188,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -198,17 +237,85 @@ const engine = new Engine(GODOT_CONFIG);
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
 	} else {
-		setStatusMode('progress');
 		const exe = GODOT_CONFIG['executable'];
-		const PARTS = ["index.pck.0", "index.pck.1", "index.pck.2"];
-		const TOTAL = 239603432;
+		const PARTS = ["index.pck.0", "index.pck.1", "index.pck.2", "index.pck.3", "index.pck.4"];
+		const TOTAL = 431931188;
+		const VERSION = '1795566271';
+		const TIPS = ["땅에 붉은 표시가 차오르면 곧 그 자리에 공격이 온다.", "구르는 동안에는 보스의 충격파와 떨어지는 칼을 지나칠 수 있다.", "화살은 칼로 쳐서 부러뜨릴 수 있다.", "손잡이가 버팀을 끝내기 직전에 E나 좌클릭을 맞추면 제대로 당긴다. 모두 맞히면 그 검의 최대 내구가 오른다.", "검집 강화는 검이 아니라 검집에 남는다. 넣는 검을 바꿔도 단계는 그대로다.", "검집 +5부터는 망치질에 실패하면 한 단계 내려간다.", "우두머리를 쓰러뜨리면 가끔 그 머리를 얻는다. 성소에서 쓸 수 있다.", "들판은 낮과 밤이 바뀐다. 밤에는 적이 더 멀리서 알아채고 더 세다.", "들판에서 쓰러지면 북문 앞에서 깨어난다.", "새벽에는 갈림길에서 다음 밤과 보상을 고른다.", "점쟁이는 손잡이의 참된 조짐을 보여 준다.", "무덤 기사는 체력이 절반 아래로 떨어지면 빨라진다.", "언덕지기에게서 멀리 달아나면 하늘에서 칼이 떨어진다.", "V로 3인칭과 쿼터뷰를 바꾸고, F10으로 설정 창을 연다."];
+		const load = document.getElementById('gh-load');
+		const what = document.getElementById('gh-what');
+		const fill = document.getElementById('gh-fill');
+		const num = document.getElementById('gh-num');
+		const tip = document.getElementById('gh-tip');
+		const note = document.getElementById('gh-note');
 		const pack = new Uint8Array(TOTAL);
 		let got = 0;
+		const mb = (n) => (n / 1048576).toFixed(0);
+		function show(done) {
+			fill.style.width = (done * 100).toFixed(1) + '%';
+		}
+		// 도움말: 6초마다 바뀐다
+		let ti = Math.floor(Math.random() * TIPS.length);
+		tip.textContent = TIPS[ti];
+		setInterval(function () {
+			tip.style.opacity = 0;
+			setTimeout(function () { ti = (ti + 1) % TIPS.length; tip.textContent = TIPS[ti]; tip.style.opacity = 1; }, 600);
+		}, 6000);
+		// 바닥 불씨
+		(function () {
+			const c = document.getElementById('gh-embers');
+			const g = c.getContext('2d');
+			const sparks = [];
+			function size() { c.width = innerWidth; c.height = innerHeight; }
+			size(); addEventListener('resize', size);
+			function spawn() { return { x: Math.random() * c.width, y: c.height + 5, v: 14 + Math.random() * 40, r: 0.8 + Math.random() * 1.8, t: 0, life: 3 + Math.random() * 3, w: Math.random() * 6 }; }
+			for (let i = 0; i < 60; i++) { const s = spawn(); s.t = Math.random() * s.life; s.y = c.height - s.v * s.t; sparks.push(s); }
+			let last = performance.now();
+			function step(now) {
+				if (!document.body.contains(c)) { return; }
+				const dt = Math.min(0.05, (now - last) / 1000); last = now;
+				g.clearRect(0, 0, c.width, c.height);
+				for (const s of sparks) {
+					s.t += dt; s.y -= s.v * dt; s.x += Math.sin(s.t * 1.3 + s.w) * 8 * dt;
+					if (s.t > s.life) { Object.assign(s, spawn()); }
+					const k = s.t / s.life; const a = k < 0.15 ? k / 0.15 : (1 - k);
+					g.fillStyle = 'rgba(255,' + Math.floor(150 - 80 * k) + ',' + Math.floor(60 - 40 * k) + ',' + (a * 0.85).toFixed(3) + ')';
+					g.beginPath(); g.arc(s.x, s.y, s.r, 0, 6.283); g.fill();
+				}
+				requestAnimationFrame(step);
+			}
+			requestAnimationFrame(step);
+		}());
+		// 받은 조각을 남겨 두는 곳(브라우저 Cache Storage). 안 되면(시크릿 창 등) 매번 받는다.
+		async function openCache() {
+			try {
+				if (!('caches' in window)) { return null; }
+				const name = 'geom-hill-' + VERSION;
+				for (const k of await caches.keys()) {
+					if (k.startsWith('geom-hill-') && k !== name) { await caches.delete(k); }
+				}
+				return await caches.open(name);
+			} catch (e) {
+				return null;
+			}
+		}
 		async function fetchParts() {
+			const cache = await openCache();
+			let saved = 0;
 			for (const part of PARTS) {
-				const res = await fetch(part + '?v=1795057646');  // 조각 이름이 늘 같아서, 옛 조각이 캐시에서 섞이지 않게
-				if (!res.ok) {
-					throw new Error('Failed to load ' + part + ' (' + res.status + ')');
+				const start = got;
+				let res = null;
+				try { res = cache ? await cache.match(part) : null; } catch (e) { res = null; }
+				const fromCache = !!res;
+				if (fromCache) {
+					saved++;
+					what.textContent = '남겨 둔 언덕을 꺼내는 중';
+				} else {
+					what.textContent = '언덕으로 가는 길을 여는 중';
+					res = await fetch(part + '?v=' + VERSION);  // 조각 이름이 늘 같아서, 옛 조각이 캐시에서 섞이지 않게
+					if (!res.ok) {
+						throw new Error('Failed to load ' + part + ' (' + res.status + ')');
+					}
 				}
 				const reader = res.body.getReader();
 				for (;;) {
@@ -218,19 +325,33 @@ const engine = new Engine(GODOT_CONFIG);
 					}
 					pack.set(value, got);
 					got += value.length;
-					statusProgress.value = got;
-					statusProgress.max = TOTAL;
+					show(got / TOTAL * 0.96);
+					num.textContent = mb(got) + ' / ' + mb(TOTAL) + ' MB';
+				}
+				if (!fromCache && cache) {
+					try { await cache.put(part, new Response(pack.subarray(start, got))); } catch (e) { /* 자리가 모자라면 다음에 다시 받는다 */ }
 				}
 			}
+			note.textContent = cache ? (saved === PARTS.length ? '' : '처음 한 번만 오래 걸린다. 다음부터는 이 브라우저에 남겨 둔 것을 쓴다.') : '';
 			return pack;
 		}
+		note.textContent = '처음 한 번만 오래 걸린다. 다음부터는 이 브라우저에 남겨 둔 것을 쓴다.';
 		Promise.all([engine.init(exe), fetchParts()]).then(function (res) {
+			what.textContent = '언덕을 깨우는 중';
+			num.textContent = '';
+			show(0.98);
 			return engine.preloadFile(res[1].buffer, 'index.pck');  // 배열 그대로 넘기면 fileSizes 키로 문자열이 되어 터진다
 		}).then(function () {
 			return engine.start({ 'args': ['--main-pack', 'index.pck'] });
 		}).then(() => {
+			show(1);
 			setStatusMode('hidden');
-		}, displayFailureNotice);
+			setTimeout(function () { load.classList.add('gone'); setTimeout(function () { load.remove(); }, 800); }, 400);
+		}, function (err) {
+			document.getElementById('status').classList.add('gh-fail');
+			load.remove();
+			displayFailureNotice(err);
+		});
 	}
 }());
 		</script>
