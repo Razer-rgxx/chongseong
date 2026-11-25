@@ -378,7 +378,7 @@ def tower(sp):
                     cz = bd["z"]
                     cyy = (min(ys) + max(ys)) / 2 + bd.get("off", 0.0)
                     box(g, (face_x + 0.12, cyy, cz), (0.24, bw + 0.5, bh + 0.5), "metal")
-                    boards.append({"p": [face_x + 0.3, cz, -cyy], "n": [1, 0, 0], "s": [bw, bh]})
+                    boards.append({"p": [face_x + 0.55, cz, -cyy], "n": [1, 0, 0], "s": [bw, bh]})   # 받침판에서 31cm 띄운다(깊이 겹침 막기)
                 else:
                     fy = min(ys)
                     bw, bh = bd["w"], bd["h"]
@@ -387,7 +387,7 @@ def tower(sp):
                     box(g, (cx, fy - 0.12, cz), (bw + 0.5, 0.24, bh + 0.5), "metal")
                     for dz in (-1, 1):
                         box(g, (cx, fy - 0.3, cz + dz * (bh / 2 + 0.2)), (bw + 0.6, 0.14, 0.14), "trim")
-                    boards.append({"p": [cx, cz, -(fy - 0.3)], "n": [0, 0, 1], "s": [bw, bh]})
+                    boards.append({"p": [cx, cz, -(fy - 0.55)], "n": [0, 0, 1], "s": [bw, bh]})
             z = z1 + 0.5
             last = (poly, z)
         tops.append(last)

@@ -2,61 +2,82 @@ shader_type spatial;
 render_mode unshaded, cull_disabled;
 // 네온 시가 광고판(2026-11-25): 글자 없이 움직이는 도형만(세계에 글자를 띄우지 않는다).
 // 판마다 INSTANCE_CUSTOM: r = 무늬(0~1을 넷으로), g = 색(팔레트 자리), b = 빠르기, a = 위상.
-// 무늬: 흐르는 가로 띠 · 퍼지는 고리 · 오르내리는 막대 · 비껴가는 빛과 칸. 주사선과 테두리가 얹힌다.
-uniform float energy = 1.25;
+// 무늬: 실제 광고처럼(아래 scene). 판마다 밝기가 다르고 몇은 꺼져 있다.
+uniform float energy = 1.1;
 uniform float dim = 1.0;   // 웹판 등에서 줄일 때
 
-varying vec4 cust;
+varying flat vec4 cust;   // flat: 판마다 같은 값. 보간하면 화소마다 미세하게 달라져 해시가 화소마다 다른 장면을 고른다(모래 얼룩)
 
-vec3 pal(float t) {
-	t = fract(t);
-	if (t < 0.2) return vec3(0.15, 0.95, 1.0);    // 청록
-	if (t < 0.4) return vec3(1.0, 0.2, 0.75);     // 자홍
-	if (t < 0.6) return vec3(1.0, 0.62, 0.18);    // 호박
-	if (t < 0.8) return vec3(0.55, 0.35, 1.0);    // 보라
-	return vec3(0.35, 1.0, 0.45);                  // 연두
+// 2026-11-25 "LED 색감이 너무 AI 스러움": 파스텔 청록·자홍 그라데이션을 버리고 실제 거리 광고의 색으로.
+// 흰 바탕의 물건, 빨강·노랑·남색 상표 색 면, 피부색·따뜻한 조명의 흐릿한 사진. 장면은 뚝 끊겨 바뀐다(광고 순서). 글자 없음.
+vec3 adpal(float t) {
+	t = fract(t) * 8.0;
+	if (t < 1.0) return vec3(0.93, 0.92, 0.9);    // 흰 바탕
+	if (t < 2.0) return vec3(0.82, 0.1, 0.08);    // 빨강
+	if (t < 3.0) return vec3(0.98, 0.76, 0.12);   // 노랑
+	if (t < 4.0) return vec3(0.06, 0.13, 0.36);   // 남색
+	if (t < 5.0) return vec3(0.86, 0.6, 0.46);    // 피부색
+	if (t < 6.0) return vec3(0.95, 0.42, 0.08);   // 주황
+	if (t < 7.0) return vec3(0.04, 0.04, 0.05);   // 검정
+	return vec3(0.1, 0.42, 0.24);                  // 짙은 초록
 }
 
 float h11(float x) { return fract(sin(x * 91.7) * 43758.5453); }
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y);
+}
 
 void vertex() {
 	cust = INSTANCE_CUSTOM;
 }
 
+// 광고 한 장면(sc: 장면 번호의 난수). 네 종류: 흐릿한 사진 · 상표 색 면 · 흰 바탕의 물건 · 어두운 바탕의 빛나는 물건
+vec3 scene(vec2 uv, float sc, float t) {
+	float kind = floor(h11(sc * 3.1) * 3.999);
+	vec3 c1 = adpal(h11(sc * 5.7));
+	vec3 c2 = adpal(h11(sc * 9.3 + 0.4));
+	if (kind < 0.5) {   // 흐릿한 사진: 따뜻한 조명 아래 사람·풍경처럼 보이는 낮은 주파수 얼룩, 천천히 다가간다(줌)
+		vec2 q = (uv - 0.5) * (1.0 - 0.06 * fract(t * 0.05)) + 0.5;
+		float n = vnoise(q * 3.0 + sc * 17.0) * 0.65 + vnoise(q * 7.0 + sc * 5.0) * 0.35;
+		vec3 dark = mix(vec3(0.05, 0.04, 0.04), c2 * 0.3, 0.5);
+		vec3 lit = mix(vec3(0.86, 0.6, 0.46), vec3(0.95, 0.85, 0.7), h11(sc));
+		return mix(dark, lit, smoothstep(0.35, 0.75, n)) * mix(0.75, 1.05, uv.y);
+	} else if (kind < 1.5) {   // 상표 색 면 + 흰 둥근 판 + 띠
+		vec3 c = c1;
+		vec2 d = abs(uv - vec2(0.3 + 0.4 * h11(sc * 2.0), 0.5)) - vec2(0.16, 0.22);
+		float box = step(max(d.x, d.y), 0.0);
+		c = mix(c, vec3(0.94, 0.93, 0.9), box);
+		c = mix(c, c2, step(0.92, uv.y));
+		return c;
+	} else if (kind < 2.5) {   // 흰 바탕의 물건(그림자 진 어두운 덩이)과 아래 상표 색 띠
+		vec3 c = vec3(0.9, 0.9, 0.88) - 0.08 * uv.y;
+		float d = length((uv - vec2(0.5, 0.48)) * vec2(1.4, 1.0));
+		c = mix(c, mix(c1, vec3(0.1), 0.5) * 0.8, smoothstep(0.24, 0.22, d));
+		c *= 1.0 - 0.25 * smoothstep(0.3, 0.2, length((uv - vec2(0.52, 0.72)) * vec2(1.4, 3.0)));
+		return mix(c, c1, step(0.86, uv.y));
+	}
+	// 어두운 바탕에 조명 받은 물건
+	vec3 c = vec3(0.03, 0.03, 0.035);
+	float d = length((uv - vec2(0.5 + 0.2 * (h11(sc) - 0.5), 0.5)) * vec2(1.3, 1.0));
+	return c + c1 * smoothstep(0.3, 0.05, d) * 0.9 + vec3(0.9) * smoothstep(0.04, 0.0, abs(d - 0.2)) * 0.15;
+}
+
 void fragment() {
-	// 2026-11-25 "ai 티 안나게": 진짜 LED 광고 화면처럼. 어두운 화면 테(빛나는 테두리 없음), LED 점 격자, 덜 진한 색,
-	// 판마다 밝기가 다르고, 무늬는 부드러운 그라데이션·흐릿한 도형이 천천히 바뀐다(글자 없음).
-	float pat = floor(cust.r * 3.999);
-	float t = TIME * (0.25 + cust.b * 0.8) + cust.a * 31.0;
-	vec2 uv = UV;
-	vec3 a = mix(pal(cust.g), vec3(0.62), 0.42);
-	vec3 b = mix(pal(cust.g + 0.37), vec3(0.62), 0.48);
-	vec3 col;
-	if (pat < 0.5) {          // 천천히 흐르는 두 빛깔 그라데이션과 빛 번짐
-		float w = 0.5 + 0.5 * sin(uv.x * 2.2 + uv.y * 1.3 - t * 0.5);
-		col = mix(a * 0.35, b, w) * (0.55 + 0.45 * smoothstep(1.0, 0.0, length(uv - vec2(0.3 + 0.4 * sin(t * 0.3), 0.5))));
-	} else if (pat < 1.5) {   // 어두운 바탕 위 흐릿한 둥근 도형 둘이 천천히 움직인다(물건 광고 느낌)
-		float d1 = length((uv - vec2(0.35 + 0.1 * sin(t * 0.4), 0.55)) * vec2(1.6, 1.0));
-		float d2 = length((uv - vec2(0.7, 0.4 + 0.1 * cos(t * 0.5))) * vec2(1.6, 1.0));
-		col = vec3(0.04, 0.045, 0.06) + a * smoothstep(0.35, 0.1, d1) * 0.9 + b * smoothstep(0.28, 0.05, d2) * 0.7;
-	} else if (pat < 2.5) {   // 오르내리는 막대(소리 그림), 막대 끝이 밝다
-		float bar = floor(uv.x * 14.0);
-		float hgt = 0.2 + 0.6 * abs(sin(t * (0.6 + h11(bar) * 0.8) + bar));
-		float v = step(1.0 - uv.y, hgt) * step(0.2, fract(uv.x * 14.0));
-		col = vec3(0.03) + mix(b, a, 1.0 - uv.y) * v * 0.85;
-	} else {                  // 장면이 바뀌듯 가끔 색이 넘어간다(넘어가는 동안 살짝 밝다)
-		float k = fract(t * 0.08);
-		float cut = smoothstep(0.0, 0.05, k) * smoothstep(0.55, 0.5, k);
-		col = mix(mix(a, b, uv.y) * 0.6, mix(b * 0.5, a, uv.x) * 0.7, cut) * (0.85 + 0.15 * smoothstep(0.06, 0.0, abs(k - 0.03)));
-	}
-	// LED 점: 칸마다 동그란 점, 사이는 어둡다
-	vec2 px = fract(uv * vec2(96.0, 54.0)) - 0.5;
-	float led = 0.55 + 0.45 * smoothstep(0.5, 0.2, length(px));
-	float lvl = 0.55 + 0.45 * h11(cust.a * 17.0 + cust.g);
-	float bezel = step(0.025, uv.x) * step(uv.x, 0.975) * step(0.04, uv.y) * step(uv.y, 0.96);
+	float t = TIME * (0.6 + cust.b * 0.5) + cust.a * 40.0;
+	float slot = floor(t / 6.0);                       // 6초쯤마다 뚝 끊겨 다음 광고
+	vec3 col = scene(UV, h11(slot + cust.g * 37.0 + cust.r * 11.0), t);
+	// LED: 흰색이 살짝 차가운 화이트 포인트, 판마다 밝기
+	float led = 0.92;   // 점 격자는 비스듬히 보면 모래 같은 얼룩이 되어 뺐다(거리에서 보는 LED 화면은 매끈하다)
+	float lvl = 0.6 + 0.4 * h11(cust.a * 17.0 + cust.g);
+	col = col * vec3(0.94, 0.97, 1.0);
 	if (h11(cust.a * 5.3 + 1.7) < 0.18) {   // 꺼진 화면(검은 유리에 희미한 비침)
-		col = vec3(0.012, 0.014, 0.02) + vec3(0.03) * smoothstep(0.3, 0.0, abs(uv.x - uv.y * 0.6 - 0.2));
+		col = vec3(0.012, 0.014, 0.02) + vec3(0.03) * smoothstep(0.3, 0.0, abs(UV.x - UV.y * 0.6 - 0.2));
 	}
+	float bezel = step(0.025, UV.x) * step(UV.x, 0.975) * step(0.04, UV.y) * step(UV.y, 0.96);
 	col = mix(vec3(0.015, 0.016, 0.02), col * led * lvl, bezel);
 	ALBEDO = col * energy * dim;
 }
