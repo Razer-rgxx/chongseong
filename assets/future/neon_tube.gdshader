@@ -1,10 +1,10 @@
 shader_type spatial;
-// 네온 시가 Blender 건물의 네온관(2026-11-25 사용자: "건물 네온좀 ai 티 안나게").
-// 진짜 네온관처럼: 정면으로 보이는 가운데는 거의 흰빛으로 달아오르고, 가장자리로 갈수록 색이 짙고 어두워진다.
-// 관마다(세계 자리 4m 칸) 밝기가 조금씩 다르고, 몇 개는 가끔 지직거리며 꺼진다(낡은 변압기). 같은 색 판처럼 고르게 빛나지 않게.
-uniform vec3 tint : source_color = vec3(0.2, 0.9, 1.0);
-uniform float energy = 2.2;
-uniform float buzz = 0.08;   // 지직거리는 관의 몫
+// 네온 시가 Blender 건물의 LED 줄(2026-11-25 사용자: "건물 led만 바꾸라고", "led 색이랑 디자인이 별로임").
+// 알루미늄 홈에 든 확산형 LED 줄처럼: 앞에서 보면 고르고 부드럽게 빛나고(흰 심 없음), 옆으로 갈수록 어두운 홈 테가 보인다.
+// 몇 토막(세계 자리 2m 칸)은 LED가 나가 어둡거나 반쯤만 켜져 있다. 깜빡이거나 지직거리지 않는다(LED는 그러지 않는다).
+uniform vec3 tint : source_color = vec3(1.0, 0.8, 0.56);
+uniform float energy = 1.6;
+uniform float dead = 0.07;   // 나간 토막의 몫
 
 varying vec3 wpos;
 
@@ -18,16 +18,12 @@ void vertex() {
 
 void fragment() {
 	float facing = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
-	float core = pow(facing, 3.0);
-	vec3 c = mix(tint * 0.55, mix(tint, vec3(1.0), 0.55), core);   // 가장자리는 짙은 색, 가운데는 흰빛 섞인 색
-	vec2 cell = floor(wpos.xz / 4.0) + floor(wpos.y / 4.0);
+	float diffuser = smoothstep(0.15, 0.6, facing);              // 비스듬하면 홈 테(어두운 알루미늄)가 보인다
+	vec2 cell = floor(wpos.xz / 2.0) + floor(wpos.y / 2.0) * 17.0;
 	float k = h21(cell);
-	float lvl = 0.7 + 0.3 * h21(cell + 3.0);
-	if (k < buzz) {   // 낡은 관: 대부분 켜져 있다가 가끔 짧게 꺼지거나 흐려진다
-		float t = floor(TIME * 9.0 + k * 50.0);
-		lvl *= mix(1.0, step(0.25, h21(vec2(t, k * 31.0))), step(0.82, h21(vec2(floor(TIME * 0.7 + k * 9.0), 7.0))));
-	}
-	ALBEDO = c * 0.25;
-	ROUGHNESS = 0.35;
-	EMISSION = c * energy * lvl * (0.55 + 0.45 * core);
+	float lvl = k < dead ? 0.05 : (k < dead * 1.6 ? 0.45 : 0.9 + 0.1 * h21(cell + 3.0));
+	ALBEDO = mix(vec3(0.08, 0.085, 0.09), tint * 0.35, diffuser);
+	METALLIC = mix(0.8, 0.0, diffuser);
+	ROUGHNESS = mix(0.35, 0.6, diffuser);
+	EMISSION = tint * energy * lvl * diffuser;
 }

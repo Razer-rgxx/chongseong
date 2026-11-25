@@ -53,15 +53,12 @@ vec3 scene(vec2 uv, float sc, float t) {
 		c = mix(c, vec3(0.94, 0.93, 0.9), box);
 		c = mix(c, c2, step(0.92, uv.y));
 		return c;
-	} else if (kind < 2.5) {   // 흰 바탕의 물건: 한쪽으로 비켜 선 둥근 네모(상자·병) 꼴, 바닥 그림자, 아래 상표 색 띠(가운데 원은 국기처럼 보여서 쓰지 않는다)
+	} else if (kind < 2.5) {   // 흰 바탕의 물건(그림자 진 어두운 덩이)과 아래 상표 색 띠
 		vec3 c = vec3(0.9, 0.9, 0.88) - 0.08 * uv.y;
-		float side = h11(sc * 4.4) < 0.5 ? 0.3 : 0.7;
-		vec2 q = abs(uv - vec2(side, 0.47)) - vec2(0.09, 0.2);
-		float box = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.04;
-		c *= 1.0 - 0.3 * smoothstep(0.12, 0.0, length((uv - vec2(side + 0.03, 0.7)) * vec2(1.0, 4.0)));
-		c = mix(c, mix(c1, vec3(0.12), 0.35) * mix(0.75, 1.0, uv.x), smoothstep(0.01, 0.0, box));
-		c = mix(c, c2 * 0.9, step(0.9, uv.y));
-		return c;
+		float d = length((uv - vec2(0.5, 0.48)) * vec2(1.4, 1.0));
+		c = mix(c, mix(c1, vec3(0.1), 0.5) * 0.8, smoothstep(0.24, 0.22, d));
+		c *= 1.0 - 0.25 * smoothstep(0.3, 0.2, length((uv - vec2(0.52, 0.72)) * vec2(1.4, 3.0)));
+		return mix(c, c1, step(0.86, uv.y));
 	}
 	// 어두운 바탕에 조명 받은 물건
 	vec3 c = vec3(0.03, 0.03, 0.035);
