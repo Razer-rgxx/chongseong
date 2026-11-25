@@ -88,10 +88,10 @@ var _vel := Vector3.ZERO
 # 무덤 기사(기사 모델이 없을 때의 도형 칼 팔 포즈와 몸 기울임)
 var _arm_pivot: Node3D = null
 ## 체력 막대: 뿌리(카메라를 본다), 채움, 깎인 몫, 막대 너비(m), 마지막으로 깎인 뒤 지난 초(-1이면 감춤), 지난 체력, 깎인 몫의 비율.
+const BAR_SHADER: Shader = preload("res://scripts/enemies/enemy_bar.gdshader")
+
 var _bar: Node3D = null
-var _bar_fill: MeshInstance3D = null
-var _bar_lag: MeshInstance3D = null
-var _bar_mats: Array[StandardMaterial3D] = []
+var _bar_mat: ShaderMaterial = null
 var _bar_w: float = 0.9
 var _bar_t: float = -1.0
 var _bar_hp: float = -1.0
@@ -271,50 +271,35 @@ func _draw_bar(delta: float) -> void:
 	_bar.visible = true
 	var k: float = clampf(enemy.hp / enemy.max_hp, 0.0, 1.0)
 	_lag_k = maxf(k, move_toward(_lag_k, k, delta * bar_lag_speed) if _bar_t > 0.25 else _lag_k)
-	_fill_to(_bar_fill, k)
-	_fill_to(_bar_lag, _lag_k)
-	var a: float = 1.0 - clampf((_bar_t - bar_show) / bar_fade, 0.0, 1.0)
-	for i in _bar_mats.size():
-		var m := _bar_mats[i]
-		m.albedo_color.a = [0.8, 0.55, 1.0][i] * a
+	_bar_mat.set_shader_parameter("k", k)
+	_bar_mat.set_shader_parameter("lag", _lag_k)
+	_bar_mat.set_shader_parameter("alpha", 1.0 - clampf((_bar_t - bar_show) / bar_fade, 0.0, 1.0))
 	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
 	if cam:
 		_bar.global_basis = cam.global_basis
 
 
-func _fill_to(mi: MeshInstance3D, k: float) -> void:
-	mi.scale.x = maxf(0.001, k)
-	mi.position.x = -_bar_w / 2.0 * (1.0 - k)
-
-
+## 판 하나에 셰이더(enemy_bar.gdshader)로 그린다(2026-11-25 "막대는 좀 이쁘게"): 놋쇠 실선·마름모 마개·결 있는 채움.
 func _make_bar() -> void:
 	_bar_w = clampf(Grid.cells_to_meters(enemy.radius) * 2.4, 0.7, 1.6)
 	_bar = Node3D.new()
 	_bar.position = Vector3(0.0, _height + 0.4, 0.0)
 	add_child(_bar)
-	var h: float = 0.09
-	var fill_c := Color(0.78, 0.52, 0.16) if enemy.elite else Color(0.72, 0.15, 0.12)
-	var cols := [Color(0.02, 0.018, 0.015), Color(0.86, 0.78, 0.64), fill_c]
-	var sizes := [Vector2(_bar_w + 0.05, h + 0.05), Vector2(_bar_w, h), Vector2(_bar_w, h)]
-	var made: Array[MeshInstance3D] = []
-	for i in 3:
-		var m := StandardMaterial3D.new()
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.no_depth_test = true   # 제 몸에 가리지 않게
-		m.render_priority = 10 + i
-		m.albedo_color = cols[i]
-		_bar_mats.append(m)
-		var q := QuadMesh.new()
-		q.size = sizes[i]
-		var mi := MeshInstance3D.new()
-		mi.mesh = q
-		mi.material_override = m
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_bar.add_child(mi)
-		made.append(mi)
-	_bar_lag = made[1]
-	_bar_fill = made[2]
+	var size := Vector2(_bar_w + 0.17, 0.2)
+	_bar_mat = ShaderMaterial.new()
+	_bar_mat.shader = BAR_SHADER
+	_bar_mat.render_priority = 10
+	_bar_mat.set_shader_parameter("size", size)
+	if enemy.elite:   # 정예: 호박빛
+		_bar_mat.set_shader_parameter("top", Color(0.86, 0.58, 0.18))
+		_bar_mat.set_shader_parameter("bottom", Color(0.42, 0.2, 0.04))
+	var q := QuadMesh.new()
+	q.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	mi.material_override = _bar_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_bar.add_child(mi)
 
 
 func _draw_death(delta: float) -> bool:
@@ -583,6 +568,7 @@ func _animate_wraith(delta: float) -> void:
 func _build_future(kind: StringName, grow: float, c: Color) -> void:
 	var f: Dictionary = PastEnemyArt.build(kind, _body, grow, c) if enemy.data.past else FutureEnemyArt.build(kind, _body, grow, c)
 	_height = float(f.height) * grow
+	_arm_pivot = f.get("arm") as Node3D   # 금고지기: 빛 칼 든 오른팔(_rust_pose가 돌린다)
 	for m in f.mats:
 		_mats.append(m)
 		_base.append(m.albedo_color)
