@@ -66,38 +66,251 @@ func _build(form: FormData, p_grade: int, seed: int, col: Color) -> void:
 		_aura(col, grade)
 
 
-## 사이버 카타나(311, docs/stranger.md): 가늘고 곧은 칼날, 날을 따라 차가운 푸른 줄. 도형만으로 짓는다.
+## 사이버 카타나(311, docs/stranger.md): 휘어진 외날 칼날, 날과 칼등을 따라 도는 차가운 청록빛 줄, 칼뿌리의 기계 덮개.
+## 칼날은 +Y로 길이 L, 휜 쪽(날 쪽)은 +X. 손잡이는 -Y. 메시 여섯 개와 공유 재질만 쓴다.
 const KATANA_SEED: int = 311
-const KATANA_BLUE: Color = Color(0.35, 0.72, 1.0)
+const KATANA_BLUE: Color = Color(0.35, 0.85, 0.95)
+const KATANA_SORI: float = 0.08    ## 휨(칼날 길이에 대한 비율)
+const KATANA_N: int = 12           ## 칼날 마디 수
+
+
+## 휜 칼날의 가운데선 x(칼뿌리 0, 칼끝은 살짝 +X). t = 0~1.
+static func _kx(t: float, L: float) -> float:
+	return KATANA_SORI * L * (t * t - 0.5 * t) * 1.6
 
 
 func _katana(L: float) -> void:
 	glow_color = KATANA_BLUE
 	grip_length = 0.28
 	var steel := StandardMaterial3D.new()
-	steel.albedo_color = Color(0.1, 0.11, 0.14)
-	steel.metallic = 0.9
+	steel.albedo_color = Color(0.17, 0.19, 0.23)
+	steel.metallic = 0.85
 	steel.roughness = 0.3
+	var plate := steel.duplicate() as StandardMaterial3D   # 덮개의 밝은 판
+	plate.albedo_color = Color(0.27, 0.3, 0.35)
+	plate.roughness = 0.38
 	var dark := StandardMaterial3D.new()
-	dark.albedo_color = Color(0.05, 0.05, 0.07)
-	dark.roughness = 0.8
-	var line := StandardMaterial3D.new()
-	line.albedo_color = KATANA_BLUE
-	line.emission_enabled = true
-	line.emission = KATANA_BLUE
-	line.emission_energy_multiplier = 2.2
-	_box(Vector3(0.036, L, 0.011), Vector3(0, L / 2.0, 0), steel)
-	_box(Vector3(0.036, 0.07, 0.011), Vector3(0, L + 0.025, 0), steel)
-	_box(Vector3(0.006, L * 0.9, 0.013), Vector3(0, L * 0.47, 0), line)   # 날을 따라 도는 푸른 줄
-	for i in 4:
-		_box(Vector3(0.04, 0.008, 0.013), Vector3(0, L * (0.2 + 0.2 * i), 0), line)   # 줄에 걸린 가로 마디
-	_cyl(0.05, 0.05, 0.012, Vector3(0, 0, 0), dark)
-	_cyl(0.052, 0.052, 0.004, Vector3(0, 0.007, 0), line)
-	_cyl(0.017, 0.017, grip_length, Vector3(0, -grip_length / 2.0, 0), dark)
-	for i in 4:
-		_cyl(0.019, 0.019, 0.007, Vector3(0, -0.04 - i * 0.06, 0), line)
-	_ball(0.024, Vector3(0, -grip_length - 0.02, 0), dark)
+	dark.albedo_color = Color(0.03, 0.035, 0.045)
+	dark.metallic = 0.6
+	dark.roughness = 0.5
+	var wrap := StandardMaterial3D.new()
+	wrap.albedo_color = Color(0.13, 0.145, 0.17)
+	wrap.roughness = 0.7
+	wrap.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var pale := StandardMaterial3D.new()
+	pale.albedo_color = Color(0.72, 0.78, 0.82)
+	pale.metallic = 0.9
+	pale.roughness = 0.3
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = KATANA_BLUE
+	glow.emission_enabled = true
+	glow.emission = KATANA_BLUE
+	glow.emission_energy_multiplier = 1.5
+	glow.albedo_color = KATANA_BLUE.darkened(0.3)
+	var faint := glow.duplicate() as StandardMaterial3D
+	faint.emission_energy_multiplier = 0.9
+	faint.albedo_color = KATANA_BLUE.darkened(0.4)
+	# 칼날과 날·등의 빛 줄
+	var y0: float = 0.02
+	var y1: float = L + 0.03
+	var rings: Array = []   # 마디마다 [중심 x, y, 날쪽 반너비, 등쪽 반너비, 반두께, 뾰족함 0~1]
+	for i in KATANA_N + 1:
+		var t: float = float(i) / KATANA_N
+		var base_w: float = 0.046 - 0.016 * t      # 칼뿌리로 갈수록 넓다
+		var u: float = smoothstep(0.0, 1.0, clampf((t - 0.78) / 0.22, 0.0, 1.0))   # 칼끝(키사키)
+		var we: float = base_w * (1.0 - 0.55 * u)
+		var ws: float = base_w * (1.0 - u)
+		var h: float = 0.0055 * (1.0 - 0.3 * t) * (1.0 - u * u)
+		var cx: float = _kx(t, L)
+		if i == KATANA_N:
+			we = 0.0
+			ws = 0.0
+			h = 0.0
+		rings.append([cx, y0 + t * (y1 - y0), we, ws, h])
+	var bs := SurfaceTool.new()
+	bs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	bs.set_smooth_group(-1)
+	var edge_pts: Array[Vector3] = []
+	var spine_pts: Array[Vector3] = []
+	for i in KATANA_N + 1:
+		var r: Array = rings[i]
+		edge_pts.append(Vector3(r[0] + r[2], r[1], 0))
+		spine_pts.append(Vector3(r[0] - r[3], r[1], r[4]))
+	for i in KATANA_N:
+		var a: Array = rings[i]
+		var b: Array = rings[i + 1]
+		var pa := _katana_ring(a)
+		var pb := _katana_ring(b)
+		for k in 5:
+			var k2: int = (k + 1) % 5
+			_tri_quad(bs, pa[k], pa[k2], pb[k2], pb[k])
+	# 칼뿌리 마개(등 쪽 단면)
+	var p0 := _katana_ring(rings[0])
+	_tri_quad(bs, p0[0], p0[4], p0[3], p0[2])
+	_tri_quad(bs, p0[0], p0[2], p0[1], p0[0])
+	bs.generate_normals()
+	_mesh_node(bs, steel)
+	_mesh_node(_tube(edge_pts, 0.0042, 2, KATANA_N), glow)    # 날과 칼끝을 따라 도는 줄
+	var sp: Array[Vector3] = []
+	for i in range(2, KATANA_N - 1):
+		sp.append(spine_pts[i] + Vector3(0, 0, 0.0008))
+	_mesh_node(_tube(sp, 0.0022, 0, sp.size() - 1), faint)    # 칼등의 가는 줄
+	# 칼뿌리 덮개: 겹친 네모 판, 홈의 선, 작은 네모
+	var H: float = L * 0.2
+	var hs := SurfaceTool.new()      # 밝은 판
+	var ds := SurfaceTool.new()      # 어두운 판·홈
+	var gs := SurfaceTool.new()      # 홈 속 빛
+	for s in [hs, ds, gs]:
+		s.begin(Mesh.PRIMITIVE_TRIANGLES)
+		s.set_smooth_group(-1)
+	var yb: float = 0.008
+	_sbox(hs, Vector3(0, yb + H * 0.5, 0), Vector3(0.09, H, 0.03))               # 몸통
+	_sbox(ds, Vector3(0, yb + 0.006, 0), Vector3(0.1, 0.012, 0.038))             # 아래 받침
+	_sbox(ds, Vector3(0, yb + H + 0.005, 0), Vector3(0.098, 0.012, 0.036))          # 위 테두리
+	_sbox(hs, Vector3(0, yb + H + 0.016, 0), Vector3(0.07, 0.01, 0.025))           # 위로 좁아지는 층
+	_sbox(hs, Vector3(0, yb + H + 0.024, 0), Vector3(0.055, 0.006, 0.019))
+	for z in [-1.0, 1.0]:
+		var fz: float = z * 0.0165
+		_sbox(ds, Vector3(0, yb + H * 0.5, fz), Vector3(0.074, H * 0.82, 0.004))     # 앞뒤 어두운 판
+		_sbox(hs, Vector3(-0.016, yb + H * 0.72, fz + z * 0.002), Vector3(0.03, H * 0.3, 0.003))   # 겹친 작은 판
+		_sbox(ds, Vector3(0.0, yb + H * 0.2, fz + z * 0.002), Vector3(0.066, H * 0.1, 0.003))
+		var gz: float = z * 0.0186
+		_sbox(gs, Vector3(-0.032, yb + H * 0.5, gz), Vector3(0.0022, H * 0.7, 0.0016))   # 세로 홈 빛
+		_sbox(gs, Vector3(0.032, yb + H * 0.5, gz), Vector3(0.0022, H * 0.7, 0.0016))
+		_sbox(gs, Vector3(0, yb + H * 0.88, gz), Vector3(0.066, 0.0022, 0.0016))          # 가로 홈 빛
+		_sbox(gs, Vector3(0, yb + H * 0.1, gz), Vector3(0.066, 0.0022, 0.0016))
+		_sbox(ds, Vector3(0.016, yb + H * 0.44, gz + z * 0.0005), Vector3(0.016, 0.016, 0.0014))   # 작은 네모
+		_sbox(gs, Vector3(0.016, yb + H * 0.44, gz + z * 0.0016), Vector3(0.007, 0.007, 0.0012))
+	for s in [hs, ds, gs]:
+		s.generate_normals()
+	_mesh_node(hs, plate)
+	_mesh_node(ds, dark)
+	_mesh_node(gs, glow)
+	# 코등이: 둥글고 약간 두껍게, 얇은 청록 테
+	_cyl_n(0.056, 0.056, 0.014, Vector3(0, 0, 0), dark, 18)
+	_cyl_n(0.0585, 0.0585, 0.0036, Vector3(0, 0, 0), glow, 18)
+	# 손잡이: 검은 심, 비스듬한 감김, 옅은 쇠고리, 네모진 자루끝
+	_cyl_n(0.0155, 0.0155, grip_length, Vector3(0, -grip_length / 2.0 - 0.012, 0), dark, 10)
+	_cyl_n(0.0215, 0.0215, 0.016, Vector3(0, -0.02, 0), pale, 12)
+	var ws := SurfaceTool.new()
+	ws.begin(Mesh.PRIMITIVE_TRIANGLES)
+	ws.set_smooth_group(-1)
+	var rows: int = 8
+	for r in rows:
+		var yy: float = -0.052 - r * 0.0245
+		for c in 6:
+			var ang: float = TAU * (float(c) + 0.5 * (r % 2)) / 6.0
+			_wrap_quad(ws, ang, yy, 0.0165, 1.0 if (c + r) % 2 == 0 else -1.0)
+	ws.generate_normals()
+	_mesh_node(ws, wrap)
+	var cap_y: float = -grip_length - 0.012 - 0.013
+	_cyl_n(0.0195, 0.0195, 0.008, Vector3(0, -grip_length - 0.004, 0), pale, 12)
+	var cs := SurfaceTool.new()
+	cs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	cs.set_smooth_group(-1)
+	_sbox(cs, Vector3(0, cap_y, 0), Vector3(0.036, 0.026, 0.036))
+	cs.generate_normals()
+	_mesh_node(cs, plate)
+	var cg := SurfaceTool.new()
+	cg.begin(Mesh.PRIMITIVE_TRIANGLES)
+	cg.set_smooth_group(-1)
+	_sbox(cg, Vector3(0, cap_y, 0), Vector3(0.039, 0.0028, 0.039))
+	cg.generate_normals()
+	_mesh_node(cg, glow)
 	_aura(KATANA_BLUE, 4)
+	var motes := get_child(get_child_count() - 1) as CPUParticles3D
+	if motes:
+		motes.amount = 6
+		motes.scale_amount_max = 0.3
+		motes.scale_amount_min = 0.12
+
+
+## 마디 하나의 단면 5점: 날, 윗 시노기, 윗 등, 아랫 등, 아랫 시노기.
+static func _katana_ring(r: Array) -> Array[Vector3]:
+	var cx: float = r[0]
+	var y: float = r[1]
+	var we: float = r[2]
+	var ws: float = r[3]
+	var h: float = r[4]
+	return [
+		Vector3(cx + we, y, 0),
+		Vector3(cx + we * 0.15, y, h),
+		Vector3(cx - ws, y, h * 0.85),
+		Vector3(cx - ws, y, -h * 0.85),
+		Vector3(cx + we * 0.15, y, -h),
+	]
+
+
+## 앞에서 봤을 때 반시계인 네 점(a,b,c,d)을 Godot의 시계 방향 앞면으로 쓴다.
+static func _tri_quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	for v in [a, b, c, a, c, d]:
+		st.add_vertex(v)
+
+
+static func _sbox(st: SurfaceTool, c: Vector3, s: Vector3) -> void:
+	var h: Vector3 = s * 0.5
+	var p: Array[Vector3] = []
+	for k in 8:
+		p.append(c + Vector3(h.x if k & 1 else -h.x, h.y if k & 2 else -h.y, h.z if k & 4 else -h.z))
+	# 면마다 바깥에서 보아 반시계 순서
+	_tri_quad(st, p[1], p[3], p[7], p[5])   # +X
+	_tri_quad(st, p[4], p[6], p[2], p[0])   # -X
+	_tri_quad(st, p[2], p[6], p[7], p[3])   # +Y
+	_tri_quad(st, p[0], p[1], p[5], p[4])   # -Y
+	_tri_quad(st, p[5], p[7], p[6], p[4])   # +Z
+	_tri_quad(st, p[0], p[2], p[3], p[1])   # -Z
+
+
+## 점들을 따라가는 가는 마름모 관. from~to 마디(포함). 칼끝에서 뾰족하게 닫힌다.
+static func _tube(pts: Array[Vector3], r: float, from: int, to: int) -> SurfaceTool:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	var offs: Array[Vector3] = [Vector3(r, 0, 0), Vector3(0, 0, r), Vector3(-r, 0, 0), Vector3(0, 0, -r)]
+	for i in range(from, to):
+		for k in 4:
+			var k2: int = (k + 1) % 4
+			_tri_quad(st, pts[i] + offs[k], pts[i] + offs[k2], pts[i + 1] + offs[k2], pts[i + 1] + offs[k])
+	st.generate_normals()
+	return st
+
+
+## 손잡이 둘레에 비스듬히 놓이는 작은 판 하나(방향 s로 기울기가 번갈아 바뀐다).
+static func _wrap_quad(st: SurfaceTool, ang: float, y: float, rad: float, s: float) -> void:
+	var b := Basis(Vector3.UP, ang)
+	var tang: Vector3 = b * Vector3(1, 0, 0)
+	var rad_dir: Vector3 = b * Vector3(0, 0, 1)
+	var along: Vector3 = (Vector3(0, 1, 0) * 0.8 + tang * 0.6 * s).normalized()
+	var across: Vector3 = (tang * 0.8 - Vector3(0, 1, 0) * 0.6 * s).normalized()
+	var c: Vector3 = rad_dir * (rad + 0.0012) + Vector3(0, y, 0)
+	var la: float = 0.0105
+	var lb: float = 0.0055
+	_tri_quad(st, c - along * la - across * lb, c - along * la + across * lb,
+		c + along * la + across * lb, c + along * la - across * lb)
+
+
+func _mesh_node(st: SurfaceTool, m: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	st.index()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	add_child(mi)
+	return mi
+
+
+func _cyl_n(top: float, bottom: float, h: float, at: Vector3, m: Material, segs: int) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var c := CylinderMesh.new()
+	c.top_radius = top
+	c.bottom_radius = bottom
+	c.height = h
+	c.radial_segments = segs
+	c.rings = 1
+	mi.mesh = c
+	mi.material_override = m
+	mi.position = at
+	add_child(mi)
+	return mi
 
 
 ## Blender 칼의 glow_·ghost_ 재질을 등급 빛깔로.
