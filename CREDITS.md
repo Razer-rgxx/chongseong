@@ -23,6 +23,7 @@
 | Asphalt 02, Concrete Wall 004, Cracked Concrete, Rusty Metal 02 (질감, 1k jpg) | Poly Haven 작가들 | CC0 | https://polyhaven.com/a/asphalt_02 · https://polyhaven.com/a/concrete_wall_004 · https://polyhaven.com/a/cracked_concrete · https://polyhaven.com/a/rusty_metal_02 | 녹슨 미래 구역의 바닥, 건물 벽, 포장 조각, 자동차·철근 (`assets/future/textures/`) |
 | City Kit (Commercial) 2.1 | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 건물·먼 건물 (`assets/future/models/city_commercial/`, 어둡게 덮어 씀) |
 | City Kit (Roads) | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 길 조각과 길가 소품 (`assets/future/models/city_roads/`) |
+| 네온 시가 고층 건물 24종과 벽 질감 4벌 | 코드로 지음(tools/blender/make_city.py, Blender bmesh·numpy) | 이 저장소 | — | 네온 시가 건물·먼 건물 (`assets/future/models/neon_city/`, 바깥 모델·AI 생성 에셋 없음) |
 
 ## 불러오기 화면 그림
 

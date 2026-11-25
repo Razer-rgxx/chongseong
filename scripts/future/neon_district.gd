@@ -11,6 +11,12 @@ const LOT_M: Vector2 = Vector2(9.0, 15.0)  ## 건물 한 채의 가로 범위(m)
 const H_MIN: float = 16.0
 const H_MAX: float = 120.0
 const BOARD_RANGE: float = 260.0           ## 광고판·네온 줄이 보이는 거리(m)
+## Blender로 지은 고층 건물(tools/blender/make_city.py, docs/neon_city_blender.md). 있으면 Kenney 대신 이것을 세운다.
+const CITY: String = "res://assets/future/models/neon_city/"
+const FIT: float = 0.15                    ## Blender 건물을 조각에 맞춰 늘리고 줄이는 한도(±, 가로·깊이·높이)
+const CUT_M: Vector2 = Vector2(8.6, 16.1)  ## Blender 건물이 있을 때 블록을 자르는 조각 범위(m): 발자국 10·12·14m의 ±15% 안
+
+static var _index: Dictionary = {}
 
 
 static func build(root: Node3D, rng: RandomNumberGenerator) -> void:
@@ -18,10 +24,12 @@ static func build(root: Node3D, rng: RandomNumberGenerator) -> void:
 	city.name = "NeonDistrict"
 	root.add_child(city)
 	var groups: Dictionary = {}
-	var lots: Array = []   # {rect(m, xz), h, faces: [법선 Vector2...]}
+	var towers: Dictionary = {}   # Blender 건물(제 재질을 쓴다)
+	var lots: Array = []   # {rect(m, xz), h, faces: [법선 Vector2...], city: {name, xf, s}(Blender 건물일 때)}
 	for r in FutureLayout.neon_blocks():
-		_block(groups, lots, r, rng)
+		_block(groups, towers, lots, r, rng)
 	FutureBuilder._flush(city, groups, mat_buildings())
+	FutureBuilder._flush(city, towers, null)
 	_curbs(city)
 	_streets(city, rng)
 	_signs(city, lots, rng)
@@ -50,13 +58,14 @@ static func mat_buildings() -> Material:
 
 
 ## 블록 하나를 건물로 빈틈없이 나눈다. 높이는 CENTER에 가까울수록 높다. 블록 둘레에 닿은 면은 길 쪽(간판을 붙일 면).
-static func _block(groups: Dictionary, lots: Array, r: Rect2, rng: RandomNumberGenerator) -> void:
+static func _block(groups: Dictionary, towers: Dictionary, lots: Array, r: Rect2, rng: RandomNumberGenerator) -> void:
 	var x0: float = r.position.x * Grid.CELL
 	var z0: float = r.position.y * Grid.CELL
 	var w: float = r.size.x * Grid.CELL
 	var d: float = r.size.y * Grid.CELL
-	var xs: Array[float] = _cuts(w, rng)
-	var zs: Array[float] = _cuts(d, rng)
+	var blender: bool = not city_index().is_empty()
+	var xs: Array[float] = _fit_cuts(w, rng) if blender else _cuts(w, rng)
+	var zs: Array[float] = _fit_cuts(d, rng) if blender else _cuts(d, rng)
 	var far: float = (r.get_center() - CENTER).length()
 	var top: float = lerpf(H_MAX, 38.0, clampf(far / 95.0, 0.0, 1.0))
 	for ix in xs.size() - 1:
@@ -82,8 +91,13 @@ static func _block(groups: Dictionary, lots: Array, r: Rect2, rng: RandomNumberG
 			if not faces.is_empty():
 				var f: Vector2 = faces[0]
 				yaw = atan2(f.x, f.y)
-			_building(groups, Rect2(lx, lz, lw, ld), h, yaw, rng)
-			lots.append({"rect": Rect2(lx, lz, lw, ld), "h": h, "faces": faces})
+			var lot: Dictionary = {"rect": Rect2(lx, lz, lw, ld), "h": h, "faces": faces}
+			var tower: Dictionary = _city_building(towers, lot.rect, h, yaw, rng) if blender else {}
+			if tower.is_empty():
+				_building(groups, Rect2(lx, lz, lw, ld), h, yaw, rng)
+			else:
+				lot["city"] = tower
+			lots.append(lot)
 
 
 ## 길이 len(m)을 LOT_M 범위의 조각으로 자른 경계들(0부터 len까지).
@@ -96,6 +110,140 @@ static func _cuts(len: float, rng: RandomNumberGenerator) -> Array[float]:
 		out.append(minf(acc, len - 4.0))
 	out.append(len)
 	return out
+
+
+## Blender 건물이 있을 때의 자르기: 조각마다 CUT_M 안(어느 조각이든 발자국 10·12·14m 중 하나를 ±15% 안으로 늘려 꽉 채운다).
+static func _fit_cuts(len: float, rng: RandomNumberGenerator) -> Array[float]:
+	var n: int = maxi(1, ceili(len / 14.5))
+	while n > 1 and len / n < CUT_M.x:
+		n -= 1
+	var parts: Array[float] = []
+	var sum: float = 0.0
+	for i in n:
+		var p: float = len / n * rng.randf_range(0.9, 1.1)
+		parts.append(p)
+		sum += p
+	var out: Array[float] = [0.0]
+	var acc: float = 0.0
+	for i in n - 1:
+		acc += clampf(parts[i] * len / sum, CUT_M.x, CUT_M.y)
+		out.append(acc)
+	out.append(len)
+	return out
+
+
+## Blender 건물 목록(index.json: 이름 → {w, d, h, top, boards}). 없으면 빈 것.
+static func city_index() -> Dictionary:
+	if _index.is_empty():
+		var path: String = CITY + "index.json"
+		var txt: String = ""
+		var res: Resource = load(path) if ResourceLoader.exists(path) else null
+		if res is JSON:
+			_index = (res as JSON).data if (res as JSON).data is Dictionary else {}
+		elif FileAccess.file_exists(path):
+			txt = FileAccess.get_file_as_string(path)
+			var v: Variant = JSON.parse_string(txt)
+			_index = v if v is Dictionary else {}
+		var keep: Dictionary = {}
+		for nm in _index:   # glb가 있는 것만
+			if ResourceLoader.exists(CITY + str(nm) + ".glb"):
+				keep[nm] = _index[nm]
+		_index = keep
+	return _index
+
+
+## 조각(lot, m)에 Blender 건물 한 채: 돌린 뒤의 가로·깊이가 ±FIT 안에 드는 것 중 높이가 가장 가까운 것(조금 섞는다).
+## 발자국은 조각에 꽉 맞추고 높이는 ±FIT 안에서만 맞춘다. 돌려주는 값: {name, xf, s} 또는 빈 것(맞는 것이 없으면 Kenney로).
+static func _city_building(towers: Dictionary, lot: Rect2, h: float, yaw: float, rng: RandomNumberGenerator) -> Dictionary:
+	var idx: Dictionary = city_index()
+	var best: String = ""
+	var best_s: float = 1e9
+	var best_yaw: float = yaw
+	var tx: float = 0.0
+	var tz: float = 0.0
+	# 앞을 길 쪽으로 둔 것을 먼저, 맞는 발자국이 없으면 90도 더 돌린 것도 본다(받침층은 사방이 가게, 광고판은 길 쪽 면에만 붙는다)
+	for k in 2:
+		var yw: float = yaw + k * PI / 2.0
+		var turned: bool = absf(sin(yw)) > 0.5
+		var ax: float = lot.size.y if turned else lot.size.x
+		var az: float = lot.size.x if turned else lot.size.y
+		for nm in idx:
+			var e: Dictionary = idx[nm]
+			var sx: float = ax / float(e.w)
+			var sz: float = az / float(e.d)
+			if absf(sx - 1.0) > FIT + 0.001 or absf(sz - 1.0) > FIT + 0.001:
+				continue
+			var sc: float = absf(log(float(e.h) / h)) + 0.5 * (absf(log(sx)) + absf(log(sz))) + rng.randf() * 0.35 + k * 0.4
+			if sc < best_s:
+				best_s = sc
+				best = nm
+				best_yaw = yw
+				tx = ax
+				tz = az
+	if best == "":
+		return {}
+	yaw = best_yaw
+	var e: Dictionary = idx[best]
+	var s := Vector3(tx / float(e.w), clampf(h / float(e.h), 1.0 - FIT, 1.0 + FIT), tz / float(e.d))
+	var path: String = CITY + best + ".glb"
+	_dress(path)
+	var xf := Transform3D(Basis(Vector3.UP, yaw) * Basis.from_scale(s), Vector3(lot.position.x + lot.size.x * 0.5, 0.0, lot.position.y + lot.size.y * 0.5))
+	FutureBuilder._put(towers, path, xf)
+	return {"name": best, "xf": xf, "s": s}
+
+
+## Blender 건물의 재질을 이름으로 공유 재질에 바꿔 끼운다(한 번만).
+static func _dress(path: String) -> void:
+	var info: Dictionary = FutureBuilder._kit(path)
+	if info.is_empty() or info.has("dressed"):
+		return
+	var mesh := info.mesh as ArrayMesh
+	if mesh:
+		for i in mesh.get_surface_count():
+			var m: Material = mesh.surface_get_material(i)
+			mesh.surface_set_material(i, city_mat(m.resource_name if m else ""))
+	info["dressed"] = true
+
+
+## Blender 건물의 재질(이름 → 공유 재질). 벽(fa_*)과 가게층은 창 셰이더(assets/future/neon_tower.gdshader).
+static func city_mat(nm: String) -> Material:
+	var key: String = "city_" + nm
+	if FutureBuilder._tex.has(key):
+		return FutureBuilder._tex[key]
+	var m: Material = null
+	var wins: Dictionary = {"fa_a": Vector4(0.16, 0.2, 0.84, 0.8), "fa_b": Vector4(0.03, 0.04, 0.97, 0.87), "fa_c": Vector4(0.0, 0.3, 1.0, 0.76), "shop": Vector4(0.04, 0.08, 0.96, 0.82)}
+	var neon: Dictionary = {"neon_c": PALETTE[0], "neon_m": PALETTE[1], "neon_a": PALETTE[2], "neon_v": PALETTE[3], "neon_l": PALETTE[4], "beacon": Color(1.0, 0.12, 0.1)}
+	if wins.has(nm):
+		var sm := ShaderMaterial.new()
+		sm.shader = load("res://assets/future/neon_tower.gdshader")
+		sm.set_shader_parameter("alb", load(CITY + "textures/%s_alb.jpg" % nm))
+		sm.set_shader_parameter("nrm", load(CITY + "textures/%s_nrm.jpg" % nm))
+		sm.set_shader_parameter("win", wins[nm])
+		sm.set_shader_parameter("cells", 1.0 if nm == "shop" else 4.0)
+		sm.set_shader_parameter("shop", 1.0 if nm == "shop" else 0.0)
+		sm.set_shader_parameter("lit", {"fa_a": 0.3, "fa_b": 0.26, "fa_c": 0.28}.get(nm, 1.0))
+		sm.set_shader_parameter("wall_rough", {"fa_a": 0.85, "fa_b": 0.3, "fa_c": 0.45}.get(nm, 0.6))
+		sm.set_shader_parameter("lit_energy", {"fa_b": 2.0, "shop": 1.4}.get(nm, 2.6))
+		m = sm
+	elif neon.has(nm):
+		var nmat := StandardMaterial3D.new()
+		var c: Color = neon[nm]
+		nmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		nmat.albedo_color = c
+		nmat.emission_enabled = true
+		nmat.emission = c
+		nmat.emission_energy_multiplier = 3.5 if nm == "beacon" else 3.0
+		m = nmat
+	elif nm == "trim":
+		m = FutureBuilder._pbr("city_trim", "concrete_wall_004", 3.0, Color(0.5, 0.52, 0.6))
+	elif nm == "metal":
+		m = FutureBuilder._plain("city_metal", Color(0.07, 0.075, 0.09), 0.45, 0.7)
+	elif nm == "glass":
+		m = FutureBuilder._plain("city_glass", Color(0.02, 0.026, 0.04), 0.08, 0.6)
+	else:
+		m = FutureBuilder._concrete()
+	FutureBuilder._tex[key] = m
+	return m
 
 
 ## 건물 한 채: 가로 대비 높이가 가장 가까운 Kenney 모델을 발자국에 꽉 맞춰 세운다(FutureBuilder._tower와 같은 방식).
@@ -201,6 +349,9 @@ static func _signs(city: Node3D, lots: Array, rng: RandomNumberGenerator) -> voi
 	for lot in lots:
 		var r: Rect2 = lot.rect
 		var h: float = lot.h
+		if lot.has("city"):   # Blender 건물: 네온·붉은 등은 모델에 있다. 광고판은 모델이 적어 둔 자리 중 길 쪽 면에만
+			_city_boards(boards, lot, rng)
+			continue
 		if h > 55.0 and rng.randf() < 0.8:
 			beacons.append([Transform3D(Basis.from_scale(Vector3.ONE * 0.9), Vector3(r.get_center().x, h + 0.6, r.get_center().y)), Color(1.0, 0.12, 0.1)])
 		for f in lot.faces:
@@ -261,6 +412,25 @@ static func _signs(city: Node3D, lots: Array, rng: RandomNumberGenerator) -> voi
 	mi.visibility_range_end = BOARD_RANGE
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	city.add_child(mi)
+
+
+## Blender 건물의 광고판 자리(index.json의 boards: 모델 기준 가운데·법선·크기)를 세계로 옮겨, 길 쪽 면이면 화면 판을 단다.
+static func _city_boards(boards: Array, lot: Dictionary, rng: RandomNumberGenerator) -> void:
+	var c: Dictionary = lot.city
+	var xf: Transform3D = c.xf
+	var s: Vector3 = c.s
+	for b in (city_index()[c.name] as Dictionary).get("boards", []):
+		var p: Array = b.p
+		var nl := Vector3(float(b.n[0]), float(b.n[1]), float(b.n[2]))
+		var nw: Vector3 = (xf.basis * nl).normalized()
+		var n2 := Vector2(roundf(nw.x), roundf(nw.z))
+		if not (lot.faces as Array).has(n2):
+			continue
+		var bw: float = float(b.s[0]) * (s.x if absf(nl.z) > 0.5 else s.z)
+		var bh: float = float(b.s[1]) * s.y
+		var at: Vector3 = xf * Vector3(float(p[0]), float(p[1]), float(p[2]))
+		var bxf := Transform3D(Basis(Vector3.UP, atan2(nw.x, nw.z)) * Basis.from_scale(Vector3(bw, bh, 1.0)), at)
+		boards.append([bxf, Color(rng.randf(), rng.randf(), rng.randf(), rng.randf())])
 
 
 ## 면에 붙는 줄 하나: 바닥 자리(칸이 아닌 m 단위 xz), 높이 y, 크기(면을 따라·위·앞).

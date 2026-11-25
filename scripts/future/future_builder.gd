@@ -340,6 +340,29 @@ static func _put_raw(groups: Dictionary, path: String, xf_with_aabb_space: Trans
 ## 구역 밖의 먼 건물: 저해상도 Kenney 모델을 크게 키워 안개에 묻는다. LOW_FROM보다 가까우면 안 그린다(가까운 쪽은 진짜 건물).
 static func _skyline(root: Node3D, rng: RandomNumberGenerator, w: float, d: float) -> void:
 	var g: Dictionary = {}
+	var idx: Dictionary = NeonDistrict.city_index()
+	if not idx.is_empty():   # Blender 건물(docs/neon_city_blender.md)을 크게 키워 둘레에 세운다. 제 재질을 쓴다
+		var names: Array = []
+		for nm in idx:   # 먼 둘레는 높은 것만(같은 비율로 키워 창이 늘어나지 않게)
+			if float(idx[nm].h) >= 50.0:
+				names.append(nm)
+		if names.is_empty():
+			names = idx.keys()
+		for i in 64:
+			var side: int = i % 4
+			var nm: String = names[rng.randi() % names.size()]
+			var k: float = rng.randf_range(1.0, 1.5)
+			var p := Vector3.ZERO
+			match side:
+				0: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, -18.0 - rng.randf_range(0.0, 40.0))
+				1: p = Vector3(rng.randf_range(-20.0, w + 20.0), 0.0, d + 18.0 + rng.randf_range(0.0, 40.0))
+				2: p = Vector3(-18.0 - rng.randf_range(0.0, 40.0), 0.0, rng.randf_range(-20.0, d + 20.0))
+				_: p = Vector3(w + 18.0 + rng.randf_range(0.0, 40.0), 0.0, rng.randf_range(-20.0, d + 20.0))
+			var path: String = NeonDistrict.CITY + nm + ".glb"
+			NeonDistrict._dress(path)
+			_put(g, path, Transform3D(Basis(Vector3.UP, float(rng.randi() % 4) * PI / 2.0) * Basis.from_scale(Vector3.ONE * k), p))
+		_flush(root, g, null, LOW_FROM)
+		return
 	# 2026-11-25: 구역이 넓어져 둘레를 촘촘한 높은 건물 벽으로(창이 켜진 네온 시가 재질)
 	for i in 64:
 		var side: int = i % 4
