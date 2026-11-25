@@ -257,7 +257,7 @@ func _spots() -> Dictionary:
 func _prompt(key: String) -> String:
 	match key:
 		"exit":
-			return "틈으로 돌아간다"
+			return "틈으로 돌아간다" if meta.time_traveller else "닫힌 틈을 살핀다"
 		"terminal":
 			return "단말을 건드린다"
 		"vault":
@@ -273,7 +273,10 @@ func _interact() -> void:
 	if _over or _leaving >= 0.0:
 		return
 	if _near == "exit":
-		_leave()
+		if meta.time_traveller:
+			_leave()
+		else:   # 2026-11-25 사용자: 타임트래블러를 받기 전에는 한 번 들어오면 못 나간다
+			_hud.toast("틈이 닫혀 있다. 이 시대에서 돌아갈 길을 찾아야 한다.")
 	elif _near == "terminal":
 		if meta.future_terminal():
 			_sfx.play(&"glitch", Grid.cells_to_world(FutureLayout.TERMINAL_AT), -4.0)
@@ -425,6 +428,13 @@ func _on_enemy_act(_e: Enemy, _act: StringName, _info: Dictionary) -> void:
 func _on_down(_won: bool) -> void:
 	_over = true
 	PlayLog.down("future", rules, _held_id, "future")
+	if not meta.time_traveller:   # 못 나가는 동안은 미래 구역 처음 자리에서 다시 깬다(검은 그대로 쥔다)
+		meta.save()
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
+		await get_tree().create_timer(1.6).timeout
+		SceneLoader.go(get_tree(), scene_file_path)
+		return
 	Meta.wake_note = FieldHud.drop_note(data, meta.drop_sword(data, _held_id, FutureLayout.RIFT_WAKE + FutureLayout.DROP_OFFSET), _held_id, meta)
 	meta.save()
 	Meta.wake_at_rift = true
