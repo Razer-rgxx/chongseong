@@ -373,6 +373,8 @@ var memory: Dictionary = {}
 ## 시대(docs/stranger.md 3단계). 비면 지금 시대, &"future"면 녹슨 미래 구역: 모든 검이 사거리 +15%, 마무리 베기 뒤에 짧은 데이터 메아리가 한 번 더 친다.
 ## 장면이 start_field 전에 정한다. state_hash에 든다.
 const ERA_FUTURE: StringName = &"future"
+## 과거 신화 구역(5단계): 쥔 검이 무엇이든 맞힐 때 피해 +10%, 밀림 +25%(Powers.strike).
+const ERA_PAST: StringName = &"past"
 var era: StringName = &""
 
 

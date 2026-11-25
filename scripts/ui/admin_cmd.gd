@@ -44,7 +44,7 @@ static func describe(cmd: Dictionary) -> String:
 		"미래":
 			return "미래 (낯선이 이야기를 마친 것으로 하고 다음 들판 방문부터 틈이 선다. 들판에서 바로 든다)"
 		"시대":
-			return "시대 현재 · 미래 (타임트래블러 없이도 건넌다. 들판과 미래 구역에서)"
+			return "시대 현재 · 미래 · 과거 (타임트래블러 없이도 건넌다. 들판과 미래·과거 구역에서)"
 		"이야기":
 			return "이야기 0~4 (0 처음, 1 조각 하나, 2 조각 셋, 3 금고 엶, 4 장치를 받음)"
 		"머리":
@@ -93,10 +93,10 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 				Meta.go_future = true
 			return "관리: 녹슨 미래로 간다" if Meta.go_future else "관리: 낯선이 이야기를 마쳤다(사이버 카타나 도감). 들판에 가면 틈이 선다."
 		"시대":
-			if a.is_empty() or not ["현재", "미래"].has(a[0]):
-				return "시대 현재 또는 미래를 적으세요."
+			if a.is_empty() or not ["현재", "미래", "과거"].has(a[0]):
+				return "시대 현재, 미래, 과거 중 하나를 적으세요."
 			if rules == null or not rules.field:
-				return "시대는 들판과 미래 구역에서만 건널 수 있습니다."
+				return "시대는 들판과 미래·과거 구역에서만 건널 수 있습니다."
 			if a[0] == "미래":
 				if meta != null and not meta.rift_open():
 					meta.stranger_done = true
@@ -107,7 +107,12 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 					return "이미 미래입니다."
 				Meta.go_future = true
 				return "관리: 미래로 건넌다"
-			if rules.era != Rules.ERA_FUTURE:
+			if a[0] == "과거":
+				if rules.era == Rules.ERA_PAST:
+					return "이미 과거입니다."
+				Meta.go_past = true
+				return "관리: 과거로 건넌다 (최초의 대장간)"
+			if rules.era == &"":
 				return "이미 현재입니다."
 			Meta.go_present = true
 			return "관리: 현재로 돌아간다"

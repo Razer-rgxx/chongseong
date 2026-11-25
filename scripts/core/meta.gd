@@ -109,6 +109,8 @@ var stranger_drop: int = -1
 var story_shards: Array[int] = []
 var vault_open: bool = false
 var time_traveller: bool = false
+## 과거 신화 구역(5단계): 다시 벼린 검 번호(문자열) → 1. 검마다 한 번, 검집에서 꺼낸 검의 내구 +PastLayout.REFORGE_DUR.
+var reforged: Dictionary = {}
 var time_lock: bool = false
 ## 들판 지도(38단계): 가 본 곳. FieldLayout.SEEN_SIZE 격자의 비트(한 칸 = 들판 SEEN_CELL칸, j * 너비 + i 번째 비트). 저장은 base64, 옛 저장은 아무것도 안 본 상태.
 var field_seen: PackedByteArray = PackedByteArray()
@@ -134,6 +136,8 @@ static var wake_at_crypt: bool = false
 static var wake_at_rift: bool = false
 ## 관리 명령 미래: 들판이 읽고 끄며 바로 녹슨 미래 구역으로 간다.
 static var go_future: bool = false
+## 관리 명령 `시대 과거`·시대 창에서 과거를 골랐다: 들판이 이어받아 과거로 건넌다.
+static var go_past: bool = false
 ## 관리 명령 `시대 현재`: 미래 구역이면 틈으로 나간다(2026-11-25).
 static var go_present: bool = false
 var rng := RandomNumberGenerator.new()
@@ -177,7 +181,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "time_lock": time_lock}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "time_lock": time_lock, "reforged": reforged}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -333,6 +337,9 @@ func from_dict(d: Dictionary) -> void:
 	vault_open = bool(d.get("vault_open", false)) and story_shards.size() >= Story.SHARDS.size()
 	time_traveller = bool(d.get("time_traveller", false))
 	time_lock = bool(d.get("time_lock", false))
+	reforged = {}
+	for k in d.get("reforged", {}):
+		reforged[str(k)] = 1
 	if stranger_drop < 0 or stranger_drop >= FieldLayout.STRANGER_SPOTS.size() or stranger_done:
 		stranger_drop = -1
 	crypt_cleared = {}
@@ -598,6 +605,9 @@ func sheath_sword(game: GameData) -> Sword:
 		return null
 	var s := Sword.new(d, game)
 	s.apply_sheath(sheath_lv, sheath_ins, game)
+	if reforged.has(str(sheath_id)) and s.breakable():   # 과거에서 다시 벼린 검(5단계)
+		s.max_durability = roundf(s.max_durability * (1.0 + PastLayout.REFORGE_DUR))
+		s.durability = s.max_durability
 	return s
 
 
@@ -980,6 +990,30 @@ func guardian_slain() -> bool:
 		return false
 	time_traveller = true
 	return true
+
+
+## 과거로 건널 수 있는가: 타임트래블러를 가졌으면 연다(정한 것: 낯선 사람이 첫 대장간을 가리킨다. 따로 물건을 두지 않았다).
+func past_open() -> bool:
+	return time_traveller
+
+
+## 과거의 첫 대장간 제단: 조각 PastLayout.REFORGE_COST개로 검집의 검을 다시 벼린다. {why: ok|none|done|poor, id}.
+func reforge(game: GameData) -> Dictionary:
+	var d := game.sword_by_id(sheath_id) if sheath_id >= 0 else null
+	if d == null or not has_found(sheath_id):
+		return {"why": "none", "id": -1}
+	if reforged.has(str(sheath_id)):
+		return {"why": "done", "id": sheath_id}
+	if shards < PastLayout.REFORGE_COST:
+		return {"why": "poor", "id": sheath_id}
+	shards -= PastLayout.REFORGE_COST
+	reforged[str(sheath_id)] = 1
+	return {"why": "ok", "id": sheath_id}
+
+
+## 과거의 성스러운 숲 함(한 번만): 조각 수를 돌려준다. 이미 열었으면 0.
+func past_cache() -> int:
+	return field_open(PastLayout.CACHE_ID, PastLayout.CACHE_SHARDS)
 
 
 ## 시대를 오갈 수 있는가(타임트래블러를 가졌고 싸움 중이 아닐 때). in_combat은 TimeTravel.in_combat(rules).

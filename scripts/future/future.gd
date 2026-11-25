@@ -225,7 +225,7 @@ func _process(delta: float) -> void:
 		_say_t -= delta
 		if _say_t <= 0.0 and not _final_on:
 			_hud.say_end()
-	if Meta.go_present:   # 관리 명령 `시대 현재`
+	if Meta.go_present or Meta.go_past:   # 관리 명령 `시대 현재`·`시대 과거`(과거는 들판이 이어받는다)
 		Meta.go_present = false
 		if not _over and _leaving < 0.0:
 			_leave()
@@ -566,8 +566,9 @@ func _toggle_era_window() -> void:
 
 func _on_era_picked(era: StringName) -> void:
 	_ui.close()
-	if era == TimeTravel.ERA_NOW and not _over and _leaving < 0.0:
+	if (era == TimeTravel.ERA_NOW or era == TimeTravel.ERA_PAST) and not _over and _leaving < 0.0:
 		if meta.can_travel(rules):
+			Meta.go_past = era == TimeTravel.ERA_PAST   # 과거는 들판을 거쳐 건넌다(들판이 이어받는다)
 			_leave()
 		else:
 			_hud.toast("싸움 중에는 시간이 열리지 않는다.")

@@ -15,6 +15,7 @@ const LORD_SCENE: PackedScene = preload("res://scenes/lord/lord.tscn")
 const VILLAGE_PATH: String = "res://scenes/lobby/lobby.tscn"
 const RUN_PATH: String = "res://scenes/world/main.tscn"
 const FUTURE_PATH: String = "res://scenes/future/future.tscn"
+const PAST_PATH: String = "res://scenes/past/past.tscn"
 const CRYPT_PATH: String = "res://scenes/crypt/crypt.tscn"
 
 @export var reach: float = 2.0
@@ -777,7 +778,7 @@ func _build_rift() -> void:
 
 
 ## E: 글리치가 오르고 녹슨 미래 구역 장면으로 간다. 쥔 검(Meta.carry_sword)은 그대로 가져간다.
-func _enter_rift() -> void:
+func _enter_rift(path: String = FUTURE_PATH) -> void:
 	if _rifting or _glitch != null:
 		return
 	_rifting = true
@@ -791,7 +792,7 @@ func _enter_rift() -> void:
 		t += dt
 		_glitch_fx.set_amount(minf(1.0, t / 0.9), dt)
 		await get_tree().process_frame
-	SceneLoader.go(get_tree(), FUTURE_PATH)
+	SceneLoader.go(get_tree(), path)
 
 
 func _stranger_say(text: String) -> void:
@@ -809,6 +810,9 @@ func _update_stranger(delta: float) -> void:
 		Meta.go_future = false
 		_build_rift()
 		_enter_rift()
+	if Meta.go_past:   # 시대 창·관리 명령 `시대 과거`
+		Meta.go_past = false
+		_enter_rift(PAST_PATH)
 	if Stranger.force:
 		Stranger.force = false
 		if _st == null and _st_drop == null:
@@ -1395,5 +1399,10 @@ func _on_era_picked(era: StringName) -> void:
 	if era == TimeTravel.ERA_FUTURE and not _over:
 		if meta.can_travel(rules):
 			_enter_rift()
+		else:
+			_hud.toast("싸움 중에는 시간이 열리지 않는다.")
+	elif era == TimeTravel.ERA_PAST and not _over:
+		if meta.can_travel(rules):
+			_enter_rift(PAST_PATH)
 		else:
 			_hud.toast("싸움 중에는 시간이 열리지 않는다.")

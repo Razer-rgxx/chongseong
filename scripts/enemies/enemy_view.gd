@@ -114,8 +114,10 @@ func _ready() -> void:
 	var grow: float = enemy.radius / D.radius * D.view_scale
 	var hill_boss: bool = D.boss and D.kind == &""
 	# 24단계: 이 적의 Mixamo 모델(assets/characters/enemies/<id>.fbx)이 있으면 그것으로 선다. 늑대·허수아비·방패병은 따로.
-	var own: String = "" if kind in [&"wolf", &"dummy", &"shield"] or D.future else LordCharacter.enemy_path(kind)
+	var own: String = "" if kind in [&"wolf", &"dummy", &"shield"] or D.future or D.past else LordCharacter.enemy_path(kind)
 	if D.future:   # 녹슨 미래 구역의 적: 도형 몸
+		_build_future(kind, grow, D.color)
+	elif D.past:   # 과거 신화 구역의 적: 돌과 뿔의 도형 몸
 		_build_future(kind, grow, D.color)
 	elif own != "":
 		_build_knight(grow, D.color, hill_boss, own)
@@ -579,7 +581,7 @@ func _animate_wraith(delta: float) -> void:
 # ---------------------------------------------------------------- 늑대
 
 func _build_future(kind: StringName, grow: float, c: Color) -> void:
-	var f: Dictionary = FutureEnemyArt.build(kind, _body, grow, c)
+	var f: Dictionary = PastEnemyArt.build(kind, _body, grow, c) if enemy.data.past else FutureEnemyArt.build(kind, _body, grow, c)
 	_height = float(f.height) * grow
 	for m in f.mats:
 		_mats.append(m)

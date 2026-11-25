@@ -256,6 +256,9 @@ func wears() -> bool:
 func strike(e: Enemy, dmg: float, knock: Vector2) -> Dictionary:
 	var L := r.lord
 	var d: float = dmg
+	if r.era == Rules.ERA_PAST:   # 과거 신화 구역: 맞힐 때 피해 +10%, 밀림 +25%
+		d *= PastLayout.DMG_MULT
+		knock *= PastLayout.KNOCK_MULT
 	if e.hp <= e.max_hp * T.i("처형_체력"):
 		d *= 1.0 + ins("처형") / 100.0
 	if not e.was_hit:

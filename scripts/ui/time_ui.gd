@@ -69,7 +69,10 @@ func _open() -> void:
 	box.custom_minimum_size = Vector2(300, 0)
 	UiKit.header(box, "시대를 고른다", close)
 	box.add_child(UiKit.label("싸움 중에는 시간이 열리지 않는다.", 13, UiKit.MUTED))
-	for era in [TimeTravel.ERA_NOW, TimeTravel.ERA_FUTURE]:
+	var eras: Array = [TimeTravel.ERA_NOW, TimeTravel.ERA_FUTURE]
+	if _meta.past_open():
+		eras.append(TimeTravel.ERA_PAST)
+	for era in eras:
 		var here: bool = era == _era
 		var b := UiKit.button("%s%s" % [TimeTravel.NAMES[era], "  (지금 여기)" if here else ""], func() -> void: picked.emit(era), 40.0)
 		b.disabled = here

@@ -24,6 +24,8 @@ extends Resource
 @export var kind: StringName = &""
 ## 녹슨 미래 구역의 적(docs/stranger.md 3단계): 참이면 EnemyView가 FutureEnemyArt의 도형 몸(무딘 쇠에 차가운 눈빛 하나)으로 짓는다.
 @export var future: bool = false
+## 과거 신화 구역의 적(docs/stranger.md 5단계): 참이면 EnemyView가 PastEnemyArt의 도형 몸(이끼 낀 돌, 사슴 뿔, 호박빛 눈)으로 짓는다.
+@export var past: bool = false
 ## 몸을 그리는 크기 배수(우두머리는 그 종류의 몸을 이만큼 키운다). 규칙의 크기는 radius.
 @export var view_scale: float = 1.0
 

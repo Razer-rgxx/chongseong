@@ -5,7 +5,8 @@ extends RefCounted
 const COMBAT_RANGE: float = 14.0   ## 이 안에 살아 있는 적이 있으면 싸움 중(칸)
 const ERA_NOW: StringName = &"now"
 const ERA_FUTURE: StringName = &"future"
-const NAMES: Dictionary = {&"now": "현재", &"future": "미래"}
+const ERA_PAST: StringName = &"past"
+const NAMES: Dictionary = {&"now": "현재", &"future": "미래", &"past": "과거"}
 
 
 ## 싸움 중인가: 깨어난 보스, 덤비는 무리, 가까운 살아 있는 적(허수아비 빼고)이 있으면 참.
