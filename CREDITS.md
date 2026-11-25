@@ -24,6 +24,7 @@
 | City Kit (Commercial) 2.1 | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 건물·먼 건물 (`assets/future/models/city_commercial/`, 어둡게 덮어 씀) |
 | City Kit (Roads) | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 길 조각과 길가 소품 (`assets/future/models/city_roads/`) |
 | 네온 시가 고층 건물 24종과 벽 질감 4벌 | 코드로 지음(tools/blender/make_city.py, Blender bmesh·numpy) | 이 저장소 | — | 네온 시가 건물·먼 건물 (`assets/future/models/neon_city/`, 바깥 모델·AI 생성 에셋 없음) |
+| Pirate Kit: Captain Barbarossa (캐릭터, 동작 14개, glTF 그대로) | Quaternius | CC0 | https://quaternius.com (받은 곳: GitHub Juanxpeke/Godot-JXP-Nodes의 같은 파일) | 과거 수정 호수의 닻의 선장 몸(`assets/past/models/captain/`, 머리는 코드로 지은 닻 오브젝트헤드 `ObjectHead` "anchor") |
 
 ## 불러오기 화면 그림
 

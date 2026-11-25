@@ -50,7 +50,7 @@ static func describe(cmd: Dictionary) -> String:
 		"닻":
 			return "닻 0~6 (미래 2막: 0 처음, 1~5 기록을 그만큼 읽음, 6 대수확자를 쓰러뜨림. 1 이상이면 1막도 마친 것으로)"
 		"첫닻":
-			return "첫닻 0~4 (과거 3막: 0 처음, 1~3 기억의 돌을 그만큼 읽음, 4 짐승을 쓰러뜨림 = 닻의 손. 4면 미래 2막도 마친 것으로)"
+			return "첫닻 0~6 (과거 3막: 0 처음, 1~4 기억의 돌을 그만큼 읽음, 5 아라 선장의 맹세까지(미래 2막도 마친 것으로), 6 흑룡을 쓰러뜨림 = 닻의 손)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -140,17 +140,19 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			return "관리: 닻 공사 기록 %d/%d%s (다음에 미래 구역에 들면 맞춰 선다)" % [meta.neon_logs.size(), StoryNeon.LOGS.size(), ", 대수확자 쓰러뜨림" if meta.harvest_down else ""]
 		"첫닻":
 			if meta == null or a.is_empty() or not a[0].is_valid_int():
-				return "첫닻 0~4를 적으세요."
-			var m: int = clampi(int(a[0]), 0, StoryPast.MEMORIES.size() + 1)
+				return "첫닻 0~6을 적으세요."
+			var full: int = StoryPast.MEMORIES.size()
+			var m: int = clampi(int(a[0]), 0, full + 2)
 			meta.past_memories.clear()
-			for i in mini(m, StoryPast.MEMORIES.size()):
+			for i in mini(m, full):
 				meta.past_memories.append(i)
-			meta.anchor_hand = m > StoryPast.MEMORIES.size()
-			if meta.anchor_hand:
+			meta.captain_oath = m > full
+			meta.anchor_hand = m > full + 1
+			if meta.captain_oath:
 				meta.set_story(4)
 				meta.harvest_down = true
 			meta.save()
-			return "관리: 첫 닻 기억 %d/%d%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), StoryPast.MEMORIES.size(), ", 닻의 손" if meta.anchor_hand else ""]
+			return "관리: 첫 닻 기억 %d/%d%s%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), full, ", 선장의 맹세" if meta.captain_oath else "", ", 닻의 손" if meta.anchor_hand else ""]
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

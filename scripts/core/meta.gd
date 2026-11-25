@@ -118,6 +118,8 @@ var future_roll_run: int = -1
 ## 과거 3막 「첫 닻」(2026-11-26, StoryPast): 읽은 기억의 돌, 짐승을 쓰러뜨렸나(= 닻의 손 축복).
 var past_memories: Array[int] = []
 var anchor_hand: bool = false
+## 닻의 선장의 맹세(기억 넷 + 미래 2막 뒤 선착장에서 받는다). 없으면 봉인 제단이 안 열린다.
+var captain_oath: bool = false
 ## 과거 신화 구역(5단계): 다시 벼린 검 번호(문자열) → 1. 검마다 한 번, 검집에서 꺼낸 검의 내구 +PastLayout.REFORGE_DUR.
 var reforged: Dictionary = {}
 var time_lock: bool = false
@@ -190,7 +192,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "time_lock": time_lock, "reforged": reforged}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "time_lock": time_lock, "reforged": reforged}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -362,6 +364,7 @@ func from_dict(d: Dictionary) -> void:
 		if pi >= 0 and pi < StoryPast.MEMORIES.size() and not past_memories.has(pi):
 			past_memories.append(pi)
 	anchor_hand = bool(d.get("anchor_hand", false)) and harvest_down
+	captain_oath = (bool(d.get("captain_oath", false)) and harvest_down) or anchor_hand
 	time_lock = bool(d.get("time_lock", false))
 	reforged = {}
 	for k in d.get("reforged", {}):
@@ -1040,12 +1043,25 @@ func read_memory(i: int) -> bool:
 	return true
 
 
-## 짐승을 깨울 수 있는가: 기억 셋 + 미래 2막(대수확자)을 마쳤고 아직 안 쓰러뜨렸다.
+## 닻의 선장이 맹세를 받는다: 기억 넷 + 미래 2막(대수확자)을 마쳤고 아직 안 받았을 때만 참(저장은 부른 쪽이).
+func swear_oath() -> bool:
+	if captain_oath or past_memories.size() < StoryPast.MEMORIES.size() or not harvest_down:
+		return false
+	captain_oath = true
+	return true
+
+
+## 용의 산맥 둥지의 보물 더미: 조각 PastLayout.HOARD_SHARDS개를 한 번만.
+func dragon_hoard() -> int:
+	return field_open(PastLayout.HOARD_ID, PastLayout.HOARD_SHARDS)
+
+
+## 흑룡을 깨울 수 있는가: 기억 넷 + 미래 2막(대수확자) + 선장의 맹세, 아직 안 쓰러뜨렸다.
 func beast_ready() -> bool:
-	return past_memories.size() >= StoryPast.MEMORIES.size() and harvest_down and not anchor_hand
+	return past_memories.size() >= StoryPast.MEMORIES.size() and harvest_down and captain_oath and not anchor_hand
 
 
-## 짐승을 쓰러뜨렸다: 깨울 수 있었을 때만 한 번, 닻의 손과 조각.
+## 흑룡을 쓰러뜨렸다: 깨울 수 있었을 때만 한 번, 닻의 손과 조각.
 func beast_slain() -> bool:
 	if not beast_ready():
 		return false

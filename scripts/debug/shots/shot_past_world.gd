@@ -27,11 +27,16 @@ func _init() -> void:
 	cam.make_current()
 	var C: float = Grid.CELL
 	var shots: Array = [
+		["ship", Vector2(112, 62), Vector3(108.0 * C, 4.0, 60.0 * C), Vector3(130.0 * C, 18.0, 80.0 * C)],
+		["ship_side", Vector2(150, 100), Vector3(150.0 * C, 22.0, 108.0 * C), Vector3(130.0 * C, 22.0, 80.0 * C)],
+		["captain", Vector2(124, 61), Vector3(124.0 * C + 1.2, 2.0, 64.6 * C - 3.2), Vector3(124.0 * C, 1.4, 64.6 * C)],
+		["captain_hat", Vector2(124, 61), Vector3(124.0 * C + 0.3, 1.9, 64.6 * C - 1.1), Vector3(124.0 * C, 1.65, 64.6 * C)],
+		["realm", Vector2(196, 50), Vector3(188.0 * C, 9.0, 52.0 * C), Vector3(232.0 * C, 10.0, 46.0 * C)],
+		["nest", Vector2(212, 80), Vector3(210.0 * C, 7.0, 80.0 * C), Vector3(216.0 * C, 1.0, 92.0 * C)],
+		["skull", Vector2(196, 22), Vector3(192.0 * C, 5.0, 24.0 * C), Vector3(200.0 * C, 3.0, 12.0 * C)],
 		["bones", Vector2(100, 34), Vector3(100.0 * C, 6.0, 34.0 * C), Vector3(140.0 * C, 6.0, 18.0 * C)],
-		["lake", Vector2(100, 70), Vector3(100.0 * C, 7.0, 70.0 * C), Vector3(135.0 * C, 0.0, 86.0 * C)],
-		["ash", Vector2(38, 72), Vector3(38.0 * C + 4.0, 12.0, 70.0 * C), Vector3(38.0 * C, 2.0, 88.0 * C)],
-		["smith", Vector2(45, 36), Vector3(45.0 * C - 2.0, 3.0, 31.0 * C + 10.0), Vector3(45.0 * C, 1.6, 31.0 * C)],
-		["sky", Vector2(90, 50), Vector3(90.0 * C, 260.0, 150.0 * C), Vector3(90.0 * C, 0.0, 55.0 * C)],
+		["ash", Vector2(38, 72), Vector3(38.0 * C + 4.0, 12.0, 72.0 * C), Vector3(38.0 * C, 1.0, 88.0 * C)],
+		["sky", Vector2(130, 50), Vector3(130.0 * C, 330.0, 170.0 * C), Vector3(130.0 * C, 0.0, 55.0 * C)],
 	]
 	for s in shots:
 		rules.lord.pos = s[1]
@@ -42,7 +47,7 @@ func _init() -> void:
 		root.get_texture().get_image().save_png(OUT + "past_%s.png" % s[0])
 		print("shot past_", s[0], " ", m.get("_region"))
 	# 깨어난 짐승
-	rules.lord.pos = Vector2(38, 76)
+	rules.lord.pos = StoryPast.SEAL_AT + Vector2(-10, 0)
 	rules.lord.prev_pos = rules.lord.pos
 	var e: Enemy = rules.spawn_field_boss(StoryPast.BEAST_AT, StoryPast.BEAST_ID, StoryPast.BEAST_ZONE)
 	await _wait(150)
@@ -50,7 +55,7 @@ func _init() -> void:
 	e.face = Vector2(0, -1)
 	await _wait(4)
 	var bp := Grid.cells_to_world(e.pos)
-	cam.look_at_from_position(bp + Vector3(5.0, 3.5, -12.0), bp + Vector3(0, 3.0, 0))
+	cam.look_at_from_position(bp + Vector3(6.0, 4.0, -15.0), bp + Vector3(0, 4.0, 0))
 	await _wait(4)
 	root.get_texture().get_image().save_png(OUT + "past_beast.png")
 	print("shot past_beast")

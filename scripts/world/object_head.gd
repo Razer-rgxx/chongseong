@@ -9,6 +9,7 @@ const FOR_KIND: Dictionary = {
 	&"merchant": &"pouch", &"herbalist": &"mortar", &"gatherer": &"basket", &"hunter": &"antlers",
 	&"knight": &"helm", &"gatekeeper": &"spear", &"pilgrim": &"candle", &"drunk": &"jug",
 	&"peasant": &"bucket", &"peasant2": &"wheat", &"peasant3": &"pot", &"peasant4": &"wheat",
+	&"captain": &"anchor",
 }
 
 var bone_name: String = ""
@@ -255,6 +256,38 @@ static func build(obj: StringName) -> Node3D:
 			_box(n, Vector3(0.15, 0.36, 0.035), Vector3(0, 0.33, 0), steel)
 			_box(n, Vector3(0.03, 0.3, 0.04), Vector3(0, 0.32, 0), iron)
 			_box(n, Vector3(0.106, 0.106, 0.035), Vector3(0, 0.51, 0), steel, Vector3(0, 0, PI / 4))
+		&"anchor":
+			# 2026-11-26 닻의 선장(과거 수정 호수): 머리가 닻. 아래는 목을 감싸듯 휜 두 팔과 화살촉 갈고리,
+			# 가운데 자루에 감은 밧줄, 위에 가로대와 놋쇠 고리(앞에서 구멍이 보이게).
+			var arc: int = 7
+			for k in arc:
+				var a0: float = PI * (1.12 + 0.76 * k / float(arc - 1))   # 아래 반원(왼쪽 끝 → 아래 → 오른쪽 끝)
+				var a1: float = PI * (1.12 + 0.76 * (k + 1) / float(arc - 1))
+				if k == arc - 1:
+					break
+				var p0 := Vector3(cos(a0) * 0.15, 0.17 + sin(a0) * 0.15, 0)
+				var p1 := Vector3(cos(a1) * 0.15, 0.17 + sin(a1) * 0.15, 0)
+				var mid: Vector3 = (p0 + p1) * 0.5
+				_box(n, Vector3(p0.distance_to(p1) + 0.012, 0.042, 0.05), mid, iron, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+			for sx in [-1.0, 1.0]:   # 갈고리 끝(화살촉)
+				var tip := Vector3(cos(PI * (1.5 - 0.38 * sx)) * 0.15, 0.17 + sin(PI * (1.5 - 0.38 * sx)) * 0.15, 0)
+				_box(n, Vector3(0.075, 0.075, 0.035), tip + Vector3(0.012 * sx, 0.03, 0), steel, Vector3(0, 0, PI / 4))
+			_box(n, Vector3(0.05, 0.4, 0.05), Vector3(0, 0.2, 0), iron)   # 자루
+			_box(n, Vector3(0.012, 0.36, 0.054), Vector3(0, 0.21, 0), steel)
+			for k in 3:   # 감은 밧줄
+				_cyl(n, 0.036, 0.036, 0.02, Vector3(0, 0.25 + k * 0.024, 0), cloth)
+			_box(n, Vector3(0.3, 0.045, 0.06), Vector3(0, 0.37, 0), iron)   # 가로대
+			for sx in [-1.0, 1.0]:
+				_ball(n, 0.03, Vector3(sx * 0.15, 0.37, 0), brass)
+			var ring := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.028
+			tm.outer_radius = 0.052
+			ring.mesh = tm
+			ring.material_override = brass
+			ring.position = Vector3(0, 0.45, 0)
+			ring.rotation = Vector3(PI / 2, 0, 0)
+			n.add_child(ring)
 		&"hill":
 			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,
 			# 갈라진 틈에서 불씨가 새고, 가운데 한 자루(주인의 검)만 우뚝하고 날이 희게 빛난다.

@@ -44,6 +44,11 @@ var _blockers: Dictionary = {}
 var _seal: Node3D
 var _mem_nodes: Dictionary = {}
 var _smith: Node3D
+var _captain: Node3D
+var _ship: Node3D
+var _ship_base: Vector3
+var _dragons: Array[Node3D] = []
+var _hoard: Node3D
 var _region: String = ""
 var _say_t: float = 0.0
 var _final_on: bool = false
@@ -86,6 +91,11 @@ func _ready() -> void:
 	_seal = world.seal
 	_mem_nodes = world.memories
 	_smith = world.smith
+	_captain = world.captain
+	_ship = world.ship
+	_ship_base = _ship.position
+	_dragons = world.dragons
+	_hoard = world.hoard
 	if meta.field_found.has(PastLayout.CACHE_ID):
 		PastBuilder.open_cache(_chest)
 	var b: Dictionary = PastLayout.blockers()
@@ -238,6 +248,9 @@ func _process(delta: float) -> void:
 	if _smith:
 		(_smith.get_node("Body") as Node3D).position.y = 0.25 + sin(_t * 1.3) * 0.12
 		_smith.rotation.y = lerp_angle(_smith.rotation.y, atan2(_smith.position.x - _lord.position.x, _smith.position.z - _lord.position.z), 1.0 - exp(-2.0 * delta))
+	if _captain and _captain.position.distance_to(_lord.position) < 24.0:
+		_captain.rotation.y = lerp_angle(_captain.rotation.y, atan2(_captain.position.x - _lord.position.x, _captain.position.z - _lord.position.z), 1.0 - exp(-3.0 * delta))
+	_animate_sky(delta)
 	_blend_look(delta)
 	if _say_t > 0.0:
 		_say_t -= delta
@@ -262,7 +275,9 @@ func _process(delta: float) -> void:
 
 
 func _spots() -> Dictionary:
-	var s := {"exit": PastLayout.EXIT_AT, "altar": PastLayout.ALTAR_AT, "smith": StoryPast.SMITH_AT, "seal": StoryPast.SEAL_AT}
+	var s := {"exit": PastLayout.EXIT_AT, "altar": PastLayout.ALTAR_AT, "smith": StoryPast.SMITH_AT, "seal": StoryPast.SEAL_AT, "captain": StoryPast.CAPTAIN_AT}
+	if not meta.field_found.has(PastLayout.HOARD_ID):
+		s["hoard"] = PastLayout.hoard_at()
 	if not meta.field_found.has(PastLayout.CACHE_ID):
 		s["cache"] = PastLayout.CACHE_AT
 	for i in StoryPast.MEMORIES.size():
@@ -280,9 +295,31 @@ func _prompt(key: String) -> String:
 			return "첫 대장간에서 검을 다시 벼린다"
 		"smith":
 			return "첫 대장장이의 혼과 말한다"
+		"captain":
+			return "닻의 선장과 말한다"
+		"hoard":
+			return "용의 보물 더미를 뒤진다"
 		"seal":
 			return "봉인 제단을 살핀다"
 	return "성스러운 숲의 함을 연다"
+
+
+## 하늘배는 천천히 오르내리며 기울고, 용들은 산맥 위를 크게 돌며 날개를 친다(꾸밈, 규칙과 무관).
+func _animate_sky(_delta: float) -> void:
+	if _ship:
+		_ship.position = _ship_base + Vector3(0, sin(_t * 0.4) * 0.5, 0)
+		_ship.rotation = Vector3(sin(_t * 0.31) * 0.02, PastLayout.SHIP_YAW, sin(_t * 0.37) * 0.035)
+	for i in _dragons.size():
+		var c: Vector3 = PastLayout.SKY_DRAGONS[i]
+		var speed: float = 0.16 + i * 0.03
+		var a: float = _t * speed + i * 2.1
+		var centre := Grid.cells_to_world(Vector2(c.x, c.y))
+		var dr: Node3D = _dragons[i]
+		dr.position = centre + Vector3(cos(a) * c.z, 48.0 + i * 9.0 + sin(_t * 0.5 + i) * 3.0, sin(a) * c.z)
+		dr.rotation = Vector3(0, -a, sin(_t * 0.5 + i) * 0.12 - 0.25)   # 원을 따라 앞(-Z)을 돌리고 안쪽으로 기운다
+		var flap: float = sin(_t * (2.2 + i * 0.3)) * 0.45
+		(dr.get_node("WingL") as Node3D).rotation.z = flap
+		(dr.get_node("WingR") as Node3D).rotation.z = -flap
 
 
 ## 선 땅의 빛과 안개(PastLayout.LOOKS) 쪽으로 몇 초에 걸쳐 섞는다. 규칙과 무관.
@@ -314,8 +351,19 @@ func _interact() -> void:
 	elif _near.begins_with("mem"):
 		_read_memory(int(_near.substr(3)))
 	elif _near == "smith":
-		_hud.say(StoryPast.SMITH_NAME, StoryPast.smith_line(meta.past_memories.size(), meta.harvest_down, meta.anchor_hand), true)
+		_hud.say(StoryPast.SMITH_NAME, StoryPast.smith_line(meta.past_memories.size(), meta.harvest_down, meta.captain_oath, meta.anchor_hand), true)
 		_say_t = 6.0
+	elif _near == "captain":
+		_talk_captain()
+	elif _near == "hoard":
+		var got: int = meta.dragon_hoard()
+		if got > 0:
+			PastWorld.set_taken(_hoard, true)
+			_sfx.play(&"thump", _hoard.position, -3.0, 0.8)
+			_hud.flash(PastLayout.GOLD, 0.15, 0.5)
+			_hud.toast(StoryPast.HOARD_GOT % got)
+			_hud.refresh_top()
+			_saved()
 	elif _near == "seal":
 		_use_seal()
 	elif _near == "cache":
@@ -340,7 +388,20 @@ func _read_memory(i: int) -> void:
 	_say_t = 7.0
 
 
-## 봉인 제단: 기억 셋과 미래 2막을 마쳤으면 짐승이 깬다.
+## 닻의 선장: 단계마다 말이 바뀌고, 기억 넷 + 미래 2막이면 맹세를 준다(한 번, 저장).
+func _talk_captain() -> void:
+	var line: String = StoryPast.captain_line(meta.past_memories.size(), meta.harvest_down, meta.captain_oath, meta.anchor_hand)
+	_hud.say(StoryPast.CAPTAIN_NAME, line, true)
+	_say_t = 7.0
+	PastWorld.captain_greet(_captain)
+	if meta.swear_oath():
+		_saved()
+		_hud.flash(PastLayout.GOLD, 0.2, 0.7)
+		_sfx.play(&"thump", _captain.position, -4.0, 0.6)
+		_hud.toast(StoryPast.OATH_GOT)
+
+
+## 봉인 제단: 기억 넷과 미래 2막, 선장의 맹세가 있으면 흑룡이 깬다.
 func _use_seal() -> void:
 	if meta.anchor_hand:
 		_hud.toast(StoryPast.SEAL_DONE)
@@ -350,6 +411,8 @@ func _use_seal() -> void:
 		_hud.toast(StoryPast.SEAL_LOOSE % [meta.past_memories.size(), StoryPast.MEMORIES.size()])
 	elif not meta.harvest_down:
 		_hud.toast(StoryPast.SEAL_PULLED)
+	elif not meta.captain_oath:
+		_hud.toast(StoryPast.SEAL_OATH)
 	elif rules.field_boss == null:
 		_sfx.play(&"thump", Grid.cells_to_world(StoryPast.SEAL_AT), -1.0, 0.45)
 		_camera.add_shake(0.6)
@@ -359,7 +422,7 @@ func _use_seal() -> void:
 		rules.spawn_field_boss(StoryPast.BEAST_AT, StoryPast.BEAST_ID, StoryPast.BEAST_ZONE)
 
 
-## 짐승이 쓰러졌다: 봉인이 식고, 첫 대장장이의 혼이 곁에 서서 마지막으로 말하고 축복을 준다(한 번만).
+## 흑룡이 쓰러졌다: 봉인이 식고, 첫 대장장이의 혼이 곁에 서서 선장과 마지막으로 말하고 축복을 준다(한 번만).
 func _on_beast(e: Enemy) -> void:
 	if e == null or e.data == null or e.data.id != StoryPast.BEAST_ID or _final_on or not meta.beast_slain():
 		return
@@ -371,7 +434,7 @@ func _on_beast(e: Enemy) -> void:
 	for line in StoryPast.FINAL_LINES:
 		if not is_inside_tree():
 			return
-		_hud.say(StoryPast.SMITH_NAME, line, true)
+		_hud.say(String(line[0]), String(line[1]), true)
 		await get_tree().create_timer(3.4).timeout
 	if not is_inside_tree():
 		return

@@ -1,6 +1,6 @@
 class_name PastWorld
 extends RefCounted
-## 넓힌 과거(2026-11-26, PastLayout.REGIONS)를 그린다: 거인의 뼈 들, 수정 호수, 잿불 능선, 옛 숲과 새 땅 사이 나무 줄.
+## 넓힌 과거(2026-11-26, PastLayout.REGIONS)를 그린다: 거인의 뼈 들, 수정 호수(하늘배 「첫 닻호」와 선착장), 잿불 능선, 용의 산맥(벼랑, 용 해골, 둥지, 하늘을 도는 용), 옛 숲과 새 땅 사이 나무 줄.
 ## 이야기 자리(StoryPast)의 기억의 돌·첫 대장장이 혼·봉인 제단도 여기서 짓는다. 세계에 글자 없음(새김은 무늬뿐).
 ## 모양은 상자·원기둥과 받은 자연 모델(assets/nature, HillBuilder._parts)만 쓴다(AI 생성 에셋 없음).
 
@@ -20,7 +20,7 @@ static func _glow(key: String, c: Color, e: float) -> StandardMaterial3D:
 	return PastBuilder._plain(key, c, 0.5, e)
 
 
-## 다 짓는다. 돌려주는 것: {fires: [{light, phase}], seal: Node3D, memories: {i: Node3D}, smith: Node3D}.
+## 다 짓는다. 돌려주는 것: {fires: [{light, phase}], seal, memories: {i: Node3D}, smith, captain, ship, dragons: [Node3D], hoard}.
 static func build(root: Node3D, meta: Meta) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3100
@@ -30,13 +30,22 @@ static func build(root: Node3D, meta: Meta) -> Dictionary:
 	_lake(root, rng, fires)
 	_ash(root, rng, fires)
 	_scatter(root, rng)
+	_fire_scar(root, fires)
+	_dragon_realm(root, rng, fires)
+	var hoard := hoard_pile(root, _m(PastLayout.hoard_at()), meta != null and meta.field_found.has(PastLayout.HOARD_ID))
+	var ship := sky_ship(root)
+	_dock(root)
+	var cap := captain(root, _m(StoryPast.CAPTAIN_AT))
+	var dragons: Array[Node3D] = []
+	for i in PastLayout.SKY_DRAGONS.size():
+		dragons.append(sky_dragon(root, 0.8 + 0.2 * i))
 	var seal := seal_altar(root, _m(StoryPast.SEAL_AT), meta != null and meta.anchor_hand)
 	fires.append({"light": seal.get_node("Light"), "phase": 1.3})
 	var mem: Dictionary = {}
 	for i in StoryPast.MEMORIES.size():
 		mem[i] = memory_stone(root, _m(StoryPast.MEMORIES[i].at), meta != null and meta.past_memories.has(i))
 	var smith := spirit(root, _m(StoryPast.SMITH_AT))
-	return {"fires": fires, "seal": seal, "memories": mem, "smith": smith}
+	return {"fires": fires, "seal": seal, "memories": mem, "smith": smith, "captain": cap, "ship": ship, "dragons": dragons, "hoard": hoard}
 
 
 # ---------------------------------------------------------------- 나무 줄
@@ -69,6 +78,8 @@ static func _scatter(root: Node3D, rng: RandomNumberGenerator) -> void:
 				var rot := Vector3(rng.randf_range(-7, 7), rng.randf() * 72.0, rng.randf_range(-7, 7))
 				PastBuilder._put(root, col, basalt, _m(p) + Vector3(0, h * 0.45, 0), rot, 220.0)
 				PastBuilder._box(root, Vector3(0.1, h * 0.6, 0.1), _m(p) + Vector3(0, h * 0.35, 0) + Vector3.FORWARD.rotated(Vector3.UP, deg_to_rad(rot.y)) * -t.z * 1.05, ember, rot)
+			3:   # 용 이빨 바위: 휘어 솟은 잿빛 바위 두세 마디
+				dragon_tooth(root, _m(p), t.z, rng)
 
 
 # ---------------------------------------------------------------- 거인의 뼈 들
@@ -331,6 +342,482 @@ static func _ash(root: Node3D, rng: RandomNumberGenerator, fires: Array) -> void
 	fires.append({"light": l, "phase": 2.1})
 
 
+# ---------------------------------------------------------------- 잿불 능선: 흑룡의 불이 떨어진 자리
+
+static func _fire_scar(root: Node3D, fires: Array) -> void:
+	var o := _m(PastLayout.FIRE_SCAR)
+	var char_m := PastBuilder._plain("char", Color(0.05, 0.045, 0.04), 1.0)
+	var ember := _glow("ember", EMBER, 2.6)
+	var disc := CylinderMesh.new()
+	disc.top_radius = 1.0
+	disc.bottom_radius = 1.0
+	disc.height = 0.02
+	disc.radial_segments = 24
+	var d := PastBuilder._put(root, disc, char_m, o + Vector3(0, 0.025, 0))
+	d.scale = Vector3(9.0, 1.0, 9.0)
+	for k in 12:   # 가운데서 뻗는 불 금
+		var a: float = TAU * k / 12.0 + 0.2
+		var len: float = 5.0 + (k % 3) * 2.0
+		PastBuilder._box(root, Vector3(0.18, 0.03, len), o + Vector3(cos(a), 0, sin(a)) * len * 0.5 + Vector3(0, 0.04, 0), ember, Vector3(0, rad_to_deg(-a) + 90.0, 0))
+	# 땅에 꽂힌 흑룡의 비늘 한 장(검은 육각 판, 가장자리 잿불)
+	var scale_m := PastBuilder._plain("dragon_scale", Color(0.08, 0.07, 0.08), 0.35)
+	scale_m.metallic = 0.5
+	var hexm := CylinderMesh.new()
+	hexm.top_radius = 2.2
+	hexm.bottom_radius = 2.2
+	hexm.height = 0.4
+	hexm.radial_segments = 6
+	PastBuilder._put(root, hexm, scale_m, o + Vector3(0, 1.6, 0), Vector3(70, 20, 0))
+	var rim := CylinderMesh.new()
+	rim.top_radius = 2.35
+	rim.bottom_radius = 2.35
+	rim.height = 0.12
+	rim.radial_segments = 6
+	PastBuilder._put(root, rim, ember, o + Vector3(0, 1.6, 0), Vector3(70, 20, 0))
+	var l := OmniLight3D.new()
+	l.light_color = EMBER
+	l.light_energy = 1.4
+	l.omni_range = 12.0
+	l.position = o + Vector3(0, 2.0, 0)
+	root.add_child(l)
+	fires.append({"light": l, "phase": 0.4})
+
+
+# ---------------------------------------------------------------- 용의 산맥
+
+const SLATE: Color = Color(0.2, 0.2, 0.24)
+
+
+static func _dragon_realm(root: Node3D, rng: RandomNumberGenerator, fires: Array) -> void:
+	var slate := PastBuilder._plain("slate", SLATE, 1.0)
+	var disc := CylinderMesh.new()
+	disc.top_radius = 1.0
+	disc.bottom_radius = 1.0
+	disc.height = 0.02
+	disc.radial_segments = 12
+	var r: Rect2 = PastLayout.REGIONS[3].rect
+	for i in 40:   # 잿빛 바위땅
+		var p := Vector2(rng.randf_range(r.position.x + 3.0, r.end.x - 2.0), rng.randf_range(r.position.y + 2.0, r.end.y - 2.0))
+		var mi := PastBuilder._put(root, disc, slate, _m(p) + Vector3(0, 0.017, 0), Vector3.ZERO, 120.0)
+		mi.scale = Vector3(rng.randf_range(6.0, 13.0), 1.0, rng.randf_range(5.0, 11.0))
+	# 서쪽 벼랑: 받은 바위 모델을 잿빛으로 겹쳐 쌓는다(막힘 PastLayout.crags와 같은 자리)
+	var parts: Array[Dictionary] = HillBuilder._parts("boulder_01")
+	for c in PastLayout.crags():
+		var o := _m(Vector2(c.x, c.y))
+		for layer in 2:
+			if parts.is_empty():
+				PastBuilder._box(root, Vector3(c.z * 4.0, c.z * 3.0, c.z * 4.0), o + Vector3(0, c.z * 1.5 + layer * c.z * 2.0, 0), slate, Vector3(0, rng.randf() * 360.0, 0))
+				continue
+			for part in parts:
+				var sz: Vector3 = part.size
+				var k: float = c.z * Grid.CELL * (2.4 - layer * 0.8) / maxf(maxf(sz.x, sz.z), 0.1)
+				var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(k, k * (1.6 + layer * 0.6), k))
+				var mi := MeshInstance3D.new()
+				mi.mesh = part.mesh
+				var m: Material = part.mat
+				if m is StandardMaterial3D:
+					var dm := (m as StandardMaterial3D).duplicate() as StandardMaterial3D
+					dm.albedo_color = Color(0.5, 0.5, 0.58)
+					m = dm
+				mi.material_override = m
+				mi.transform = Transform3D(b, o + Vector3(0, -0.4 + layer * c.z * 2.6, 0)) * (part.xf as Transform3D)
+				mi.visibility_range_end = 260.0
+				root.add_child(mi)
+	_dragon_skull(root)
+	_nest(root, rng, fires)
+
+
+## 용 이빨 바위: 아래가 굵고 위로 휘어 가는 잿빛 바위(세 마디).
+static func dragon_tooth(root: Node3D, o: Vector3, r: float, rng: RandomNumberGenerator) -> void:
+	var rock := PastBuilder._plain("tooth_rock", Color(0.3, 0.29, 0.34), 0.95)
+	var yaw: float = rng.randf() * TAU
+	var lean := Vector3(cos(yaw), 0, sin(yaw))
+	var h: float = rng.randf_range(7.0, 15.0)
+	var base: float = r * Grid.CELL * 0.75
+	var at := o
+	for k in 3:
+		var seg := CylinderMesh.new()
+		seg.bottom_radius = base * (1.0 - k * 0.3)
+		seg.top_radius = base * (1.0 - (k + 1) * 0.3) + 0.15
+		seg.height = h / 3.0 + 0.4
+		seg.radial_segments = 5
+		var tilt: float = 6.0 + k * 10.0
+		var mi := PastBuilder._put(root, seg, rock, at + Vector3(0, h / 6.0, 0), Vector3(0, rad_to_deg(yaw), 0), 240.0)
+		mi.rotation = Basis(Vector3.UP, yaw).rotated(lean.cross(Vector3.UP).normalized(), deg_to_rad(-tilt)).get_euler()
+		at += Vector3(0, h / 3.0, 0) + lean * (h / 3.0) * sin(deg_to_rad(tilt))
+
+
+static func _dragon_skull(root: Node3D) -> void:
+	var bone := PastBuilder._plain("bone", BONE, 0.85)
+	var dark := PastBuilder._plain("bone_dark", BONE.darkened(0.35), 0.9)
+	var g := Node3D.new()
+	g.position = _m(PastLayout.DRAGON_SKULL_AT)
+	g.rotation_degrees = Vector3(0, 140, -6)
+	root.add_child(g)
+	PastBuilder._box(g, Vector3(4.6, 3.4, 5.0), Vector3(0, 1.6, 1.2), bone)   # 머리뼈
+	PastBuilder._box(g, Vector3(3.0, 1.8, 6.5), Vector3(0, 1.0, -4.2), bone, Vector3(-6, 0, 0))   # 긴 주둥이
+	PastBuilder._box(g, Vector3(2.6, 0.9, 6.0), Vector3(0.4, 0.2, -3.6), dark, Vector3(8, 4, 0))   # 아래턱
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(1.0, 1.0, 1.4), Vector3(1.8 * sx, 2.4, -0.6), PastBuilder._plain("socket", Color(0.03, 0.025, 0.02), 1.0))
+		PastBuilder._box(g, Vector3(0.7, 0.7, 6.0), Vector3(1.6 * sx, 3.6, 4.4), bone, Vector3(28, 14.0 * sx, 0))   # 뒤로 휜 뿔
+		PastBuilder._box(g, Vector3(0.45, 0.45, 3.4), Vector3(2.2 * sx, 5.6, 8.6), bone, Vector3(58, 20.0 * sx, 0))
+	for k in 6:   # 이빨
+		PastBuilder._box(g, Vector3(0.35, 1.1, 0.35), Vector3(-1.1 + (k % 2) * 2.2, 0.0, -2.0 - (k / 2) * 2.0), bone)
+
+
+## 용의 둥지: 낮은 둥근 테(뼈와 통나무), 알 셋(용암 금), 보물 더미(hoard_pile).
+static func _nest(root: Node3D, rng: RandomNumberGenerator, fires: Array) -> void:
+	var o := _m(PastLayout.NEST_AT)
+	var bark := PastBuilder._plain("dead_bark", Color(0.19, 0.16, 0.13), 1.0)
+	var bone := PastBuilder._plain("bone", BONE, 0.85)
+	var n: int = 22
+	for k in n:   # 테: 둘레로 비스듬히 쌓인 통나무와 뼈(낮아서 막힘 없음)
+		var a: float = TAU * k / n
+		var rr: float = PastLayout.NEST_R * Grid.CELL + rng.randf_range(-0.6, 0.6)
+		var at := o + Vector3(cos(a), 0, sin(a)) * rr
+		PastBuilder._box(root, Vector3(0.5, 0.5, rng.randf_range(3.0, 4.5)), at + Vector3(0, 0.3, 0), bark if k % 3 else bone, Vector3(rng.randf_range(-10, 10), rad_to_deg(-a), rng.randf_range(-12, 12)))
+	var shell := PastBuilder._plain("egg", Color(0.16, 0.13, 0.14), 0.4)
+	var ember := _glow("ember", EMBER, 2.6)
+	var egg := SphereMesh.new()
+	egg.radius = 1.0
+	egg.height = 2.0
+	egg.radial_segments = 14
+	egg.rings = 8
+	for e in PastLayout.eggs():
+		var c := _m(e)
+		var mi := PastBuilder._put(root, egg, shell, c + Vector3(0, 1.3, 0), Vector3(rng.randf_range(-12, 12), 0, rng.randf_range(-12, 12)))
+		mi.scale = Vector3(1.3, 1.8, 1.3)
+		for k in 3:   # 알 껍질의 잿불 금
+			PastBuilder._box(root, Vector3(0.06, 1.6, 0.06), c + Vector3(0, 1.3, 0) + Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * 1.28, ember, Vector3(0, rad_to_deg(-k * 2.1), 14.0 - k * 9.0))
+	var l := OmniLight3D.new()
+	l.light_color = EMBER
+	l.light_energy = 1.3
+	l.omni_range = 14.0
+	l.position = o + Vector3(0, 3.0, 0)
+	root.add_child(l)
+	fires.append({"light": l, "phase": 2.7})
+
+
+## 보물 더미: 금화 무더기와 작은 상자, 금빛 빛. taken이면 무더기가 거의 비었다.
+static func hoard_pile(root: Node3D, at: Vector3, taken: bool) -> Node3D:
+	var g := Node3D.new()
+	g.name = "Hoard"
+	g.position = at
+	root.add_child(g)
+	var gold := PastBuilder._plain("hoard_gold", PastLayout.GOLD, 0.3, 0.5)
+	gold.metallic = 0.9
+	var pile := Node3D.new()
+	pile.name = "Pile"
+	g.add_child(pile)
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.2
+	cone.bottom_radius = 1.0
+	cone.height = 1.0
+	cone.radial_segments = 10
+	for k in 5:
+		var mi := PastBuilder._put(pile, cone, gold, Vector3(cos(k * 1.3) * 0.9, 0.35, sin(k * 1.3) * 0.7))
+		mi.scale = Vector3(1.2 - k * 0.12, 0.7 - k * 0.06, 1.2 - k * 0.12)
+	var chest := PastBuilder._plain("hoard_chest", Color(0.3, 0.18, 0.1), 0.8)
+	PastBuilder._box(pile, Vector3(1.0, 0.6, 0.7), Vector3(-1.4, 0.3, 0.6), chest, Vector3(0, 25, 0))
+	PastBuilder._box(pile, Vector3(1.04, 0.1, 0.74), Vector3(-1.4, 0.45, 0.6), gold, Vector3(0, 25, 0))
+	var l := OmniLight3D.new()
+	l.name = "Light"
+	l.light_color = PastLayout.GOLD
+	l.light_energy = 0.9
+	l.omni_range = 6.0
+	l.position = Vector3(0, 1.4, 0)
+	g.add_child(l)
+	set_taken(g, taken)
+	return g
+
+
+static func set_taken(hoard: Node3D, taken: bool) -> void:
+	(hoard.get_node("Pile") as Node3D).scale = Vector3(1.0, 0.25, 1.0) if taken else Vector3.ONE
+	(hoard.get_node("Light") as OmniLight3D).visible = not taken
+
+
+## 하늘을 도는 용(꾸밈): 몸·목·머리·꼬리와 날개 둘(WingL·WingR, past.gd가 퍼덕이고 원을 그리게 옮긴다). 날개폭 약 14m × size.
+static func sky_dragon(root: Node3D, size: float) -> Node3D:
+	var g := Node3D.new()
+	g.scale = Vector3.ONE * size
+	root.add_child(g)
+	var m := PastBuilder._plain("sky_dragon", Color(0.1, 0.09, 0.11), 0.7)
+	var wm := PastBuilder._plain("sky_dragon_wing", Color(0.14, 0.11, 0.12), 0.9)
+	wm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	PastBuilder._box(g, Vector3(1.4, 1.2, 4.2), Vector3.ZERO, m)
+	PastBuilder._box(g, Vector3(0.7, 0.7, 2.6), Vector3(0, 0.4, -3.0), m, Vector3(-12, 0, 0))
+	PastBuilder._box(g, Vector3(0.8, 0.6, 1.4), Vector3(0, 0.7, -4.6), m)
+	for k in 4:
+		PastBuilder._box(g, Vector3(0.7 - k * 0.15, 0.5 - k * 0.1, 1.8), Vector3(0, -0.1 * k, 2.8 + k * 1.6), m, Vector3(4.0 * k, 0, 0))
+	for sx in [-1.0, 1.0]:
+		var w := Node3D.new()
+		w.name = "WingL" if sx < 0.0 else "WingR"
+		w.position = Vector3(0.6 * sx, 0.3, -0.6)
+		g.add_child(w)
+		PastBuilder._box(w, Vector3(6.5, 0.08, 3.2), Vector3(3.3 * sx, 0, 0.6), wm)
+		PastBuilder._box(w, Vector3(3.2, 0.08, 2.0), Vector3(6.4 * sx, 0, 1.4), wm, Vector3(0, 18.0 * sx, 0))
+		PastBuilder._box(w, Vector3(6.6, 0.2, 0.25), Vector3(3.3 * sx, 0.05, -0.9), m)
+	for mi in g.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return g
+
+
+# ---------------------------------------------------------------- 하늘배 「첫 닻호」
+
+const HULL: Color = Color(0.22, 0.14, 0.09)
+const DECK: Color = Color(0.4, 0.3, 0.2)
+const SAIL: Color = Color(0.86, 0.8, 0.66)
+
+
+## 호수 위에 뜬 하늘배: 배 몸, 선루, 돛대 셋과 돛(닻 무늬), 배 밑의 빛나는 수정 용골, 뱃머리에서 호수의 닻(첫 칼)까지 사슬.
+## 돌려주는 것은 배 노드(past.gd가 천천히 띄워 흔든다). 닻 칼은 호수에 따로 서 있다.
+static func sky_ship(root: Node3D) -> Node3D:
+	var base := _m(PastLayout.SHIP_AT)
+	var hull := PastBuilder._plain("ship_hull", HULL, 0.8)
+	var deck := PastBuilder._plain("ship_deck", DECK, 0.9)
+	var gold := PastBuilder._plain("ship_gold", PastLayout.GOLD.darkened(0.15), 0.4, 0.6)
+	gold.metallic = 0.8
+	var sail := PastBuilder._plain("ship_sail", SAIL, 1.0)
+	sail.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var crystal := _glow("crystal", CRYSTAL, 2.6)
+	var g := Node3D.new()
+	g.name = "Ship"
+	g.position = base + Vector3(0, PastLayout.SHIP_HEIGHT, 0)
+	g.rotation.y = PastLayout.SHIP_YAW
+	root.add_child(g)
+	# 배 몸: 넓은 몸통, 좁은 바닥, 뾰족한 뱃머리, 높은 고물
+	PastBuilder._box(g, Vector3(5.6, 2.6, 18.0), Vector3(0, 0, 0.5), hull)
+	PastBuilder._box(g, Vector3(3.6, 1.6, 16.0), Vector3(0, -1.9, 0.5), hull)
+	PastBuilder._box(g, Vector3(1.6, 0.9, 14.0), Vector3(0, -3.0, 0.5), hull)
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(0.5, 2.4, 6.4), Vector3(1.75 * sx, 0.1, -10.4), hull, Vector3(0, 24.0 * sx, 0))
+	PastBuilder._box(g, Vector3(0.4, 0.4, 5.0), Vector3(0, 1.6, -14.2), hull, Vector3(-18, 0, 0))   # 뱃머리 장대
+	PastBuilder._box(g, Vector3(5.8, 3.0, 5.0), Vector3(0, 2.4, 8.6), hull)   # 고물 선루
+	PastBuilder._box(g, Vector3(5.4, 0.2, 17.0), Vector3(0, 1.35, 0.0), deck)
+	for sx in [-1.0, 1.0]:   # 금빛 줄(꾸밈 띠)과 난간
+		PastBuilder._box(g, Vector3(0.08, 0.16, 18.0), Vector3(2.84 * sx, 0.6, 0.5), gold)
+		PastBuilder._box(g, Vector3(0.12, 0.6, 15.0), Vector3(2.7 * sx, 1.7, -0.6), hull)
+	for k in 3:   # 고물 창(따뜻한 빛)
+		PastBuilder._box(g, Vector3(0.9, 0.7, 0.06), Vector3(-1.6 + k * 1.6, 2.6, 11.12), _glow("ship_window", Color(1.0, 0.75, 0.4), 2.0))
+	# 돛대와 돛: 돛마다 위아래 두 장, 가운데 큰 돛에 닻 무늬(글자 아님)
+	var masts: Array[Vector2] = [Vector2(-6.0, 12.0), Vector2(0.0, 15.0), Vector2(5.5, 10.0)]
+	for mz in masts:
+		var pole := CylinderMesh.new()
+		pole.top_radius = 0.16
+		pole.bottom_radius = 0.26
+		pole.height = mz.y
+		pole.radial_segments = 6
+		PastBuilder._put(g, pole, hull, Vector3(0, 1.4 + mz.y * 0.5, mz.x))
+		for k in 2:
+			var w: float = 7.0 - k * 1.6
+			var h: float = mz.y * 0.32
+			var y: float = 1.4 + mz.y * (0.38 + k * 0.36)
+			PastBuilder._box(g, Vector3(w + 0.6, 0.18, 0.18), Vector3(0, y + h * 0.5, mz.x), hull)   # 활대
+			var sl := PastBuilder._box(g, Vector3(w, h, 0.06), Vector3(0, y, mz.x - 0.35), sail, Vector3(-6, 0, 0))
+			sl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var emblem_y: float = 1.4 + 15.0 * 0.38
+	PastBuilder._box(g, Vector3(0.22, 2.2, 0.04), Vector3(0, emblem_y + 0.2, -0.42), gold)   # 닻 무늬: 자루
+	PastBuilder._box(g, Vector3(1.3, 0.2, 0.04), Vector3(0, emblem_y + 0.9, -0.42), gold)   # 가로대
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(0.9, 0.2, 0.04), Vector3(0.45 * sx, emblem_y - 0.75, -0.42), gold, Vector3(0, 0, 30.0 * sx))   # 갈고리 팔
+	# 수정 용골: 배 밑에서 빛나며 배를 띄우는 수정들
+	var prism := CylinderMesh.new()
+	prism.top_radius = 0.0
+	prism.bottom_radius = 0.6
+	prism.height = 1.0
+	prism.radial_segments = 6
+	for k in 5:
+		var mi := PastBuilder._put(g, prism, crystal, Vector3(0, -4.0, -5.0 + k * 2.5), Vector3(180, 0, 0))
+		mi.scale = Vector3(1.0, 2.2 - absf(k - 2) * 0.4, 1.0)
+	var l := OmniLight3D.new()
+	l.light_color = CRYSTAL
+	l.light_energy = 1.6
+	l.omni_range = 16.0
+	l.position = Vector3(0, -5.0, 0)
+	g.add_child(l)
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(1.0, 0.75, 0.4)
+	lamp.light_energy = 1.0
+	lamp.omni_range = 8.0
+	lamp.position = Vector3(0, 3.5, 11.5)
+	g.add_child(lamp)
+	# 닻 사슬: 뱃머리 아래에서 호수의 닻 칼 고리까지(배에 붙어 같이 흔들린다)
+	var iron := PastBuilder._plain("chain", Color(0.24, 0.22, 0.2), 0.5)
+	iron.metallic = 0.8
+	var link := TorusMesh.new()
+	link.inner_radius = 0.22
+	link.outer_radius = 0.42
+	link.rings = 8
+	link.ring_segments = 6
+	var top := Vector3(0, -1.0, -11.0)
+	var ring_world: Vector3 = base + Vector3(0, ANCHOR_RING_Y, 0)
+	var bottom: Vector3 = g.transform.affine_inverse() * ring_world
+	var links: Array[Transform3D] = []
+	var n: int = int(top.distance_to(bottom) / 0.62)
+	for k in n:
+		var t: float = (k + 0.5) / n
+		var q: Vector3 = top.lerp(bottom, t) + Vector3(0, 0, sin(t * PI) * 1.2)
+		var dir: Vector3 = (bottom - top).normalized()
+		var bs := Basis.looking_at(dir, Vector3.UP if absf(dir.y) < 0.95 else Vector3.FORWARD) * Basis(Vector3.FORWARD, PI * 0.5 * (k % 2))
+		links.append(Transform3D(bs, q))
+	PastBuilder._multi(g, link, links, iron)
+	_anchor_sword(root, base)
+	return g
+
+
+const ANCHOR_RING_Y: float = 12.5
+
+
+## 호수 가운데의 닻: 벼리의 첫 칼. 물에 비스듬히 박힌 큰 칼, 가로대 끝이 닻의 갈고리처럼 휘었고 칼자루 끝에 사슬 고리.
+static func _anchor_sword(root: Node3D, base: Vector3) -> void:
+	var g := Node3D.new()
+	g.position = base
+	g.rotation_degrees = Vector3(8, 30, -6)
+	root.add_child(g)
+	var steel := PastBuilder._plain("anchor_steel", Color(0.62, 0.64, 0.68), 0.25, 0.15)
+	steel.metallic = 0.9
+	var gold := PastBuilder._plain("ship_gold", PastLayout.GOLD.darkened(0.15), 0.4, 0.6)
+	PastBuilder._box(g, Vector3(2.0, 9.0, 0.4), Vector3(0, 3.5, 0), steel)
+	PastBuilder._box(g, Vector3(0.3, 9.0, 0.44), Vector3(0, 3.5, 0), _glow("anchor_rune", CRYSTAL, 1.6))
+	PastBuilder._box(g, Vector3(6.0, 0.7, 0.8), Vector3(0, 8.3, 0), gold)
+	for sx in [-1.0, 1.0]:   # 닻 갈고리처럼 휜 가로대 끝
+		PastBuilder._box(g, Vector3(0.6, 1.8, 0.8), Vector3(3.2 * sx, 7.7, 0), gold, Vector3(0, 0, 30.0 * sx))
+	PastBuilder._box(g, Vector3(0.7, 3.2, 0.7), Vector3(0, 10.3, 0), PastBuilder._plain("giant_grip", Color(0.16, 0.1, 0.06), 0.9))
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.6
+	ring.outer_radius = 1.0
+	PastBuilder._put(g, ring, gold, Vector3(0, 12.4, 0), Vector3(90, 0, 0))
+
+
+## 선착장: 물가에서 호수 쪽으로 뻗은 잔교와 기둥, 옆에 매인 작은 배.
+static func _dock(root: Node3D) -> void:
+	var wood := PastBuilder._plain("dock_wood", Color(0.34, 0.25, 0.17), 1.0)
+	var a := _m(PastLayout.DOCK_FROM)
+	var b := _m(PastLayout.DOCK_TO)
+	var mid := (a + b) * 0.5
+	var len: float = a.distance_to(b)
+	var yaw: float = rad_to_deg(atan2(b.x - a.x, b.z - a.z))
+	PastBuilder._box(root, Vector3(2.6, 0.22, len), mid + Vector3(0, 0.45, 0), wood, Vector3(0, yaw, 0))
+	var dir := (b - a).normalized()
+	var side := dir.cross(Vector3.UP).normalized()
+	var k: float = 0.0
+	while k <= len:
+		for sx in [-1.0, 1.0]:
+			PastBuilder._box(root, Vector3(0.24, 1.6, 0.24), a + dir * k + side * 1.25 * sx + Vector3(0, 0.3, 0), wood)
+		k += 2.4
+	var boat := Node3D.new()
+	boat.position = b - side * 2.6 - dir * 1.5 + Vector3(0, 0.15, 0)
+	boat.rotation_degrees = Vector3(0, yaw + 8.0, 2)
+	root.add_child(boat)
+	var hull := PastBuilder._plain("ship_hull", HULL, 0.8)
+	PastBuilder._box(boat, Vector3(1.4, 0.5, 3.6), Vector3(0, 0.2, 0), hull)
+	PastBuilder._box(boat, Vector3(1.0, 0.4, 1.0), Vector3(0, 0.15, -2.0), hull, Vector3(0, 45, 0))
+	PastBuilder._box(boat, Vector3(1.3, 0.08, 0.3), Vector3(0, 0.45, 0.4), wood)
+
+
+## 닻의 선장 모델(2026-11-26 사용자: "선장 모델 다운 받아"): Quaternius 「Pirate Kit」의 Captain Barbarossa(CC0, 동작 14개, CREDITS.md).
+## 앞이 +Z라 반 바퀴 돌려 세우고, 머리는 이 게임의 다른 사람들처럼 오브젝트헤드: 닻(ObjectHead "anchor", 사용자: "머리는 원래처럼 닻으로",
+## "원래 오브젝트헤드잖아"). 모델이 없으면 도형 선장.
+const CAPTAIN_MODEL: String = "res://assets/past/models/captain/Characters_Captain_Barbarossa.gltf"
+const CAPTAIN_SCALE: float = 1.1
+
+
+## 닻의 선장: 받은 모델(있으면) 또는 긴 남색 외투·세모 모자의 도형. 사람(혼 아님). past.gd가 영주 쪽으로 돌린다.
+static func captain(root: Node3D, at: Vector3) -> Node3D:
+	var g := Node3D.new()
+	g.name = "Captain"
+	g.position = at
+	root.add_child(g)
+	if ResourceLoader.exists(CAPTAIN_MODEL):
+		var ps := load(CAPTAIN_MODEL) as PackedScene
+		if ps != null:
+			var m := ps.instantiate() as Node3D
+			m.name = "Model"
+			m.rotation.y = PI
+			m.scale = Vector3.ONE * CAPTAIN_SCALE
+			g.add_child(m)
+			var holder := ObjectHead.attach(m.find_child("Skeleton3D", true, false) as Skeleton3D, &"captain")
+			if holder != null:
+				_captain_collar(holder)
+			var ap := m.find_child("AnimationPlayer", true, false) as AnimationPlayer
+			if ap != null and ap.has_animation("Idle"):
+				ap.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
+				ap.play("Idle")
+				g.set_meta("anim", ap)
+			return g
+	_captain_shapes(g)
+	return g
+
+
+## 받은 모델은 머리가 커서 줄인 얼굴이 목에 조금 남는다: 외투 빛 높은 깃과 붉은 목수건으로 가리고 닻을 키운다.
+static func _captain_collar(holder: Node3D) -> void:
+	var o := holder.get_child(0) as Node3D
+	o.scale = Vector3.ONE * 1.35
+	o.position = Vector3(0, 0.06, 0)
+	var leather := PastBuilder._plain("cap_collar", Color(0.26, 0.17, 0.11), 0.85)
+	var scarf := PastBuilder._plain("cap_scarf", Color(0.5, 0.08, 0.07), 0.9)
+	var col := CylinderMesh.new()
+	col.top_radius = 0.17
+	col.bottom_radius = 0.21
+	col.height = 0.22
+	col.radial_segments = 12
+	PastBuilder._put(holder, col, leather, Vector3(0, -0.04, 0))
+	var knot := TorusMesh.new()
+	knot.inner_radius = 0.16
+	knot.outer_radius = 0.24
+	knot.rings = 16
+	var t := PastBuilder._put(holder, knot, scarf, Vector3(0, 0.02, 0))
+	t.scale = Vector3(1.0, 0.6, 1.0)
+	PastBuilder._box(holder, Vector3(0.09, 0.14, 0.05), Vector3(0.05, -0.06, 0.21), scarf, Vector3(0, 0, 12))   # 목수건 끝(앞)
+	PastBuilder._box(holder, Vector3(0.08, 0.12, 0.05), Vector3(-0.05, -0.07, 0.21), scarf, Vector3(0, 0, -16))
+
+
+## 말을 걸면 손을 흔들고 다시 서 있는다(모델이 있을 때만).
+static func captain_greet(cap: Node3D) -> void:
+	var ap: AnimationPlayer = cap.get_meta("anim", null)
+	if ap == null or not ap.has_animation("Wave"):
+		return
+	ap.play("Wave", 0.2)
+	ap.queue("Idle")
+
+
+static func _captain_shapes(g: Node3D) -> void:
+	var coat := PastBuilder._plain("cap_coat", Color(0.12, 0.15, 0.3), 0.85)
+	var trim := PastBuilder._plain("ship_gold", PastLayout.GOLD.darkened(0.15), 0.4, 0.6)
+	var boot := PastBuilder._plain("cap_boot", Color(0.08, 0.06, 0.05), 0.7)
+	var skin := PastBuilder._plain("cap_skin", Color(0.78, 0.6, 0.48), 0.8)
+	var hair := PastBuilder._plain("cap_hair", Color(0.12, 0.08, 0.06), 0.9)
+	var shirt := PastBuilder._plain("cap_shirt", Color(0.86, 0.82, 0.74), 0.9)
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(0.2, 0.62, 0.24), Vector3(0.13 * sx, 0.31, 0), boot)
+	var skirt := CylinderMesh.new()
+	skirt.top_radius = 0.28
+	skirt.bottom_radius = 0.42
+	skirt.height = 0.75
+	skirt.radial_segments = 10
+	PastBuilder._put(g, skirt, coat, Vector3(0, 0.85, 0))   # 외투 자락
+	PastBuilder._box(g, Vector3(0.6, 0.62, 0.34), Vector3(0, 1.45, 0), coat)   # 몸통
+	PastBuilder._box(g, Vector3(0.22, 0.5, 0.02), Vector3(0, 1.45, -0.18), shirt)
+	PastBuilder._box(g, Vector3(0.62, 0.07, 0.36), Vector3(0, 1.2, 0), boot)   # 허리띠
+	PastBuilder._box(g, Vector3(0.1, 0.09, 0.02), Vector3(0, 1.2, -0.19), trim)
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(0.04, 1.3, 0.04), Vector3(0.29 * sx, 0.95, -0.17), trim)   # 외투 단
+	PastBuilder._box(g, Vector3(0.7, 0.14, 0.38), Vector3(0, 1.78, 0), trim)   # 견장
+	PastBuilder._box(g, Vector3(0.16, 0.6, 0.16), Vector3(-0.38, 1.45, 0), coat, Vector3(0, 0, -8))
+	PastBuilder._box(g, Vector3(0.16, 0.5, 0.16), Vector3(0.36, 1.55, -0.18), coat, Vector3(-55, 0, 10))   # 망원경 든 팔
+	var glass := CylinderMesh.new()
+	glass.top_radius = 0.05
+	glass.bottom_radius = 0.07
+	glass.height = 0.5
+	glass.radial_segments = 8
+	PastBuilder._put(g, glass, trim, Vector3(0.38, 1.78, -0.46), Vector3(-80, 0, 0))
+	PastBuilder._box(g, Vector3(0.05, 0.9, 0.08), Vector3(-0.36, 0.85, 0.12), PastBuilder._plain("anchor_steel", Color(0.62, 0.64, 0.68), 0.25, 0.15), Vector3(18, 0, -6))   # 허리 칼
+	var head := ObjectHead.build(&"anchor")   # 머리는 닻(오브젝트헤드)
+	head.position = Vector3(0, 1.86, 0)
+	head.scale = Vector3.ONE * 1.25
+	g.add_child(head)
+
+
 # ---------------------------------------------------------------- 이야기 자리
 
 ## 아홉 돌 고리와 봉인 제단: 돌마다 잿불 무늬 띠, 돌에서 가운데 기둥으로 이어진 사슬. quiet면(짐승을 쓰러뜨림) 불이 식는다.
@@ -361,7 +848,7 @@ static func seal_altar(root: Node3D, at: Vector3, quiet: bool) -> Node3D:
 	for i in PastLayout.SEAL_STONES:
 		var p := _m(PastLayout.seal_stone(i))
 		var face: float = rad_to_deg(-TAU * i / PastLayout.SEAL_STONES)
-		if i == 7:
+		if i == PastLayout.SEAL_GAP:
 			PastBuilder._box(g, Vector3(1.6, 0.6, 1.4), p + Vector3(0, 0.3, 0), basalt, Vector3(8, face, 4))   # 무너진 돌(들어가는 길)
 			continue
 		PastBuilder._box(g, Vector3(1.6, 5.0, 1.2), p + Vector3(0, 2.4, 0), basalt, Vector3(0, face, 0))
