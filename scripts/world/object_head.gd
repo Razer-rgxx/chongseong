@@ -303,24 +303,17 @@ static func build(obj: StringName) -> Node3D:
 			var tm := TorusMesh.new()
 			tm.inner_radius = 0.034
 			tm.outer_radius = 0.06
+			tm.material = gold   # gl_compatibility 그림자 길에서 도넛 메시는 덮어쓴 재질만으로는 빈 재질 오류를 낸다
 			ring.mesh = tm
 			ring.material_override = gold
 			ring.position = Vector3(0, 0.575, 0)
 			ring.rotation = Vector3(PI / 2, 0, 0)
 			n.add_child(ring)
 			_ball(n, 0.02, Vector3(0, 0.575, 0), rune, Vector3(1, 1.3, 0.6))   # 고리 안의 수정
-			var link := TorusMesh.new()   # 고리에서 오른팔 쪽으로 늘어진 사슬
-			link.inner_radius = 0.008
-			link.outer_radius = 0.016
-			for k in 7:
+			for k in 7:   # 고리에서 오른팔 쪽으로 늘어진 사슬(길쭉한 쇠고리를 엇갈려 잇는다. 도넛 메시는 gl_compatibility에서 빈 재질 오류를 내서 쓰지 않는다)
 				var t: float = (k + 0.5) / 7.0
 				var q := Vector3(0.0, 0.54, 0.035).lerp(Vector3(0.15, 0.2, 0.035), t) + Vector3(0.03 * sin(t * PI), -0.05 * sin(t * PI), 0)
-				var li := MeshInstance3D.new()
-				li.mesh = link
-				li.material_override = steel
-				li.position = q
-				li.rotation = Vector3(PI / 2 if k % 2 == 0 else 0.0, 0, -0.6)
-				n.add_child(li)
+				_ball(n, 0.016, q, steel, Vector3(0.7, 1.4, 0.35 if k % 2 == 0 else 0.7))
 			var gl := OmniLight3D.new()
 			gl.light_color = Color(0.45, 0.85, 1.0)
 			gl.light_energy = 0.9   # 사진 속 등불처럼 머리 빛이 목장식과 가슴을 비춘다

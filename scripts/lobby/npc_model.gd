@@ -138,87 +138,178 @@ func _dress() -> void:
 			_pbox(Vector3(0.5, 0.06, 0.24), Vector3(0, h * 0.8, 0.04), cloth)
 		&"sash":
 			_pbox(Vector3(0.08, 0.7, 0.3), Vector3(0, h * 0.62, 0), trim, Vector3(0, 0, 0.75))
-		&"coat":   # 선장 연미복(2026-11-26, 사용자 "더 멋있게" + 사진 "이런 느낌": 등불머리의 연미복). 앞이 열린 검남색 연미복,
-			# 넓은 파란 깃(금테), 금빛 조끼와 두 줄 단추, 흰 주름 목장식(자보), 높은 깃, 금 견장과 술, 무릎 아래까지 오는 뒤 꼬리, 소매와 파란 소맷부리.
-			var facing := _mat(Color(0.1, 0.22, 0.55))
-			var waist := _mat(Color(0.42, 0.3, 0.14))
+		&"coat":   # 선장 연미복(2026-11-26, 사용자 "더 멋있게" + 등불머리 사진 "이런 느낌" + "옷에서 코드로 만든 티가 좀 덜나게").
+			# 몸통·팔은 몸 메시를 한 겹 부풀린 껍데기(_shell_coat, 칠은 captain_coat.gdshader)라 몸과 같이 움직이고,
+			# 둥근 흰 주름 목장식, 둥근 금 견장과 술, 높은 깃, 휘어 내려오는 뒤 꼬리(_tails), 허리 칼만 따로 단다.
 			var lace := _mat(Color(0.9, 0.88, 0.82))
-			_pbox(Vector3(0.2, 0.4, 0.02), Vector3(0, h * 0.65, -0.132), waist)   # 조끼
+			var coat_m := _coat_material(c[0] as Color, c[1] as Color)
+			_shell_coat(coat_m)
+			_tails(coat_m)
+			for k in 5:   # 흰 주름 목장식(자보): 아래로 갈수록 좁아지는 둥근 주름
+				_pball(Vector3(0.075 - k * 0.009, 0.026, 0.03), Vector3(0, h * 0.815 - k * 0.03, -0.15 - k * 0.006), lace)
 			for sx in [-1.0, 1.0]:
-				_pbox(Vector3(0.11, 0.05, 0.02), Vector3(sx * 0.045, h * 0.535, -0.132), waist, Vector3(0, 0, sx * 0.5))   # 조끼 끝 뾰족
-				for k in 4:
-					_pbox(Vector3(0.02, 0.02, 0.02), Vector3(sx * 0.04, h * (0.73 - k * 0.055), -0.145), trim)   # 조끼 단추
-				_pbox(Vector3(0.1, 0.5, 0.025), Vector3(sx * 0.14, h * 0.66, -0.128), cloth)   # 앞판(열림)
-				_pbox(Vector3(0.085, 0.32, 0.02), Vector3(sx * 0.11, h * 0.74, -0.148), facing, Vector3(0, 0, sx * 0.28))   # 넓은 파란 깃
-				_pbox(Vector3(0.012, 0.33, 0.024), Vector3(sx * 0.07, h * 0.74, -0.15), trim, Vector3(0, 0, sx * 0.28))   # 깃 금테
-				_pbox(Vector3(0.17, 0.04, 0.15), Vector3(sx * 0.2, h * 0.82, 0.0), trim)   # 견장
-				for k in 5:   # 견장 술
-					_pbox(Vector3(0.012, 0.07, 0.012), Vector3(sx * (0.14 + k * 0.03), h * 0.82 - 0.05, -0.06), trim)
-				_pbox(Vector3(0.02, 0.36, 0.17), Vector3(sx * 0.2, h * 0.66, 0.0), cloth)   # 옆판
-				_pbox(Vector3(0.18, 0.86, 0.02), Vector3(sx * 0.1, h * 0.27, 0.155), cloth, Vector3(0.1, 0, sx * 0.07))   # 뒤 꼬리(종아리까지)
-				_pbox(Vector3(0.04, 0.84, 0.024), Vector3(sx * 0.03, h * 0.27, 0.16), facing, Vector3(0.1, 0, sx * 0.07))   # 꼬리 안쪽 파란 단
-				_pbox(Vector3(0.18, 0.02, 0.026), Vector3(sx * 0.1, h * 0.27 - 0.42, 0.2), trim, Vector3(0.1, 0, sx * 0.07))
-				_pbox(Vector3(0.08, 0.14, 0.02), Vector3(sx * 0.09, h * 0.86, -0.06), facing, Vector3(-0.3, sx * 0.6, 0))   # 높은 깃 앞날개
-			_pbox(Vector3(0.48, 0.54, 0.025), Vector3(0, h * 0.66, 0.17), cloth, Vector3(0.08, 0, 0))   # 등판
-			_pbox(Vector3(0.02, 0.48, 0.028), Vector3(0, h * 0.65, 0.185), trim, Vector3(0.08, 0, 0))   # 등 솔기 금줄
-			_pbox(Vector3(0.3, 0.14, 0.035), Vector3(0, h * 0.865, 0.07), cloth, Vector3(-0.3, 0, 0))   # 높은 뒷깃
-			_pbox(Vector3(0.3, 0.018, 0.04), Vector3(0, h * 0.865 + 0.07, 0.09), trim, Vector3(-0.3, 0, 0))
-			for k in 5:   # 흰 주름 목장식(자보): 아래로 갈수록 좁아지는 겹
-				_pbox(Vector3(0.13 - k * 0.016, 0.045, 0.035), Vector3(0, h * 0.815 - k * 0.032, -0.152 - k * 0.006), lace, Vector3(-0.25, 0, (k % 2 - 0.5) * 0.12))
+				var ep := _pcyl(0.085, 0.075, 0.03, Vector3(sx * 0.2, h * 0.822, 0.0), trim)   # 둥근 금 견장
+				ep.scale = Vector3(1.0, 1.0, 0.85)
+				for k in 7:   # 견장 술
+					var a: float = PI * (0.15 + 0.7 * k / 6.0)
+					_pcyl(0.006, 0.006, 0.075, Vector3(sx * (0.2 + cos(a) * 0.08 * sx), h * 0.822 - 0.045, -sin(a) * 0.07 + 0.0), trim)
+			var col := _pcyl(0.12, 0.135, 0.11, Vector3(0, h * 0.865, 0.03), coat_m)   # 높은 깃(둥글게 목 뒤를 감쌈)
+			col.rotation = Vector3(-0.3, 0, 0)
 			_pbox(Vector3(0.045, 0.7, 0.03), Vector3(-0.22, h * 0.36, -0.02), _mat(Color(0.08, 0.06, 0.05)), Vector3(0.35, 0, -0.18))   # 허리 칼(칼집)
 			_pbox(Vector3(0.12, 0.03, 0.05), Vector3(-0.17, h * 0.55, -0.1), trim, Vector3(0.35, 0, -0.18))
-			_sleeves(cloth, facing, trim)
 		&"vest":
 			for sx in [-1.0, 1.0]:
 				_pbox(Vector3(0.15, 0.36, 0.02), Vector3(sx * 0.09, h * 0.63, -0.13), cloth)
 			_pbox(Vector3(0.02, 0.34, 0.025), Vector3(0, h * 0.63, -0.14), trim)
 
 
-## 연미복 소매: 팔뼈에 붙여 팔과 같이 움직인다(위팔·아래팔, 아래팔 끝에 파란 소맷부리와 금띠). 뼈 +Y가 팔 방향.
-func _sleeves(cloth: Material, facing: Material, trim: Material) -> void:
-	var skel := _body.find_child("Skeleton3D", true, false) as Skeleton3D if _body else null
-	if skel == null:
-		return
-	for side in ["l", "r"]:
-		for part in [["upperarm_", 0.26, 0.058, 0.052], ["lowerarm_", 0.22, 0.05, 0.045]]:
-			var bone: String = part[0] + side
-			if skel.find_bone(bone) < 0:
+const COAT_SHADER: String = "res://assets/past/captain_coat.gdshader"
+
+
+func _coat_material(cloth: Color, gold: Color) -> Material:
+	if not ResourceLoader.exists(COAT_SHADER):
+		return _mat(cloth)
+	var m := ShaderMaterial.new()
+	m.shader = load(COAT_SHADER) as Shader
+	m.set_shader_parameter("coat", cloth)
+	m.set_shader_parameter("gold", gold)
+	return m
+
+
+## 옷 껍데기: 몸통·팔 메시(손 빼고)를 법선 쪽으로 한 겹 부풀린 스킨 메시. 같은 스킨·뼈대를 써서 몸과 같이 움직인다.
+## 칠할 자리를 위해 묶을 때 자세 위치를 UV2(x, y)·UV.x(z)에 담는다(captain_coat.gdshader).
+func _shell_coat(mat: Material) -> void:
+	for src in _body.find_children("*", "MeshInstance3D", true, false):
+		var mi := src as MeshInstance3D
+		var nm: String = String(mi.name)
+		if mi.skin == null or not (nm.ends_with("_Body") or nm.ends_with("_Arms")):
+			continue
+		var am := ArrayMesh.new()
+		for si in mi.mesh.get_surface_count():
+			var a: Array = mi.mesh.surface_get_arrays(si)
+			var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+			var n: PackedVector3Array = a[Mesh.ARRAY_NORMAL]
+			var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX]
+			var bones: PackedInt32Array = a[Mesh.ARRAY_BONES]
+			var weights: PackedFloat32Array = a[Mesh.ARRAY_WEIGHTS]
+			if v.is_empty() or idx.is_empty() or bones.is_empty():
 				continue
-			var at := BoneAttachment3D.new()
-			at.bone_name = bone
-			skel.add_child(at)
-			var len: float = part[1]
-			var c := CylinderMesh.new()
-			c.top_radius = part[3]
-			c.bottom_radius = part[2]
-			c.height = len
-			c.radial_segments = 10
-			var mi := MeshInstance3D.new()
-			mi.mesh = c
-			mi.material_override = cloth
-			mi.position = Vector3(0, len * 0.5, 0)
-			at.add_child(mi)
-			if part[0] == "lowerarm_":
-				var cuff := CylinderMesh.new()
-				cuff.top_radius = 0.06
-				cuff.bottom_radius = 0.054
-				cuff.height = 0.07
-				cuff.radial_segments = 10
-				var cm := MeshInstance3D.new()
-				cm.mesh = cuff
-				cm.material_override = facing
-				cm.position = Vector3(0, len - 0.03, 0)
-				at.add_child(cm)
-				var band := CylinderMesh.new()
-				band.top_radius = 0.062
-				band.bottom_radius = 0.062
-				band.height = 0.012
-				band.radial_segments = 10
-				var bm := MeshInstance3D.new()
-				bm.mesh = band
-				bm.material_override = trim
-				bm.position = Vector3(0, len - 0.065, 0)
-				at.add_child(bm)
+			var per: int = bones.size() / v.size()
+			var remap := PackedInt32Array()
+			remap.resize(v.size())
+			var ov := PackedVector3Array()
+			var on := PackedVector3Array()
+			var uv := PackedVector2Array()
+			var uv2 := PackedVector2Array()
+			var ob := PackedInt32Array()
+			var ow := PackedFloat32Array()
+			var off: float = 0.012 if nm.ends_with("_Body") else 0.009
+			for k in v.size():
+				remap[k] = -1
+				if absf(v[k].x) > 0.655:   # 손은 빼고
+					continue
+				remap[k] = ov.size()
+				ov.append(v[k] + n[k] * off)
+				on.append(n[k])
+				uv.append(Vector2(v[k].z, 0.0))
+				uv2.append(Vector2(v[k].x, v[k].y))
+				for b in per:
+					ob.append(bones[k * per + b])
+					ow.append(weights[k * per + b])
+			var oi := PackedInt32Array()
+			for t in range(0, idx.size(), 3):
+				var p0: int = remap[idx[t]]
+				var p1: int = remap[idx[t + 1]]
+				var p2: int = remap[idx[t + 2]]
+				if p0 >= 0 and p1 >= 0 and p2 >= 0:
+					oi.append_array([p0, p1, p2])
+			if oi.is_empty():
+				continue
+			var arr: Array = []
+			arr.resize(Mesh.ARRAY_MAX)
+			arr[Mesh.ARRAY_VERTEX] = ov
+			arr[Mesh.ARRAY_NORMAL] = on
+			arr[Mesh.ARRAY_TEX_UV] = uv
+			arr[Mesh.ARRAY_TEX_UV2] = uv2
+			arr[Mesh.ARRAY_BONES] = ob
+			arr[Mesh.ARRAY_WEIGHTS] = ow
+			arr[Mesh.ARRAY_INDEX] = oi
+			var flags: int = Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS if per == 8 else 0
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, flags)
+			am.surface_set_material(am.get_surface_count() - 1, mat)
+		if am.get_surface_count() == 0:
+			continue
+		var shell := MeshInstance3D.new()
+		shell.name = nm + "_Coat"
+		shell.mesh = am
+		mi.get_parent().add_child(shell)
+		shell.transform = mi.transform
+		shell.skin = mi.skin
+		shell.skeleton = shell.get_path_to(mi.get_node(mi.skeleton))
+
+
+## 연미복 뒤 꼬리: 허리 뒤에서 종아리까지 휘어 내려오며 퍼지는 두 자락(곡면, 앞뒤 면, 같은 껍데기 칠: 밑단 금띠).
+func _tails(mat: Material) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rows: int = 8
+	var cols: int = 6
+	for flap in [-1.0, 1.0]:
+		var grid: Array = []
+		for r in rows + 1:
+			var t: float = r / float(rows)
+			var y: float = lerpf(0.98, 0.36, t)
+			var rad: float = lerpf(0.175, 0.26, t * t)
+			var row: Array = []
+			for cc in cols + 1:
+				var a: float = lerpf(0.06, 1.25, cc / float(cols)) * flap   # 등 가운데(0)에서 옆으로
+				# NpcModel 공간: 앞이 -Z, 등은 +Z
+				row.append(Vector3(sin(a) * rad * 1.05, y, cos(a) * rad * 0.85 + 0.02))
+			grid.append(row)
+		for r in rows:
+			for cc in cols:
+				var q: Array = [grid[r][cc], grid[r][cc + 1], grid[r + 1][cc + 1], grid[r + 1][cc]]
+				for tri in [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]]:
+					for k in tri:
+						var p: Vector3 = q[k]
+						st.set_uv(Vector2(-p.z, 0.0))   # 칠 공간은 모델 앞 +Z라 뒤집는다
+						st.set_uv2(Vector2(-p.x, p.y))
+						st.add_vertex(p)
+	st.generate_normals()
+	st.set_material(mat)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	_piece.add_child(mi)
+
+
+func _pball(scale: Vector3, at: Vector3, m: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 1.0
+	sm.height = 2.0
+	sm.radial_segments = 12
+	sm.rings = 6
+	mi.mesh = sm
+	mi.scale = scale
+	mi.position = at
+	mi.material_override = m
+	_piece.add_child(mi)
+	return mi
+
+
+func _pcyl(rt: float, rb: float, hh: float, at: Vector3, m: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = rt
+	cm.bottom_radius = rb
+	cm.height = hh
+	cm.radial_segments = 14
+	mi.mesh = cm
+	mi.position = at
+	mi.material_override = m
+	_piece.add_child(mi)
+	return mi
 
 
 func _mat(c: Color) -> StandardMaterial3D:
