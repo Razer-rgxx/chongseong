@@ -133,9 +133,9 @@ static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	if obj == &"hill":
 		mod.size = 1.7   # 주인공 머리는 눈에 띄게
 	elif obj == &"anchor":
-		# 닻의 선장(사용자 "머리가 조금 더 자연스럽게"): 사람 머리 크기에 가깝게 줄이고, 흰 주름 깃 대신 외투 빛 목깃
+		# 닻의 선장(사용자 "머리가 조금 더 자연스럽게", 사진 속 등불머리처럼): 사람 머리 크기에 가깝게 줄이고, 흰 주름 깃이 받친다
 		mod.size = 0.82
-		collar.material_override = _m(Color(0.1, 0.12, 0.22))
+		collar.material_override = _m(Color(0.9, 0.88, 0.82))
 		collar.scale = Vector3(1.15, 0.7, 1.15)
 	return holder
 
@@ -323,9 +323,9 @@ static func build(obj: StringName) -> Node3D:
 				n.add_child(li)
 			var gl := OmniLight3D.new()
 			gl.light_color = Color(0.45, 0.85, 1.0)
-			gl.light_energy = 0.35
-			gl.omni_range = 1.6
-			gl.position = Vector3(0, 0.3, -0.12)
+			gl.light_energy = 0.9   # 사진 속 등불처럼 머리 빛이 목장식과 가슴을 비춘다
+			gl.omni_range = 2.4
+			gl.position = Vector3(0, 0.25, -0.18)
 			n.add_child(gl)
 		&"hill":
 			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,

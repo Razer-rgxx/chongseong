@@ -105,7 +105,7 @@ const COSTUME: Dictionary = {
 	&"peasant2": [Color(0.4, 0.34, 0.2), Color(0.5, 0.4, 0.22), &"vest"],
 	&"peasant3": [Color(0.3, 0.28, 0.26), Color(0.4, 0.36, 0.3), &"apron"],
 	&"peasant4": [Color(0.42, 0.36, 0.22), Color(0.55, 0.45, 0.22), &"sash"],
-	&"captain": [Color(0.1, 0.13, 0.26), Color(0.75, 0.6, 0.28), &"coat"],   # 2026-11-26 닻의 선장(과거): 남색 선장 외투, 금빛 단
+	&"captain": [Color(0.07, 0.08, 0.14), Color(0.8, 0.62, 0.26), &"coat"],   # 2026-11-26 닻의 선장(과거): 검남색 연미복, 금빛 단
 }
 
 var _piece: Node3D
@@ -138,39 +138,87 @@ func _dress() -> void:
 			_pbox(Vector3(0.5, 0.06, 0.24), Vector3(0, h * 0.8, 0.04), cloth)
 		&"sash":
 			_pbox(Vector3(0.08, 0.7, 0.3), Vector3(0, h * 0.62, 0), trim, Vector3(0, 0, 0.75))
-		&"coat":   # 선장 외투(2026-11-26, 사용자: "더 멋있게"): 높은 깃, 금 견장과 술, 두 줄 단추, 무릎까지 오는 자락, 등 망토(붉은 안감), 어깨띠와 허리 칼
-			var lining := _mat(Color(0.42, 0.06, 0.06))
-			var dark := _mat(Color(0.08, 0.06, 0.05))
+		&"coat":   # 선장 연미복(2026-11-26, 사용자 "더 멋있게" + 사진 "이런 느낌": 등불머리의 연미복). 앞이 열린 검남색 연미복,
+			# 넓은 파란 깃(금테), 금빛 조끼와 두 줄 단추, 흰 주름 목장식(자보), 높은 깃, 금 견장과 술, 무릎 아래까지 오는 뒤 꼬리, 소매와 파란 소맷부리.
+			var facing := _mat(Color(0.1, 0.22, 0.55))
+			var waist := _mat(Color(0.42, 0.3, 0.14))
+			var lace := _mat(Color(0.9, 0.88, 0.82))
+			_pbox(Vector3(0.2, 0.4, 0.02), Vector3(0, h * 0.65, -0.132), waist)   # 조끼
 			for sx in [-1.0, 1.0]:
-				_pbox(Vector3(0.16, 0.46, 0.025), Vector3(sx * 0.082, h * 0.68, -0.13), cloth)   # 앞판
-				_pbox(Vector3(0.022, 0.44, 0.03), Vector3(sx * 0.016, h * 0.68, -0.145), trim)   # 금빛 단
-				_pbox(Vector3(0.07, 0.2, 0.02), Vector3(sx * 0.055, h * 0.79, -0.14), lining, Vector3(0, 0, sx * 0.35))   # 젖힌 옷깃(붉은 안)
+				_pbox(Vector3(0.11, 0.05, 0.02), Vector3(sx * 0.045, h * 0.535, -0.132), waist, Vector3(0, 0, sx * 0.5))   # 조끼 끝 뾰족
+				for k in 4:
+					_pbox(Vector3(0.02, 0.02, 0.02), Vector3(sx * 0.04, h * (0.73 - k * 0.055), -0.145), trim)   # 조끼 단추
+				_pbox(Vector3(0.1, 0.5, 0.025), Vector3(sx * 0.14, h * 0.66, -0.128), cloth)   # 앞판(열림)
+				_pbox(Vector3(0.085, 0.32, 0.02), Vector3(sx * 0.11, h * 0.74, -0.148), facing, Vector3(0, 0, sx * 0.28))   # 넓은 파란 깃
+				_pbox(Vector3(0.012, 0.33, 0.024), Vector3(sx * 0.07, h * 0.74, -0.15), trim, Vector3(0, 0, sx * 0.28))   # 깃 금테
 				_pbox(Vector3(0.17, 0.04, 0.15), Vector3(sx * 0.2, h * 0.82, 0.0), trim)   # 견장
 				for k in 5:   # 견장 술
 					_pbox(Vector3(0.012, 0.07, 0.012), Vector3(sx * (0.14 + k * 0.03), h * 0.82 - 0.05, -0.06), trim)
-				for k in 3:   # 두 줄 단추
-					_pbox(Vector3(0.022, 0.022, 0.02), Vector3(sx * 0.06, h * (0.76 - k * 0.06), -0.146), trim)
-				_pbox(Vector3(0.16, 0.62, 0.02), Vector3(sx * 0.12, h * 0.31, -0.115), cloth, Vector3(-0.08, 0, sx * 0.12))   # 앞 자락(무릎까지)
-				_pbox(Vector3(0.16, 0.02, 0.025), Vector3(sx * 0.14, h * 0.13, -0.1), trim, Vector3(-0.08, 0, sx * 0.12))
-				_pbox(Vector3(0.02, 0.6, 0.18), Vector3(sx * 0.2, h * 0.31, 0.0), cloth, Vector3(0, 0, sx * 0.14))   # 옆 자락
-				_pbox(Vector3(0.18, 0.72, 0.02), Vector3(sx * 0.1, h * 0.3, 0.15), cloth, Vector3(0.12, 0, sx * 0.08))   # 뒤 꼬리
-				_pbox(Vector3(0.18, 0.02, 0.025), Vector3(sx * 0.1, h * 0.1, 0.19), trim, Vector3(0.12, 0, sx * 0.08))
-			_pbox(Vector3(0.34, 0.16, 0.04), Vector3(0, h * 0.87, 0.1), cloth, Vector3(-0.25, 0, 0))   # 높은 뒷깃
-			_pbox(Vector3(0.34, 0.02, 0.045), Vector3(0, h * 0.87 + 0.08, 0.12), trim, Vector3(-0.25, 0, 0))
-			_pbox(Vector3(0.5, 1.08, 0.025), Vector3(0, h * 0.5, 0.2), cloth, Vector3(0.1, 0, 0))   # 등 망토
-			_pbox(Vector3(0.46, 1.04, 0.01), Vector3(0, h * 0.5, 0.185), lining, Vector3(0.1, 0, 0))
-			_pbox(Vector3(0.5, 0.025, 0.03), Vector3(0, h * 0.5 - 0.53, 0.25), trim, Vector3(0.1, 0, 0))
-			_pbox(Vector3(0.38, 0.055, 0.27), Vector3(0, h * 0.5, 0), dark)   # 허리띠
-			_pbox(Vector3(0.06, 0.05, 0.02), Vector3(0, h * 0.5, -0.14), trim)
-			_pbox(Vector3(0.05, 0.62, 0.02), Vector3(0.0, h * 0.66, -0.15), dark, Vector3(0, 0, 0.62))   # 어깨띠
-			_pbox(Vector3(0.04, 0.04, 0.02), Vector3(0.0, h * 0.66, -0.162), trim)
-			_pbox(Vector3(0.045, 0.7, 0.03), Vector3(-0.22, h * 0.36, -0.02), dark, Vector3(0.35, 0, -0.18))   # 허리 칼(칼집)
-			_pbox(Vector3(0.12, 0.03, 0.05), Vector3(-0.17, h * 0.55, -0.1), trim, Vector3(0.35, 0, -0.18))   # 코등이
-			_pbox(Vector3(0.03, 0.12, 0.03), Vector3(-0.155, h * 0.59, -0.12), dark, Vector3(0.35, 0, -0.18))   # 자루
+				_pbox(Vector3(0.02, 0.36, 0.17), Vector3(sx * 0.2, h * 0.66, 0.0), cloth)   # 옆판
+				_pbox(Vector3(0.18, 0.86, 0.02), Vector3(sx * 0.1, h * 0.27, 0.155), cloth, Vector3(0.1, 0, sx * 0.07))   # 뒤 꼬리(종아리까지)
+				_pbox(Vector3(0.04, 0.84, 0.024), Vector3(sx * 0.03, h * 0.27, 0.16), facing, Vector3(0.1, 0, sx * 0.07))   # 꼬리 안쪽 파란 단
+				_pbox(Vector3(0.18, 0.02, 0.026), Vector3(sx * 0.1, h * 0.27 - 0.42, 0.2), trim, Vector3(0.1, 0, sx * 0.07))
+				_pbox(Vector3(0.08, 0.14, 0.02), Vector3(sx * 0.09, h * 0.86, -0.06), facing, Vector3(-0.3, sx * 0.6, 0))   # 높은 깃 앞날개
+			_pbox(Vector3(0.48, 0.54, 0.025), Vector3(0, h * 0.66, 0.17), cloth, Vector3(0.08, 0, 0))   # 등판
+			_pbox(Vector3(0.02, 0.48, 0.028), Vector3(0, h * 0.65, 0.185), trim, Vector3(0.08, 0, 0))   # 등 솔기 금줄
+			_pbox(Vector3(0.3, 0.14, 0.035), Vector3(0, h * 0.865, 0.07), cloth, Vector3(-0.3, 0, 0))   # 높은 뒷깃
+			_pbox(Vector3(0.3, 0.018, 0.04), Vector3(0, h * 0.865 + 0.07, 0.09), trim, Vector3(-0.3, 0, 0))
+			for k in 5:   # 흰 주름 목장식(자보): 아래로 갈수록 좁아지는 겹
+				_pbox(Vector3(0.13 - k * 0.016, 0.045, 0.035), Vector3(0, h * 0.815 - k * 0.032, -0.152 - k * 0.006), lace, Vector3(-0.25, 0, (k % 2 - 0.5) * 0.12))
+			_pbox(Vector3(0.045, 0.7, 0.03), Vector3(-0.22, h * 0.36, -0.02), _mat(Color(0.08, 0.06, 0.05)), Vector3(0.35, 0, -0.18))   # 허리 칼(칼집)
+			_pbox(Vector3(0.12, 0.03, 0.05), Vector3(-0.17, h * 0.55, -0.1), trim, Vector3(0.35, 0, -0.18))
+			_sleeves(cloth, facing, trim)
 		&"vest":
 			for sx in [-1.0, 1.0]:
 				_pbox(Vector3(0.15, 0.36, 0.02), Vector3(sx * 0.09, h * 0.63, -0.13), cloth)
 			_pbox(Vector3(0.02, 0.34, 0.025), Vector3(0, h * 0.63, -0.14), trim)
+
+
+## 연미복 소매: 팔뼈에 붙여 팔과 같이 움직인다(위팔·아래팔, 아래팔 끝에 파란 소맷부리와 금띠). 뼈 +Y가 팔 방향.
+func _sleeves(cloth: Material, facing: Material, trim: Material) -> void:
+	var skel := _body.find_child("Skeleton3D", true, false) as Skeleton3D if _body else null
+	if skel == null:
+		return
+	for side in ["l", "r"]:
+		for part in [["upperarm_", 0.26, 0.058, 0.052], ["lowerarm_", 0.22, 0.05, 0.045]]:
+			var bone: String = part[0] + side
+			if skel.find_bone(bone) < 0:
+				continue
+			var at := BoneAttachment3D.new()
+			at.bone_name = bone
+			skel.add_child(at)
+			var len: float = part[1]
+			var c := CylinderMesh.new()
+			c.top_radius = part[3]
+			c.bottom_radius = part[2]
+			c.height = len
+			c.radial_segments = 10
+			var mi := MeshInstance3D.new()
+			mi.mesh = c
+			mi.material_override = cloth
+			mi.position = Vector3(0, len * 0.5, 0)
+			at.add_child(mi)
+			if part[0] == "lowerarm_":
+				var cuff := CylinderMesh.new()
+				cuff.top_radius = 0.06
+				cuff.bottom_radius = 0.054
+				cuff.height = 0.07
+				cuff.radial_segments = 10
+				var cm := MeshInstance3D.new()
+				cm.mesh = cuff
+				cm.material_override = facing
+				cm.position = Vector3(0, len - 0.03, 0)
+				at.add_child(cm)
+				var band := CylinderMesh.new()
+				band.top_radius = 0.062
+				band.bottom_radius = 0.062
+				band.height = 0.012
+				band.radial_segments = 10
+				var bm := MeshInstance3D.new()
+				bm.mesh = band
+				bm.material_override = trim
+				bm.position = Vector3(0, len - 0.065, 0)
+				at.add_child(bm)
 
 
 func _mat(c: Color) -> StandardMaterial3D:
