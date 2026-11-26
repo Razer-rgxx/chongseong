@@ -221,7 +221,8 @@ static func _materials(g: int, col: Color) -> Dictionary:
 	return {"steel": steel, "plate": plate, "dark": dark, "grip": grip, "glow": glow, "accent": accent}
 
 
-## Blender 무한 모델(glow_kat_* 재질)의 빛 세기: 날 끝은 사이버 카타나(311)처럼 은은하게, 홈·총구 고리는 네온처럼. 색은 모델의 청록·파랑 그대로(빨강 없음).
+## Blender 무한 모델(glow_kat_* 재질)의 빛 세기: 날 끝은 사이버 카타나(311)처럼 은은하게, 홈·총구 고리는 네온처럼. 색은 모델 그대로.
+## 2026-11-26부터 칼마다 빛 색이 달라 재질 이름 뒤에 _<빛>이 붙는다(glow_kat_edge_red 등): 앞부분으로 세기를 고른다.
 const GLOW: Dictionary = {"glow_kat_edge": 1.3, "glow_kat_line": 3.0, "glow_kat_rim": 2.8, "glow_fire": 3.0}
 
 
@@ -230,8 +231,19 @@ static func glow_boost(n: Node) -> void:
 		var mi := node as MeshInstance3D
 		for si in mi.mesh.get_surface_count():
 			var mt := mi.mesh.surface_get_material(si) as StandardMaterial3D
-			if mt and GLOW.has(mt.resource_name):
+			var key: String = _glow_key(mt.resource_name) if mt else ""
+			if key != "":
 				var d := mt.duplicate() as StandardMaterial3D
 				d.emission_enabled = true
-				d.emission_energy_multiplier = GLOW[mt.resource_name]
+				d.emission_energy_multiplier = GLOW[key]
 				mi.set_surface_override_material(si, d)
+
+
+## 재질 이름 → GLOW의 열쇠(glow_kat_edge_red → glow_kat_edge). 없으면 "".
+static func _glow_key(nm: String) -> String:
+	if GLOW.has(nm):
+		return nm
+	for k in GLOW:
+		if nm.begins_with(String(k) + "_"):
+			return k
+	return ""
