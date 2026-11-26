@@ -403,6 +403,19 @@ func attach(bone: String, node: Node3D) -> void:
 	at.add_child(node)
 
 
+## 그 뼈가 있나.
+func has_bone(bone: String) -> bool:
+	return _skel != null and _skel.find_bone(bone) >= 0
+
+
+## 뼈의 쉬는 자세(뼈대 좌표, 미터). 뼈가 없으면 단위 변환.
+func bone_rest(bone: String) -> Transform3D:
+	if _skel == null:
+		return Transform3D.IDENTITY
+	var b: int = _skel.find_bone(bone)
+	return _skel.get_bone_global_rest(b) if b >= 0 else Transform3D.IDENTITY
+
+
 ## 적으로 쓸 때: 갑옷 색에 mul을 곱하고 glow로 은은하게 빛나게 한다. 바꾼 재질들을 돌려준다(맞을 때 번쩍임에 쓴다).
 func recolor(mul: Color, glow: Color = Color.BLACK, glow_energy: float = 0.0) -> Array[StandardMaterial3D]:
 	var out: Array[StandardMaterial3D] = []

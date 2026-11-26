@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열", "방어", "리그", "시즌"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열", "방어", "리그", "시즌", "꾸미기"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -59,6 +59,8 @@ static func describe(cmd: Dictionary) -> String:
 			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨린다 = 다음에 마을에 들어서면 방어전. 수리는 마을 건물 E)"
 		"리그":
 			return "리그 녹쇠|청동|은|금|백금|금강|승천|불멸 1~3 RR(0~100) · 리그 언덕의검 · 리그 처음 (랭크 상태를 바로 정한다. 배치는 마친 것으로 한다)"
+		"꾸미기":
+			return "꾸미기 전부 · 꾸미기 처음 (전부: 망토·머리·베기 빛 항목을 모두 가진 것으로 / 처음: 가진 것과 입은 것을 처음으로). 마을 거울 창에서 입는다"
 		"시즌":
 			return "시즌 다음 (시즌 번호를 하나 올린다: 지난 시즌 최고 티어가 칭호로 남고 3단계 내려간다)"
 		"방어":
@@ -207,6 +209,21 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			if meta != null:
 				meta.save()
 			return lt
+		"꾸미기":
+			if meta == null or a.is_empty() or not ["전부", "처음"].has(a[0]):
+				return "꾸미기 전부, 처음 중 하나를 적으세요."
+			if a[0] == "전부":
+				var n: int = meta.cos_unlock_all()
+				meta.cos_mark_seen()
+				meta.save()
+				return "관리: 꾸미기 %d개를 더 열었다 (모두 %d개). 마을 거울에서 입는다" % [n, meta.cos_owned.size()]
+			meta.cos_owned.clear()
+			meta.cos_worn.clear()
+			meta.cos_seen.clear()
+			meta.cos_look = meta.cos_worn
+			meta.cos_sync()
+			meta.save()
+			return "관리: 꾸미기를 처음으로 돌렸다(조건이 찬 것은 다시 열린다)"
 		"방어":
 			if meta == null or a.is_empty() or not ["승리", "패배"].has(a[0]):
 				return "방어 승리, 패배 중 하나를 적으세요."

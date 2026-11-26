@@ -1,0 +1,429 @@
+[gd_resource type="Resource" script_class="CosmeticTable" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/cosmetic_item.gd" id="1_4ru5s"]
+[ext_resource type="Script" path="res://scripts/core/data/cosmetic_table.gd" id="2_84no0"]
+
+[sub_resource type="Resource" id="Resource_if0q6"]
+script = ExtResource("1_4ru5s")
+id = &"cape_red"
+title = "붉은 망토"
+color = Color(0.54, 0.11, 0.17, 1)
+color2 = Color(0.54, 0.11, 0.17, 1)
+
+[sub_resource type="Resource" id="Resource_4n3ja"]
+script = ExtResource("1_4ru5s")
+id = &"cape_grey"
+title = "회색 모직 망토"
+color = Color(0.3, 0.3, 0.31, 1)
+color2 = Color(0.3, 0.3, 0.31, 1)
+
+[sub_resource type="Resource" id="Resource_rv8w6"]
+script = ExtResource("1_4ru5s")
+id = &"cape_moss"
+title = "이끼빛 망토"
+unlock = &"shards"
+need = 40
+color = Color(0.17, 0.26, 0.17, 1)
+color2 = Color(0.17, 0.26, 0.17, 1)
+
+[sub_resource type="Resource" id="Resource_gw4r7"]
+script = ExtResource("1_4ru5s")
+id = &"cape_night"
+title = "밤빛 가장자리 망토"
+unlock = &"shards"
+need = 60
+style = &"trim"
+color = Color(0.08, 0.11, 0.2, 1)
+color2 = Color(0.66, 0.56, 0.38, 1)
+
+[sub_resource type="Resource" id="Resource_7clkc"]
+script = ExtResource("1_4ru5s")
+id = &"cape_stripe"
+title = "줄무늬 망토"
+unlock = &"shards"
+need = 120
+style = &"stripe"
+color = Color(0.45, 0.12, 0.12, 1)
+color2 = Color(0.14, 0.13, 0.12, 1)
+
+[sub_resource type="Resource" id="Resource_yjofd"]
+script = ExtResource("1_4ru5s")
+id = &"cape_check"
+title = "체크 망토"
+unlock = &"shards"
+need = 150
+style = &"check"
+color = Color(0.2, 0.25, 0.3, 1)
+color2 = Color(0.1, 0.12, 0.15, 1)
+
+[sub_resource type="Resource" id="Resource_ew2jr"]
+script = ExtResource("1_4ru5s")
+id = &"cape_emblem"
+title = "검 문장 망토"
+unlock = &"shards"
+need = 250
+style = &"emblem"
+color = Color(0.12, 0.12, 0.14, 1)
+
+[sub_resource type="Resource" id="Resource_unhin"]
+script = ExtResource("1_4ru5s")
+id = &"cape_knight"
+title = "무덤 기사의 낡은 망토"
+unlock = &"boss"
+key = &"grave_knight"
+style = &"ragged"
+color = Color(0.2, 0.22, 0.26, 1)
+color2 = Color(0.09, 0.1, 0.12, 1)
+
+[sub_resource type="Resource" id="Resource_keupd"]
+script = ExtResource("1_4ru5s")
+id = &"cape_shroud"
+title = "무덤 주인의 수의"
+unlock = &"boss"
+key = &"crypt_lord"
+style = &"ragged"
+color = Color(0.72, 0.7, 0.62, 1)
+color2 = Color(0.18, 0.16, 0.15, 1)
+
+[sub_resource type="Resource" id="Resource_rnm6v"]
+script = ExtResource("1_4ru5s")
+id = &"cape_runes"
+title = "룬 자수 망토"
+unlock = &"rune"
+need = 1
+style = &"rune"
+color = Color(0.14, 0.12, 0.1, 1)
+color2 = Color(0.35, 0.62, 0.85, 1)
+
+[sub_resource type="Resource" id="Resource_8palu"]
+script = ExtResource("1_4ru5s")
+id = &"cape_platinum"
+title = "백금 외투"
+unlock = &"league"
+need = 4
+style = &"trim"
+color = Color(0.66, 0.68, 0.72, 1)
+color2 = Color(0.3, 0.33, 0.4, 1)
+
+[sub_resource type="Resource" id="Resource_6mqcs"]
+script = ExtResource("1_4ru5s")
+id = &"cape_immortal"
+title = "불멸의 망토"
+unlock = &"league"
+need = 7
+style = &"emblem"
+color = Color(0.05, 0.04, 0.06, 1)
+color2 = Color(0.9, 0.75, 0.35, 1)
+
+[sub_resource type="Resource" id="Resource_episj"]
+script = ExtResource("1_4ru5s")
+id = &"cape_coat"
+title = "시간 건너는 코트"
+unlock = &"story"
+key = &"act1"
+style = &"trim"
+color = Color(0.07, 0.09, 0.11, 1)
+color2 = Color(0.2, 0.8, 0.9, 1)
+
+[sub_resource type="Resource" id="Resource_j27tu"]
+script = ExtResource("1_4ru5s")
+id = &"cape_anchor"
+title = "닻의 푸른 망토"
+unlock = &"story"
+key = &"act3"
+style = &"emblem"
+color = Color(0.1, 0.2, 0.3, 1)
+color2 = Color(0.8, 0.85, 0.9, 1)
+
+[sub_resource type="Resource" id="Resource_ucrek"]
+script = ExtResource("1_4ru5s")
+id = &"head_none"
+slot = &"head"
+title = "맨머리"
+style = &"none"
+color = Color(1, 1, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_jqkbo"]
+script = ExtResource("1_4ru5s")
+id = &"head_band"
+slot = &"head"
+title = "검은 머리띠"
+style = &"band"
+color = Color(0.08, 0.07, 0.07, 1)
+color2 = Color(0.08, 0.07, 0.07, 1)
+
+[sub_resource type="Resource" id="Resource_8k00q"]
+script = ExtResource("1_4ru5s")
+id = &"head_hood"
+slot = &"head"
+title = "두건"
+unlock = &"shards"
+need = 30
+style = &"hood"
+color = Color(0.2, 0.18, 0.15, 1)
+color2 = Color(0.12, 0.11, 0.1, 1)
+
+[sub_resource type="Resource" id="Resource_pb153"]
+script = ExtResource("1_4ru5s")
+id = &"head_kettle"
+slot = &"head"
+title = "챙 넓은 쇠모자"
+unlock = &"shards"
+need = 80
+style = &"kettle"
+color = Color(0.35, 0.3, 0.24, 1)
+color2 = Color(0.2, 0.17, 0.14, 1)
+
+[sub_resource type="Resource" id="Resource_gvnq5"]
+script = ExtResource("1_4ru5s")
+id = &"head_helm"
+slot = &"head"
+title = "철 투구"
+unlock = &"shards"
+need = 100
+style = &"helm"
+color = Color(0.42, 0.43, 0.46, 1)
+color2 = Color(0.2, 0.2, 0.22, 1)
+
+[sub_resource type="Resource" id="Resource_qk7pw"]
+script = ExtResource("1_4ru5s")
+id = &"head_circlet"
+slot = &"head"
+title = "철관"
+unlock = &"shards"
+need = 140
+style = &"circlet"
+color = Color(0.62, 0.52, 0.3, 1)
+color2 = Color(0.5, 0.12, 0.14, 1)
+
+[sub_resource type="Resource" id="Resource_681rh"]
+script = ExtResource("1_4ru5s")
+id = &"head_horn"
+slot = &"head"
+title = "뿔 투구"
+unlock = &"shards"
+need = 220
+style = &"horn"
+color = Color(0.38, 0.38, 0.4, 1)
+color2 = Color(0.85, 0.8, 0.7, 1)
+
+[sub_resource type="Resource" id="Resource_mtw25"]
+script = ExtResource("1_4ru5s")
+id = &"head_knight"
+slot = &"head"
+title = "무덤 기사의 투구"
+unlock = &"boss"
+key = &"grave_knight"
+style = &"plume"
+color = Color(0.22, 0.24, 0.28, 1)
+color2 = Color(0.5, 0.1, 0.1, 1)
+
+[sub_resource type="Resource" id="Resource_gqrj1"]
+script = ExtResource("1_4ru5s")
+id = &"head_bone"
+slot = &"head"
+title = "뼈관"
+unlock = &"boss"
+key = &"crypt_lord"
+style = &"spikes"
+color = Color(0.8, 0.78, 0.7, 1)
+color2 = Color(0.3, 0.28, 0.25, 1)
+
+[sub_resource type="Resource" id="Resource_de2v3"]
+script = ExtResource("1_4ru5s")
+id = &"head_runeband"
+slot = &"head"
+title = "룬 이마띠"
+unlock = &"rune"
+need = 2
+style = &"runeband"
+color = Color(0.12, 0.1, 0.1, 1)
+color2 = Color(0.35, 0.62, 0.85, 1)
+
+[sub_resource type="Resource" id="Resource_2dttv"]
+script = ExtResource("1_4ru5s")
+id = &"head_ascend"
+slot = &"head"
+title = "승천의 투구"
+unlock = &"league"
+need = 6
+style = &"plume"
+color = Color(0.7, 0.72, 0.76, 1)
+color2 = Color(0.85, 0.7, 0.3, 1)
+
+[sub_resource type="Resource" id="Resource_gib6m"]
+script = ExtResource("1_4ru5s")
+id = &"head_visor"
+slot = &"head"
+title = "시간의 바이저"
+unlock = &"story"
+key = &"act1"
+style = &"visor"
+color = Color(0.1, 0.1, 0.12, 1)
+color2 = Color(0.2, 0.85, 0.95, 1)
+
+[sub_resource type="Resource" id="Resource_kweqf"]
+script = ExtResource("1_4ru5s")
+id = &"head_anchor"
+slot = &"head"
+title = "닻의 관"
+unlock = &"story"
+key = &"act3"
+style = &"circlet"
+color = Color(0.55, 0.65, 0.75, 1)
+color2 = Color(0.75, 0.88, 1, 1)
+
+[sub_resource type="Resource" id="Resource_ld4ti"]
+script = ExtResource("1_4ru5s")
+id = &"slash_grade"
+slot = &"slash"
+title = "검 본래의 빛"
+style = &"slash"
+color = Color(0, 0, 0, 0)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_lktww"]
+script = ExtResource("1_4ru5s")
+id = &"slash_white"
+slot = &"slash"
+title = "흰빛"
+style = &"slash"
+color = Color(0.95, 0.95, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_mfc60"]
+script = ExtResource("1_4ru5s")
+id = &"slash_ember"
+slot = &"slash"
+title = "불씨빛"
+unlock = &"shards"
+need = 60
+style = &"slash"
+color = Color(1, 0.5, 0.15, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_6y6iw"]
+script = ExtResource("1_4ru5s")
+id = &"slash_frost"
+slot = &"slash"
+title = "서리빛"
+unlock = &"shards"
+need = 60
+style = &"slash"
+color = Color(0.6, 0.85, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_kaxjo"]
+script = ExtResource("1_4ru5s")
+id = &"slash_jade"
+slot = &"slash"
+title = "비취빛"
+unlock = &"shards"
+need = 80
+style = &"slash"
+color = Color(0.3, 0.9, 0.6, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_c7nq1"]
+script = ExtResource("1_4ru5s")
+id = &"slash_violet"
+slot = &"slash"
+title = "보랏빛"
+unlock = &"shards"
+need = 100
+style = &"slash"
+color = Color(0.65, 0.4, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_vcnrt"]
+script = ExtResource("1_4ru5s")
+id = &"slash_blood"
+slot = &"slash"
+title = "핏빛"
+unlock = &"shards"
+need = 150
+style = &"slash"
+color = Color(0.9, 0.12, 0.15, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_j8viq"]
+script = ExtResource("1_4ru5s")
+id = &"slash_gold"
+slot = &"slash"
+title = "금빛"
+unlock = &"league"
+need = 3
+style = &"slash"
+color = Color(1, 0.82, 0.35, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_xncue"]
+script = ExtResource("1_4ru5s")
+id = &"slash_void"
+slot = &"slash"
+title = "허무의 빛"
+unlock = &"league"
+need = 7
+style = &"slash"
+color = Color(0.9, 0.25, 0.75, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_7shof"]
+script = ExtResource("1_4ru5s")
+id = &"slash_grave"
+slot = &"slash"
+title = "무덤빛"
+unlock = &"boss"
+key = &"grave_knight"
+style = &"slash"
+color = Color(0.45, 0.85, 0.8, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_ywp3f"]
+script = ExtResource("1_4ru5s")
+id = &"slash_bone"
+slot = &"slash"
+title = "뼈빛"
+unlock = &"boss"
+key = &"crypt_lord"
+style = &"slash"
+color = Color(0.95, 0.92, 0.78, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_tnh32"]
+script = ExtResource("1_4ru5s")
+id = &"slash_rune"
+slot = &"slash"
+title = "룬빛"
+unlock = &"rune"
+need = 3
+style = &"slash"
+color = Color(0.35, 0.62, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_6lvt6"]
+script = ExtResource("1_4ru5s")
+id = &"slash_neon"
+slot = &"slash"
+title = "디지털 푸른빛"
+unlock = &"story"
+key = &"act1"
+style = &"slash"
+color = Color(0.2, 0.9, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[sub_resource type="Resource" id="Resource_22vt0"]
+script = ExtResource("1_4ru5s")
+id = &"slash_anchor"
+slot = &"slash"
+title = "닻빛"
+unlock = &"story"
+key = &"act3"
+style = &"slash"
+color = Color(0.7, 0.85, 1, 1)
+color2 = Color(1, 1, 1, 1)
+
+[resource]
+script = ExtResource("2_84no0")
+items = Array[ExtResource("1_4ru5s")]([SubResource("Resource_if0q6"), SubResource("Resource_4n3ja"), SubResource("Resource_rv8w6"), SubResource("Resource_gw4r7"), SubResource("Resource_7clkc"), SubResource("Resource_yjofd"), SubResource("Resource_ew2jr"), SubResource("Resource_unhin"), SubResource("Resource_keupd"), SubResource("Resource_rnm6v"), SubResource("Resource_8palu"), SubResource("Resource_6mqcs"), SubResource("Resource_episj"), SubResource("Resource_j27tu"), SubResource("Resource_ucrek"), SubResource("Resource_jqkbo"), SubResource("Resource_8k00q"), SubResource("Resource_pb153"), SubResource("Resource_gvnq5"), SubResource("Resource_qk7pw"), SubResource("Resource_681rh"), SubResource("Resource_mtw25"), SubResource("Resource_gqrj1"), SubResource("Resource_de2v3"), SubResource("Resource_2dttv"), SubResource("Resource_gib6m"), SubResource("Resource_kweqf"), SubResource("Resource_ld4ti"), SubResource("Resource_lktww"), SubResource("Resource_mfc60"), SubResource("Resource_6y6iw"), SubResource("Resource_kaxjo"), SubResource("Resource_c7nq1"), SubResource("Resource_vcnrt"), SubResource("Resource_j8viq"), SubResource("Resource_xncue"), SubResource("Resource_7shof"), SubResource("Resource_ywp3f"), SubResource("Resource_tnh32"), SubResource("Resource_6lvt6"), SubResource("Resource_22vt0")])

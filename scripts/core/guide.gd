@@ -22,6 +22,7 @@ const STEPS: Array[Dictionary] = [
 	{"id": "spend", "ch": 0, "title": "조각 쓰기", "goal": "대장간이나 성소에서 조각을 내고 강화를 한 번 해 본다", "need": 1, "reward": {"shards": 5}, "hint": {"lobby": "forge"}},
 	{"id": "quest", "ch": 0, "title": "의뢰 맡기", "goal": "의뢰판에서 의뢰 하나를 맡는다", "need": 1, "reward": {"shards": 5}, "hint": {"lobby": "board"}},
 	{"id": "yard", "ch": 0, "title": "수련장에서 검 시험", "goal": "수련장의 허수아비를 세 번 벤다", "need": 3, "reward": {"shards": 5}, "hint": {"lobby": "yard"}},
+	{"id": "mirror", "ch": 0, "title": "거울 앞에서 꾸미기", "goal": "광장의 거울에서 E를 눌러 망토·머리·베기 빛 중 하나를 골라 입는다(모양만 바뀐다)", "need": 1, "reward": {"shards": 5}, "hint": {"lobby": "mirror"}},
 	{"id": "field", "ch": 2, "title": "들판으로 나가기", "goal": "마을 북문에서 E를 눌러 검을 골라 들판으로 나간다", "need": 1, "reward": {"shards": 5, "mats": {"wood": 2}}, "hint": {"lobby": "gate"}},
 	{"id": "cache", "ch": 2, "title": "유품 상자 열기", "goal": "들판 곳곳의 유품 상자 곁에서 E를 눌러 연다", "need": 1, "reward": {"shards": 10, "mats": {"stone": 2}}, "hint": {"field": "cache"}},
 	{"id": "pack", "ch": 2, "title": "무리 하나 쓰러뜨리기", "goal": "들판에 서성이는 적 무리를 모두 쓰러뜨린다", "need": 1, "reward": {"shards": 10, "mats": {"iron": 2}}, "hint": {"field": "pack"}},
@@ -77,6 +78,7 @@ static func count(i: int, m: Meta) -> int:
 		"spend": n = _ev(m, "spend")
 		"quest": n = _ev(m, "quest")
 		"yard": n = _ev(m, "yard")
+		"mirror": n = _ev(m, "mirror")
 		"field": n = _ev(m, "field_enter")
 		"cache": n = 1 if _any_key(m.field_found, "cache") else 0
 		"pack": n = _ev(m, "pack")
@@ -98,6 +100,7 @@ static func legacy_ok(i: int, m: Meta) -> bool:
 	var vet: bool = m.runs >= 3
 	match String(STEPS[i].id):
 		"rack", "hill_gate", "first_pull", "good_pull", "finish_run": return ran
+		"mirror": return not m.cos_worn.is_empty()   # 이미 꾸민 저장
 		"first_night", "path", "day_event": return deep
 		"spend": return m.sheath_peak > 0 or m.sheath_lv > 0 or m.bless.values().any(func(v): return int(v) > 0) or vet
 		"quest": return m.quest_active >= 0 or vet

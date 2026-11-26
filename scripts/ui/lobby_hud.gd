@@ -30,6 +30,8 @@ signal repaired(id: StringName)
 ## 주민 i의 일을 바꿨다(마을이 그 사람을 일터로 옮긴다).
 signal job_set(i: int)
 signal sheath_bought(level: int)
+## 거울(영주 꾸미기 창, docs/cosmetics.md): 입은 것이 바뀌었다.
+signal mirror_changed()
 
 ## 망치를 세 번 내리친 뒤 결과가 나온다(초).
 @export var hammer_gap: float = 0.28
@@ -168,12 +170,29 @@ func _ready() -> void:
 	add_child(_flash)
 
 
+## 거울 창(마을 거울 E). 열려 있는 동안 마을은 멈춘다.
+var _mirror_win: CosmeticWindow = null
+
+
+func open_mirror() -> void:
+	if _mirror_win != null:
+		return
+	_mirror_win = CosmeticWindow.open(self, meta, data)
+	_mirror_win.changed.connect(func() -> void: mirror_changed.emit())
+	_mirror_win.closed.connect(func() -> void:
+		_mirror_win = null
+		closed.emit())
+
+
 func is_open() -> bool:
-	return _forge.visible or _shrine.visible or _storage.visible or _bld.visible or _jobs.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
+	return _mirror_win != null or _forge.visible or _shrine.visible or _storage.visible or _bld.visible or _jobs.visible or _rack.visible or _board.visible or _shop.visible or _yard.visible or _duel.visible
 
 
 func close() -> void:
 	if _busy:
+		return
+	if _mirror_win != null:
+		_mirror_win.close()
 		return
 	_gate_mode = false
 	if _online_busy:

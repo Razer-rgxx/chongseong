@@ -25,6 +25,8 @@ const DUEL_PATH: String = "res://scenes/duel/duel.tscn"
 @export var cart_at: Vector2 = Vector2(13.4, 9.7)
 ## 결투 말뚝(21단계, docs/duel.md): 광장. E로 창을 열어 같은 PC로 겨루기 → 1P·2P 검 고르기 → 결투 장면.
 @export var duel_at: Vector2 = Vector2(19.4, 10.6)
+## 거울(영주 꾸미기, docs/cosmetics.md): 광장 한쪽. E로 거울 창을 연다.
+@export var mirror_at: Vector2 = Vector2(22.0, 12.0)
 @export var merchant_at: Vector2 = Vector2(14.7, 10.4)
 ## 검 보관집(2026-11-21): 북동쪽 빈 터(집 가운데). 지으면 집이 올라가고 그 집 문 앞에서 검집을 산다.
 @export var storage_at: Vector2 = Vector2(24.2, 4.25)
@@ -58,7 +60,7 @@ const RECRUITS: Dictionary = {
 }
 
 ## 들를 곳 앞에 섰을 때 아래 띠에 뜨는 말.
-const PROMPTS: Dictionary = {"storage": "검 보관집에 들른다", "storage_site": "검 보관집 터를 본다", "forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다"}
+const PROMPTS: Dictionary = {"storage": "검 보관집에 들른다", "storage_site": "검 보관집 터를 본다", "forge": "대장간에 들른다", "shrine": "성소에서 기도한다", "rack": "검 진열대를 본다", "gate": "들판으로 나간다", "board": "의뢰판을 본다", "yard_rack": "검 걸이에서 검을 고른다", "merchant": "떠돌이 상인과 거래한다", "duel": "결투 말뚝을 본다", "mirror": "거울 앞에 선다"}
 @export var max_ticks_per_frame: int = 8
 
 ## 온라인 찾기(22단계). 결투 장면으로 넘어가면 비운다.
@@ -172,6 +174,7 @@ func _ready() -> void:
 	_hud.repaired.connect(_on_repaired)
 	_hud.job_set.connect(func(_i: int) -> void: _build_residents())
 	_hud.sheath_bought.connect(_on_sheath_bought)
+	_hud.mirror_changed.connect(func() -> void: _lord.set_cosmetics(Meta.cos_look))
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	add_child(_fx)
@@ -199,11 +202,23 @@ func _ready() -> void:
 		_camera.snap()
 		_hud.toast(Meta.wake_note if Meta.wake_note != "" else "들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
 		Meta.wake_note = ""
+	_cosmetic_news()
 	_arrival_news()
 	_start_defense()   # 터진 균열이 기다리고 있으면 곧바로 방어전
 	_capture(true)
 	GuideHud.attach(self, meta, rules, "lobby", _hud, guide_spot, _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
+
+
+## 새로 얻은 꾸밀 것이 있으면 한 번 알린다(알린 것은 cos_seen에 남아 다시 안 알린다).
+func _cosmetic_news() -> void:
+	meta.cos_sync()
+	var fresh: Array[String] = meta.cos_fresh()
+	if fresh.is_empty():
+		return
+	var t: CosmeticTable = Cosmetics.table()
+	var first: CosmeticItem = t.item(StringName(fresh[0]))
+	_hud.toast("새 꾸밀 것: %s%s  (광장의 거울)" % [first.title if first != null else "", "" if fresh.size() == 1 else " 외 %d" % (fresh.size() - 1)])
 
 
 ## 길라잡이 방향 띠가 가리킬 자리(칸 좌표). 모르면 Vector2.INF.
@@ -218,6 +233,7 @@ func guide_spot(id: String) -> Vector2:
 		"stable":
 			var b: BuildingData = data.building(&"stable")
 			return b.plot if b != null and not meta.has_built(&"stable") else Vector2.INF
+		"mirror": return mirror_at
 		"raid": return gate_at   # 균열은 북문 밖 들판에
 		"repair":
 			for bd in data.buildings:
@@ -314,7 +330,7 @@ func _process(delta: float) -> void:
 	var p: Vector2 = rules.lord.pos
 	_near = ""
 	var spots := {"forge": forge_at + Vector2(0, 2.2), "shrine": shrine_at + Vector2(0, 1.8), "rack": rack_at + Vector2(1.6, 0), "gate": gate_at + Vector2(0, 1.0),
-		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4),
+		"board": board_at + Vector2(0, 1.3), "yard_rack": yard_rack_at + Vector2(0, 0.9), "merchant": merchant_at, "duel": duel_at + Vector2(0, 1.4), "mirror": mirror_at + Vector2(0, 1.4),
 		("storage" if meta.storage_house else "storage_site"): storage_at + Vector2(-0.3, 1.75)}
 	for b in data.buildings:
 		spots["bld_" + String(b.id)] = b.plot + b.facing * (b.size.y / Grid.CELL / 2.0 + 0.9)
@@ -388,6 +404,8 @@ func _interact() -> void:
 			_hud.open_field_pick()
 		"duel":
 			_hud.open_duel()
+		"mirror":
+			_hud.open_mirror()
 		"storage":
 			_enter(&"storage", "보관집 지기", &"peasant2", ["걸이마다 기름을 먹여 두었소.", "검집은 칼보다 오래 가오. 하나 더 걸어 두겠소?"], _hud.open_storage)
 		"storage_site":
@@ -780,6 +798,8 @@ func _build_village_extras() -> void:
 	_rects.append(Rect2(yard_rack_at - Vector2(0.9, 0.2), Vector2(1.8, 0.4)))
 	VillageProps.duel_post(self, Grid.cells_to_world(duel_at))
 	_circles.append([duel_at, 0.4])
+	VillageProps.mirror(self, Grid.cells_to_world(mirror_at), VillageBuilder.facing_to(Vector2(0, 1)))
+	_rects.append(Rect2(mirror_at - Vector2(0.7, 0.2), Vector2(2.2, 0.5)))
 	VillageProps.cart(self, Grid.cells_to_world(cart_at), VillageBuilder.facing_to(Vector2(1, 0)))
 	_rects.append(Rect2(cart_at - Vector2(0.6, 0.7), Vector2(1.2, 2.0)))
 	_add_folk(&"merchant", merchant_at, Vector2(1, 0))

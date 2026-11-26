@@ -87,6 +87,14 @@ var _state: String = ""
 var _yaw_now: float = 0.0
 var _yaw_ready: bool = false
 var _fx: SlashFx = null
+## 영주 꾸미기: 베기 빛 색(알파 0이면 꾸밈 없음), 흔들 망토 축, 마지막으로 쥔 검(꾸밈을 벗을 때 다시 칠한다), 망토 흔들림 계산용 지난 자리.
+var cos_slash: Color = Color(0, 0, 0, 0)
+var _cos_cape: Node3D = null
+var _cape_scale := Vector3.ONE
+var _sword_now: Sword = null
+var _grades_now: GradeTable = null
+var _last_pos := Vector3.ZERO
+var _cape_swing: float = 0.0
 ## 미래 구역(Rules.era future): 베기 빛을 차가운 푸른 디지털 빛으로 덮는다(알파 0이면 칼 등급 색). 보기만 바꾼다.
 var slash_override: Color = Color(0, 0, 0, 0)
 var _sweep: float = 1.0
@@ -161,6 +169,8 @@ func _ready() -> void:
 	torch.light_energy = 0.0
 	torch.shadow_enabled = true
 	add_child(torch)
+	if seat < 0:
+		set_cosmetics(Meta.cos_look)   # 저장에서 읽은 입은 꾸미기(마을·언덕·들판·무덤·미래·과거). 결투는 장면이 자리마다 넣는다
 
 
 ## 이 몸의 영주 상태와 쥔 검, 날아가는 것(결투에서는 seat 번째 영주의 것).
@@ -184,15 +194,30 @@ func _mine() -> bool:
 ## 쥔 검이 바뀌면 부른다. null이면 맨손.
 func set_slash_override(c: Color) -> void:
 	slash_override = c
-	if _fx != null and c.a > 0.0:
+	if _fx != null and c.a > 0.0 and cos_slash.a <= 0.0:
 		_fx.color = c
 
 
+## 영주 꾸미기(docs/cosmetics.md)를 입힌다: worn은 자리 → 항목 id. 모든 장면이 같은 곳(CosmeticRig)을 쓴다.
+## 베기 빛은 꾸민 색이 가장 먼저, 그다음 시대 색(slash_override), 그다음 쥔 검의 등급 색.
+func set_cosmetics(worn: Dictionary) -> void:
+	var r: Dictionary = CosmeticRig.apply(_model, character, worn)
+	cos_slash = r.slash
+	_cos_cape = r.cape as Node3D
+	_cape_scale = _cos_cape.scale if _cos_cape != null else Vector3.ONE
+	if _fx != null and cos_slash.a > 0.0:
+		_fx.color = cos_slash
+	elif _fx != null:
+		set_sword(_sword_now, _grades_now)   # 꾸밈을 벗었으면 검 본래 빛으로
+
+
 func set_sword(s: Sword, grades: GradeTable) -> void:
+	_sword_now = s
+	_grades_now = grades
 	if character:
 		character.set_sword(s, grades)
 		if s:
-			_fx.color = slash_override if slash_override.a > 0.0 else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (grades.colors[s.grade] as Color).lightened(0.25))
+			_fx.color = cos_slash if cos_slash.a > 0.0 else (slash_override if slash_override.a > 0.0 else (Color(0.9, 0.92, 1.0) if s.grade == 0 else (grades.colors[s.grade] as Color).lightened(0.25)))
 		return
 	if not _blade:
 		return
@@ -212,6 +237,7 @@ func set_sword(s: Sword, grades: GradeTable) -> void:
 func draw(alpha: float, delta: float) -> void:
 	var L := _lord_state()
 	position = Grid.cells_to_world(L.prev_pos.lerp(L.pos, alpha))
+	_sway_cape(delta)
 	_draw_pull_stand()
 	_draw_hook(L, delta)
 	if not _plan.is_empty():
@@ -263,6 +289,26 @@ func draw(alpha: float, delta: float) -> void:
 			_ghosts.remove_at(i)
 	if L.dash > 0.0 and character == null:   # 기사 모델은 구르기 동작이 있어서 잔상을 남기지 않는다
 		_spawn_ghost()
+
+
+## 망토 흔들림: 빨리 걸을수록 뒤로 날리고 서면 늘어진다(화면만).
+func _sway_cape(delta: float) -> void:
+	var step: float = Vector3(position.x - _last_pos.x, 0.0, position.z - _last_pos.z).length()
+	_last_pos = position
+	if _cos_cape == null or not is_instance_valid(_cos_cape):
+		return
+	var speed: float = clampf(step / maxf(delta, 0.001) / 8.0, 0.0, 1.0)
+	_cape_swing = lerpf(_cape_swing, speed, 1.0 - exp(-8.0 * delta))
+	var swing: float = -0.08 - 0.5 * _cape_swing + sin(Time.get_ticks_msec() * 0.011) * 0.04 * _cape_swing
+	# 망토는 중력대로 늘어진다: 어깨의 자리와 몸통이 도는 쪽(yaw)만 따르고, 몸통이 숙이거나 젖혀도 곧게 드리운다.
+	var par := _cos_cape.get_parent() as Node3D
+	if par != null and par.is_inside_tree():
+		var f: Vector3 = -par.global_transform.basis.z
+		var yaw: float = atan2(-f.x, -f.z)
+		var b := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, swing)
+		_cos_cape.global_transform.basis = b.scaled_local(_cape_scale)
+	else:
+		_cos_cape.rotation.x = swing
 
 
 ## 뽑는 동안 몸을 손잡이 쪽으로 pull_stand(m)까지 당겨 세운다(버티기 세기만큼 부드럽게). 규칙의 자리는 그대로.

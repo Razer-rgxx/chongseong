@@ -109,6 +109,27 @@ static func duel_post(parent: Node3D, at: Vector3) -> void:
 		VillageBuilder.box(d, Vector3(0.36, 0.7, 0.03), Vector3(pair[0], 1.7, 0.02), VillageBuilder.plain(pair[1], 1.0))
 
 
+## 거울(영주 꾸미기, docs/cosmetics.md): 나무 틀에 선 키 큰 거울, 옆 걸대에 걸린 망토와 쇠모자. 기본 도형. 앞이 +Z.
+static func mirror(parent: Node3D, at: Vector3, facing: float) -> void:
+	var m := VillageBuilder.place(parent, at, facing)
+	var wood := VillageBuilder.timber()
+	VillageBuilder.cyl(m, 0.8, 0.85, 0.06, Vector3(0, 0.03, 0), VillageBuilder.dirt(), 18)
+	for k in [-1.0, 1.0]:
+		VillageBuilder.box(m, Vector3(0.1, 2.3, 0.12), Vector3(k * 0.58, 1.18, 0), wood)
+		VillageBuilder.box(m, Vector3(0.12, 0.08, 0.7), Vector3(k * 0.58, 0.04, -0.1), wood)
+	VillageBuilder.box(m, Vector3(1.26, 0.12, 0.12), Vector3(0, 2.3, 0), wood)
+	VillageBuilder.box(m, Vector3(1.26, 0.1, 0.12), Vector3(0, 0.18, 0), wood)
+	var glass := VillageBuilder.plain(Color(0.25, 0.29, 0.33), 0.5, 0.1)   # 거울면: 흐린 쇳빛(반사는 없다)
+	VillageBuilder.box(m, Vector3(1.06, 2.0, 0.03), Vector3(0, 1.24, 0.02), glass)
+	var brass := VillageBuilder.plain(Color(0.5, 0.4, 0.22), 0.5, 0.6)
+	VillageBuilder.box(m, Vector3(0.3, 0.1, 0.14), Vector3(0, 2.4, 0), brass)
+	# 옆 걸대: 기둥, 가로대에 걸린 망토, 꼭대기에 올린 쇠모자
+	VillageBuilder.box(m, Vector3(0.09, 1.9, 0.09), Vector3(1.25, 0.95, 0.1), wood)
+	VillageBuilder.box(m, Vector3(0.7, 0.07, 0.07), Vector3(1.25, 1.75, 0.1), wood)
+	VillageBuilder.box(m, Vector3(0.5, 0.95, 0.04), Vector3(1.25, 1.25, 0.16), VillageBuilder.plain(Color(0.34, 0.1, 0.13), 1.0), Vector3(0.06, 0, 0.03))
+	VillageBuilder.cyl(m, 0.12, 0.17, 0.22, Vector3(1.25, 2.0, 0.1), VillageBuilder.plain(Color(0.4, 0.4, 0.43), 0.45, 0.8), 12)
+
+
 ## 떠돌이 상인의 짐수레: 짐칸, 바퀴 둘, 천 덮개, 자루와 통, 끌채.
 static func cart(parent: Node3D, at: Vector3, facing: float) -> void:
 	var c := VillageBuilder.place(parent, at, facing)

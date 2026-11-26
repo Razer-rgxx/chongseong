@@ -159,6 +159,11 @@ var league_titles: Dictionary = {}
 var league_offset: int = 0
 var league_last: Dictionary = {}
 var league_sword: bool = false
+## 영주 꾸미기(2026-11-26, docs/cosmetics.md): 가진 항목 id들, 자리(cape·head·slash) → 입은 항목 id. 비면 기본(표의 자리 첫 항목).
+var cos_owned: Array[String] = []
+var cos_worn: Dictionary = {}
+## 이미 알린 항목 id들(마을에 들어설 때 "새 꾸밀 것"을 한 번만 알리고, 창에서 새 표시를 끈다).
+var cos_seen: Array[String] = []
 ## 검의 기억(2026-11-26, docs/sword_memory.md): 검 번호(글) → 쓰임 센 것 {big, night, day, boss, dash, hurt, chain, elite}.
 ## 벤 적 수는 sword_log의 k(모든 곳 공통). 박은 룬·이름은 검 번호로 따로 둔다.
 var sword_memory: Dictionary = {}
@@ -178,6 +183,8 @@ var gem_refund: int = 0
 ## 화면이 어디서나 읽는 거울: 마지막으로 읽거나 바꾼 Meta의 이름·룬(SwordModel.for_sword, Sword.label이 읽는다).
 static var shown_names: Dictionary = {}
 static var carvings: Dictionary = {}
+## 화면이 어디서나 읽는 입은 꾸미기(LordView가 처음 서면 입는다): 마지막으로 읽거나 바꾼 Meta의 cos_worn.
+static var cos_look: Dictionary = {}
 static var _rt: RuneTable = null
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
@@ -225,6 +232,7 @@ static func wipe(path: String = SAVE_PATH) -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	carry_sword = -1
 	carry_more = []
+	cos_look = {}
 	duel_picks = [0, 0]
 	wake_at_gate = false
 	wake_note = ""
@@ -240,7 +248,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "league": league, "league_titles": league_titles, "league_offset": league_offset, "league_last": league_last, "league_sword": league_sword, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_names": sword_names, "rune_bag": rune_bag, "slot_given": slot_given, "rune_placed": rune_placed, "rr_open": rr_open, "rr_spot": rr_spot, "rr_left": rr_left, "rr_since": rr_since, "rr_streak": rr_streak, "rr_ruined": rr_ruined.keys().map(func(k): return String(k)), "rr_fled": rr_fled, "rr_news": rr_news, "rr_closed": rr_closed, "rr_cut": rr_cut, "rr_breach_pending": rr_breach_pending}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "league": league, "league_titles": league_titles, "league_offset": league_offset, "league_last": league_last, "league_sword": league_sword, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_names": sword_names, "rune_bag": rune_bag, "slot_given": slot_given, "rune_placed": rune_placed, "rr_open": rr_open, "rr_spot": rr_spot, "rr_left": rr_left, "rr_since": rr_since, "rr_streak": rr_streak, "rr_ruined": rr_ruined.keys().map(func(k): return String(k)), "rr_fled": rr_fled, "rr_news": rr_news, "rr_closed": rr_closed, "rr_cut": rr_cut, "rr_breach_pending": rr_breach_pending, "cos_owned": cos_owned, "cos_worn": cos_worn, "cos_seen": cos_seen}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -452,6 +460,19 @@ func from_dict(d: Dictionary) -> void:
 		for k in lt:
 			league_titles[str(k)] = int(lt[k])
 	league_offset = int(d.get("league_offset", 0))
+	cos_owned = []
+	var co: Variant = d.get("cos_owned", [])
+	if co is Array:
+		for k in co:
+			if k is String and not cos_owned.has(k) and Cosmetics.table().item(StringName(k)) != null:
+				cos_owned.append(k)
+	cos_worn = Cosmetics.clean(d.get("cos_worn", {}))   # 옛 저장은 빈 사전 = 모두 기본
+	cos_seen = []
+	var cs: Variant = d.get("cos_seen", [])
+	if cs is Array:
+		for k in cs:
+			if k is String and not cos_seen.has(k):
+				cos_seen.append(k)
 	league_last = {}
 	var ll: Variant = d.get("league_last", {})
 	if ll is Dictionary:
@@ -659,6 +680,7 @@ func _load_carve(d: Dictionary) -> void:
 	for k in sword_runes:   # 이미 새겨진 옛 룬은 받은 것으로 센다(공짜 룬을 또 주지 않는다)
 		slot_given[k] = clampi(maxi(int(slot_given.get(k, 0)), (sword_runes[k] as Array).size()), 0, cap)
 	_convert_gems(d)
+	cos_sync()   # 조건이 찬 꾸미기를 가진 것으로(옛 저장도 한 번에)
 	_mirror()
 
 
@@ -691,6 +713,7 @@ func _convert_gems(d: Dictionary) -> void:
 ## 화면용 거울을 이 Meta의 것으로 맞춘다.
 func _mirror() -> void:
 	shown_names = sword_names
+	cos_look = cos_worn
 	var c: Dictionary = {}
 	for k in sword_runes:
 		c[k] = {"runes": sword_runes[k]}
@@ -728,6 +751,84 @@ func use_note(id: int, kind: String, n: int = 1) -> void:
 
 func use_of(id: int, kind: String) -> int:
 	return int(sword_memory.get(str(id), {}).get(kind, 0))
+
+
+## ---- 영주 꾸미기(docs/cosmetics.md). 모양만 바꾼다. 능력치와 규칙에는 닿지 않는다.
+
+## 이 항목을 가졌나(처음부터 주는 것은 늘 가진 것).
+func cos_has(id: StringName) -> bool:
+	var it: CosmeticItem = Cosmetics.table().item(id)
+	return it != null and (it.unlock == &"free" or cos_owned.has(String(id)))
+
+
+## 가진 것으로 넣는다. 새로 넣었으면 true(표에 없거나 이미 있으면 false).
+func cos_unlock(id: StringName) -> bool:
+	if Cosmetics.table().item(id) == null or cos_owned.has(String(id)):
+		return false
+	cos_owned.append(String(id))
+	return true
+
+
+## 조각으로 산다. 값(need)이 모자라거나 조각으로 사는 것이 아니거나 이미 있으면 false.
+func cos_buy(id: StringName) -> bool:
+	var it: CosmeticItem = Cosmetics.table().item(id)
+	if it == null or it.unlock != &"shards" or cos_has(id) or shards < it.need:
+		return false
+	shards -= it.need
+	return cos_unlock(id)
+
+
+## 입은 항목 id(안 골랐으면 그 자리의 기본).
+func cos_worn_id(slot: StringName) -> StringName:
+	return StringName(cos_worn.get(String(slot), String(Cosmetics.table().default_of(slot))))
+
+
+## 입는다. 가진 것만. 기본으로 돌아가면 칸을 지운다. 기본이 아닌 것을 입으면 길라잡이에 센다.
+func cos_wear(id: StringName) -> bool:
+	var it: CosmeticItem = Cosmetics.table().item(id)
+	if it == null or not cos_has(id):
+		return false
+	if id == Cosmetics.table().default_of(it.slot):
+		cos_worn.erase(String(it.slot))
+	else:
+		cos_worn[String(it.slot)] = String(id)
+		guide_note("mirror")
+	cos_look = cos_worn
+	return true
+
+
+## 조건이 찬 항목을 가진 것으로 넣는다(처음부터 주는 것 포함). 새로 얻은 id들을 돌려준다.
+func cos_sync() -> Array[String]:
+	var got: Array[String] = []
+	for it in Cosmetics.table().items:
+		if it.unlock != &"shards" and Cosmetics.met(it, self) and cos_unlock(it.id) and it.unlock != &"free":
+			got.append(String(it.id))
+	return got
+
+
+## 가졌지만 아직 알리지 않은 항목(처음부터 주는 것은 빼고).
+func cos_fresh() -> Array[String]:
+	var out: Array[String] = []
+	for id in cos_owned:
+		var it: CosmeticItem = Cosmetics.table().item(StringName(id))
+		if it != null and it.unlock != &"free" and not cos_seen.has(id):
+			out.append(id)
+	return out
+
+
+func cos_mark_seen(id: String = "") -> void:
+	for k in cos_fresh():
+		if id == "" or k == id:
+			cos_seen.append(k)
+
+
+## 관리 명령 `꾸미기 전부`: 표의 모든 항목을 가진 것으로.
+func cos_unlock_all() -> int:
+	var n: int = 0
+	for it in Cosmetics.table().items:
+		if cos_unlock(it.id):
+			n += 1
+	return n
 
 
 ## 열린 룬 자리 수(그 검으로 벤 적 수로).

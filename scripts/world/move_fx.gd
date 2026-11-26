@@ -41,6 +41,8 @@ var rules: Rules = null
 var height_of: Callable = Callable()
 ## 속성이 없을 때의 빛 색. main이 쥔 칼에 맞춰 넣는다(LordView의 SlashFx 색과 같게).
 var tint: Color = MoveArt.STEEL
+## 입은 베기 빛 꾸미기를 따르나(결투는 영주가 둘이라 끈다).
+var use_cosmetic: bool = true
 
 var _built: bool = false
 var _rng := RandomNumberGenerator.new()
@@ -424,7 +426,13 @@ static func _def(i: Dictionary, key: String, v: Variant) -> void:
 
 
 func _col(el: StringName) -> Color:
-	return MoveArt.element_color(el) if el != &"" else tint
+	if el != &"":
+		return MoveArt.element_color(el)
+	if use_cosmetic:   # 영주 꾸미기의 베기 빛(docs/cosmetics.md)이 속성 없는 판정 빛도 칠한다
+		var c: Color = Cosmetics.slash_color(Meta.cos_look)
+		if c.a > 0.0:
+			return c
+	return tint
 
 
 # ---------------------------------------------------------------- 판정 자리

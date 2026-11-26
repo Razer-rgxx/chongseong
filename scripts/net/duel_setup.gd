@@ -6,18 +6,19 @@ extends RefCounted
 
 var version: int = 1
 var seed_value: int = 1
-## 자리마다 {id: SwordData.id(0은 맨손), lv: 검집 단계, ins: 검집 각인 이름들, sheath: 검집에서 온 검인가}.
+## 자리마다 {id: SwordData.id(0은 맨손), lv: 검집 단계, ins: 검집 각인 이름들, sheath: 검집에서 온 검인가, cos: 입은 꾸미기(자리 → 항목 id, 보기만)}.
 var picks: Array[Dictionary] = [DuelSetup.bare(), DuelSetup.bare()]
 
 
 static func bare() -> Dictionary:
-	return {"id": 0, "lv": 0, "ins": PackedStringArray(), "sheath": false}
+	return {"id": 0, "lv": 0, "ins": PackedStringArray(), "sheath": false, "cos": {}}
 
 
 ## 내 Meta에서 그 검(SwordData.id)을 다시 만들 수 있는 최소 정보. 검집의 검이면 강화 단계와 각인이 같이 든다.
 static func spec_of(meta: Meta, id: int) -> Dictionary:
 	var s: Dictionary = DuelSetup.bare()
 	s.id = maxi(id, 0)
+	s.cos = meta.cos_worn.duplicate()   # 꾸미기는 모양뿐이라 규칙(상태 해시)에 안 든다
 	if id > 0 and id == meta.sheath_id:
 		s.sheath = true
 		s.lv = meta.sheath_lv
@@ -31,6 +32,7 @@ static func clean(v: Variant, game: GameData) -> Dictionary:
 	if not (v is Dictionary):
 		return s
 	var d: Dictionary = v
+	s.cos = Cosmetics.clean(d.get("cos", {}))   # 검이 맨손이어도 모양은 보인다
 	var id: int = int(d.get("id", 0)) if d.get("id", 0) is int else 0
 	if id <= 0 or game.sword_by_id(id) == null:
 		return s

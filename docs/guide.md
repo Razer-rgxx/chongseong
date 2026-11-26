@@ -29,3 +29,4 @@
 - 그림 `scripts/debug/shots/shot_guide.gd` → `/home/claude/shots/guide_lobby.png`, `guide_window.png`(Xvfb).
 - 글꼴: 새 한글 글자는 모두 기본 글꼴·Noto 조각 글꼴에 있다(fontTools cmap으로 확인).
 - PC에서: 새 저장으로 마을을 열어 오른쪽 줄과 위 띠, G 창, Shift+G를 보고, 문지기와 말해 "완료" 띠·소리를 확인한다. 언덕에서 뽑기·밤·갈림길이 세지는지, 들판에서 유품·무리·H가 세지는지 본다.
+- 거울 단계(2026-11-26, docs/cosmetics.md): `mirror`(마을, 조각 5, 방향 `lobby.guide_spot("mirror")`)는 `cos_wear`가 기본이 아닌 것을 입을 때 `guide_note("mirror")`로 센다. `legacy_ok`는 이미 입은 것이 있는 저장. 새 단계를 넣으며 `Guide.count`·`legacy_ok`·`tests/cosmetic_tests.gd`의 길라잡이 검사를 같이 고쳤다.

@@ -140,6 +140,7 @@ func _init() -> void:
 	(load("res://tests/guide_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/rift_tests.gd") as GDScript).call("run", d, check)
 	(load("res://tests/memory_tests.gd") as GDScript).call("run", d, check)
+	(load("res://tests/cosmetic_tests.gd") as GDScript).call("run", d, check)
 	print("통과 %d, 실패 %d" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 

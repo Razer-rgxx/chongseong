@@ -112,8 +112,10 @@ func _ready() -> void:
 		v.call(&"set_sword", rules.seat_sword(i), data.grades)
 		if i == (1 - _my if _net != null else 1):
 			_tint_foe(v)   # 같은 PC는 2P, 온라인은 상대의 몸 색을 바꿔 구별한다
+		v.call(&"set_cosmetics", _worn_of(i))   # 꾸미기(docs/cosmetics.md): 온라인은 시작 정보에 실린 것, 같은 PC는 1P만 내 것
 		_lords.append(v)
 	add_child(_fx)
+	_move_fx.use_cosmetic = false   # 영주가 둘이라 판정 빛은 검 색 그대로(몸의 베기 빛 꾸미기는 자리마다 LordView가 입힌다)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
 	rules.duelist_hurt.connect(_on_hurt)
@@ -144,6 +146,13 @@ func _acting() -> Node3D:
 
 
 ## 2P는 몸 색을 바꿔 구별한다: 기본 도형이면 망토와 몸, 기사 모델이면 모든 면에 색을 곱한다.
+## 이 자리가 입은 꾸미기. 온라인이면 시작 정보(DuelSetup.picks)의 것, 같은 PC는 1P만 내 것, 2P는 기본 모습.
+func _worn_of(i: int) -> Dictionary:
+	if _net != null and _net.setup != null:
+		return (_net.setup.picks[i] as Dictionary).get("cos", {})
+	return meta.cos_worn if i == 0 else {}
+
+
 func _tint_foe(v: Node3D) -> void:
 	var cape := v.get_node_or_null("Model/Cape") as MeshInstance3D
 	var body := v.get_node_or_null("Model/Body") as MeshInstance3D
