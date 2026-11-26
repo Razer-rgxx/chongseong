@@ -138,16 +138,35 @@ func _dress() -> void:
 			_pbox(Vector3(0.5, 0.06, 0.24), Vector3(0, h * 0.8, 0.04), cloth)
 		&"sash":
 			_pbox(Vector3(0.08, 0.7, 0.3), Vector3(0, h * 0.62, 0), trim, Vector3(0, 0, 0.75))
-		&"coat":
+		&"coat":   # 선장 외투(2026-11-26, 사용자: "더 멋있게"): 높은 깃, 금 견장과 술, 두 줄 단추, 무릎까지 오는 자락, 등 망토(붉은 안감), 어깨띠와 허리 칼
+			var lining := _mat(Color(0.42, 0.06, 0.06))
+			var dark := _mat(Color(0.08, 0.06, 0.05))
 			for sx in [-1.0, 1.0]:
 				_pbox(Vector3(0.16, 0.46, 0.025), Vector3(sx * 0.082, h * 0.68, -0.13), cloth)   # 앞판
 				_pbox(Vector3(0.022, 0.44, 0.03), Vector3(sx * 0.016, h * 0.68, -0.145), trim)   # 금빛 단
-				_pbox(Vector3(0.15, 0.035, 0.13), Vector3(sx * 0.2, h * 0.815, 0.0), trim)   # 견장
-				_pbox(Vector3(0.18, 0.66, 0.02), Vector3(sx * 0.1, h * 0.36, 0.15), cloth, Vector3(0.12, 0, sx * 0.08))   # 뒤 꼬리
-				_pbox(Vector3(0.15, 0.46, 0.02), Vector3(sx * 0.12, h * 0.4, -0.12), cloth, Vector3(-0.1, 0, sx * 0.1))   # 앞 자락
-				for k in 3:   # 단추
+				_pbox(Vector3(0.07, 0.2, 0.02), Vector3(sx * 0.055, h * 0.79, -0.14), lining, Vector3(0, 0, sx * 0.35))   # 젖힌 옷깃(붉은 안)
+				_pbox(Vector3(0.17, 0.04, 0.15), Vector3(sx * 0.2, h * 0.82, 0.0), trim)   # 견장
+				for k in 5:   # 견장 술
+					_pbox(Vector3(0.012, 0.07, 0.012), Vector3(sx * (0.14 + k * 0.03), h * 0.82 - 0.05, -0.06), trim)
+				for k in 3:   # 두 줄 단추
 					_pbox(Vector3(0.022, 0.022, 0.02), Vector3(sx * 0.06, h * (0.76 - k * 0.06), -0.146), trim)
-			_pbox(Vector3(0.36, 0.05, 0.27), Vector3(0, h * 0.5, 0), _mat(Color(0.12, 0.08, 0.05)))   # 허리띠
+				_pbox(Vector3(0.16, 0.62, 0.02), Vector3(sx * 0.12, h * 0.31, -0.115), cloth, Vector3(-0.08, 0, sx * 0.12))   # 앞 자락(무릎까지)
+				_pbox(Vector3(0.16, 0.02, 0.025), Vector3(sx * 0.14, h * 0.13, -0.1), trim, Vector3(-0.08, 0, sx * 0.12))
+				_pbox(Vector3(0.02, 0.6, 0.18), Vector3(sx * 0.2, h * 0.31, 0.0), cloth, Vector3(0, 0, sx * 0.14))   # 옆 자락
+				_pbox(Vector3(0.18, 0.72, 0.02), Vector3(sx * 0.1, h * 0.3, 0.15), cloth, Vector3(0.12, 0, sx * 0.08))   # 뒤 꼬리
+				_pbox(Vector3(0.18, 0.02, 0.025), Vector3(sx * 0.1, h * 0.1, 0.19), trim, Vector3(0.12, 0, sx * 0.08))
+			_pbox(Vector3(0.34, 0.16, 0.04), Vector3(0, h * 0.87, 0.1), cloth, Vector3(-0.25, 0, 0))   # 높은 뒷깃
+			_pbox(Vector3(0.34, 0.02, 0.045), Vector3(0, h * 0.87 + 0.08, 0.12), trim, Vector3(-0.25, 0, 0))
+			_pbox(Vector3(0.5, 1.08, 0.025), Vector3(0, h * 0.5, 0.2), cloth, Vector3(0.1, 0, 0))   # 등 망토
+			_pbox(Vector3(0.46, 1.04, 0.01), Vector3(0, h * 0.5, 0.185), lining, Vector3(0.1, 0, 0))
+			_pbox(Vector3(0.5, 0.025, 0.03), Vector3(0, h * 0.5 - 0.53, 0.25), trim, Vector3(0.1, 0, 0))
+			_pbox(Vector3(0.38, 0.055, 0.27), Vector3(0, h * 0.5, 0), dark)   # 허리띠
+			_pbox(Vector3(0.06, 0.05, 0.02), Vector3(0, h * 0.5, -0.14), trim)
+			_pbox(Vector3(0.05, 0.62, 0.02), Vector3(0.0, h * 0.66, -0.15), dark, Vector3(0, 0, 0.62))   # 어깨띠
+			_pbox(Vector3(0.04, 0.04, 0.02), Vector3(0.0, h * 0.66, -0.162), trim)
+			_pbox(Vector3(0.045, 0.7, 0.03), Vector3(-0.22, h * 0.36, -0.02), dark, Vector3(0.35, 0, -0.18))   # 허리 칼(칼집)
+			_pbox(Vector3(0.12, 0.03, 0.05), Vector3(-0.17, h * 0.55, -0.1), trim, Vector3(0.35, 0, -0.18))   # 코등이
+			_pbox(Vector3(0.03, 0.12, 0.03), Vector3(-0.155, h * 0.59, -0.12), dark, Vector3(0.35, 0, -0.18))   # 자루
 		&"vest":
 			for sx in [-1.0, 1.0]:
 				_pbox(Vector3(0.15, 0.36, 0.02), Vector3(sx * 0.09, h * 0.63, -0.13), cloth)

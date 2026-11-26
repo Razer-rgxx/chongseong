@@ -257,37 +257,69 @@ static func build(obj: StringName) -> Node3D:
 			_box(n, Vector3(0.03, 0.3, 0.04), Vector3(0, 0.32, 0), iron)
 			_box(n, Vector3(0.106, 0.106, 0.035), Vector3(0, 0.51, 0), steel, Vector3(0, 0, PI / 4))
 		&"anchor":
-			# 2026-11-26 닻의 선장(과거 수정 호수): 머리가 닻. 아래는 목을 감싸듯 휜 두 팔과 화살촉 갈고리,
-			# 가운데 자루에 감은 밧줄, 위에 가로대와 놋쇠 고리(앞에서 구멍이 보이게).
-			var arc: int = 7
-			for k in arc:
-				var a0: float = PI * (1.12 + 0.76 * k / float(arc - 1))   # 아래 반원(왼쪽 끝 → 아래 → 오른쪽 끝)
-				var a1: float = PI * (1.12 + 0.76 * (k + 1) / float(arc - 1))
-				if k == arc - 1:
-					break
-				var p0 := Vector3(cos(a0) * 0.15, 0.17 + sin(a0) * 0.15, 0)
-				var p1 := Vector3(cos(a1) * 0.15, 0.17 + sin(a1) * 0.15, 0)
+			# 2026-11-26 닻의 선장(과거 수정 호수): 머리가 닻. 이야기대로 첫 닻은 칼이라, 자루는 푸른 룬 홈이 빛나는 칼날이고
+			# 가로대는 금빛 칼코등이, 꼭대기 고리 안에 빛나는 수정. 아래는 목을 감싸듯 휜 검은 쇠 팔과 금테 두른 갈고리,
+			# 팔이 만나는 곳에 푸른 눈 하나, 고리에서 한쪽 팔로 늘어진 짧은 사슬. 사용자: "더 멋있게".
+			var dark := _m(Color(0.1, 0.1, 0.12), 0.85, 0.35)
+			var gold := _m(Color(0.78, 0.6, 0.26), 0.9, 0.3)
+			var rune := _m(Color(0.45, 0.85, 1.0))
+			rune.emission_enabled = true
+			rune.emission = Color(0.4, 0.85, 1.0)
+			rune.emission_energy_multiplier = 3.0
+			var arc: int = 9
+			for k in arc - 1:   # 아래 반원 팔(왼쪽 끝 → 아래 → 오른쪽 끝), 가운데가 두껍다
+				var a0: float = PI * (1.1 + 0.8 * k / float(arc - 1))
+				var a1: float = PI * (1.1 + 0.8 * (k + 1) / float(arc - 1))
+				var p0 := Vector3(cos(a0) * 0.17, 0.19 + sin(a0) * 0.17, 0)
+				var p1 := Vector3(cos(a1) * 0.17, 0.19 + sin(a1) * 0.17, 0)
 				var mid: Vector3 = (p0 + p1) * 0.5
-				_box(n, Vector3(p0.distance_to(p1) + 0.012, 0.042, 0.05), mid, iron, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
-			for sx in [-1.0, 1.0]:   # 갈고리 끝(화살촉)
-				var tip := Vector3(cos(PI * (1.5 - 0.38 * sx)) * 0.15, 0.17 + sin(PI * (1.5 - 0.38 * sx)) * 0.15, 0)
-				_box(n, Vector3(0.075, 0.075, 0.035), tip + Vector3(0.012 * sx, 0.03, 0), steel, Vector3(0, 0, PI / 4))
-			_box(n, Vector3(0.05, 0.4, 0.05), Vector3(0, 0.2, 0), iron)   # 자루
-			_box(n, Vector3(0.012, 0.36, 0.054), Vector3(0, 0.21, 0), steel)
-			for k in 3:   # 감은 밧줄
-				_cyl(n, 0.036, 0.036, 0.02, Vector3(0, 0.25 + k * 0.024, 0), cloth)
-			_box(n, Vector3(0.3, 0.045, 0.06), Vector3(0, 0.37, 0), iron)   # 가로대
+				var thick: float = 0.06 - absf(k - (arc - 2) * 0.5) * 0.005
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, thick, 0.06), mid, dark, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, 0.01, 0.064), mid + Vector3(0, -thick * 0.5, 0), gold, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+			for sx in [-1.0, 1.0]:   # 갈고리(금테 화살촉, 바깥으로 젖힘)
+				var ang: float = PI * (1.5 - 0.4 * sx)
+				var tip := Vector3(cos(ang) * 0.17, 0.19 + sin(ang) * 0.17, 0)
+				_box(n, Vector3(0.1, 0.1, 0.045), tip + Vector3(0.02 * sx, 0.045, 0), dark, Vector3(0, 0, PI / 4))
+				_box(n, Vector3(0.11, 0.016, 0.05), tip + Vector3(0.045 * sx, 0.07, 0), gold, Vector3(0, 0, -0.75 * sx))
+				_box(n, Vector3(0.016, 0.11, 0.05), tip + Vector3(-0.005 * sx, 0.09, 0), gold, Vector3(0, 0, -0.75 * sx + PI / 2 * 0.0))
+			_ball(n, 0.05, Vector3(0, 0.03, 0), dark, Vector3(1.2, 0.8, 1.0))   # 팔이 만나는 곳
+			_ball(n, 0.028, Vector3(0, 0.035, -0.04), rune)   # 푸른 눈
+			_box(n, Vector3(0.07, 0.4, 0.022), Vector3(0, 0.25, 0), steel)   # 자루 = 칼날
+			_box(n, Vector3(0.012, 0.34, 0.026), Vector3(0, 0.25, 0), rune)   # 룬 홈
+			_box(n, Vector3(0.09, 0.08, 0.035), Vector3(0, 0.07, 0), dark)
+			_box(n, Vector3(0.34, 0.05, 0.07), Vector3(0, 0.44, 0), gold)   # 가로대 = 금빛 칼코등이
+			_box(n, Vector3(0.3, 0.02, 0.074), Vector3(0, 0.44, 0), dark)
 			for sx in [-1.0, 1.0]:
-				_ball(n, 0.03, Vector3(sx * 0.15, 0.37, 0), brass)
+				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(sx * 0.18, 0.44, 0), gold, Vector3(0, 0, PI / 4))
+			_box(n, Vector3(0.035, 0.07, 0.035), Vector3(0, 0.5, 0), dark)
 			var ring := MeshInstance3D.new()
 			var tm := TorusMesh.new()
-			tm.inner_radius = 0.028
-			tm.outer_radius = 0.052
+			tm.inner_radius = 0.034
+			tm.outer_radius = 0.06
 			ring.mesh = tm
-			ring.material_override = brass
-			ring.position = Vector3(0, 0.45, 0)
+			ring.material_override = gold
+			ring.position = Vector3(0, 0.575, 0)
 			ring.rotation = Vector3(PI / 2, 0, 0)
 			n.add_child(ring)
+			_ball(n, 0.026, Vector3(0, 0.575, 0), rune, Vector3(1, 1.3, 0.6))   # 고리 안의 수정
+			var link := TorusMesh.new()   # 고리에서 오른팔 쪽으로 늘어진 사슬
+			link.inner_radius = 0.008
+			link.outer_radius = 0.016
+			for k in 7:
+				var t: float = (k + 0.5) / 7.0
+				var q := Vector3(0.0, 0.54, 0.035).lerp(Vector3(0.15, 0.2, 0.035), t) + Vector3(0.03 * sin(t * PI), -0.05 * sin(t * PI), 0)
+				var li := MeshInstance3D.new()
+				li.mesh = link
+				li.material_override = steel
+				li.position = q
+				li.rotation = Vector3(PI / 2 if k % 2 == 0 else 0.0, 0, -0.6)
+				n.add_child(li)
+			var gl := OmniLight3D.new()
+			gl.light_color = Color(0.45, 0.85, 1.0)
+			gl.light_energy = 0.5
+			gl.omni_range = 1.6
+			gl.position = Vector3(0, 0.3, -0.12)
+			n.add_child(gl)
 		&"hill":
 			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,
 			# 갈라진 틈에서 불씨가 새고, 가운데 한 자루(주인의 검)만 우뚝하고 날이 희게 빛난다.
