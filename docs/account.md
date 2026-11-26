@@ -16,3 +16,5 @@ GD-Sync 계정 API(`account_create/login/verify/login_from_session/logout`)를 �
 2. 이메일 인증을 쓰려면 그 설정에서 켜고 메일 보내기를 맞춘다(안 켜면 가입하자마자 로그인된다). 켜면 인증 코드 칸이 쓰인다.
 3. 키는 `user://gdsync_keys.cfg`(결투와 같은 것).
 - 참고: 마을 입장 때 `FallenShare`가 따로 만드는 자동 계정(lordxxxxxx)은 이 계정과 별개다. 이메일 인증을 켜면 그 자동 계정 로그인이 막혀 "다른 영주의 검"이 조용히 빠진다(순위표 `fallen_swords`).
+
+- 웹판 관리자(2026-11-26): 웹판은 GD-Sync 키가 없어 로그인을 못 하므로, 주소 끝 `?admin=<비밀 문구>`의 SHA-256이 `Account.WEB_ADMIN_HASH`와 같으면 관리자(`Account.is_admin()`). 문구는 저장소에 쓰지 않고 사용자만 안다.

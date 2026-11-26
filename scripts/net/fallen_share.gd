@@ -22,7 +22,7 @@ static var _busy: bool = false
 
 ## 순위표에 올려도 되나: 관리자 계정은 어떤 순위에도 오르지 않는다(docs/account.md).
 static func may_submit() -> bool:
-	return not Account.admin
+	return not Account.is_admin()
 
 
 ## 올릴 꼴(2048바이트 안).

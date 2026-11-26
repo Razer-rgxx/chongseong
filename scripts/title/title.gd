@@ -395,7 +395,7 @@ func _account_gate() -> void:
 
 ## 관리자 계정이면 오른쪽 위에 작은 놋쇠빛 "관리자" 표.
 func _admin_mark() -> void:
-	if not Account.admin or _ui.get_node_or_null("AdminMark") != null:
+	if not Account.is_admin() or _ui.get_node_or_null("AdminMark") != null:
 		return
 	var m := UiKit.label("관리자", 15, UiKit.LINE)
 	m.name = "AdminMark"

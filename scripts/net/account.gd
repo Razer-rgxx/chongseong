@@ -31,6 +31,25 @@ static var logged_in: bool = false
 ## 관리자: 로그인 세션이 실제로 인증한 이메일의 해시(소문자·앞뒤 공백 뺀 글의 SHA-256)가 ADMIN_HASHES에 있을 때만 켜진다.
 ## 저장하지 않고(파일에서 읽지 않는다) 로그인·로그아웃 때마다 다시 정한다. 이메일 글자는 저장소 어디에도 없다.
 static var admin: bool = false
+## 웹판 관리자(2026-11-26 사용자): 웹판은 GD-Sync 키가 없어 로그인을 못 하니, 주소 끝 ?admin=<비밀 문구>의 SHA-256이 이것과 같으면 관리자로 켠다. 문구는 저장소에 쓰지 않는다.
+const WEB_ADMIN_HASH: String = "b5b1d0076cd9b5c9c37534c4e9fe5f578fec64476186e63ea2dfb1b4028f9105"
+static var _web_checked: bool = false
+static var _web_admin: bool = false
+
+
+## 관리자인가: 로그인한 관리자 이메일이거나, 웹판에서 비밀 문구로 연 경우.
+static func is_admin() -> bool:
+	if admin:
+		return true
+	if not _web_checked:
+		_web_checked = true
+		if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
+			var q: Variant = JavaScriptBridge.eval("new URLSearchParams(location.search).get('admin') || ''", true)
+			var phrase: String = str(q).strip_edges()
+			_web_admin = phrase != "" and phrase.sha256_text() == WEB_ADMIN_HASH
+	return _web_admin
+
+
 static var ADMIN_HASHES: Array[String] = ["3d93a7674a3d0b9d5a7cff8782db7764c4a777acd275f594786f3867476d78eb"]
 
 ## 응답 번호의 이름(GD-Sync ENUMS) → 한국어. 종류마다 같은 이름이면 같은 글.

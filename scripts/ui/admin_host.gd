@@ -27,7 +27,7 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
-	if k == null or not k.pressed or k.echo or not Account.admin:
+	if k == null or not k.pressed or k.echo or not Account.is_admin():
 		return
 	if k.physical_keycode != KEY_QUOTELEFT and k.physical_keycode != KEY_F6:
 		return
