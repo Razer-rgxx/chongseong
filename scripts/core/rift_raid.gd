@@ -161,7 +161,7 @@ static func repair(m: Meta, b: BuildingData, md: MetaData) -> bool:
 
 # ---------------------------------------------------------------- 닫기
 
-## 균열을 닫는다: 열려 있을 때 한 번만 보상을 준다. {shards, gem, sword}를 돌려주고, 열려 있지 않았으면 빈 사전.
+## 균열을 닫는다: 열려 있을 때 한 번만 보상을 준다. {shards, rune, sword}를 돌려주고, 열려 있지 않았으면 빈 사전.
 static func close(m: Meta, d: GameData) -> Dictionary:
 	if not m.rr_open:
 		return {}
@@ -171,14 +171,14 @@ static func close(m: Meta, d: GameData) -> Dictionary:
 	m.rr_since = 0
 	m.rr_closed += 1
 	m.shards += md.rift_reward_shards
-	var out := {"shards": md.rift_reward_shards, "gem": "", "sword": 0}
-	if m.rng.randf() < md.rift_gem_chance:
+	var out := {"shards": md.rift_reward_shards, "rune": "", "sword": 0}
+	if m.rng.randf() < md.rift_rune_chance:
 		var T: RuneTable = Meta.rt()
-		var type: String = String(T.gem_order[m.rng.randi() % T.gem_order.size()])
+		var type: String = String(T.rune_order[m.rng.randi() % T.rune_order.size()])
 		var tier: int = 2 + (m.rng.randi() % 2)   # 2~3단계
 		var key: String = "%s:%d" % [type, mini(tier, T.buy_cost.size())]
-		if m.gem_add(key):
-			out.gem = key
+		if m.rune_add(key):
+			out.rune = key
 	if m.rng.randf() < md.rift_sword_chance:
 		out.sword = _reward_sword(m, d)
 		if int(out.sword) > 0:

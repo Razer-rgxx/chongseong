@@ -1,7 +1,7 @@
 class_name CarveOverlay
 extends RefCounted
 ## 검의 기억(docs/sword_memory.md)을 칼 모델 위에 얹는다: 룬은 칼날을 따라 새긴 차가운 푸른 각진 무늬(마름모 테두리, V 표시),
-## 보석은 코등이와 칼날 밑동에 박힌 깎은 돌(작은 팔면체, 종류마다 붉은·보랏빛 등 제 색).
+## 보석은 없다(룬 박기로 바뀜).
 ## SwordModel의 블레이드 길이·너비·칼끝 x·손잡이 길이만 읽어서 절차 모양과 Blender 모델 어느 쪽에나 같게 붙는다.
 ## 좌표는 SwordModel과 같다(코등이가 원점, 칼날 +Y, 날 ±X, 두께 ±Z).
 
@@ -9,69 +9,60 @@ const RUNE_BLUE: Color = Color(0.35, 0.72, 1.0)
 const NAME: String = "CarveOverlay"
 
 
-## 룬 키 목록(Meta.sword_runes[id])과 보석 키 목록("종류:단계")으로 m에 얹는다. 이미 얹은 것은 먼저 걷어 낸다.
-static func apply(m: SwordModel, runes: Array, gems: Array) -> void:
+## 룬 키 목록(Meta.sword_runes[id], "종류:단계")으로 m에 얹는다. 이미 얹은 것은 먼저 걷어 낸다.
+## 단계가 높을수록 무늬가 조금 크고 더 밝게 빛난다.
+static func apply(m: SwordModel, runes: Array) -> void:
 	var old := m.get_node_or_null(NAME)
 	if old:
 		m.remove_child(old)
 		old.free()
-	if runes.is_empty() and gems.is_empty():
+	if runes.is_empty():
 		return
 	var root := Node3D.new()
 	root.name = NAME
 	m.add_child(root)
 	var T: RuneTable = Meta.rt()
-	var L: float = m.blade_length
 	var W: float = m.form_width if m.form_width > 0.0 else 0.07
 	var glyph: float = clampf(W * 0.7, 0.032, 0.056)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = RUNE_BLUE
-	mat.emission_enabled = true
-	mat.emission = RUNE_BLUE
-	mat.emission_energy_multiplier = 3.0
 	for i in runes.size():
-		var idx: int = maxi(0, T.rune_order.find(String(runes[i])))
-		var t: float = 0.34 + 0.2 * float(i)
-		var cx: float = m.tip_x * t * t
-		var y: float = 0.1 + t * (L - 0.1) * 0.9
-		for side in [-1.0, 1.0]:
-			_glyph(root, idx % 4, Vector3(cx, y, side * (0.017 if W >= 0.05 else 0.014)), glyph, mat)
-	for i in mini(gems.size(), 2):
-		var col: Color = T.gem_color(String(gems[i]))
-		var gm := _gem_mat(col, int(String(gems[i]).split(":")[1]))
-		var sz: float = 0.018 + 0.004 * float(int(String(gems[i]).split(":")[1]))
-		if i == 0:   # 칼날 밑동, 앞뒤
-			for side in [-1.0, 1.0]:
-				_gem(root, Vector3(0.0, 0.085, side * 0.022), sz, gm)
-		else:        # 코등이 양 끝
-			for sx in [-1.0, 1.0]:
-				_gem(root, Vector3(sx * 0.06, 0.0, 0.03), sz, gm)
+		var key: String = T.norm(String(runes[i]))
+		var tier: int = T.tier_of(key)
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = RUNE_BLUE
+		mat.emission_enabled = true
+		mat.emission = RUNE_BLUE
+		mat.emission_energy_multiplier = 2.2 + 0.9 * float(tier)
+		var pos: Array = slot_positions(m, i)
+		var scene: PackedScene = model_of(T.type_of(key))
+		for k in pos.size():
+			var sz: float = glyph * (0.9 + 0.1 * float(tier))
+			if scene != null:   # Blender 룬 모델(assets/runes/<종류>.glb)이 있으면 그것을, 없으면 납작한 무늬
+				var n := scene.instantiate() as Node3D
+				n.position = pos[k]
+				n.scale = Vector3.ONE * (sz * 1.2)   # 모델은 가장 긴 변이 1.0, 무늬 면이 +Z(앞)
+				if k == 1:
+					n.rotation.y = PI   # 뒷면 짝은 반대쪽을 본다
+				root.add_child(n)
+			else:
+				_glyph(root, T.glyph_of(key), pos[k], sz, mat)
 
 
-static func _gem_mat(col: Color, tier: int) -> StandardMaterial3D:
-	var gm := StandardMaterial3D.new()
-	gm.albedo_color = col
-	gm.metallic = 0.3
-	gm.roughness = 0.12
-	gm.emission_enabled = true
-	gm.emission = col
-	gm.emission_energy_multiplier = 1.4 + 0.6 * float(tier)
-	return gm
+## Blender 룬 모델(docs/sword_memory.md "룬 모델 약속"). 없으면 null(납작한 무늬로 돌아간다).
+static func model_of(type: String) -> PackedScene:
+	var path: String = "res://assets/runes/%s.glb" % type
+	return load(path) as PackedScene if ResourceLoader.exists(path) else null
 
 
-static func _gem(root: Node3D, at: Vector3, size: float, mat: Material) -> void:
-	var mi := MeshInstance3D.new()
-	var s := SphereMesh.new()   # 낮은 분할의 구 = 깎은 돌(팔면체에 가깝다)
-	s.radial_segments = 4
-	s.rings = 2
-	s.radius = size
-	s.height = size * 2.4
-	mi.mesh = s
-	mi.material_override = mat
-	mi.position = at
-	mi.rotation.y = PI / 4.0
-	root.add_child(mi)
+## 룬 자리 i(0~2)가 칼에서 놓이는 곳(앞뒤 둘). 빈 자리 고리(ForgePreview)도 같은 곳에 띄운다.
+static func slot_positions(m: SwordModel, i: int) -> Array:
+	var L: float = m.blade_length
+	var W: float = m.form_width if m.form_width > 0.0 else 0.07
+	var t: float = 0.34 + 0.2 * float(i)
+	var cx: float = m.tip_x * t * t
+	var y: float = 0.1 + t * (L - 0.1) * 0.9
+	var z: float = 0.017 if W >= 0.05 else 0.014
+	return [Vector3(cx, y, z), Vector3(cx, y, -z)]
 
 
 ## 얇은 막대 하나(길이 len, 각도 ang(rad, z축)).

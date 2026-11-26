@@ -1,16 +1,11 @@
 class_name ForgePreview
 extends SubViewportContainer
-## 대장간 가운데: 고른 검의 진짜 모델(룬·보석 포함)을 작은 세계 하나(SubViewport)에 세워 천천히 돌린다.
-## 끌면 돌고, 빈 보석 자리는 모델 위에 흐린 테두리 고리로 뜬다. 고리나 박힌 보석을 누르면 socket_clicked(번호).
+## 대장간 가운데: 고른 검의 진짜 모델(박은 룬 포함)을 작은 세계 하나(SubViewport)에 세워 천천히 돌린다.
+## 끌면 돌고, 빈 룬 자리는 모델 위에 흐린 테두리 고리로 뜬다. 고리나 박힌 룬을 누르면 socket_clicked(번호).
 
 signal socket_clicked(i: int)
 
 const RING_COLOR := Color(0.85, 0.78, 0.6)
-## CarveOverlay와 같은 자리: 0번 = 칼날 밑동 앞뒤, 1번 = 코등이 양 끝.
-const SOCKET_POS: Array = [
-	[Vector3(0, 0.085, 0.03), Vector3(0, 0.085, -0.03)],
-	[Vector3(0.06, 0, 0.035), Vector3(-0.06, 0, 0.035)],
-]
 
 var _vp: SubViewport
 var _cam: Camera3D
@@ -21,7 +16,7 @@ var _yaw: float = 0.5
 var _drag: bool = false
 var _moved: float = 0.0
 var _sockets: int = 0
-var _hot: bool = false   # 박을 보석을 들고 있다: 빈 고리가 밝게 숨 쉰다
+var _hot: bool = false   # 박을 룬을 들고 있다: 빈 고리가 밝게 숨 쉰다
 var _t: float = 0.0
 static var _ring_tex: ImageTexture
 
@@ -45,7 +40,7 @@ func _init() -> void:
 
 
 ## 검과 새긴 것을 바꿔 세운다. 돌린 각도는 그대로.
-func show_sword(d: SwordData, game: GameData, runes: Array, gems: Array, sockets: int) -> void:
+func show_sword(d: SwordData, game: GameData, runes: Array, sockets: int) -> void:
 	if _model != null:
 		_model.queue_free()
 		_model = null
@@ -54,15 +49,15 @@ func show_sword(d: SwordData, game: GameData, runes: Array, gems: Array, sockets
 	_rings.clear()
 	_sockets = sockets
 	_model = SwordModel.make(game.forms[d.form], d.grade, d.id, game.grades.colors[d.grade])
-	_model.carve(runes, gems)
+	_model.carve(runes)
 	_model.position.y = -(_model.blade_length - _model.grip_length) * 0.5
 	_pivot.add_child(_model)
 	var span: float = _model.blade_length + _model.grip_length
 	_cam.position = Vector3(0, 0.05, span * 0.5 / tan(deg_to_rad(_cam.fov * 0.5)) * 1.12)
 	_cam.look_at(Vector3.ZERO)
 	_pivot.rotation.x = deg_to_rad(10.0)
-	for i in range(gems.size(), sockets):
-		for p in SOCKET_POS[i]:
+	for i in range(runes.size(), sockets):
+		for p in CarveOverlay.slot_positions(_model, i):
 			var s := Sprite3D.new()
 			s.texture = _ring()
 			s.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -122,14 +117,14 @@ func _gui_input(e: InputEvent) -> void:
 		_pivot.rotation.x = clampf(_pivot.rotation.x + rel.y * 0.006, deg_to_rad(-25), deg_to_rad(40))
 
 
-## 누른 자리 가까이 있는 보석 자리(빈 고리나 박힌 보석)를 찾는다.
+## 누른 자리 가까이 있는 룬 자리(빈 고리나 박힌 룬)를 찾는다.
 func _click(at: Vector2) -> void:
 	if _model == null:
 		return
 	var best: int = -1
 	var bd: float = 30.0
 	for i in _sockets:
-		for p in SOCKET_POS[i]:
+		for p in CarveOverlay.slot_positions(_model, i):
 			var w: Vector3 = _model.to_global(p)
 			if _cam.is_position_behind(w):
 				continue

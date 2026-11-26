@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "보석", "균열"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -52,9 +52,9 @@ static func describe(cmd: Dictionary) -> String:
 		"첫닻":
 			return "첫닻 0~6 (과거 3막: 0 처음, 1~4 기억의 돌을 그만큼 읽음, 5 아라 선장의 맹세까지(미래 2막도 마친 것으로), 6 흑룡을 쓰러뜨린 뒤 = 선장이 남긴 손, 선장은 떠남. 장면은 5로 맞추고 봉인 제단에서 흑룡을 쓰러뜨려야 본다)"
 		"기억":
-			return "기억 검번호 벤적수 (예: 기억 1 1000 = 그 검의 벤 적을 1000으로 하고 룬 셋을 새긴다. 이름도 지을 수 있다. 쓰임이 없으면 룬은 표 순서)"
-		"보석":
-			return "보석 홍옥|자수정|청금석|호박|흑요석|월장석 1~3 (주머니에 하나 넣는다. 대장간 E의 보석 박기 탭에서 박는다)"
+			return "기억 검번호 벤적수 (예: 기억 1 1000 = 그 검의 벤 적을 1000으로 하고 룬 자리 셋을 연다. 자리마다 가장 많이 쓴 종류의 룬이 주머니에 든다. 이름도 지을 수 있다)"
+		"룬":
+			return "룬 예리|밤|낮|사냥|바람|불굴|연쇄|정예 1~3 (룬 주머니에 하나 넣는다. 대장간 E의 룬 박기 탭에서 박는다. keen night day hunt wind grit chain elite도 된다)"
 		"균열":
 			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨려 건물을 망가뜨린다. 수리는 마을 건물 E)"
 		"머리":
@@ -137,19 +137,20 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 				return "기억 검번호 벤적수를 적으세요."
 			var got: Array[String] = meta.set_memory(int(a[0]), int(a[1]))
 			meta.save()
-			return "관리: 검 %d 벤 적 %d · 룬 %d개%s" % [int(a[0]), int(a[1]), meta.runes_of(int(a[0])).size(), (" (새로 " + ", ".join(got.map(func(k: String) -> String: return Meta.rt().rune_name(k))) + ")") if not got.is_empty() else ""]
-		"보석":
+			return "관리: 검 %d 벤 적 %d · 룬 자리 %d개%s" % [int(a[0]), int(a[1]), meta.rune_slots(int(a[0])), (" (주머니에 " + ", ".join(got.map(func(k: String) -> String: return Meta.rt().rune_name(k))) + ")") if not got.is_empty() else ""]
+		"룬":
 			if meta == null or a.size() < 2 or not a[1].is_valid_int():
-				return "보석 종류와 단계(1~3)를 적으세요."
+				return "룬 종류와 단계(1~3)를 적으세요."
 			var type: String = ""
-			for k in Meta.rt().gems:
-				if a[0] == String(k) or a[0] == String(Meta.rt().gems[k].name):
+			for k in Meta.rt().runes:
+				var nm: String = String(Meta.rt().runes[k].name)
+				if a[0] == String(k) or a[0] == nm or nm.begins_with(a[0]):
 					type = String(k)
 			var key: String = "%s:%d" % [type, int(a[1])]
-			if type == "" or not meta.gem_add(key):
-				return "보석 종류(홍옥 자수정 청금석 호박 흑요석 월장석)와 단계 1~3을 확인하세요."
+			if type == "" or not meta.rune_add(key):
+				return "룬 종류(예리 밤 낮 사냥 바람 불굴 연쇄 정예)와 단계 1~3을 확인하세요."
 			meta.save()
-			return "관리: %s을(를) 주머니에 넣었다" % Meta.rt().gem_name(key)
+			return "관리: %s을(를) 룬 주머니에 넣었다" % Meta.rt().rune_name(key)
 		"닻":
 			if meta == null or a.is_empty() or not a[0].is_valid_int():
 				return "닻 0~6을 적으세요."

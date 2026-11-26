@@ -386,7 +386,7 @@ func got_mat(id: StringName, n: int) -> void:
 
 # ---------------------------------------------------------------- 대장간
 
-## 대장간 탭: 0 검집 강화, 1 보석 박기(검의 기억, docs/sword_memory.md).
+## 대장간 탭: 0 검집 강화, 1 룬 박기(검의 기억, docs/sword_memory.md).
 var _forge_tab: int = 0
 
 
@@ -400,23 +400,23 @@ func open_forge() -> void:
 ## 검집에 넣을 검과 그 카드 → 검집 강화 줄(ForgeTrack: 지금 단계, 각인 단계, 내려가는 단계) → 다음 단계에 무엇이 오르는지(피해·내구 숫자 앞뒤, 각인)
 ## → 성공 확률과 실패하면 어떻게 되는지 → 망치질 단추 → 결과(크게: 성공/그대로/내려감과 바뀐 숫자).
 func _render_forge(msg: String) -> void:
-	if _gems_ui != null and is_instance_valid(_gems_ui) and _gems_ui.get_parent() == _forge_box:
-		_forge_box.remove_child(_gems_ui)
+	if _runes_ui != null and is_instance_valid(_runes_ui) and _runes_ui.get_parent() == _forge_box:
+		_forge_box.remove_child(_runes_ui)
 	for c in _forge_box.get_children():
 		c.queue_free()
 	var md := data.meta
-	UiKit.header(_forge_box, "대장간 · 검집 강화 +%d" % meta.sheath_lv if _forge_tab == 0 else "대장간 · 보석 박기", close)
+	UiKit.header(_forge_box, "대장간 · 검집 강화 +%d" % meta.sheath_lv if _forge_tab == 0 else "대장간 · 룬 박기", close)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	for ti in 2:
-		var tb := UiKit.button(["검집 강화", "보석 박기"][ti] + ("  ◆" if ti == _forge_tab else ""), func() -> void:
+		var tb := UiKit.button(["검집 강화", "룬 박기"][ti] + ("  ◆" if ti == _forge_tab else ""), func() -> void:
 			_forge_tab = ti
 			_render_forge(""), 34)
 		tb.disabled = _busy
 		tabs.add_child(tb)
 	_forge_box.add_child(tabs)
 	if _forge_tab == 1:
-		_render_gems(msg)
+		_render_runes(msg)
 		return
 	var cands := meta.sheath_candidates(data)
 	var now := meta.sheath_sword(data)
@@ -498,20 +498,20 @@ func _render_forge(msg: String) -> void:
 	_forge_box.add_child(_msg)
 
 
-# ---------------------------------------------------------------- 보석 박기 (검의 기억)
-## 그림 창(2026-11-26): ForgeGemsUi(scripts/ui/forge_gems_ui.gd)가 검 카드·3D 미리보기·보석 타일을 맡는다.
-var _gems_ui: ForgeGemsUi
+# ---------------------------------------------------------------- 룬 박기 (검의 기억)
+## 그림 창(2026-11-26): ForgeRunesUi(scripts/ui/forge_runes_ui.gd)가 검 카드·3D 미리보기·보석 타일을 맡는다.
+var _runes_ui: ForgeRunesUi
 
 
-func _render_gems(msg: String) -> void:
-	if _gems_ui == null or not is_instance_valid(_gems_ui):
-		_gems_ui = ForgeGemsUi.new()
-		_gems_ui.setup(data, meta, func() -> void:
+func _render_runes(msg: String) -> void:
+	if _runes_ui == null or not is_instance_valid(_runes_ui):
+		_runes_ui = ForgeRunesUi.new()
+		_runes_ui.setup(data, meta, func() -> void:
 			meta.save()
 			forge_changed.emit())
-	_gems_ui.msg_text = msg
-	_forge_box.add_child(_gems_ui)
-	_gems_ui.refresh()
+	_runes_ui.msg_text = msg
+	_forge_box.add_child(_runes_ui)
+	_runes_ui.refresh()
 
 
 const FORGE_GOLD := Color(0.95, 0.78, 0.4)

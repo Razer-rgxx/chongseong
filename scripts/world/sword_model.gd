@@ -34,16 +34,16 @@ static func for_sword(sw: Sword, grades: GradeTable) -> SwordModel:
 	return m
 
 
-## 그 검 번호의 저장된 룬·보석(Meta 거울)을 얹는다. 없으면 아무 일도 없다.
+## 그 검 번호의 저장된 룬(Meta 거울)을 얹는다. 없으면 아무 일도 없다.
 func carve_saved(id: int) -> void:
 	var c: Variant = Meta.carvings.get(str(id))
 	if c != null:
-		carve(c.runes, c.gems)
+		carve(c.runes)
 
 
-## 룬(키 목록)과 보석("종류:단계" 목록)을 모양 위에 얹는다(CarveOverlay). 절차 모양과 Blender 모양 모두.
-func carve(runes: Array, gems: Array) -> void:
-	CarveOverlay.apply(self, runes, gems)
+## 박은 룬("종류:단계" 목록)을 모양 위에 얹는다(CarveOverlay). 절차 모양과 Blender 모양 모두.
+func carve(runes: Array) -> void:
+	CarveOverlay.apply(self, runes)
 
 
 ## 칼날의 손잡이 쪽 끝과 칼끝(세계 좌표).

@@ -89,5 +89,5 @@ extends Resource
 @export var rift_boss_hp: float = 0.5
 ## 닫은 보상: 조각, 보석 확률, 검(사이버·높은 등급) 확률.
 @export var rift_reward_shards: int = 150
-@export var rift_gem_chance: float = 1.0
+@export var rift_rune_chance: float = 1.0
 @export var rift_sword_chance: float = 0.35

@@ -860,8 +860,8 @@ func _raid_done() -> void:
 	_camera.add_shake(data.lord.shake_big * 2.0)
 	_hud.flash(Color(0.6, 0.78, 1.0), 0.25, 0.9)
 	var bits: Array[String] = ["조각 %d개" % int(r.shards)]
-	if r.gem != "":
-		bits.append(Meta.rt().gem_name(String(r.gem)))
+	if r.rune != "":
+		bits.append(Meta.rt().rune_name(String(r.rune)))
 	if int(r.sword) > 0:
 		var sd: SwordData = data.sword_by_id(int(r.sword))
 		bits.append(sd.display_name if sd else "검")

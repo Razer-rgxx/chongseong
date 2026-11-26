@@ -7,6 +7,7 @@ signal done(id: int)
 
 const SIZE: int = 112
 static var cache: Dictionary = {}   # 검 번호 → ImageTexture
+static var rune_cache: Dictionary = {}   # 룬 종류 → ImageTexture
 static var inst: ForgeThumbs = null
 
 var _vp: SubViewport
@@ -70,10 +71,43 @@ func want(d: SwordData, game: GameData) -> Texture2D:
 	return null
 
 
+## 룬 종류의 그림(assets/runes/<종류>.glb가 있을 때만). 없으면 null이고 줄도 안 세운다(타일이 납작한 무늬를 그린다).
+## 다 그리면 done(-1).
+func want_rune(type: String) -> Texture2D:
+	if CarveOverlay.model_of(type) == null:
+		return null
+	if rune_cache.has(type):
+		return rune_cache[type]
+	for q in _queue:
+		if q[0] is String and q[0] == type:
+			return null
+	_queue.append([type])
+	if not _busy:
+		_pump()
+	return null
+
+
 func _pump() -> void:
 	_busy = true
 	while not _queue.is_empty():
 		var q: Array = _queue.pop_front()
+		if q[0] is String:   # 룬 모델: 앞(+Z)에서 정사영으로
+			var sc: PackedScene = CarveOverlay.model_of(q[0])
+			if sc == null or rune_cache.has(q[0]):
+				continue
+			var rn := sc.instantiate() as Node3D
+			_vp.add_child(rn)
+			_cam.size = 1.15
+			_cam.position = Vector3(0, 0, 4)
+			_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+			await RenderingServer.frame_post_draw
+			await RenderingServer.frame_post_draw
+			var rimg: Image = _vp.get_texture().get_image()
+			rn.queue_free()
+			if rimg != null and not rimg.is_empty():
+				rune_cache[q[0]] = ImageTexture.create_from_image(rimg)
+				done.emit(-1)
+			continue
 		if cache.has(q[0]):
 			continue
 		var m := SwordModel.make(q[1], q[2], q[0], q[3])

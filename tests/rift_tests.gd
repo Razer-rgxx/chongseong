@@ -88,7 +88,7 @@ func _close_pays_once() -> void:
 	var s0: int = m.shards
 	var r: Dictionary = RiftRaid.close(m, d)
 	check.call(not m.rr_open and int(r.shards) == d.meta.rift_reward_shards and m.shards == s0 + d.meta.rift_reward_shards and m.rr_closed == 1, "균열: 닫으면 조각 보상(%d)과 닫은 횟수" % d.meta.rift_reward_shards)
-	check.call(r.gem != "" and m.gem_bag.size() > 0, "균열: 보석 하나가 주머니에 든다")
+	check.call(r.rune != "" and m.rune_bag.size() > 0, "균열: 룬 하나가 주머니에 든다")
 	check.call(RiftRaid.close(m, d).is_empty() and m.shards == s0 + d.meta.rift_reward_shards, "균열: 보상은 한 번만")
 	# 검 보상은 확률이지만 굴리면 도감에 든다
 	var got: bool = false
@@ -180,9 +180,8 @@ func _disabled_and_repair() -> void:
 	rules.horse_unlocked = m.in_use(&"stable")
 	check.call(rules.call_horse() == &"locked", "균열: 받침터가 망가지면 탈 검을 못 부른다")
 	check.call(m.forge_grade(d) == -1, "균열: 풀무간이 망가지면 검을 못 벼린다")
-	m.gem_add("ruby:1")
-	m.sword_runes["1"] = ["x"]
-	check.call(m.socket_gem(1, "ruby:1") == "ruined", "균열: 풀무간이 망가지면 보석을 못 박는다")
+	m.rune_add("keen:1")
+	check.call(m.socket_rune(1, "keen:1") == "ruined", "균열: 풀무간이 망가지면 룬을 못 박는다")
 	check.call(m.village_made(d)[&"wood"] == 0, "균열: 망가진 일터는 재료를 못 모은다")
 	check.call(m.workers_at(&"woodcutter") == 1 and not m.set_job(1, &"woodcutter", d), "균열: 망가진 일터에는 일을 못 맡긴다")
 	var b: BuildingData = d.building(&"stable")
@@ -202,7 +201,7 @@ func _disabled_and_repair() -> void:
 	rules.horse_unlocked = m.in_use(&"stable")
 	check.call(rules.call_horse() != &"locked", "균열: 고치면 탈 검을 다시 부른다")
 	RiftRaid.repair(m, d.building(&"forge"), md)
-	check.call(m.forge_grade(d) >= 0 and m.socket_gem(1, "ruby:1") != "ruined", "균열: 풀무간을 고치면 보석도 다시 박는다")
+	check.call(m.forge_grade(d) >= 0 and m.socket_rune(1, "keen:1") != "ruined", "균열: 풀무간을 고치면 룬도 다시 박는다")
 
 
 func _tier_drop() -> void:

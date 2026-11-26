@@ -27,8 +27,8 @@ const STEPS: Array[Dictionary] = [
 	{"id": "pack", "ch": 2, "title": "무리 하나 쓰러뜨리기", "goal": "들판에 서성이는 적 무리를 모두 쓰러뜨린다", "need": 1, "reward": {"shards": 10, "mats": {"iron": 2}}, "hint": {"field": "pack"}},
 	{"id": "stable_horse", "ch": 2, "title": "검 받침터와 탈 검", "goal": "마을 바깥 터에 검 받침터를 짓고, 들판에서 H로 탈 검을 부른다", "need": 2, "reward": {"shards": 15}, "hint": {"lobby": "stable"}},
 	{"id": "stranger", "ch": 2, "title": "낯선 사람 만나기", "goal": "들판을 거닐다 마주치는 총 든 낯선 사람을 만난다", "need": 1, "reward": {"shards": 10}, "hint": {"field": "stranger"}},
-	{"id": "first_rune", "ch": 2, "title": "검에 첫 룬 새기기", "goal": "한 검으로 적을 100마리 벤다(어디서든). 룬이 저절로 새겨진다", "need": 1, "reward": {"shards": 15}},
-	{"id": "gem_socket", "ch": 0, "title": "보석 박기", "goal": "대장간 E의 보석 탭에서 룬이 새겨진 검에 보석을 박는다(보석은 우두머리·상자에서 가끔 나오고 조각으로도 산다)", "need": 1, "reward": {"shards": 20}, "hint": {"lobby": "forge"}},
+	{"id": "first_rune", "ch": 2, "title": "첫 룬 자리 열기", "goal": "한 검으로 적을 100마리 벤다(어디서든). 룬 자리가 열리고 그 검이 가장 많이 쓴 종류의 룬 하나가 룬 주머니에 든다", "need": 1, "reward": {"shards": 15}},
+	{"id": "rune_socket", "ch": 0, "title": "룬 박기", "goal": "대장간 E의 룬 박기 탭에서 룬을 골라 열린 자리에 박는다(룬은 우두머리·상자에서 가끔 나오고 조각으로도 산다)", "need": 1, "reward": {"shards": 20}, "hint": {"lobby": "forge"}},
 	{"id": "future", "ch": 3, "title": "녹슨 미래로", "goal": "들판에 열린 갈라진 틈에서 E를 눌러 건너간다", "need": 1, "reward": {"shards": 20}, "hint": {"field": "rift"}, "hidden": true},
 	{"id": "traveller", "ch": 3, "title": "시간을 건너는 사람", "goal": "미래의 이야기를 따라가 타임트래블러를 만난다", "need": 1, "reward": {"shards": 30}, "hidden": true},
 	## 시대 균열(docs/rift_raid.md): 3막(흑룡)을 마친 뒤에만 목록에 든다(raid). 열려 있는 동안은 맨 앞 단계가 된다(urgent).
@@ -86,8 +86,8 @@ static func count(i: int, m: Meta) -> int:
 		"rift_close": n = m.rr_closed
 		"repair": n = 0   # 끝나는 단계가 아니다(건물을 다 고치면 목록에서 사라진다)
 		"traveller": n = 1 if m.time_traveller else 0
-		"first_rune": n = 1 if m.sword_runes.values().any(func(v): return not (v as Array).is_empty()) else 0
-		"gem_socket": n = 1 if m.sword_gems.values().any(func(v): return not (v as Array).is_empty()) else 0
+		"first_rune": n = 1 if m.slot_given.values().any(func(v): return int(v) > 0) else 0
+		"rune_socket": n = 1 if m.rune_placed > 0 else 0
 	return mini(n, int(s.need))
 
 
@@ -106,6 +106,7 @@ static func legacy_ok(i: int, m: Meta) -> bool:
 		"pack": return not m.packs_cleared.is_empty() or m.boss_first or not m.chiefs_first.is_empty() or not m.crypt_cleared.is_empty() or not m.crypt_opened.is_empty()
 		"stable_horse": return m.has_built(&"stable")
 		"rift_close": return m.rr_closed > 0
+		"first_rune": return m.slot_given.values().any(func(v): return int(v) > 0)   # 옛 자동 룬도 자리가 열렸던 것
 		"future": return not m.neon_logs.is_empty() or not m.story_shards.is_empty() or not m.future_hilts.is_empty() or m.time_traveller or m.vault_open
 	return false
 

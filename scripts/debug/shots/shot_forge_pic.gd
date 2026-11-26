@@ -1,5 +1,5 @@
 extends SceneTree
-## 대장간 그림 창 확인: 보석 박기 탭(미리보기·카드·보석 타일)과 검집 탭. 저장 파일은 끝나면 되돌린다.
+## 대장간 그림 창 확인: 룬 박기 탭(미리보기·카드·룬 타일)과 검집 탭. 저장 파일은 끝나면 되돌린다.
 ## xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3 --rendering-method gl_compatibility -s scripts/debug/shots/shot_forge_pic.gd
 
 const OUT: String = "/home/claude/shots/"
@@ -41,18 +41,20 @@ func _init() -> void:
 		if meta.has_found(s.id):
 			meta._log(s.id)["k"] = 1000 if s.id == first else 450
 			meta.sync_runes(s.id)
-	meta.gem_add("ruby:3")
-	meta.gem_add("lapis:2", 2)
-	meta.gem_add("amber:1")
-	meta.gem_add("moonstone:3")
-	meta.gem_add("obsidian:2")
+	meta.rune_add("keen:3")
+	meta.rune_add("night:2", 2)
+	meta.rune_add("hunt:1")
+	meta.rune_add("wind:3")
+	meta.rune_add("grit:2")
+	meta.rune_add("chain:1", 3)
+	meta.socket_rune(first, "keen:1")
 	hud.set("_forge_tab", 1)
 	hud.call("open_forge")
 	await _frames(60)
 	await _shot("forge_pic")
-	var g: Node = hud.get("_gems_ui")
+	var g: Node = hud.get("_runes_ui")
 	if g:
-		g.set("pick_gem", "ruby:3")
+		g.set("pick_rune", "keen:3")
 		g.call("_on_socket", 0)
 		await _frames(20)
 		g.call("_on_socket", 0)
