@@ -801,7 +801,7 @@ func _on_pulled(s: Sword) -> void:
 		_camera.add_shake(0.3 + 0.08 * s.grade)
 	_reveal_until = Time.get_ticks_msec() + int(hold * 1000.0)
 	# 연출 중에는 글자를 띄우지 않는다. 끝나면 이름을 알린다
-	var text: String = "%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, s.data.display_name]
+	var text: String = "%s · %s %s을(를) 뽑았다." % [data.grades.names[s.grade], s.form.display_name, Meta.shown_name(s.data)]
 	if _perfect_note:
 		_perfect_note = false
 		if s.breakable():
@@ -848,7 +848,7 @@ func _on_drawn(s: Sword, _h: Hilt, _planted: Hilt) -> void:
 	_sync_hilts()
 	_sfx.play(&"draw", _lord.position, -2.0, 1.15)
 	_camera.add_shake(0.08 + 0.04 * s.grade)
-	_hud.toast("%s · %s %s" % [data.grades.names[s.grade], s.form.display_name, s.data.display_name])
+	_hud.toast("%s · %s %s" % [data.grades.names[s.grade], s.form.display_name, Meta.shown_name(s.data)])
 
 
 func _on_choice_needed(s: Sword) -> void:
@@ -910,7 +910,7 @@ func _on_broke(_k: int, s: Sword) -> void:
 	meta.log_break(s.data.id)
 	_sfx.play(&"break", _lord.position, 0.0)
 	_camera.add_shake(0.3)
-	_hud.toast(s.data.display_name + "이(가) 부러졌다." + ("" if rules.current() else " 이제 맨손이야."))
+	_hud.toast(Meta.shown_name(s.data) + "이(가) 부러졌다." + ("" if rules.current() else " 이제 맨손이야."))
 
 
 func _on_lord_hurt(d: float) -> void:
@@ -1273,6 +1273,9 @@ func _build_world() -> void:
 
 ## 검의 기억 단계를 넘었다: 한 줄과 낮은 울림(올라가는 소리 없음). 피해 배수는 다음에 쥐고 나갈 때부터.
 func _memory_toast(d: SwordData, tier: int) -> void:
+	var rune_text: String = meta.take_rune_news(data)   # 검의 기억: 새 룬 알림
+	if rune_text != "":
+		_hud.toast(rune_text)
 	if tier <= 0 or d == null:
 		return
 	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])

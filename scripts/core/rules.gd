@@ -370,6 +370,8 @@ var _pull_cursed: bool = false
 var bonus_hp: float = 0.0
 ## 검의 기억(Meta.memory_table): 검 번호 → 그 검으로 벨 때 피해 배수. 시작할 때 Meta에서 받는다.
 var memory: Dictionary = {}
+## 쥔 검의 룬·보석(호박, 연쇄의 룬)이 벨 때마다 모은 조각(소수). 판이 끝나면 Meta.run_shards가 정수 부분을 센다. state_hash에 든다.
+var carve_shard: float = 0.0
 ## 시대(docs/stranger.md 3단계). 비면 지금 시대, &"future"면 녹슨 미래 구역: 모든 검이 사거리 +15%, 마무리 베기 뒤에 짧은 데이터 메아리가 한 번 더 친다.
 ## 장면이 start_field 전에 정한다. state_hash에 든다.
 const ERA_FUTURE: StringName = &"future"
@@ -510,6 +512,37 @@ func last_zone() -> bool:
 
 
 ## 검의 기억에 따른 피해 배수(없으면 1).
+## 낮밤 중 밤인가(검의 기억이 세는 "밤"): 언덕은 밤 국면, 들판 시계가 켜져 있으면 시계의 밤, 시계가 없으면(무덤·미래·과거) 늘 밤.
+func is_dark() -> bool:
+	return phase == Phase.NIGHT and (not field_clock_on or field_night)
+
+
+## 쥔 검의 쓰임을 센다(검의 기억: 룬을 고르는 근거). 결투와 Meta가 없는 판은 세지 않는다.
+func note_use(kind: String, n: int = 1) -> void:
+	var s := current()
+	if meta == null or duel or s == null or s.data == null:
+		return
+	meta.use_note(s.data.id, kind, n)
+
+
+## 이 처치가 어떤 쓰임인지 센다(큰 베기, 밤·낮, 우두머리, 정예, 처치 연쇄)와 호박·연쇄의 룬의 조각.
+func _note_kill_use(e: Enemy, big: bool) -> void:
+	var s := current()
+	if s == null or duel or e.data.still:
+		return
+	if big:
+		note_use("big")
+	note_use("night" if is_dark() else "day")
+	if e.data.boss:
+		note_use("boss")
+	if e.elite:
+		note_use("elite")
+	if chain >= 5:
+		note_use("chain")
+	if powers != null:
+		carve_shard += powers.cv("shard")
+
+
 func memory_mult(s: Sword) -> float:
 	return float(memory.get(s.data.id, 1.0)) if s and s.data else 1.0
 
@@ -1310,6 +1343,7 @@ func _step_lord(input: LordInput) -> void:
 		L.invuln = maxf(L.invuln, D.dash_time + 0.05)
 		L.dash_dir = L.move_dir if L.moving else Vector2.from_angle(L.face)
 		powers.on_dash()
+		note_use("dash")
 		lord_dashed.emit()
 	if input and input.hook and not busy and not aloft and phase == Phase.NIGHT and L.hook <= 0.0 and L.dash <= 0.0 and L.hook_cooldown <= 0.0:
 		_try_hook(input)
@@ -1506,6 +1540,7 @@ func hurt(e: Enemy, damage: float, knock: Vector2, big: bool, dot: bool = false,
 		if e.hunt:
 			hunt_killed = true
 		_note_grave(e)
+		_note_kill_use(e, big)
 		powers.on_kill(e)
 		_hz_killed(e)
 		if _head_fx(&"heal") and lord.hp > 0.0:
@@ -3158,6 +3193,7 @@ func state_hash() -> int:
 	parts.append(lord.air)
 	parts.append_array([lord.riding, lord.ride_vel, horse.state, horse.pos, horse.face, horse.speed, horse.come_t])
 	parts.append(callers_out)
+	parts.append(carve_shard)
 	parts.append_array([goal, rule, next_goal, next_rule, night_total, beacon_hp, beacon_lost, hunt_out, hunt_killed, siege, siege_left, _ember_t, goal_shards])
 	for f in embers:
 		parts.append_array([f.at, f.warn, f.burn])

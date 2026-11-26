@@ -88,6 +88,13 @@ func set_online(my_seat: int) -> void:
 		_name_labels[i].text = _names[i]
 
 
+## 두 영주의 검 이름(지은 이름이 있으면 그것)을 이름 곁에 보인다.
+func set_swords(a: String, b: String) -> void:
+	var sw: Array[String] = [a, b]
+	for i in 2:
+		_name_labels[i].text = "%s · %s" % [_names[i], sw[i]] if sw[i] != "" else _names[i]
+
+
 func player_name(i: int) -> String:
 	return _names[i]
 

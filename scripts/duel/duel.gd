@@ -93,6 +93,7 @@ func _ready() -> void:
 		_net.desync.connect(_on_desync)
 		_net.peer_lost.connect(_on_peer_lost)
 		_hud.set_online(_my)
+	_hud.set_swords(a.label() if a else "", b.label() if b else "")   # 검의 기억: 지은 이름
 	HillBuilder.build(self, _env.environment, data.forms)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
 	_sun.light_energy = sun_energy

@@ -89,6 +89,16 @@ func holding(name: String) -> bool:
 	return false
 
 
+## 쥔 검의 룬·보석 수치 하나(검의 기억, Meta.carve_of). 결투처럼 능력을 끈 때는 0.
+func cv(k: String) -> float:
+	if off:
+		return 0.0
+	var s := r.current()
+	if s == null or s.data == null:
+		return 0.0
+	return float(Meta.carve_of(s.data.id).get(k, 0.0))
+
+
 func king() -> float:
 	return T.u("첫 번째 왕", "mult") if holding("첫 번째 왕") else 1.0
 
@@ -106,7 +116,7 @@ func ins(k: String) -> float:
 		v = maxf(v, float(o.ins.get(k, 0.0)))
 	if using("언덕"):
 		v = maxf(v, float(run_ins.get(k, 0.0)))
-	return v * king()
+	return v * king() * (1.0 + cv("power"))
 
 
 ## 들고만 있어도 되는 각인(두 칸의 합).
@@ -136,10 +146,10 @@ func stats() -> Dictionary:
 	var s := r.current()
 	var F: FormData = s.form if s else r.data.unarmed
 	var g_mult: float = r.data.grades.damage_mult[s.grade] * s.bonus * s.night_bonus if s else 1.0
-	var dmg: float = D.damage * F.damage * g_mult * (1.0 + ins("날") / 100.0)
+	var dmg: float = D.damage * F.damage * g_mult * (1.0 + ins("날") / 100.0) * (1.0 + cv("dmg") + (cv("night") if r.is_dark() else 0.0))
 	if ins("투박함") > 0.0:
 		dmg *= T.i("투박함_피해")
-	var spd: float = F.speed * (1.0 + ins("가벼움") / 100.0) * C.speed_mult()
+	var spd: float = F.speed * (1.0 + ins("가벼움") / 100.0) * C.speed_mult() * (1.0 + cv("speed"))
 	if ins("무거움") > 0.0:
 		spd *= T.i("무거움_속도")
 	var hp_k: float = clampf(r.lord.hp / r.max_hp(), 0.0, 1.0)
@@ -215,7 +225,7 @@ func crowd_mult(n: int) -> float:
 
 
 func knock_mult() -> float:
-	return 1.0 + ins("밀쳐내기") / 100.0
+	return (1.0 + ins("밀쳐내기") / 100.0) * (1.0 + cv("knock"))
 
 
 ## 벤 뒤에 따라오는 것들(메아리, 언덕의 심장, 폭풍, 떨어진 검). hit: 이번에 벤 적들.
@@ -276,6 +286,10 @@ func strike(e: Enemy, dmg: float, knock: Vector2) -> Dictionary:
 		d *= 1.0 + ins("망령 베기") / 100.0
 	if e.vuln > 0.0:
 		d *= 2.0
+	if e.data.boss and cv("boss") > 0.0:
+		d *= 1.0 + cv("boss")   # 사냥의 룬
+	if cv("crit") > 0.0 and r.rng.randf() < cv("crit"):   # 예리의 룬·청금석: 치명타
+		d *= r.data.runes.crit_mult
 	d *= C.strike_mult(e)
 	if using("상처 세는 자") and e.bleed_t > 0.0:
 		d += e.bleed * e.bleed_t
@@ -386,6 +400,8 @@ func heal(v: float) -> void:
 ## 영주가 맞을 때 받는 피해를 줄인다. attacker는 null일 수 있다.
 func lord_damage(d: float, attacker: Enemy) -> float:
 	var L := r.lord
+	r.note_use("hurt")
+	d *= 1.0 - minf(0.5, cv("guard"))   # 불굴의 룬
 	d *= 1.0 - minf(T.i("버팀_상한"), ins("버팀") / 100.0)
 	if L.swing > 0.0:
 		d *= 1.0 - minf(T.i("막기_상한"), ins("막기") / 100.0)

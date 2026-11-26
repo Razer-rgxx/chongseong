@@ -28,7 +28,7 @@ func _order() -> void:
 		ids[Guide.STEPS[i].id] = 1
 		if int(Guide.STEPS[i].need) < 1 or Guide.reward_text(i) == "":
 			ok_ch = false
-	check.call(ids.size() == Guide.size() and Guide.size() >= 15 and Guide.size() <= 20, "길라잡이: 단계 15~20개, id가 겹치지 않는다(%d)" % Guide.size())
+	check.call(ids.size() == Guide.size() and Guide.size() >= 15 and Guide.size() <= 25, "길라잡이: 단계 15~25개, id가 겹치지 않는다(%d)" % Guide.size())
 	check.call(ok_ch, "길라잡이: 모든 단계에 세는 수와 보상이 있다")
 	var order: Array = ["talk_gate", "rack", "hill_gate", "first_pull", "good_pull", "first_night", "path", "day_event", "finish_run"]
 	var same: bool = true

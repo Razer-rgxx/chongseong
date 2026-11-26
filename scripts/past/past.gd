@@ -650,6 +650,9 @@ func _on_enemy_died(e: Enemy) -> void:
 	if _held_id > 0:
 		var tier: int = meta.log_kill(_held_id)
 		var d: SwordData = data.sword_by_id(_held_id)
+		var rune_text: String = meta.take_rune_news(data)   # 검의 기억: 새 룬 알림
+		if rune_text != "":
+			_hud.toast(rune_text)
 		if tier > 0 and d != null:
 			_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])
 	if e.act != &"explode":

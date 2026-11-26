@@ -92,7 +92,7 @@ func _fill() -> void:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.text = "%s · %s%s" % [d.display_name, _data.forms[d.form].display_name, ("   [" + " · ".join(tags) + "]") if not tags.is_empty() else ""]
+		b.text = "%s · %s%s" % [Meta.shown_name(d), _data.forms[d.form].display_name, ("   [" + " · ".join(tags) + "]") if not tags.is_empty() else ""]
 		b.add_theme_color_override("font_color", _data.grades.colors[d.grade].lerp(UiKit.TEXT, 0.35))
 		var sid: int = id
 		b.pressed.connect(func() -> void: _show(sid))

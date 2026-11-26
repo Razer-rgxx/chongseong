@@ -139,6 +139,21 @@ var guide_init: bool = false
 var guide_step: int = 0
 var guide_fold: bool = false
 var duel_losses: int = 0
+## 검의 기억(2026-11-26, docs/sword_memory.md): 검 번호(글) → 쓰임 센 것 {big, night, day, boss, dash, hurt, chain, elite}.
+## 벤 적 수는 sword_log의 k(모든 곳 공통). 룬·보석·이름은 검 번호로 따로 둔다.
+var sword_memory: Dictionary = {}
+var sword_runes: Dictionary = {}
+var sword_gems: Dictionary = {}
+var sword_names: Dictionary = {}
+## 보석 주머니: "종류:단계" → 개수.
+var gem_bag: Dictionary = {}
+## 방금 새겨진 룬 알림(장면이 take_rune_news로 꺼내 띄운다)과 방금 얻은 보석 이름.
+var rune_news: Array[String] = []
+var last_gem: String = ""
+## 화면이 어디서나 읽는 거울: 마지막으로 읽거나 바꾼 Meta의 이름·룬·보석(SwordModel.for_sword, Sword.label이 읽는다).
+static var shown_names: Dictionary = {}
+static var carvings: Dictionary = {}
+static var _rt: RuneTable = null
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
 static var carry_sword: int = -1
@@ -200,7 +215,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_gems": sword_gems, "sword_names": sword_names, "gem_bag": gem_bag}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -400,6 +415,7 @@ func from_dict(d: Dictionary) -> void:
 	guide_fold = bool(d.get("guide_fold", false))
 	duel_wins = int(d.get("duel_wins", 0))
 	duel_losses = int(d.get("duel_losses", 0))
+	_load_carve(d)
 	field_seen = Meta.empty_seen()
 	var fs: Variant = d.get("field_seen", "")
 	if fs is String and fs != "":
@@ -453,6 +469,7 @@ func log_kill(id: int) -> int:
 	var before: int = memory_tier(id)
 	e["k"] = int(e["k"]) + 1
 	var after: int = memory_tier(id)
+	sync_runes(id)   # 룬 자리가 열렸으면 새긴다
 	return after if after > before else 0
 
 
@@ -485,8 +502,8 @@ func memory_title(d: SwordData, id: int = -1) -> String:
 		return "?"
 	var t: int = memory_tier(id if id > 0 else d.id)
 	if t == 0:
-		return d.display_name
-	var n: String = d.display_name
+		return shown_name(d)
+	var n: String = shown_name(d)
 	return String(MEMORY[t - 1][1]).replace("{n}", n).replace("{과}", josa(n, "과", "와"))
 
 
@@ -539,6 +556,310 @@ func log_line(id: int) -> String:
 	if int(e["r"]) > 0:
 		parts.append("%d번째 판에 처음 뽑음" % int(e["r"]))
 	return " · ".join(parts)
+
+
+# ---------------------------------------------------------------- 검의 기억: 룬·보석·이름 (2026-11-26, docs/sword_memory.md)
+
+const USE_KINDS: PackedStringArray = ["big", "night", "day", "boss", "dash", "hurt", "chain", "elite"]
+
+
+## 수치 표(data/runes.tres). 처음 한 번만 읽는다.
+static func rt() -> RuneTable:
+	if _rt == null:
+		_rt = load("res://data/runes.tres") as RuneTable if ResourceLoader.exists("res://data/runes.tres") else RuneTable.new()
+	return _rt
+
+
+func _load_carve(d: Dictionary) -> void:
+	sword_memory = {}
+	sword_runes = {}
+	sword_gems = {}
+	sword_names = {}
+	gem_bag = {}
+	var sm: Variant = d.get("sword_memory", {})
+	if sm is Dictionary:
+		for k in sm:
+			if sm[k] is Dictionary:
+				var e: Dictionary = {}
+				for u in USE_KINDS:
+					e[u] = maxi(0, int((sm[k] as Dictionary).get(u, 0)))
+				sword_memory[str(k)] = e
+	var sr: Variant = d.get("sword_runes", {})
+	if sr is Dictionary:
+		for k in sr:
+			if sr[k] is Array:
+				var list: Array = []
+				for x in sr[k]:
+					if rt().runes.has(str(x)) and not list.has(str(x)):
+						list.append(str(x))
+				sword_runes[str(k)] = list
+	var sg: Variant = d.get("sword_gems", {})
+	if sg is Dictionary:
+		for k in sg:
+			if sg[k] is Array:
+				var list: Array = []
+				for x in sg[k]:
+					if rt().valid_gem(str(x)):
+						list.append(str(x))
+				sword_gems[str(k)] = list.slice(0, rt().sockets[rt().sockets.size() - 1])
+	var sn: Variant = d.get("sword_names", {})
+	if sn is Dictionary:
+		for k in sn:
+			var nm: String = clean_name(str(sn[k]))
+			if nm != "":
+				sword_names[str(k)] = nm
+	var gb: Variant = d.get("gem_bag", {})
+	if gb is Dictionary:
+		for k in gb:
+			if rt().valid_gem(str(k)) and int(gb[k]) > 0:
+				gem_bag[str(k)] = int(gb[k])
+	_mirror()
+
+
+## 화면용 거울을 이 Meta의 것으로 맞춘다.
+func _mirror() -> void:
+	shown_names = sword_names
+	var c: Dictionary = {}
+	for k in sword_runes:
+		c[k] = {"runes": sword_runes[k], "gems": sword_gems.get(k, [])}
+	for k in sword_gems:
+		if not c.has(k):
+			c[k] = {"runes": [], "gems": sword_gems[k]}
+	carvings = c
+
+
+## 화면에 쓸 검 이름: 지은 이름이 있으면 그것, 없으면 원래 이름.
+static func shown_name(d: SwordData) -> String:
+	if d == null:
+		return "?"
+	return String(shown_names.get(str(d.id), d.display_name))
+
+
+## 이름에 쓸 수 있는 글자만 남긴다(한글 음절, 영문, 숫자, 공백). 던파 글꼴이 이 글자를 다 가졌다(상자로 안 보인다). 앞뒤 공백을 자르고 name_max자까지.
+static func clean_name(raw: String) -> String:
+	var out: String = ""
+	for i in raw.length():
+		var c: int = raw.unicode_at(i)
+		if (c >= 0xAC00 and c <= 0xD7A3) or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 32:
+			out += raw[i]
+	return out.strip_edges().left(rt().name_max)
+
+
+func use_note(id: int, kind: String, n: int = 1) -> void:
+	if id <= 0 or not USE_KINDS.has(kind):
+		return
+	var k: String = str(id)
+	if not sword_memory.has(k):
+		var e: Dictionary = {}
+		for u in USE_KINDS:
+			e[u] = 0
+		sword_memory[k] = e
+	sword_memory[k][kind] = int(sword_memory[k][kind]) + n
+
+
+func use_of(id: int, kind: String) -> int:
+	return int(sword_memory.get(str(id), {}).get(kind, 0))
+
+
+## 열린 룬 자리 수(그 검으로 벤 적 수로).
+func rune_slots(id: int) -> int:
+	var k: int = kills_of(id)
+	var n: int = 0
+	for t in rt().slot_kills:
+		if k >= t:
+			n += 1
+	return n
+
+
+func runes_of(id: int) -> Array:
+	return sword_runes.get(str(id), [])
+
+
+## 룬 하나를 고른다: 그 검의 쓰임 중 가장 많이 센 것의 룬(이미 있는 룬은 빼고, 같으면 표 순서, 쓰임이 없으면 표 순서).
+func pick_rune(id: int) -> String:
+	var have: Array = runes_of(id)
+	var best: String = ""
+	var best_n: int = -1
+	for key in rt().rune_order:
+		if have.has(key):
+			continue
+		var n: int = use_of(id, String(rt().runes[key].counter))
+		if n > best_n:
+			best_n = n
+			best = key
+	return best
+
+
+## 열린 자리만큼 룬을 새긴다. 새로 새긴 룬 키들을 돌려준다(알림은 rune_news에도 쌓인다).
+func sync_runes(id: int) -> Array[String]:
+	var out: Array[String] = []
+	if id <= 0:
+		return out
+	var k: String = str(id)
+	while runes_of(id).size() < rune_slots(id):
+		var key: String = pick_rune(id)
+		if key == "":
+			break
+		if not sword_runes.has(k):
+			sword_runes[k] = []
+		sword_runes[k].append(key)
+		out.append(key)
+		rune_news.append("%d|%s" % [id, key])
+	if not out.is_empty():
+		_mirror()
+	return out
+
+
+func take_rune_news(game: GameData) -> String:
+	if rune_news.is_empty():
+		return ""
+	var p: PackedStringArray = rune_news[0].split("|")
+	rune_news.remove_at(0)
+	var d: SwordData = game.sword_by_id(int(p[0]))
+	var nm: String = shown_name(d) if d else "검"
+	return "%s에 %s이(가) 새겨졌다" % [nm, rt().rune_name(p[1])]
+
+
+## 보석 자리 수(룬 개수로).
+func socket_count(id: int) -> int:
+	var n: int = runes_of(id).size()
+	return int(rt().sockets[mini(n, rt().sockets.size() - 1)])
+
+
+func gems_of(id: int) -> Array:
+	return sword_gems.get(str(id), [])
+
+
+## 보석 주머니에 넣는다.
+func gem_add(key: String, n: int = 1) -> bool:
+	if not rt().valid_gem(key) or n <= 0:
+		return false
+	gem_bag[key] = int(gem_bag.get(key, 0)) + n
+	return true
+
+
+## 보석을 박는다. 자리가 없거나 주머니에 없으면 거절하고 이유를 돌려준다("ok", "full", "none", "bad").
+func socket_gem(id: int, key: String) -> String:
+	if not rt().valid_gem(key):
+		return "bad"
+	if int(gem_bag.get(key, 0)) <= 0:
+		return "none"
+	if gems_of(id).size() >= socket_count(id):
+		return "full"
+	var k: String = str(id)
+	if not sword_gems.has(k):
+		sword_gems[k] = []
+	sword_gems[k].append(key)
+	gem_bag[key] = int(gem_bag[key]) - 1
+	if int(gem_bag[key]) <= 0:
+		gem_bag.erase(key)
+	_mirror()
+	return "ok"
+
+
+## 보석을 뺀다(조각 값). 보석은 주머니로 돌아온다. "ok", "poor", "bad".
+func unsocket_gem(id: int, idx: int) -> String:
+	var list: Array = gems_of(id)
+	if idx < 0 or idx >= list.size():
+		return "bad"
+	var key: String = String(list[idx])
+	var fee: int = int(rt().remove_fee[int(key.split(":")[1]) - 1])
+	if shards < fee:
+		return "poor"
+	shards -= fee
+	list.remove_at(idx)
+	gem_add(key)
+	_mirror()
+	return "ok"
+
+
+## 조각으로 보석을 산다. "ok", "poor", "bad".
+func buy_gem(type: String, tier: int) -> String:
+	var key: String = "%s:%d" % [type, tier]
+	if not rt().valid_gem(key):
+		return "bad"
+	var cost: int = int(rt().buy_cost[tier - 1])
+	if shards < cost:
+		return "poor"
+	shards -= cost
+	gem_add(key)
+	return "ok"
+
+
+## 드롭 굴림(Meta.rng): 보스는 drop_boss, 상자는 drop_cache 확률로 보석 하나가 주머니에 든다. 얻은 키를 돌려준다(없으면 "").
+func roll_gem(boss: bool) -> String:
+	var T: RuneTable = rt()
+	if rng.randf() >= (T.drop_boss if boss else T.drop_cache):
+		last_gem = ""
+		return ""
+	var type: String = String(T.gem_order[rng.randi() % T.gem_order.size()])
+	var w: PackedFloat32Array = T.tier_weights_boss if boss else T.tier_weights_cache
+	var x: float = rng.randf()
+	var tier: int = w.size()
+	var acc: float = 0.0
+	for i in w.size():
+		acc += w[i]
+		if x < acc:
+			tier = i + 1
+			break
+	var key: String = "%s:%d" % [type, tier]
+	gem_add(key)
+	last_gem = key
+	return key
+
+
+## 이름을 지을 수 있는가: 룬 name_runes개 이상이거나 무한 등급(마지막 등급).
+func can_name(d: SwordData, grades: GradeTable) -> bool:
+	if d == null:
+		return false
+	return runes_of(d.id).size() >= rt().name_runes or d.grade >= grades.names.size() - 1
+
+
+## 이름을 짓는다(빈 글이면 이름을 지운다). "ok", "locked", "empty"(쓸 수 있는 글자가 하나도 없음).
+func set_sword_name(d: SwordData, raw: String, grades: GradeTable) -> String:
+	if not can_name(d, grades):
+		return "locked"
+	var nm: String = clean_name(raw)
+	if raw.strip_edges() != "" and nm == "":
+		return "empty"
+	if nm == "":
+		sword_names.erase(str(d.id))
+	else:
+		sword_names[str(d.id)] = nm
+	_mirror()
+	return "ok"
+
+
+## 그 검의 수치 합(룬 + 보석): {dmg, night, boss, crit, speed, guard, tough, knock, shard, power}. 없으면 빈 사전.
+func carve_stats(id: int) -> Dictionary:
+	return _sum(runes_of(id), gems_of(id))
+
+
+## 같은 합을 화면 거울(마지막으로 읽은 Meta)에서. Rules·Sword가 쓴다.
+static func carve_of(id: int) -> Dictionary:
+	var c: Variant = carvings.get(str(id))
+	if c == null:
+		return {}
+	return _sum(c.runes, c.gems)
+
+
+static func _sum(runes: Array, gems: Array) -> Dictionary:
+	var out: Dictionary = {}
+	var T: RuneTable = rt()
+	for key in runes:
+		var st: String = T.stat_of_rune(String(key))
+		out[st] = float(out.get(st, 0.0)) + float(T.runes[key].value)
+	for g in gems:
+		var st: String = T.gem_stat(String(g))
+		out[st] = float(out.get(st, 0.0)) + T.gem_value(String(g))
+	return out
+
+
+## 관리 명령 `기억 검번호 수`: 그 검으로 벤 적 수를 정하고 룬을 새긴다.
+func set_memory(id: int, kills: int) -> Array[String]:
+	var e := _log(id)
+	e["k"] = maxi(0, kills)
+	return sync_runes(id)
 
 
 # ---------------------------------------------------------------- 떨군 검 (2026-11-20)
@@ -715,8 +1036,9 @@ static func run_shards(rules: Rules, md: MetaData) -> Dictionary:
 		"goal": rules.goal_shards,
 		"path": rules.path_shards,
 		"chain": rules.chain_paid,
+		"carve": floori(rules.carve_shard),
 	}
-	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal + r.path + r.chain
+	r["total"] = r.kills + r.zone + r.broken + r.elite + r.melt + r.goal + r.path + r.chain + r.carve
 	return r
 
 
@@ -773,6 +1095,7 @@ func field_open(id: String, amount: int) -> int:
 		return 0
 	field_found[id] = 1
 	shards += amount
+	roll_gem(false)   # 상자에서 가끔 보석이 나온다(검의 기억)
 	return amount
 
 
@@ -806,7 +1129,7 @@ func boss_defeat() -> Dictionary:
 	var charm: bool = not pack.has(FieldLayout.BOSS_CHARM)
 	if charm:
 		pack.append(FieldLayout.BOSS_CHARM)
-	return {"shards": n, "first": first, "charm": charm}
+	return {"shards": n, "first": first, "charm": charm, "gem": roll_gem(true)}
 
 
 ## 곳마다 우두머리(32단계)를 쓰러뜨렸다. 처음이면 조각 CHIEF_FIRST_SHARDS와 그 곳의 오픈월드 한정 검(도감에 든다),
@@ -824,6 +1147,7 @@ func chief_defeat(id: String) -> Dictionary:
 	if r.first:
 		r.sword = int(FieldLayout.CHIEFS[id].sword)
 		note_found(r.sword)
+	r["gem"] = roll_gem(true)
 	return r
 
 
@@ -1203,6 +1527,7 @@ func crypt_open(id: String) -> Dictionary:
 		n = rng.randi_range(CryptLayout.COFFIN_MIN, CryptLayout.COFFIN_MAX)
 	shards += n
 	r.shards = n
+	r["gem"] = roll_gem(false)
 	return r
 
 

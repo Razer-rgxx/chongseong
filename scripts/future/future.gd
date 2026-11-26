@@ -516,6 +516,9 @@ func _leave() -> void:
 
 
 func _memory_toast(d: SwordData, tier: int) -> void:
+	var rune_text: String = meta.take_rune_news(data)   # 검의 기억: 새 룬 알림
+	if rune_text != "":
+		_hud.toast(rune_text)
 	if tier <= 0 or d == null:
 		return
 	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])

@@ -1320,6 +1320,8 @@ func _build_dropped() -> void:
 	add_child(root)
 	var col: Color = data.grades.colors[d.grade] if d and d.grade < data.grades.colors.size() else Color(0.9, 0.9, 0.9)
 	var sw := SwordModel.make(data.forms[d.form] if d else null, d.grade if d else 0, d.id if d else 1, col)
+	if d:
+		sw.carve_saved(d.id)
 	sw.basis = Basis.from_euler(Vector3(PI + 0.18, 0.4, 0.1))
 	sw.position = Vector3(0.0, 0.5, 0.0)
 	root.add_child(sw)
@@ -1391,6 +1393,9 @@ static func _dot_texture() -> GradientTexture2D:
 
 ## 검의 기억 단계를 넘었다: 한 줄과 낮은 울림(올라가는 소리 없음). 피해 배수는 다음에 쥐고 나갈 때부터.
 func _memory_toast(d: SwordData, tier: int) -> void:
+	var rune_text: String = meta.take_rune_news(data)   # 검의 기억: 새 룬 알림
+	if rune_text != "":
+		_hud.toast(rune_text)
 	if tier <= 0 or d == null:
 		return
 	_hud.toast("%s · 벤 적 %d" % [meta.memory_title(d), int(Meta.MEMORY[tier - 1][0])])

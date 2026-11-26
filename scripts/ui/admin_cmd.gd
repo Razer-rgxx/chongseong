@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "보석"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -51,6 +51,10 @@ static func describe(cmd: Dictionary) -> String:
 			return "닻 0~6 (미래 2막: 0 처음, 1~5 기록을 그만큼 읽음, 6 대수확자를 쓰러뜨림. 1 이상이면 1막도 마친 것으로)"
 		"첫닻":
 			return "첫닻 0~6 (과거 3막: 0 처음, 1~4 기억의 돌을 그만큼 읽음, 5 아라 선장의 맹세까지(미래 2막도 마친 것으로), 6 흑룡을 쓰러뜨린 뒤 = 선장이 남긴 손, 선장은 떠남. 장면은 5로 맞추고 봉인 제단에서 흑룡을 쓰러뜨려야 본다)"
+		"기억":
+			return "기억 검번호 벤적수 (예: 기억 1 1000 = 그 검의 벤 적을 1000으로 하고 룬 셋을 새긴다. 이름도 지을 수 있다. 쓰임이 없으면 룬은 표 순서)"
+		"보석":
+			return "보석 홍옥|자수정|청금석|호박|흑요석|월장석 1~3 (주머니에 하나 넣는다. 대장간 E의 보석 박기 탭에서 박는다)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -126,6 +130,24 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.set_story(int(a[0]))
 			meta.save()
 			return "관리: 이야기 %d (조각 %d/3%s%s)" % [meta.story(), meta.story_shards.size(), ", 금고 열림" if meta.vault_open else "", ", 타임트래블러" if meta.time_traveller else ""]
+		"기억":
+			if meta == null or a.size() < 2 or not a[0].is_valid_int() or not a[1].is_valid_int():
+				return "기억 검번호 벤적수를 적으세요."
+			var got: Array[String] = meta.set_memory(int(a[0]), int(a[1]))
+			meta.save()
+			return "관리: 검 %d 벤 적 %d · 룬 %d개%s" % [int(a[0]), int(a[1]), meta.runes_of(int(a[0])).size(), (" (새로 " + ", ".join(got.map(func(k: String) -> String: return Meta.rt().rune_name(k))) + ")") if not got.is_empty() else ""]
+		"보석":
+			if meta == null or a.size() < 2 or not a[1].is_valid_int():
+				return "보석 종류와 단계(1~3)를 적으세요."
+			var type: String = ""
+			for k in Meta.rt().gems:
+				if a[0] == String(k) or a[0] == String(Meta.rt().gems[k].name):
+					type = String(k)
+			var key: String = "%s:%d" % [type, int(a[1])]
+			if type == "" or not meta.gem_add(key):
+				return "보석 종류(홍옥 자수정 청금석 호박 흑요석 월장석)와 단계 1~3을 확인하세요."
+			meta.save()
+			return "관리: %s을(를) 주머니에 넣었다" % Meta.rt().gem_name(key)
 		"닻":
 			if meta == null or a.is_empty() or not a[0].is_valid_int():
 				return "닻 0~6을 적으세요."

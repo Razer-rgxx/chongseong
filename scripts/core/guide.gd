@@ -27,6 +27,8 @@ const STEPS: Array[Dictionary] = [
 	{"id": "pack", "ch": 2, "title": "무리 하나 쓰러뜨리기", "goal": "들판에 서성이는 적 무리를 모두 쓰러뜨린다", "need": 1, "reward": {"shards": 10, "mats": {"iron": 2}}, "hint": {"field": "pack"}},
 	{"id": "stable_horse", "ch": 2, "title": "검 받침터와 탈 검", "goal": "마을 바깥 터에 검 받침터를 짓고, 들판에서 H로 탈 검을 부른다", "need": 2, "reward": {"shards": 15}, "hint": {"lobby": "stable"}},
 	{"id": "stranger", "ch": 2, "title": "낯선 사람 만나기", "goal": "들판을 거닐다 마주치는 총 든 낯선 사람을 만난다", "need": 1, "reward": {"shards": 10}, "hint": {"field": "stranger"}},
+	{"id": "first_rune", "ch": 2, "title": "검에 첫 룬 새기기", "goal": "한 검으로 적을 100마리 벤다(어디서든). 룬이 저절로 새겨진다", "need": 1, "reward": {"shards": 15}},
+	{"id": "gem_socket", "ch": 0, "title": "보석 박기", "goal": "대장간 E의 보석 탭에서 룬이 새겨진 검에 보석을 박는다(보석은 우두머리·상자에서 가끔 나오고 조각으로도 산다)", "need": 1, "reward": {"shards": 20}, "hint": {"lobby": "forge"}},
 	{"id": "future", "ch": 3, "title": "녹슨 미래로", "goal": "들판에 열린 갈라진 틈에서 E를 눌러 건너간다", "need": 1, "reward": {"shards": 20}, "hint": {"field": "rift"}, "hidden": true},
 	{"id": "traveller", "ch": 3, "title": "시간을 건너는 사람", "goal": "미래의 이야기를 따라가 타임트래블러를 만난다", "need": 1, "reward": {"shards": 30}, "hidden": true},
 ]
@@ -78,6 +80,8 @@ static func count(i: int, m: Meta) -> int:
 		"stranger": n = 1 if m.stranger_seen >= 1 else 0
 		"future": n = _ev(m, "future_enter")
 		"traveller": n = 1 if m.time_traveller else 0
+		"first_rune": n = 1 if m.sword_runes.values().any(func(v): return not (v as Array).is_empty()) else 0
+		"gem_socket": n = 1 if m.sword_gems.values().any(func(v): return not (v as Array).is_empty()) else 0
 	return mini(n, int(s.need))
 
 

@@ -630,6 +630,7 @@ func _build_rack() -> void:
 	for k in show.size():
 		var sd: SwordData = show[k]
 		var m := SwordModel.make(data.forms[sd.form], sd.grade, sd.id, data.grades.colors[sd.grade])
+		m.carve_saved(sd.id)
 		m.position = at + Vector3(0, 0.5, -2.0 + k * gap)
 		m.rotation.x = 0.12
 		add_child(m)

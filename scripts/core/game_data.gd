@@ -11,6 +11,7 @@ var unarmed: FormData
 var meta: MetaData
 ## 각인과 고유 능력의 정해진 수치.
 var powers: PowerTable
+var runes: RuneTable
 ## 마을 컨텐츠(15단계): 의뢰, 상인, 주민.
 var village: VillageData
 ## 1대1 결투(21단계)의 수치.
@@ -48,6 +49,7 @@ static func load_default() -> GameData:
 	d.grades = load(DIR + "grades.tres") as GradeTable
 	d.unarmed = load(DIR + "unarmed.tres") as FormData
 	d.meta = load(DIR + "meta.tres") as MetaData
+	d.runes = load(DIR + "runes.tres") as RuneTable if ResourceLoader.exists(DIR + "runes.tres") else RuneTable.new()
 	d.powers = load(DIR + "powers.tres") as PowerTable if ResourceLoader.exists(DIR + "powers.tres") else PowerTable.new()
 	d.village = load(DIR + "village.tres") as VillageData
 	d.hill_zone = load(DIR + "hill_zone.tres") as HillZoneData if ResourceLoader.exists(DIR + "hill_zone.tres") else null

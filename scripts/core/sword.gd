@@ -39,7 +39,16 @@ func _init(d: SwordData, game: GameData) -> void:
 		max_durability = roundf(game.grades.durability[grade] * form.durability * (1.0 + tough / 100.0))
 		if d.cyber and game.powers:   # 2026-11-26: 사이버 검은 내구가 적다(PowerTable.cyber_durability)
 			max_durability = maxf(1.0, roundf(max_durability * game.powers.cyber_durability))
+	_carve_tough()
 	durability = max_durability
+
+
+## 룬·보석의 내구 배수(검의 기억). 검집 강화가 내구를 다시 정한 뒤에도 부른다.
+func _carve_tough() -> void:
+	var t: float = float(Meta.carve_of(data.id).get("tough", 0.0))
+	if t > 0.0 and max_durability > 0.0:
+		max_durability = roundf(max_durability * (1.0 + t))
+		durability = max_durability
 
 
 func breakable() -> bool:
@@ -53,7 +62,7 @@ func damage(game: GameData) -> float:
 
 ## 화면에 쓸 이름(검집 단계가 붙는다).
 func label() -> String:
-	return ("+%d " % sheath_lv if sheath_lv > 0 else "") + data.display_name
+	return ("+%d " % sheath_lv if sheath_lv > 0 else "") + Meta.shown_name(data)
 
 
 ## 각인 하나를 이 검의 등급 수치로 붙인다. 이미 있으면 아무 일도 없다.
