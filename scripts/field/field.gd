@@ -227,6 +227,7 @@ func _ready() -> void:
 	_camera.snap()
 	_light(0.0, true)
 	_capture(true)
+	GuideHud.attach(self, meta, rules, "field", _hud, guide_spot, _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, env, _sun, _camera)   # 웹판에서만 가볍게
 	FieldMap.prepare()   # 38단계: 지도의 땅 그림(세션에 한 번, 첫 M이 멈칫하지 않게)
 
@@ -640,6 +641,33 @@ func _prompt(key: String) -> String:
 	if key.begins_with("mat_"):
 		return {&"wood": "나무를 벤다", &"stone": "돌을 깬다", &"iron": "녹슨 쇠를 거둔다"}[FieldLayout.MATS[int(key.substr(4))][1]]
 	return "쇳조각을 줍는다"
+
+
+## 길라잡이 방향 띠가 가리킬 자리(칸 좌표). 모르면 Vector2.INF. 틈은 열린 뒤에만(Meta.rift_open).
+func guide_spot(id: String) -> Vector2:
+	var me: Vector2 = rules.lord.pos
+	var best: Vector2 = Vector2.INF
+	var bd: float = INF
+	match id:
+		"trail": return FieldLayout.TRAILHEAD
+		"cache":
+			for k in FieldLayout.CACHES:
+				if not meta.field_found.has(k) and me.distance_to(FieldLayout.CACHES[k][0]) < bd:
+					bd = me.distance_to(FieldLayout.CACHES[k][0])
+					best = FieldLayout.CACHES[k][0]
+		"pack":
+			for k in FieldLayout.PACKS:
+				var at: Vector2 = FieldLayout.PACKS[k].at
+				if not meta.packs_cleared.has(k) and me.distance_to(at) < bd:
+					bd = me.distance_to(at)
+					best = at
+		"stranger":
+			if is_instance_valid(_st):
+				return Grid.world_to_cells(_st.position)
+		"rift":
+			if meta.rift_open():
+				return FutureLayout.RIFT_FIELD
+	return best
 
 
 func _interact() -> void:

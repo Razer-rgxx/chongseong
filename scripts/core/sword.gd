@@ -37,6 +37,8 @@ func _init(d: SwordData, game: GameData) -> void:
 	else:
 		var tough: float = float(ins.get("단단함", 0.0)) + float(ins.get("투박함", 0.0))
 		max_durability = roundf(game.grades.durability[grade] * form.durability * (1.0 + tough / 100.0))
+		if d.cyber and game.powers:   # 2026-11-26: 사이버 검은 내구가 적다(PowerTable.cyber_durability)
+			max_durability = maxf(1.0, roundf(max_durability * game.powers.cyber_durability))
 	durability = max_durability
 
 

@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"drake"
+kind = &"charger"
+display_name = "비룡"
+hp = 60
+damage = 16
+speed = 2.0
+radius = 0.4
+cooldown = 1.5
+color = Color(0.36, 0.2, 0.16, 1)
+knockback_mult = 1.0
+big = false
+wraith = false
+boss = false
+token_cost = 2
+wait_range = 5.5
+charge_min = 3.0
+charge_max = 8.0
+wind_time = 0.7
+charge_speed = 13.0
+charge_length = 9.0
+charge_knock = 6.0
+stagger_time = 1.0
+stagger_mult = 1.5
+past = true

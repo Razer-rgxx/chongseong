@@ -84,7 +84,10 @@ extends Resource
 	"조준": {"mult": 1.5, "hp": 0.9},
 }
 ## 사이버 능력 피해 배수가 등급(0~5)마다 이만큼씩 오른다(1 + 이 값 × 등급).
-@export var cyber_grade_scale: float = 0.12
+## 2026-11-26 밸런스(scripts/debug/balance_sim.gd): 0.12에서 같은 등급 일반 검보다 잃는 체력이 25%쯤 적어서 0.09로.
+@export var cyber_grade_scale: float = 0.09
+## 사이버 검의 내구 배수(2026-11-26): 다시 벼린 옛 칼이라 쉽게 부러진다. 세지만 빨리 닳는 맞바꿈.
+@export var cyber_durability: float = 0.75
 ## 낯선 사람 이야기를 마친 뒤 언덕 뽑기에서 사이버 검이 나올 확률.
 @export var cyber_pull_share: float = 0.25
 

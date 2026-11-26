@@ -133,6 +133,7 @@ func _ready() -> void:
 		_titled = true
 		_hud.area_title("녹슨 미래")
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _hud.toast("Tab: 내 검 목록"))
+	GuideHud.attach(self, meta, rules, "future", _hud, Callable(), _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, env, built.sun, _camera)
 
 
@@ -266,6 +267,10 @@ func _spots() -> Dictionary:
 			s["hilt%d" % i] = _cyber_hilts[i].pos
 	s["vault"] = Story.VAULT_AT
 	s["lock"] = Story.TIME_LOCK_AT
+	for i in StoryNeon.LOGS.size():   # 미래 2막(2026-11-26)
+		s["log%d" % i] = StoryNeon.LOGS[i].at
+	s["fixer"] = StoryNeon.FIXER_AT
+	s["stop"] = StoryNeon.STOP_AT
 	return s
 
 
@@ -279,6 +284,12 @@ func _prompt(key: String) -> String:
 			return "봉인 단말을 건드린다"
 		"lock":
 			return "시간 고정 단말을 건드린다"
+		"fixer":
+			return "정보상 %s와 말한다" % StoryNeon.FIXER_NAME
+		"stop":
+			return "정지 단말을 건드린다"
+	if key.begins_with("log"):
+		return "기록 단말을 읽는다"
 	if key.begins_with("shard"):
 		return "자료 조각을 줍는다"
 	if key.begins_with("hilt"):
@@ -310,6 +321,12 @@ func _interact() -> void:
 		_use_vault()
 	elif _near == "lock":
 		_use_lock()
+	elif _near.begins_with("log"):
+		_read_log(int(_near.substr(3)))
+	elif _near == "fixer":
+		_hud.say(StoryNeon.FIXER_NAME, StoryNeon.fixer_line(meta.neon_logs.size(), meta.time_traveller, meta.harvest_down), true)
+	elif _near == "stop":
+		_use_stop()
 	elif _near == "cache":
 		var got: int = meta.future_cache()
 		if got > 0:
@@ -521,12 +538,18 @@ func _build_story() -> void:
 	_vault = StoryProps.vault(self, Grid.cells_to_world(Story.VAULT_AT), meta.vault_open)
 	if meta.vault_open and not meta.time_traveller:
 		_spawn_guardian()
+	# 미래 2막 「닻 공사」(2026-11-26): 기록 단말 다섯, 정보상, 정지 단말(금고와 같은 판, 멈추면 푸름)
+	for i in StoryNeon.LOGS.size():
+		_log_nodes[i] = StoryProps.log_terminal(self, Grid.cells_to_world(StoryNeon.LOGS[i].at), meta.neon_logs.has(i))
+	StoryProps.fixer(self, Grid.cells_to_world(StoryNeon.FIXER_AT))
+	_stop = StoryProps.vault(self, Grid.cells_to_world(StoryNeon.STOP_AT), meta.harvest_down)
 
 
 ## 꽂힌 낯선 검 셋(docs/cyber_swords.md): 들를 때마다 사이버 검 셋이 서고(CyberSwords.roll_future), 무엇인지 보인다. E로 뽑으면 도감에 오른다.
 func _build_cyber_hilts() -> void:
-	var ids: Array[int] = CyberSwords.roll_future(rules)
-	for i in ids.size():
+	var ids: Array[int] = meta.future_set(rules)   # 2026-11-26: 언덕 판 하나 마칠 때마다 새로(드나들어도 같다)
+	_saved()
+	for i in mini(ids.size(), FutureLayout.CYBER_HILTS.size()):
 		var h := Hilt.new()
 		h.id = 900 + i
 		h.pos = FutureLayout.CYBER_HILTS[i]
@@ -546,6 +569,7 @@ func _pull_cyber_hilt(i: int) -> void:
 	var sd: SwordData = h.sword.data
 	var fresh: bool = not meta.has_found(sd.id)
 	meta.note_found(sd.id)
+	meta.take_future_hilt(sd.id)
 	var col: Color = data.grades.colors[sd.grade]
 	_sfx.play(&"crack", Grid.cells_to_world(h.pos), -2.0, 0.8)
 	_hud.flash(Color(0.4, 0.75, 1.0), 0.25, 0.5)
@@ -603,7 +627,67 @@ func _use_lock() -> void:
 
 
 ## 금고지기가 쓰러졌다: 낯선 사람이 마지막으로 서서 말하고 타임트래블러를 준다(한 번만).
-func _on_guardian(_e: Enemy) -> void:
+var _log_nodes: Dictionary = {}
+var _stop: Node3D = null
+
+
+func _read_log(i: int) -> void:
+	if i < 0 or i >= StoryNeon.LOGS.size():
+		return
+	var fresh: bool = meta.read_log(i)
+	if fresh:
+		StoryProps.set_read(_log_nodes[i], true)
+		_sfx.play(&"glitch", Grid.cells_to_world(StoryNeon.LOGS[i].at), -6.0)
+		_hud.flash(Color(0.35, 0.85, 1.0), 0.12, 0.4)
+		_saved()
+	_hud.say("", String(StoryNeon.LOGS[i].text), true)
+
+
+func _use_stop() -> void:
+	if meta.harvest_down:
+		_hud.toast(StoryNeon.STOP_DONE)
+	elif rules.field_boss != null and not rules.field_boss.dead:
+		_hud.toast(StoryNeon.STOP_BUSY)
+	elif meta.neon_logs.size() < StoryNeon.LOGS.size():
+		_hud.toast(StoryNeon.STOP_LOGS % [meta.neon_logs.size(), StoryNeon.LOGS.size()])
+	elif not meta.time_traveller:
+		_hud.toast(StoryNeon.STOP_SIGN)
+	else:
+		_sfx.play(&"thump", Grid.cells_to_world(StoryNeon.STOP_AT), -2.0, 0.5)
+		_camera.add_shake(0.5)
+		_hud.flash(Color(1.0, 0.3, 0.6), 0.3, 0.8)
+		_hud.say("", StoryNeon.STOP_WAKE, true)
+		rules.spawn_field_boss(StoryNeon.HARVESTER_AT, StoryNeon.HARVESTER_ID, StoryNeon.HARVESTER_ZONE)
+
+
+## 대수확자를 쓰러뜨렸다: 정지 단말이 푸르게, 낯선 사람(7714)이 정체를 밝히고 과거를 가리킨다.
+func _on_harvester() -> void:
+	if not meta.harvester_slain():
+		return
+	_saved()
+	if _stop:
+		StoryProps.set_open(_stop, true)
+	var st := StrangerView.make(self, Grid.cells_to_world(StoryNeon.FINAL_AT), _lord.position)
+	for line in StoryNeon.FINAL_LINES:
+		if not is_inside_tree():
+			return
+		_hud.say("7714", line, true)
+		await get_tree().create_timer(3.2).timeout
+	if not is_inside_tree():
+		return
+	_hud.say("", StoryNeon.GOT_LINE % StoryNeon.REWARD_SHARDS, true)
+	_hud.refresh_top()
+	_sfx.play(&"glitch", _lord.position, -2.0)
+	st.fade()
+	await get_tree().create_timer(3.2).timeout
+	if is_inside_tree():
+		_hud.say_end()
+
+
+func _on_guardian(e: Enemy) -> void:
+	if e and e.data and e.data.id == StoryNeon.HARVESTER_ID:
+		_on_harvester()
+		return
 	if _final_on or not meta.guardian_slain():
 		return
 	_final_on = true

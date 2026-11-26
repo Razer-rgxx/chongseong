@@ -185,7 +185,23 @@ func _ready() -> void:
 		_hud.toast(Meta.wake_note if Meta.wake_note != "" else "들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
 		Meta.wake_note = ""
 	_capture(true)
+	GuideHud.attach(self, meta, rules, "lobby", _hud, guide_spot, _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
+
+
+## 길라잡이 방향 띠가 가리킬 자리(칸 좌표). 모르면 Vector2.INF.
+func guide_spot(id: String) -> Vector2:
+	match id:
+		"v_gatekeeper": return VILLAGERS[&"gatekeeper"][0]
+		"rack": return rack_at
+		"gate": return gate_at
+		"forge": return forge_at
+		"board": return board_at
+		"yard": return yard_area.get_center()
+		"stable":
+			var b: BuildingData = data.building(&"stable")
+			return b.plot if b != null and not meta.has_built(&"stable") else Vector2.INF
+	return Vector2.INF
 
 
 func _capture(on: bool) -> void:
@@ -1146,6 +1162,7 @@ func _on_dummy_hit(e: Enemy, damage: float, big: bool) -> void:
 	_wobble_dir[i] = d.normalized() if d.length() > 0.01 else Vector3.RIGHT
 	_wobble[i] = 1.0
 	_yard_hits.append([_clock, damage])
+	meta.guide_note("yard")
 	if _yard_hits.size() > 400:
 		_yard_hits = _yard_hits.slice(200)
 	var t := FloatText.new()

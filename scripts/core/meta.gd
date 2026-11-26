@@ -109,6 +109,17 @@ var stranger_drop: int = -1
 var story_shards: Array[int] = []
 var vault_open: bool = false
 var time_traveller: bool = false
+## 미래 2막 「닻 공사」(2026-11-26, StoryNeon): 읽은 기록 단말 번호, 대수확자를 쓰러뜨렸나.
+var neon_logs: Array[int] = []
+var harvest_down: bool = false
+## 미래 구역의 꽂힌 검(2026-11-26): 지금 선 번호들(뽑으면 빠진다)과 굴린 때의 판 수(runs). 판이 늘면 다시 굴린다.
+var future_hilts: Array[int] = []
+var future_roll_run: int = -1
+## 과거 3막 「첫 닻」(2026-11-26, StoryPast): 읽은 기억의 돌, 짐승을 쓰러뜨렸나(= 닻의 손 축복).
+var past_memories: Array[int] = []
+var anchor_hand: bool = false
+## 닻의 선장의 맹세(기억 넷 + 미래 2막 뒤 선착장에서 받는다). 없으면 봉인 제단이 안 열린다.
+var captain_oath: bool = false
 ## 과거 신화 구역(5단계): 다시 벼린 검 번호(문자열) → 1. 검마다 한 번, 검집에서 꺼낸 검의 내구 +PastLayout.REFORGE_DUR.
 var reforged: Dictionary = {}
 var time_lock: bool = false
@@ -119,6 +130,12 @@ var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
 ## 결투 기록(21단계, 저장): 같은 PC에서는 1P를 나로 센다. 비긴 결투는 세지 않는다. 옛 저장은 0으로 읽힌다.
 var duel_wins: int = 0
+## 길라잡이(2026-11-26, scripts/core/guide.gd): 끝난 단계(id → 1), 장면이 센 일(이름 → 횟수), 옛 저장 정리 여부, 추적 줄 접기.
+var guide_done: Dictionary = {}
+var guide_ev: Dictionary = {}
+var guide_init: bool = false
+var guide_step: int = 0
+var guide_fold: bool = false
 var duel_losses: int = 0
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
@@ -181,7 +198,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "time_lock": time_lock, "reforged": reforged}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -336,6 +353,24 @@ func from_dict(d: Dictionary) -> void:
 			story_shards.append(si)
 	vault_open = bool(d.get("vault_open", false)) and story_shards.size() >= Story.SHARDS.size()
 	time_traveller = bool(d.get("time_traveller", false))
+	neon_logs = []
+	for k in d.get("neon_logs", []):
+		var li: int = int(k)
+		if li >= 0 and li < StoryNeon.LOGS.size() and not neon_logs.has(li):
+			neon_logs.append(li)
+	harvest_down = bool(d.get("harvest_down", false)) and time_traveller
+	future_hilts = []
+	for k in d.get("future_hilts", []):
+		if CyberSwords.is_cyber(int(k)):
+			future_hilts.append(int(k))
+	future_roll_run = int(d.get("future_roll_run", -1))
+	past_memories = []
+	for k in d.get("past_memories", []):
+		var pi: int = int(k)
+		if pi >= 0 and pi < StoryPast.MEMORIES.size() and not past_memories.has(pi):
+			past_memories.append(pi)
+	anchor_hand = bool(d.get("anchor_hand", false)) and harvest_down
+	captain_oath = (bool(d.get("captain_oath", false)) and harvest_down) or anchor_hand
 	time_lock = bool(d.get("time_lock", false))
 	reforged = {}
 	for k in d.get("reforged", {}):
@@ -348,6 +383,18 @@ func from_dict(d: Dictionary) -> void:
 	crypt_opened = {}
 	for k in d.get("crypt_opened", {}):
 		crypt_opened[str(k)] = 1
+	guide_init = d.has("guide_done")   # 길라잡이가 없던 옛 저장은 처음 읽을 때 이미 이룬 것을 보상 없이 끝낸다
+	guide_done = {}
+	for k in d.get("guide_done", {}):
+		if Guide.index_of(str(k)) >= 0:
+			guide_done[str(k)] = 1
+	guide_ev = {}
+	var gev: Variant = d.get("guide_ev", {})
+	if gev is Dictionary:
+		for k in gev:
+			guide_ev[str(k)] = maxi(0, int(gev[k]))
+	guide_step = int(d.get("guide_step", 0))
+	guide_fold = bool(d.get("guide_fold", false))
 	duel_wins = int(d.get("duel_wins", 0))
 	duel_losses = int(d.get("duel_losses", 0))
 	field_seen = Meta.empty_seen()
@@ -359,6 +406,11 @@ func from_dict(d: Dictionary) -> void:
 
 
 ## 결투가 끝났다(winner: 0은 1P가 이김, 1은 2P가 이김, 그 밖은 비김). 1P를 나로 센다.
+## 길라잡이가 셀 일 하나를 적는다(장면이 부른다. 규칙은 바꾸지 않는다).
+func guide_note(ev: String, n: int = 1) -> void:
+	guide_ev[ev] = int(guide_ev.get(ev, 0)) + n
+
+
 func record_duel(winner: int) -> void:
 	if winner == 0:
 		duel_wins += 1
@@ -579,6 +631,7 @@ func forge_sheath(game: GameData) -> Dictionary:
 		return r
 	shards -= sheath_cost(md)
 	r.paid = true
+	guide_note("spend")
 	var before: int = sheath_lv
 	if rng.randf() * 100.0 < sheath_rate(md):
 		sheath_lv += 1
@@ -634,6 +687,7 @@ func forge_bless(md: MetaData, key: String) -> Dictionary:
 		return r
 	shards -= bless_cost(md, key)
 	r.paid = true
+	guide_note("spend")
 	if rng.randf() * 100.0 < bless_rate(md, key):
 		bless[key] = bless_level(key) + 1
 		r.ok = true
@@ -992,6 +1046,77 @@ func guardian_slain() -> bool:
 	return true
 
 
+## 미래 구역에 설 꽂힌 검 번호들: 마지막으로 굴린 뒤 언덕 판을 하나라도 마쳤으면(runs가 늘었으면) 새로 굴리고, 아니면 남은 것 그대로.
+## 대수확자를 쓰러뜨렸으면 더 좋은 운(CyberSwords.FUTURE_LUCK_FREED). 저장은 부른 쪽이.
+func future_set(rules: Rules) -> Array[int]:
+	if future_roll_run != runs:
+		future_hilts = CyberSwords.roll_future(rules, CyberSwords.FUTURE_LUCK_FREED if harvest_down else CyberSwords.FUTURE_LUCK)
+		future_roll_run = runs
+	return future_hilts.duplicate()
+
+
+## 미래의 꽂힌 검 하나를 뽑았다: 다음 판까지 다시 안 선다.
+func take_future_hilt(id: int) -> void:
+	future_hilts.erase(id)
+
+
+## 과거 3막: 기억의 돌 i를 읽는다(처음이면 참, 저장은 부른 쪽이).
+func read_memory(i: int) -> bool:
+	if i < 0 or i >= StoryPast.MEMORIES.size() or past_memories.has(i):
+		return false
+	past_memories.append(i)
+	return true
+
+
+## 닻의 선장이 맹세를 받는다: 기억 넷 + 미래 2막(대수확자)을 마쳤고 아직 안 받았을 때만 참(저장은 부른 쪽이).
+func swear_oath() -> bool:
+	if captain_oath or past_memories.size() < StoryPast.MEMORIES.size() or not harvest_down:
+		return false
+	captain_oath = true
+	return true
+
+
+## 용의 산맥 둥지의 보물 더미: 조각 PastLayout.HOARD_SHARDS개를 한 번만.
+func dragon_hoard() -> int:
+	return field_open(PastLayout.HOARD_ID, PastLayout.HOARD_SHARDS)
+
+
+## 흑룡을 깨울 수 있는가: 기억 넷 + 미래 2막(대수확자) + 선장의 맹세, 아직 안 쓰러뜨렸다.
+func beast_ready() -> bool:
+	return past_memories.size() >= StoryPast.MEMORIES.size() and harvest_down and captain_oath and not anchor_hand
+
+
+## 흑룡을 쓰러뜨렸다: 깨울 수 있었을 때만 한 번, 닻의 손과 조각.
+func beast_slain() -> bool:
+	if not beast_ready():
+		return false
+	anchor_hand = true
+	shards += StoryPast.REWARD_SHARDS
+	return true
+
+
+## 미래 2막: 기록 단말 i를 읽는다(처음이면 참, 저장은 부른 쪽이).
+func read_log(i: int) -> bool:
+	if i < 0 or i >= StoryNeon.LOGS.size() or neon_logs.has(i):
+		return false
+	neon_logs.append(i)
+	return true
+
+
+## 대수확자를 깨울 수 있는가: 기록을 다 읽고, 1막(타임트래블러)을 마쳤고, 아직 안 쓰러뜨렸다.
+func harvester_ready() -> bool:
+	return neon_logs.size() >= StoryNeon.LOGS.size() and time_traveller and not harvest_down
+
+
+## 대수확자를 쓰러뜨렸다: 깨울 수 있었을 때만 한 번, 조각 StoryNeon.REWARD_SHARDS.
+func harvester_slain() -> bool:
+	if not harvester_ready():
+		return false
+	harvest_down = true
+	shards += StoryNeon.REWARD_SHARDS
+	return true
+
+
 ## 과거로 건널 수 있는가: 타임트래블러를 가졌으면 연다(정한 것: 낯선 사람이 첫 대장간을 가리킨다. 따로 물건을 두지 않았다).
 func past_open() -> bool:
 	return time_traveller
@@ -1261,6 +1386,7 @@ func take_quest(i: int) -> bool:
 	if quest_active >= 0 or i < 0 or i >= quest_board.size():
 		return false
 	quest_active = i
+	guide_note("quest")
 	return true
 
 

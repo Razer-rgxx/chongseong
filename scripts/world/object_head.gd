@@ -9,6 +9,7 @@ const FOR_KIND: Dictionary = {
 	&"merchant": &"pouch", &"herbalist": &"mortar", &"gatherer": &"basket", &"hunter": &"antlers",
 	&"knight": &"helm", &"gatekeeper": &"spear", &"pilgrim": &"candle", &"drunk": &"jug",
 	&"peasant": &"bucket", &"peasant2": &"wheat", &"peasant3": &"pot", &"peasant4": &"wheat",
+	&"captain": &"anchor",
 }
 
 var bone_name: String = ""
@@ -131,6 +132,11 @@ static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	mod.holder = holder
 	if obj == &"hill":
 		mod.size = 1.7   # 주인공 머리는 눈에 띄게
+	elif obj == &"anchor":
+		# 닻의 선장(사용자 "머리가 조금 더 자연스럽게", 사진 속 등불머리처럼): 사람 머리 크기에 가깝게 줄이고, 흰 주름 깃이 받친다
+		mod.size = 0.82
+		collar.material_override = _m(Color(0.9, 0.88, 0.82))
+		collar.scale = Vector3(1.15, 0.7, 1.15)
 	return holder
 
 
@@ -255,6 +261,72 @@ static func build(obj: StringName) -> Node3D:
 			_box(n, Vector3(0.15, 0.36, 0.035), Vector3(0, 0.33, 0), steel)
 			_box(n, Vector3(0.03, 0.3, 0.04), Vector3(0, 0.32, 0), iron)
 			_box(n, Vector3(0.106, 0.106, 0.035), Vector3(0, 0.51, 0), steel, Vector3(0, 0, PI / 4))
+		&"anchor":
+			# 2026-11-26 닻의 선장(과거 수정 호수): 머리가 닻. 이야기대로 첫 닻은 칼이라, 자루는 푸른 룬 홈이 빛나는 칼날이고
+			# 가로대는 금빛 칼코등이, 꼭대기 고리 안에 빛나는 수정. 아래는 목을 감싸듯 휜 검은 쇠 팔과 금테 두른 갈고리,
+			# 팔이 만나는 곳에 푸른 눈 하나, 고리에서 한쪽 팔로 늘어진 짧은 사슬. 사용자: "더 멋있게".
+			var dark := _m(Color(0.1, 0.1, 0.12), 0.85, 0.35)
+			var gold := _m(Color(0.78, 0.6, 0.26), 0.9, 0.3)
+			var rune := _m(Color(0.45, 0.85, 1.0))
+			rune.emission_enabled = true
+			rune.emission = Color(0.4, 0.85, 1.0)
+			rune.emission_energy_multiplier = 1.8
+			var arc: int = 9
+			for k in arc - 1:   # 아래 반원 팔(왼쪽 끝 → 아래 → 오른쪽 끝), 가운데가 두껍다
+				var a0: float = PI * (1.1 + 0.8 * k / float(arc - 1))
+				var a1: float = PI * (1.1 + 0.8 * (k + 1) / float(arc - 1))
+				var p0 := Vector3(cos(a0) * 0.17, 0.19 + sin(a0) * 0.17, 0)
+				var p1 := Vector3(cos(a1) * 0.17, 0.19 + sin(a1) * 0.17, 0)
+				var mid: Vector3 = (p0 + p1) * 0.5
+				var thick: float = 0.06 - absf(k - (arc - 2) * 0.5) * 0.005
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, thick, 0.085), mid, dark, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, 0.01, 0.089), mid + Vector3(0, -thick * 0.5, 0), gold, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+			for sx in [-1.0, 1.0]:   # 갈고리(금테 화살촉, 바깥으로 젖힘)
+				var ang: float = PI * (1.5 - 0.4 * sx)
+				var tip := Vector3(cos(ang) * 0.17, 0.19 + sin(ang) * 0.17, 0)
+				_box(n, Vector3(0.1, 0.1, 0.07), tip + Vector3(0.02 * sx, 0.045, 0), dark, Vector3(0, 0, PI / 4))
+				_box(n, Vector3(0.11, 0.016, 0.05), tip + Vector3(0.045 * sx, 0.07, 0), gold, Vector3(0, 0, -0.75 * sx))
+				_box(n, Vector3(0.016, 0.11, 0.05), tip + Vector3(-0.005 * sx, 0.09, 0), gold, Vector3(0, 0, -0.75 * sx + PI / 2 * 0.0))
+			_ball(n, 0.065, Vector3(0, 0.03, 0), dark, Vector3(1.2, 0.85, 1.1))   # 팔이 만나는 곳(정수리 아래 턱처럼 둥글게)
+			_cyl(n, 0.07, 0.085, 0.07, Vector3(0, -0.03, 0), dark)   # 목에 끼운 쇠 테: 닻이 목에서 자라난 것처럼
+			_cyl(n, 0.088, 0.088, 0.014, Vector3(0, -0.005, 0), gold)
+			_ball(n, 0.026, Vector3(0, 0.04, -0.06), rune)   # 푸른 눈
+			_box(n, Vector3(0.07, 0.4, 0.034), Vector3(0, 0.25, 0), steel)   # 자루 = 칼날
+			_box(n, Vector3(0.012, 0.34, 0.038), Vector3(0, 0.25, 0), rune)   # 룬 홈
+			_box(n, Vector3(0.1, 0.09, 0.06), Vector3(0, 0.08, 0), dark)
+			_box(n, Vector3(0.34, 0.05, 0.08), Vector3(0, 0.44, 0), gold)   # 가로대 = 금빛 칼코등이
+			_box(n, Vector3(0.3, 0.02, 0.084), Vector3(0, 0.44, 0), dark)
+			for sx in [-1.0, 1.0]:
+				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(sx * 0.18, 0.44, 0), gold, Vector3(0, 0, PI / 4))
+			_box(n, Vector3(0.035, 0.07, 0.035), Vector3(0, 0.5, 0), dark)
+			var ring := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.034
+			tm.outer_radius = 0.06
+			ring.mesh = tm
+			ring.material_override = gold
+			ring.position = Vector3(0, 0.575, 0)
+			ring.rotation = Vector3(PI / 2, 0, 0)
+			n.add_child(ring)
+			_ball(n, 0.02, Vector3(0, 0.575, 0), rune, Vector3(1, 1.3, 0.6))   # 고리 안의 수정
+			var link := TorusMesh.new()   # 고리에서 오른팔 쪽으로 늘어진 사슬
+			link.inner_radius = 0.008
+			link.outer_radius = 0.016
+			for k in 7:
+				var t: float = (k + 0.5) / 7.0
+				var q := Vector3(0.0, 0.54, 0.035).lerp(Vector3(0.15, 0.2, 0.035), t) + Vector3(0.03 * sin(t * PI), -0.05 * sin(t * PI), 0)
+				var li := MeshInstance3D.new()
+				li.mesh = link
+				li.material_override = steel
+				li.position = q
+				li.rotation = Vector3(PI / 2 if k % 2 == 0 else 0.0, 0, -0.6)
+				n.add_child(li)
+			var gl := OmniLight3D.new()
+			gl.light_color = Color(0.45, 0.85, 1.0)
+			gl.light_energy = 0.9   # 사진 속 등불처럼 머리 빛이 목장식과 가슴을 비춘다
+			gl.omni_range = 2.4
+			gl.position = Vector3(0, 0.25, -0.18)
+			n.add_child(gl)
 		&"hill":
 			# 주인공: 머리가 "검의 언덕" 그 자체. 검은 돌무더기에 검 다섯 자루가 제각각 기울어 꽂혀 있고,
 			# 갈라진 틈에서 불씨가 새고, 가운데 한 자루(주인의 검)만 우뚝하고 날이 희게 빛난다.

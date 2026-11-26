@@ -818,6 +818,7 @@ func _forge_bless(key: String) -> void:
 # ---------------------------------------------------------------- 진열대(도감)
 
 func open_rack() -> void:
+	meta.guide_note("rack")
 	var t: String = _my_swords()
 	for g in data.grades.names.size():
 		var ids: PackedInt32Array = data.swords_by_grade[g]
