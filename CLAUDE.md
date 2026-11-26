@@ -92,7 +92,7 @@
 
 - 클라우드에서는 Godot 에디터로 직접 플레이할 수 없다. Godot 실행 파일을 받을 수 있으면 헤드리스로 프로젝트를 열어 스크립트 오류와 `tests/`를 확인하고, Xvfb와 gl_compatibility로 화면을 찍어 본다. 받을 수 없으면 그 사실을 정리에 적는다.
 - 손맛(이동, 베기, 넉백, 돌진, 히트스톱)은 사용자가 PC에서 맞춘다. 수치를 리소스로 빼 두는 이유다.
-- 웹판: `python3 docs/web_build.py <godot> <폴더>`가 `export_presets.cfg`의 "Web"(스레드 없음)으로 내보내고, 100MB가 넘는 index.pck를 90MB 조각으로 잘라 index.html이 이어 붙이게 고친다. 그 폴더를 `gh-pages` 가지로 올리면 https://razer-rgxx.github.io/chongseong/ 에서 돈다(웨일북용). 사운드 팩은 공개 웹판에서도 뺀다. GD-Sync 플러그인이 내보낼 때 키 파일(`addons/GD-Sync/keys.cfg`)을 넣는데, 웹판에 둘지는 정식 출시 때 사용자가 정한다(GDD 2.14, 그때까지 그대로). 웹판에서만 `WebQuality`(scripts/world/web_quality.gd, 마을·언덕 _ready 끝)가 그래픽을 가볍게 한다(3D 해상도 0.6, 해 그림자 한 겹, 작은 빛 그림자·번짐 판·빛 번짐 끔, 풀 30%).
+- 웹판: `python3 docs/web_build.py <godot> <폴더>`가 `export_presets.cfg`의 "Web"(스레드 없음)으로 내보내고, 100MB가 넘는 index.pck를 90MB 조각으로 잘라 index.html이 이어 붙이게 고친다. 그 폴더를 `gh-pages` 가지로 올리면 https://razer-rgxx.github.io/chongseong/ 에서 돈다(웨일북용). 사운드 팩은 공개 웹판에서도 뺀다. GD-Sync 플러그인이 내보낼 때 키 파일(`addons/GD-Sync/keys.cfg`)을 넣는데, 웹판에 둘지는 정식 출시 때 사용자가 정한다(GDD 2.14, 그때까지 그대로). 웹판에서만 `WebQuality`(scripts/world/web_quality.gd, 모든 장면 _ready 끝)가 그래픽을 가볍게 한다(3D 해상도 0.5, 해 그림자 끔, 작은 빛 그림자·번짐 판·빛 번짐 끔, 작은 빛은 28m 밖에서 사라지고 대각선 5m 안 물건은 70m 밖에서 안 그림, 풀 30%; project.godot의 `.web` 덮어쓰기로 hiDPI 끔·물체당 빛 3개). 무게는 `scripts/debug/web_profile.gd`로 잰다(`WebQuality.force`).
 - 규칙이 시험판과 같게 도는지 헷갈리면 `prototype/geom_hill.html`을 브라우저로 열어 본다. ` 키로 관리 패널이 열린다.
 
 ## 폴더 구조
