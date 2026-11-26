@@ -12,27 +12,52 @@
 
 ## 표와 저장
 
-- 표: `data/cosmetics.tres` (`CosmeticTable`, 한 줄 = `CosmeticItem`: `id`, `slot`, `title`, `unlock`, `need`, `key`, `style`, `color`, `color2`). `scripts/debug/build_cosmetics.gd`가 만든다(손으로 고치지 않는다: 줄을 고치고 `godot --headless --path . -s scripts/debug/build_cosmetics.gd`). 자리마다 **첫 줄이 기본**이고 처음부터 준다. 41개(망토 14, 머리 13, 베기 빛 14).
+- 표: `data/cosmetics.tres` (`CosmeticTable`, 한 줄 = `CosmeticItem`: `id`, `slot`, `title`, `unlock`, `need`, `key`, `style`, `color`, `color2`). `scripts/debug/build_cosmetics.gd`가 만든다(손으로 고치지 않는다: 줄을 고치고 `godot --headless --path . -s scripts/debug/build_cosmetics.gd`). 자리마다 **첫 줄이 기본**이고 처음부터 준다. 41개(망토 14, 머리 13, 베기 빛 14). 해금 종류에 `secret`(열쇠 = 비밀 id)이 있다.
 - `Meta.cos_owned`(가진 id 배열), `Meta.cos_worn`(자리 → 입은 id, 기본이면 칸이 없다), `Meta.cos_seen`(이미 알린 id). 저장 키 `cos_owned`·`cos_worn`·`cos_seen`. 옛 저장은 세 칸 모두 빈 값 → 처음부터인 것만 가진 채로 모두 기본 모습으로 읽힌다. 읽을 때 표에 없는 id, 다른 자리의 id, 중복은 걸러낸다(`Cosmetics.clean`).
-- 함수: `Meta.cos_has`(처음부터인 것은 늘 가짐), `cos_unlock`, `cos_buy`(조각), `cos_wear`(가진 것만, 기본을 입으면 칸 삭제, 기본이 아닌 것을 입으면 길라잡이 `mirror`를 센다), `cos_sync`(조건이 찬 것을 가진 것으로, 새로 얻은 id를 돌려준다. 읽을 때·창을 열 때·마을에 들어설 때), `cos_unlock_all`, `cos_fresh`/`cos_mark_seen`(새것 표시).
+- 함수: `Meta.cos_has`(처음부터인 것은 늘 가짐), `cos_unlock`, `cos_discover`(비밀을 찾았다고 적고 새로 열린 id를 돌려준다), `cos_buy`(조각, 조각으로 사는 둘만), `cos_wear`(가진 것만, 기본을 입으면 칸 삭제, 기본이 아닌 것을 입으면 길라잡이 `mirror`를 센다), `cos_sync`(조건이 찬 것을 가진 것으로, 새로 얻은 id를 돌려준다. 읽을 때·창을 열 때·마을에 들어설 때), `cos_unlock_all`, `cos_fresh`/`cos_mark_seen`(새것 표시).
 - 화면이 어디서나 읽는 거울 `Meta.cos_look`(= 입은 것). `Meta`를 읽거나 `cos_wear`할 때 맞춰진다(검 이름의 `shown_names`와 같은 방식).
 
 ## 해금 조건 (`Cosmetics.met`, 이미 있는 Meta 값에서 읽는다)
 
+2026-11-27 개정(사용자): 조각으로 사는 것은 **둘만** 남기고(`cape_moss` 40, `head_hood` 30), 나머지는 비밀 행동·리그·이야기·룬 자리로만 열린다. 우두머리 해금은 비밀 행동으로 바뀌었다(`boss` 종류는 표에서 쓰지 않는다, 코드 열쇠만 남아 있다). 창과 게임 화면 어디에도 열리는 법을 쓰지 않는다. **아래 목록은 이 문서(개발용)에만 있다.**
+
 - **처음부터**(`free`): 붉은 망토, 회색 모직 망토 / 맨머리, 검은 머리띠 / 검 본래의 빛, 흰빛.
-- **조각**(`shards`, `need` = 값, 창에서 산다): 이끼빛 망토 40, 밤빛 가장자리 망토 60, 줄무늬 망토 120, 체크 망토 150, 검 문장 망토 250 / 두건 30, 챙 넓은 쇠모자 80, 철 투구 100, 철관 140, 뿔 투구 220 / 불씨빛 60, 서리빛 60, 비취빛 80, 보랏빛 100, 핏빛 150.
+- **조각**(`shards`): 이끼빛 망토 40, 두건 30.
+- **비밀**(`secret`, `key` = `CosSecrets.TABLE`의 id, 아래): 19개 항목. 11개 비밀 + 지하 무덤 비밀 1개.
 - **리그**(`league`, `need` = 티어 번호 0 녹쇠 … 7 불멸): 지난 시즌 칭호(`Meta.league_titles`)와 배치를 마친 뒤의 이번 시즌 최고(`League.state.peak`) 중 가장 높은 티어. 금(3) → 금빛 / 백금(4) → 백금 외투 / 승천(6) → 승천의 투구 / 불멸(7) → 불멸의 망토, 허무의 빛.
-- **우두머리**(`boss`): 무덤 기사(`Meta.boss_first`) → 무덤 기사의 낡은 망토·투구, 무덤빛. 무덤 주인(`Meta.crypt_cleared["boss"]`) → 무덤 주인의 수의, 뼈관, 뼈빛.
-- **이야기**(`story`): 1막 타임트래블러(`Meta.time_traveller`) → 시간 건너는 코트, 시간의 바이저, 디지털 푸른빛. 3막 첫 닻(`Meta.anchor_hand`) → 닻의 푸른 망토, 닻의 관, 닻빛. (2막 `act2` = `harvest_down`은 표에 쓰는 줄이 아직 없다. 열쇠만 있다.) **이야기 항목은 틈이 열리기 전(`Meta.rift_open`)에는 목록에 이름도 안 보인다**(길라잡이의 숨김과 같은 규칙, 가진 것은 늘 보인다).
+- **이야기**(`story`): 1막 타임트래블러(`Meta.time_traveller`) → 시간 건너는 코트, 시간의 바이저, 디지털 푸른빛. 3막 첫 닻(`Meta.anchor_hand`) → 닻의 푸른 망토, 닻의 관, 닻빛. **이야기 항목은 틈이 열리기 전(`Meta.rift_open`)에는 목록에 이름도 안 보인다.**
 - **검의 기억 룬 자리**(`rune`, `need` = 열린 룬 자리 수, 검 하나 기준 `Meta.rune_slots`): 1칸 → 룬 자수 망토 / 2칸 → 룬 이마띠 / 3칸 → 룬빛.
+
+### 비밀 행동 목록 (개발용, `CosSecrets.TABLE`, scripts/core/cos_secrets.gd)
+
+저장: `Meta.cos_secrets`(찾은 비밀 id, 저장 키 `cos_secrets`), `Meta.cos_discover(id)`가 적고 `cos_sync`로 항목을 연다(새로 열린 id 반환). 자리는 때(날씨·밤낮)가 맞을 때만 서고(`SecretRun.refresh`), 틀리면 모양도 E 자리도 없다. 한 번 찾으면 다시 서지 않는다. 장면 쪽 연결은 `_spots`/`_prompt`/`_interact`에 `sec_<id>` 한 줄씩(`field.gd`·`future.gd`·`past.gd`), 모양은 `SecretProps`(그림자 인물 `figure`: 후드와 눈 두 점, 납작한 돌탑 `cairn`: 은은한 빛).
+
+| 비밀 id | 장면 · 자리(칸) | 때 | 하는 일 | 열리는 것 |
+| --- | --- | --- | --- | --- |
+| `well_rain` | 들판 불탄 마을 우물 앞 (192, 55.2) | 비 또는 폭풍 | E: 우물 속을 들여다본다 | 밤빛 가장자리 망토, 서리빛 |
+| `marsh_hermit` | 들판 안개 늪 (138, 88) | 안개 | 숨은 인물 "???"에게 말을 건다 | 줄무늬 망토 |
+| `ash_ruin` | 들판 불탄 마을 집터 안 (177.5, 47.6) | 잿바람 | E: 식은 잿더미를 헤친다 | 불씨빛 |
+| `quarry_storm` | 들판 채석장 서쪽 (175.5, 24) | 폭풍 | E: 벼락 맞은 모루를 만진다 | 뿔 투구, 보랏빛 |
+| `pass_night` | 들판 까마귀 고개 (200, 95) | 밤 | E: 까마귀 둥지를 뒤진다 | 핏빛 |
+| `keep_clear` | 들판 무너진 성채 탑 아래 (151, 22.6) | 맑은 낮 | E: 탑 그늘의 돌 밑을 본다 | 챙 넓은 쇠모자 |
+| `knight_relic` | 들판 무덤 기사가 서 있던 자리 (84, 98.4) | 무덤 기사를 한 번이라도 쓰러뜨린 뒤(`boss_first`) | E: 쓰러진 자리를 살핀다 | 무덤 기사의 망토·투구, 무덤빛 |
+| `neon_door` | 미래 네온 시가 남쪽 광장 옆 문 앞 (41.5, 99) | 늘 | 숨은 인물 "???"에게 말을 건다 | 체크 망토, 철 투구 |
+| `neon_billboard` | 미래 네온 시가 큰길 광고판 밑 (83, 76) | 늘 | E: 꺼진 광고판 밑을 만진다 | 비취빛 |
+| `rib_hollow` | 과거 거인의 뼈 들 갈비뼈 아치 가운데 (118, 22) | 늘 | E: 갈비뼈 사이 틈을 더듬는다 | 검 문장 망토 |
+| `crystal_echo` | 과거 수정 호수 수정 곁 (157.4, 70) | 늘 | E: 수정에 귀를 댄다 | 철관 |
+| `crypt_low` | 지하 무덤 r3 방의 관 | 체력 35% 이하로 그 관을 처음 연다 | 돌 관을 연다(자리·모양 따로 없음, `crypt.gd`) | 무덤 주인의 수의, 뼈관, 뼈빛 |
+
+- 숨은 인물(`marsh_hermit`, `neon_door`)은 말을 마치면 안개처럼 가라앉는다. 대사에 다른 비밀을 은근히 가리키는 말(맑은 낮의 그림자, 비 오는 날만 떠오르는 것)이 조금 있다. 띠는 하는 일만 말한다.
+- 자리는 모두 막힘 밖·장면 안쪽이다(`tests/cosmetic_tests.gd`가 각 장면의 막힘 표로 본다).
+- 관리 `꾸미기 전부`는 비밀과 상관없이 항목을 연다. `꾸미기 처음`은 `cos_secrets`도 비운다.
 
 ## 화면
 
 - **거울**: 마을 광장(`Lobby.mirror_at`, 결투 말뚝 곁)의 소품(`VillageProps.mirror`: 나무 틀 거울과 걸대) → E → `LobbyHud.open_mirror` → `CosmeticWindow`(scripts/ui/cosmetic_window.gd, `UiKit` 판). 열려 있는 동안 마을은 멈춘다(`is_open`). 새로 얻은 것이 있으면 마을에 들어설 때 띠로 한 번 알린다(`Lobby._cosmetic_news`).
-- **창**: 왼쪽에 돌아가는 영주 미리보기(끌어서 돌린다, 기사 모델이 있으면 그것, 없으면 기본 도형), 오른쪽에 자리 탭 셋과 항목 타일(4열). 타일은 그림이다: 망토·머리는 작은 3D 그림(`CosmeticThumb`), 베기 빛은 초승달 그림. 잠긴 항목은 어둡고 구석에 "잠김"/"조각 N", **눌러서 입혀 볼 수는 있다**(미리보기만). 아래 줄에 이름과 조건 한 줄, 가진 것은 "입기"/"벗기", 조각으로 사는 것은 "조각 N으로 얻기"(모자라면 눌리지 않음). 처음 열린 것은 구석에 "새것". Esc·닫기로 닫는다.
+- **창**: 왼쪽에 돌아가는 영주 미리보기(끌어서 돌린다, 기사 모델이 있으면 그것, 없으면 기본 도형), 오른쪽에 자리 탭 셋과 항목 타일(4열). 타일은 그림이다: 망토·머리는 작은 3D 그림(`CosmeticThumb`), 베기 빛은 초승달 그림. **잠긴 항목은 열리는 법을 어디서도 알리지 않는다**: 조각으로 사는 둘을 뺀 잠긴 타일은 검은 그림자 실루엣뿐(구석 글자 없음), 눌러도 이름은 "???"이고 설명·조건 줄이 없고 미리보기에 입혀 보이지도 않는다(`Cosmetics.reveals_name`). 조각으로 사는 둘만 이름과 "조각 N", "조각 N으로 얻기"가 보인다(모자라면 눌리지 않음). 가진 것은 "입기"/"벗기". 처음 열린 것은 구석에 "새것". Esc·닫기로 닫는다. 비밀을 찾았을 때 화면 알림은 그 자리의 대사·한 줄뿐이고 어떤 꾸미기가 열렸는지는 마을에 들어설 때 "새 꾸밀 것" 띠로 한 번 알린다.
 - **입히는 한 곳**: `CosmeticRig.apply(model, character, worn)`(scripts/lord/cosmetic_rig.gd). `LordView.set_cosmetics(worn)`이 부르고, `LordView._ready`가 `Meta.cos_look`을 읽어 스스로 입는다 → 마을·언덕·들판·무덤·미래·과거 장면은 코드를 안 고친다. 꾸미기 창의 미리보기도 같은 함수다.
   - 기사 모델(`LordCharacter`)이면 머리 뼈 `mixamorig_Head`와 등 뼈 `mixamorig_Spine2`에 받침을 붙인다(`CosmeticRig._holder`: 영주 모델 좌표(앞 -Z)로 지은 것을 뼈의 쉬는 자세로 맞춘다. `EnemyArt`의 방패·눈과 같은 방법). 기본 도형이면 `Model` 노드에 직접 얹는다. 파일이 없어도 돌아야 한다는 규칙대로 두 길 다 있다.
-  - 모양은 에셋 없이 기본 도형과 코드로 그린 질감(`CosmeticArt`: 망토는 주름 잡힌 면 + 짠 천 결이 있는 질감, 머리는 반구·고리·원뿔·상자). 어두운 사실풍(낡은 천, 거친 쇠). 세계에 글자는 없다. 룬 망토·바이저·이마띠만 은은히 빛난다.
+  - 모양(2026-11-27): `assets/cosmetics/<항목 id>.glb`(망토 14, 머리 12)가 있으면 `CosmeticArt.glb`가 그것을 쓰고(`cape`/`head`가 `Glb` 노드로 붙인다), 없으면 에셋 없이 기본 도형과 코드로 그린 질감으로 돌아간다(망토는 주름 잡힌 면 + 짠 천 결이 있는 질감, 머리는 반구·고리·원뿔·상자). glb는 `tools/blender/make_cosmetics.py`(Blender 4.2, `blender -b -P tools/blender/make_cosmetics.py`)가 표(`build_cosmetics.gd`의 색)를 읽어 스크립트로 짓는다(AI 생성이 아님): 망토는 64×80칸 면에 잔주름·꼭짓점 색 무늬·해진 끝(진짜 구멍)·어깨 띠와 단추·룬 자수의 빛나는 재질, 머리는 닳은 쇠(잡음으로 민 면, 깎은 모서리, 징·능선·볼가리개·뿔·눈 틈 빛). 크기·방향 약속은 스크립트 머리말(같은 좌표). 어두운 사실풍. 세계에 글자는 없다. 룬 망토·바이저·이마띠만 은은히 빛난다.
   - 망토는 빨리 걸을수록 뒤로 날리고 서면 늘어진다(`LordView._sway_cape`, 화면만).
   - 베기 빛 색의 차례: 꾸민 색 → 시대 색(`slash_override`: 미래 푸른빛, 과거 금빛) → 쥔 검의 등급 색. 속성 없는 판정 모양의 빛(`MoveFx._col`)도 같은 꾸민 색을 따른다(속성이 있는 판정은 속성 색, 결투는 `use_cosmetic = false`).
 - **결투**: `duel.gd`가 자리마다 입힌다(`_worn_of`). 같은 PC는 1P만 내 꾸미기, 2P는 기본. 온라인은 `DuelSetup`의 자리 사전에 `cos`(자리 → id)를 실어 보내고(`spec_of`), 받는 쪽은 `DuelSetup.clean`이 표에 있는 id만 남긴다(맨손이어도 모양은 보인다). 락스텝 프로토콜·`Rules`·`state_hash`는 그대로(테스트가 같은 해시를 본다).
@@ -47,6 +72,6 @@
 
 ## 테스트와 그림
 
-- `tests/cosmetic_tests.gd`: 표(id 유일·자리·해금·모양), 조건별 해금(우두머리·이야기·룬 자리·리그 배치 전후와 칭호), 조각 구입, 입기·벗기, 새것·숨김, 저장 왕복·옛 저장·잘못된 저장, 결투 시작 정보(`cos`, 걸러냄, 상태 해시 같음), 모든 항목의 모양이 만들어짐과 `CosmeticRig`가 처음 모습을 가렸다 되돌림, 관리 명령, 길라잡이 단계.
-- 그림 `scripts/debug/shots/shot_cosmetics.gd` → `/home/claude/shots/cosmetics_*.png`(Xvfb).
+- `tests/cosmetic_tests.gd`: 표(id 유일·자리·해금·모양), 조건별 해금(이야기·룬 자리·리그 배치 전후와 칭호), 비밀(모든 비밀에 항목, 자리가 막힘 밖, 날씨·밤낮·우두머리 조건, 찾은 뒤 안 섬, 띠·글에 조건 낱말 없음, 저장 왕복), Blender 모양이 없을 때 기본 도형, 조각 구입(둘), 입기·벗기, 새것·숨김, 저장 왕복·옛 저장·잘못된 저장, 결투 시작 정보(`cos`, 걸러냄, 상태 해시 같음), 모든 항목의 모양이 만들어짐과 `CosmeticRig`가 처음 모습을 가렸다 되돌림, 관리 명령, 길라잡이 단계.
+- 그림 `scripts/debug/shots/shot_cosmetics.gd` → `/home/claude/shots/cosmetics_*.png`, 2차 `shot_cosmetics2.gd` → `cos2_*.png`(Xvfb).
 - PC에서: 마을 광장 거울에서 E → 창에서 타일을 눌러 미리보기가 맞는지, 입고 나가서 언덕·들판에서 망토·머리·베기 빛이 보이는지, `꾸미기 전부`로 모두 열어 이야기 항목이 틈 열린 뒤에만 보이는지 본다. 기사 모델의 머리·등 위치(`CosmeticRig` 상수 `CHAR_*`)와 망토 크기는 사용자 PC 모델 기준으로 조금 맞출 수 있다.

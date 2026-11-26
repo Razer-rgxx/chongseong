@@ -243,6 +243,8 @@ func _process(delta: float) -> void:
 		if not _over and _leaving < 0.0:
 			_leave()
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
+	_sec.refresh()
+	_sec.animate(delta, _lord.position)
 	_near = ""
 	var best_d: float = reach
 	var p: Vector2 = rules.lord.pos
@@ -255,8 +257,12 @@ func _process(delta: float) -> void:
 	_hud.set_prompt("E", _prompt(_near) if _near != "" else "")
 
 
+var _sec: SecretRun   # 꾸미기 비밀(CosSecrets, docs/cosmetics.md)
+
+
 func _spots() -> Dictionary:
 	var s := {"exit": FutureLayout.EXIT_AT, "terminal": FutureLayout.TERMINAL_AT}
+	s.merge(_sec.spots())
 	if not meta.field_found.has(FutureLayout.CACHE_ID):
 		s["cache"] = FutureLayout.CACHE_AT
 	for i in Story.SHARDS.size():
@@ -275,6 +281,8 @@ func _spots() -> Dictionary:
 
 
 func _prompt(key: String) -> String:
+	if key.begins_with("sec_"):
+		return _sec.prompt(key)
 	match key:
 		"exit":
 			return "틈으로 돌아간다" if meta.time_traveller else "닫힌 틈을 살핀다"
@@ -325,6 +333,10 @@ func _interact() -> void:
 		_read_log(int(_near.substr(3)))
 	elif _near == "fixer":
 		_hud.say(StoryNeon.FIXER_NAME, StoryNeon.fixer_line(meta.neon_logs.size(), meta.time_traveller, meta.harvest_down), true)
+	elif _near.begins_with("sec_"):
+		_sec.use(_near, _hud)
+		_sfx.play(&"glitch", _lord.position, -10.0)
+		_saved()
 	elif _near == "stop":
 		_use_stop()
 	elif _near == "cache":
@@ -546,6 +558,7 @@ func _build_story() -> void:
 		_log_nodes[i] = StoryProps.log_terminal(self, Grid.cells_to_world(StoryNeon.LOGS[i].at), meta.neon_logs.has(i))
 	StoryProps.fixer(self, Grid.cells_to_world(StoryNeon.FIXER_AT))
 	_stop = StoryProps.vault(self, Grid.cells_to_world(StoryNeon.STOP_AT), meta.harvest_down)
+	_sec = SecretRun.new("future", self, meta)
 
 
 ## 꽂힌 낯선 검 셋(docs/cyber_swords.md): 들를 때마다 사이버 검 셋이 서고(CyberSwords.roll_future), 무엇인지 보인다. E로 뽑으면 도감에 오른다.

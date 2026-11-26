@@ -98,6 +98,7 @@ func _ready() -> void:
 	_ship = world.ship
 	_ship_base = _ship.position
 	_dragons = world.dragons
+	_sec = SecretRun.new("past", self, meta)
 	_hoard = world.hoard
 	if meta.field_found.has(PastLayout.CACHE_ID):
 		PastBuilder.open_cache(_chest)
@@ -271,6 +272,8 @@ func _process(delta: float) -> void:
 			_leave()
 	Meta.go_past = false
 	_hud.set_hp(rules.lord.hp, rules.max_hp())
+	_sec.refresh()
+	_sec.animate(delta, _lord.position)
 	_near = ""
 	var best_d: float = PastLayout.REACH
 	var spots: Dictionary = _spots()
@@ -282,8 +285,12 @@ func _process(delta: float) -> void:
 	_hud.set_prompt("E", _prompt(_near) if _near != "" else "")
 
 
+var _sec: SecretRun   # 꾸미기 비밀(CosSecrets, docs/cosmetics.md)
+
+
 func _spots() -> Dictionary:
 	var s := {"exit": PastLayout.EXIT_AT, "altar": PastLayout.ALTAR_AT, "smith": StoryPast.SMITH_AT, "seal": StoryPast.SEAL_AT}
+	s.merge(_sec.spots())
 	if meta.captain_gone:
 		s["coat"] = StoryPast.COAT_AT
 	else:
@@ -298,6 +305,8 @@ func _spots() -> Dictionary:
 
 
 func _prompt(key: String) -> String:
+	if key.begins_with("sec_"):
+		return _sec.prompt(key)
 	if key.begins_with("mem"):
 		return "기억의 돌을 읽는다"
 	match key:
@@ -360,6 +369,10 @@ func _interact() -> void:
 		return
 	if _near == "exit":
 		_leave()
+	elif _near.begins_with("sec_"):
+		_sec.use(_near, _hud)
+		_sfx.play(&"thump", _lord.position, -8.0, 1.3)
+		_saved()
 	elif _near == "altar":
 		_use_altar()
 	elif _near.begins_with("mem"):

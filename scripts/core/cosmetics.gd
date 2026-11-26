@@ -2,7 +2,7 @@ class_name Cosmetics
 extends RefCounted
 ## 영주 꾸미기 규칙(docs/cosmetics.md). 노드에 기대지 않는 정적 함수. 랜덤이 없고 Rules는 건드리지 않는다.
 ## 표는 data/cosmetics.tres(CosmeticTable), 가진 것과 입은 것은 Meta.cos_owned·cos_worn(저장).
-## 해금 조건은 이미 있는 Meta 값에서 읽는다: 리그 최고 티어, 우두머리, 이야기 막, 검의 기억 룬 자리.
+## 해금 조건은 이미 있는 Meta 값에서 읽는다: 리그 최고 티어, 이야기 막, 검의 기억 룬 자리, 세계 곳곳의 비밀(Meta.cos_secrets, CosSecrets).
 
 static var _table: CosmeticTable = null
 
@@ -40,6 +40,8 @@ static func met(it: CosmeticItem, meta: Meta) -> bool:
 			return league_tier(meta) >= it.need
 		"rune":
 			return rune_slots_best(meta) >= it.need
+		"secret":
+			return meta.cos_secrets.has(String(it.key))
 		"boss":
 			match String(it.key):
 				"grave_knight": return meta.boss_first
@@ -59,25 +61,9 @@ static func shown(it: CosmeticItem, meta: Meta) -> bool:
 	return it.unlock != &"story" or meta.rift_open()
 
 
-## 잠긴 항목의 조건 한 줄.
-static func condition_text(it: CosmeticItem) -> String:
-	match String(it.unlock):
-		"free":
-			return "처음부터"
-		"shards":
-			return "조각 %d" % it.need
-		"league":
-			return "랭크 결투 %s 이상" % League.data().tier_names[clampi(it.need, 0, League.data().tier_names.size() - 1)]
-		"rune":
-			return "검 하나의 룬 자리 %d개 열기" % it.need
-		"boss":
-			return "무덤 기사를 쓰러뜨린다" if it.key == &"grave_knight" else "무덤 주인을 쓰러뜨린다"
-		"story":
-			match String(it.key):
-				"act1": return "타임트래블러 이야기를 마친다"
-				"act2": return "닻 공사를 마친다"
-				"act3": return "첫 닻 이야기를 마친다"
-	return ""
+## 잠긴 항목을 창에서 이름으로 보여도 되나: 조각으로 사는 것만(살 수 있어야 하니). 그 밖은 "???"와 그림자뿐이다(어떻게 여는지 어디서도 말하지 않는다).
+static func reveals_name(it: CosmeticItem, meta: Meta) -> bool:
+	return it.unlock == &"shards" or meta.cos_has(it.id)
 
 
 ## 입은 베기 빛 색. 안 입었거나 검 본래의 빛이면 알파 0(쥔 검의 등급 색을 쓴다).

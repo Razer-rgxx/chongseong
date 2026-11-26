@@ -238,7 +238,11 @@ func _interact() -> void:
 		_leave()
 	elif _near.begins_with("coffin_"):
 		var id := StringName(_near.substr(7))
+		var low: bool = id == CosSecrets.CRYPT_COFFIN and not meta.crypt_opened.has(String(id)) and rules.lord.hp <= rules.max_hp() * CosSecrets.CRYPT_HP
 		var r: Dictionary = meta.crypt_open(String(id))
+		if int(r.shards) > 0 and low and not meta.cos_discover(CosSecrets.CRYPT_ID).is_empty():   # 꾸미기 비밀: 목숨이 간당할 때 이 관을 연다
+			_hud.say("", CosSecrets.CRYPT_LINE, true)
+			get_tree().create_timer(5.0).timeout.connect(_hud.say_end)
 		if int(r.shards) > 0:
 			CryptBuilder.open_coffin(_coffins[id])
 			_sfx.play(&"thump", _coffins[id].position, -3.0, 0.7)

@@ -1,8 +1,8 @@
 class_name CosmeticWindow
 extends ColorRect
 ## 거울(꾸미기) 창(docs/cosmetics.md). 글보다 그림: 왼쪽에 돌아가는 영주 미리보기, 오른쪽에 자리별 항목 타일.
-## 타일을 누르면 잠겨 있어도 입혀 볼 수 있고(미리보기만), 가진 것이면 입고, 조각으로 사는 것은 살 수 있다.
-## 잠긴 항목은 어둡게 + 조건 한 줄. 마을 거울에서 연다. 닫으면 스스로 지운다.
+## 타일을 누르면 가진 것은 입고, 조각으로 사는 것은 살 수 있다(사기 전에는 입혀 볼 수 있다).
+## 잠긴 항목은 그림자 실루엣과 "???"뿐(어떻게 여는지 어디서도 말하지 않는다, 입혀 보지도 못한다). 조각으로 사는 둘만 이름과 값이 보인다. 마을 거울에서 연다. 닫으면 스스로 지운다.
 
 signal closed()
 ## 입은 것이 바뀌었다(장면이 영주 모습을 다시 입힌다).
@@ -181,7 +181,7 @@ func _on_preview_input(event: InputEvent) -> void:
 func _preview_worn() -> Dictionary:
 	var w: Dictionary = _meta.cos_worn.duplicate()
 	var it: CosmeticItem = Cosmetics.table().item(_picked)
-	if it != null:
+	if it != null and Cosmetics.reveals_name(it, _meta):   # 숨은 것은 입혀 볼 수도 없다(모양이 드러나지 않게)
 		w[String(it.slot)] = String(it.id)
 	return w
 
@@ -248,7 +248,7 @@ func _tile(it: CosmeticItem, worn: StringName) -> Control:
 	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(thumb)
 	if not owned:
-		thumb.modulate = Color(0.28, 0.28, 0.3, 0.95)   # 잠긴 것은 어둡게
+		thumb.modulate = Color(0.28, 0.28, 0.3, 0.95) if it.unlock == &"shards" else Color(0.0, 0.0, 0.0, 0.9)   # 숨은 것은 그림자 실루엣만
 		var lock := ColorRect.new()
 		lock.color = Color(0, 0, 0, 0.25)
 		lock.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -258,8 +258,8 @@ func _tile(it: CosmeticItem, worn: StringName) -> Control:
 		b.add_child(_corner("입음", Control.PRESET_BOTTOM_RIGHT, UiKit.TITLE))
 	elif _fresh.has(String(it.id)):
 		b.add_child(_corner("새것", Control.PRESET_TOP_RIGHT, Color(0.95, 0.8, 0.4)))
-	elif not owned:
-		b.add_child(_corner("조각 %d" % it.need if it.unlock == &"shards" else "잠김", Control.PRESET_BOTTOM_RIGHT, UiKit.MUTED))
+	elif not owned and it.unlock == &"shards":
+		b.add_child(_corner("조각 %d" % it.need, Control.PRESET_BOTTOM_RIGHT, UiKit.MUTED))
 	b.pressed.connect(func() -> void:
 		_picked = it.id
 		_render())
@@ -299,10 +299,9 @@ func _render_info() -> void:
 		return
 	var owned: bool = _meta.cos_has(it.id)
 	var worn: StringName = _meta.cos_worn_id(_slot)
-	_info.add_child(UiKit.label(it.title, 20, UiKit.TITLE))
-	if not owned:
-		var cond := UiKit.label("잠김  ·  " + Cosmetics.condition_text(it), 14, Color(0.78, 0.6, 0.4))
-		_info.add_child(cond)
+	_info.add_child(UiKit.label(it.title if Cosmetics.reveals_name(it, _meta) else "???", 20, UiKit.TITLE))
+	if not owned and it.unlock != &"shards":
+		return   # 숨은 항목은 이름도 조건도 말하지 않는다
 	var def: StringName = Cosmetics.table().default_of(_slot)
 	if owned and it.id != worn:
 		_info.add_child(UiKit.button("입기", func() -> void:

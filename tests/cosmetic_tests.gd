@@ -2,7 +2,7 @@ extends RefCounted
 ## 영주 꾸미기 테스트(docs/cosmetics.md). run_all.gd가 부른다: run(데이터, check). 실제 저장 파일은 쓰지 않는다.
 
 const TMP: String = "user://테스트_cosmetics.json"
-const UNLOCKS: Array[StringName] = [&"free", &"shards", &"league", &"boss", &"story", &"rune"]
+const UNLOCKS: Array[StringName] = [&"free", &"shards", &"league", &"boss", &"story", &"rune", &"secret"]
 const STYLES: Array[StringName] = [&"plain", &"trim", &"stripe", &"check", &"emblem", &"ragged", &"rune", &"none", &"band", &"hood", &"kettle", &"helm", &"circlet", &"horn", &"plume", &"spikes", &"visor", &"runeband", &"slash"]
 
 var check: Callable
@@ -19,6 +19,7 @@ static func run(game: GameData, chk: Callable) -> void:
 func _all() -> void:
 	_table()
 	_conditions()
+	_secrets()
 	_shop()
 	_wear()
 	_fresh_and_hidden()
@@ -45,6 +46,8 @@ func _table() -> void:
 			ok = false
 		if it.unlock in [&"boss", &"story"] and it.key == &"":
 			ok = false
+		if it.unlock == &"secret" and not CosSecrets.known(String(it.key)):
+			ok = false
 	check.call(ids.size() == t.items.size() and t.items.size() >= 30 and ok, "꾸미기: 표의 항목 id가 겹치지 않고 자리·해금·모양이 모두 알려진 값(%d개)" % t.items.size())
 	var firsts: bool = true
 	for s in CosmeticTable.SLOTS:
@@ -54,7 +57,7 @@ func _table() -> void:
 	var kinds: Dictionary = {}
 	for it in t.items:
 		kinds[it.unlock] = 1
-	check.call(kinds.size() == UNLOCKS.size(), "꾸미기: 해금 종류(처음부터·조각·리그·우두머리·이야기·룬 자리)가 다 쓰인다")
+	check.call(kinds.size() == UNLOCKS.size() - 1, "꾸미기: 해금 종류(처음부터·조각·리그·이야기·룬 자리·비밀)가 다 쓰인다")
 
 
 func _conditions() -> void:
@@ -62,12 +65,16 @@ func _conditions() -> void:
 	var t: CosmeticTable = Cosmetics.table()
 	check.call(m.cos_worn_id(&"cape") == &"cape_red" and m.cos_worn_id(&"head") == &"head_none" and m.cos_worn_id(&"slash") == &"slash_grade", "꾸미기: 새 기록은 자리마다 기본을 입고 있다")
 	check.call(m.cos_has(&"cape_grey") and m.cos_has(&"head_band") and not m.cos_has(&"cape_moss") and not m.cos_has(&"cape_knight"), "꾸미기: 처음부터인 것만 가졌다")
+	var by: Dictionary = {}
+	for it in t.items:
+		by[it.unlock] = int(by.get(it.unlock, 0)) + 1
+	check.call(by.get(&"shards", 0) == 2 and by.get(&"secret", 0) >= 15 and by.get(&"free", 0) == 6, "꾸미기: 조각으로 사는 것은 둘뿐이고 대부분은 비밀 행동(%s)" % str(by))
 	check.call(m.cos_sync().is_empty(), "꾸미기: 아무것도 이루지 않았으면 새로 열리는 것이 없다")
 	m.boss_first = true
-	check.call(m.cos_sync() == ["cape_knight", "head_knight", "slash_grave"], "꾸미기: 무덤 기사를 쓰러뜨리면 그 셋이 열린다")
-	check.call(m.cos_sync().is_empty(), "꾸미기: 같은 조건으로 두 번 열리지 않는다")
-	m.crypt_cleared["boss"] = 1
-	check.call(m.cos_sync() == ["cape_shroud", "head_bone", "slash_bone"], "꾸미기: 무덤 주인을 쓰러뜨리면 그 셋이 열린다")
+	check.call(m.cos_sync().is_empty(), "꾸미기: 우두머리를 쓰러뜨리는 것만으로는 열리지 않는다(비밀을 찾아야 한다)")
+	check.call(m.cos_discover("knight_relic") == ["cape_knight", "head_knight", "slash_grave"] and m.cos_discover("knight_relic").is_empty(), "꾸미기: 비밀 knight_relic을 찾으면 그 셋이 한 번 열린다")
+	check.call(m.cos_discover("없는비밀").is_empty() and m.cos_secrets == ["knight_relic"], "꾸미기: 모르는 비밀은 적히지 않는다")
+	check.call(m.cos_discover(CosSecrets.CRYPT_ID) == ["cape_shroud", "head_bone", "slash_bone"], "꾸미기: 지하 무덤 비밀을 찾으면 수의·뼈관·뼈빛이 열린다")
 	m.time_traveller = true
 	m.harvest_down = true
 	m.anchor_hand = true
@@ -94,6 +101,66 @@ func _conditions() -> void:
 		if it.unlock != &"shards" and not Meta.new().cos_has(it.id):
 			all_free = all_free and it.unlock != &"free"
 	check.call(all_free, "꾸미기: 처음부터가 아닌 항목은 처음엔 없다")
+
+
+func _secrets() -> void:
+	var t: CosmeticTable = Cosmetics.table()
+	var used: Dictionary = {}
+	for it in t.items:
+		if it.unlock == &"secret":
+			used[String(it.key)] = int(used.get(String(it.key), 0)) + 1
+	var all_used: bool = true
+	for id in CosSecrets.ids():
+		all_used = all_used and used.has(id)
+	check.call(all_used and used.size() == CosSecrets.ids().size(), "꾸미기 비밀: 모든 비밀에 열리는 항목이 있고 모든 비밀 항목의 열쇠가 표에 있다(%d개)" % used.size())
+	# 자리: 장면의 막힘 밖, 장면 안쪽
+	var fb: Dictionary = FieldBuilder.blockers()
+	var blk: Dictionary = {"field": fb, "future": FutureLayout.blockers(), "past": PastLayout.blockers()}
+	var sizes: Dictionary = {"field": Vector2(FieldLayout.SIZE), "future": Vector2(180, 110), "past": Vector2(PastLayout.SIZE)}
+	var free_ok: bool = true
+	var bad: String = ""
+	for sc in CosSecrets.TABLE:
+		var b: Dictionary = blk[sc.scene]
+		var p: Vector2 = sc.at
+		var out: Vector2 = Blockers.push_out(p, b.rects, b.circles, b.low_rects, b.low_circles)
+		if out.distance_to(p) > 0.001 or not Rect2(Vector2.ZERO, sizes[sc.scene]).grow(-1.0).has_point(p):
+			free_ok = false
+			bad += " " + String(sc.id)
+	check.call(free_ok, "꾸미기 비밀: 모든 자리가 막힘 밖·장면 안쪽이다%s" % bad)
+	# 때
+	var m := Meta.new()
+	var well: Dictionary = CosSecrets.find("well_rain")
+	check.call(CosSecrets.active(well, m, {"weather": "rain"}) and CosSecrets.active(well, m, {"weather": "storm"}) and not CosSecrets.active(well, m, {"weather": "clear"}) and not CosSecrets.active(well, m, {}), "꾸미기 비밀: 비 오는 날에만 우물이 서고 맑은 날엔 없다")
+	var keep: Dictionary = CosSecrets.find("keep_clear")
+	check.call(CosSecrets.active(keep, m, {"weather": "clear", "night": false}) and not CosSecrets.active(keep, m, {"weather": "clear", "night": true}) and not CosSecrets.active(keep, m, {"weather": "rain", "night": false}), "꾸미기 비밀: 맑은 낮에만")
+	var pn: Dictionary = CosSecrets.find("pass_night")
+	check.call(CosSecrets.active(pn, m, {"weather": "clear", "night": true}) and not CosSecrets.active(pn, m, {"weather": "clear", "night": false}), "꾸미기 비밀: 밤에만")
+	var kn: Dictionary = CosSecrets.find("knight_relic")
+	check.call(not CosSecrets.active(kn, m, {}) and (func() -> bool:
+		m.boss_first = true
+		return CosSecrets.active(kn, m, {})).call(), "꾸미기 비밀: 무덤 기사를 쓰러뜨린 뒤에만 흔적이 선다")
+	check.call(not m.cos_discover("well_rain").is_empty() and not CosSecrets.active(well, m, {"weather": "rain"}), "꾸미기 비밀: 찾은 뒤에는 다시 서지 않는다")
+	# 장면 도구: 때가 맞을 때만 모양과 E 자리가 선다
+	var root := Node3D.new()
+	var run := SecretRun.new("field", root, Meta.new(), func(_c: Vector2) -> float: return 0.0)
+	run.refresh({"weather": "clear", "night": false})
+	check.call(run.spots().keys() == ["sec_keep_clear"] and root.get_child_count() == 1, "꾸미기 비밀: 맑은 낮에는 성채 그늘 자리 하나만 선다")
+	run.refresh({"weather": "fog", "night": true})
+	await_free(root)
+	check.call(run.spots().has("sec_marsh_hermit") and run.spots().has("sec_pass_night") and not run.spots().has("sec_keep_clear") and run.prompt("sec_marsh_hermit") != "", "꾸미기 비밀: 안개 낀 밤에는 안개 속 그림자와 둥지가 선다")
+	root.free()
+	# 어디에도 조건을 말하지 않는다: 띠·글에 날씨·시간 낱말과 꾸미기 낱말이 없다
+	var leak: bool = false
+	for sc in CosSecrets.TABLE:
+		for k in ["prompt", "line"]:
+			var tx: String = String(sc.get(k, ""))
+			for w in ["조건", "잠김", "비밀", "꾸미기", "해금", "열린다"]:
+				leak = leak or tx.contains(w)
+	check.call(not leak, "꾸미기 비밀: 띠와 글에 조건·해금을 말하는 낱말이 없다")
+
+
+func await_free(_n: Node) -> void:
+	pass   # (queue_free는 다음 프레임에 지워지므로 이 테스트는 spots()만 본다)
 
 
 func _shop() -> void:
@@ -124,8 +191,7 @@ func _wear() -> void:
 
 func _fresh_and_hidden() -> void:
 	var m := Meta.new()
-	m.boss_first = true
-	m.cos_sync()
+	m.cos_discover("knight_relic")
 	check.call(m.cos_fresh().size() == 3, "꾸미기: 새로 연 것은 알릴 목록에 든다(처음부터인 것은 빼고)")
 	m.cos_mark_seen()
 	check.call(m.cos_fresh().is_empty(), "꾸미기: 알리고 나면 목록이 빈다")
@@ -134,31 +200,31 @@ func _fresh_and_hidden() -> void:
 	m.stranger_done = true
 	check.call(Cosmetics.shown(it, m), "꾸미기: 틈이 열리면 목록에 든다")
 	var gold: CosmeticItem = Cosmetics.table().item(&"slash_gold")
-	check.call(Cosmetics.condition_text(gold).contains("금") and Cosmetics.condition_text(Cosmetics.table().item(&"cape_moss")) == "조각 40" and Cosmetics.condition_text(Cosmetics.table().item(&"cape_runes")).contains("룬"), "꾸미기: 조건 한 줄이 나온다")
+	check.call(Cosmetics.reveals_name(Cosmetics.table().item(&"cape_moss"), m) and not Cosmetics.reveals_name(gold, m) and not Cosmetics.reveals_name(Cosmetics.table().item(&"cape_check"), m) and Cosmetics.reveals_name(Cosmetics.table().item(&"cape_knight"), m), "꾸미기: 잠긴 것은 조각으로 사는 것 말고는 이름도 안 보이고, 가진 것은 보인다")
 
 
 func _save() -> void:
 	var m := Meta.new()
-	m.boss_first = true
 	m.shards = 500
-	m.cos_buy(&"cape_stripe")
-	m.cos_wear(&"cape_stripe")
+	m.cos_buy(&"cape_moss")
+	m.cos_wear(&"cape_moss")
+	m.cos_discover("well_rain")
 	m.cos_wear(&"slash_white")
 	m.cos_sync()
 	m.cos_mark_seen()
 	m.save(TMP)
 	var n := Meta.load_or_new(TMP)
-	check.call(n.cos_owned == m.cos_owned and n.cos_worn == m.cos_worn and n.cos_seen == m.cos_seen and n.shards == m.shards and Meta.cos_look == n.cos_worn, "꾸미기: 저장하고 읽어도 가진 것·입은 것·알린 것이 그대로")
+	check.call(n.cos_owned == m.cos_owned and n.cos_secrets == ["well_rain"] and n.cos_worn == m.cos_worn and n.cos_seen == m.cos_seen and n.shards == m.shards and Meta.cos_look == n.cos_worn, "꾸미기: 저장하고 읽어도 가진 것·입은 것·알린 것이 그대로")
 	var f := FileAccess.open(TMP, FileAccess.WRITE)
 	f.store_string(JSON.stringify({"shards": 9, "runs": 2}))
 	f.close()
 	var old := Meta.load_or_new(TMP)
 	check.call(old.cos_worn.is_empty() and old.cos_worn_id(&"cape") == &"cape_red" and old.cos_has(&"cape_grey") and not old.cos_has(&"cape_moss") and old.shards == 9, "꾸미기: 옛 저장은 모두 기본, 처음부터인 것만 가진 채로 읽힌다")
 	f = FileAccess.open(TMP, FileAccess.WRITE)
-	f.store_string(JSON.stringify({"cos_owned": ["cape_moss", "없는것", 5, "cape_moss"], "cos_worn": {"cape": "head_hood", "head": "head_hood", "slash": "없는것", "x": "y"}}))
+	f.store_string(JSON.stringify({"cos_owned": ["cape_moss", "없는것", 5, "cape_moss"], "cos_worn": {"cape": "head_hood", "head": "head_hood", "slash": "없는것", "x": "y"}, "cos_secrets": ["well_rain", "없는비밀", 3, "well_rain"]}))
 	f.close()
 	var odd := Meta.load_or_new(TMP)
-	check.call(odd.cos_owned.count("cape_moss") == 1 and not odd.cos_owned.has("없는것") and odd.cos_worn == {"head": "head_hood"}, "꾸미기: 잘못된 저장(없는 항목·다른 자리·중복)은 걸러진다")
+	check.call(odd.cos_owned.count("cape_moss") == 1 and not odd.cos_owned.has("없는것") and odd.cos_worn == {"head": "head_hood"} and odd.cos_secrets == ["well_rain"], "꾸미기: 잘못된 저장(없는 항목·다른 자리·중복)은 걸러진다")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TMP))
 
 
@@ -194,18 +260,30 @@ func _art() -> void:
 	var scene: PackedScene = load("res://scenes/lord/lord_model.tscn")
 	var built: int = 0
 	var bad: int = 0
+	var glbs: int = 0
 	for it in t.items:
 		if it.slot == &"cape":
 			var c: Node3D = CosmeticArt.cape(it)
 			var mi := c.get_node_or_null("Cape") as MeshInstance3D
-			if mi == null or mi.mesh == null or mi.mesh.get_surface_count() != 1 or (mi.material_override as StandardMaterial3D).albedo_texture == null:
-				bad += 1
+			if mi != null:   # 기본 도형(Blender 모양이 없을 때)
+				if mi.mesh == null or mi.mesh.get_surface_count() != 1 or (mi.material_override as StandardMaterial3D).albedo_texture == null:
+					bad += 1
+			else:
+				var meshes: Array[Node] = c.find_children("*", "MeshInstance3D", true, false)
+				if meshes.is_empty():
+					bad += 1
+				else:
+					glbs += 1
 			c.free()
 			built += 1
 		elif it.slot == &"head":
 			var h: Node3D = CosmeticArt.head(it)
 			if (it.style == &"none") != (h.get_child_count() == 0):
 				bad += 1
+			elif it.style != &"none" and h.find_children("*", "MeshInstance3D", true, false).is_empty():
+				bad += 1
+			if h.get_node_or_null("Glb") != null:
+				glbs += 1
 			h.free()
 			built += 1
 		else:
@@ -213,7 +291,21 @@ func _art() -> void:
 			if img.get_width() != 64:
 				bad += 1
 			built += 1
-	check.call(built == t.items.size() and bad == 0, "꾸미기: 모든 항목의 모양(망토 면·머리 도형·베기 그림)이 만들어진다")
+	check.call(built == t.items.size() and bad == 0, "꾸미기: 모든 항목의 모양(망토 면·머리 도형·베기 그림)이 만들어진다(Blender 모양 %d개)" % glbs)
+	# Blender 모양이 없으면 기본 도형으로 돌아간다
+	var keep: Variant = CosmeticArt._glb_cache.get("cape_grey")
+	CosmeticArt._glb_cache["cape_grey"] = null
+	var fb: Node3D = CosmeticArt.cape(t.item(&"cape_grey"))
+	var fh: Node3D = null
+	CosmeticArt._glb_cache["head_helm"] = null
+	fh = CosmeticArt.head(t.item(&"head_helm"))
+	check.call(fb.get_node_or_null("Cape") is MeshInstance3D and fb.get_node_or_null("Glb") == null and fh.get_child_count() > 3 and fh.get_node_or_null("Glb") == null, "꾸미기: Blender 모양 파일이 없으면 기본 도형으로 돌아간다")
+	fb.free()
+	fh.free()
+	CosmeticArt._glb_cache.erase("cape_grey")
+	CosmeticArt._glb_cache.erase("head_helm")
+	if keep != null:
+		CosmeticArt._glb_cache["cape_grey"] = keep
 	check.call(Cosmetics.slash_color({"slash": "slash_ember"}) == Color(1.0, 0.5, 0.15) and Cosmetics.slash_color({}).a == 0.0 and Cosmetics.slash_color({"slash": "cape_moss"}).a == 0.0, "꾸미기: 베기 빛 색(안 입으면 알파 0 = 검 본래 빛, 다른 자리 항목은 무시)")
 	var fx := MoveFx.new()
 	Meta.cos_look = {"slash": "slash_blood"}

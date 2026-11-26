@@ -3,6 +3,7 @@ extends RefCounted
 ## 영주 꾸미기의 모양(docs/cosmetics.md). 에셋 없이 기본 도형과 코드로 그린 질감만 쓴다. 어두운 사실풍: 낡은 천, 거친 쇠.
 ## 머리는 머리 반지름 1을 기준으로 짓고(앞 -Z, 위 +Y, 머리 가운데가 원점) 몸에 붙이는 쪽(CosmeticRig)이 크기를 맞춘다.
 ## 망토는 어깨 가운데가 원점이고 아래(-Y)로 늘어진다(앞 -Z, 등 쪽 +Z).
+## 2026-11-27: assets/cosmetics/<항목 id>.glb(tools/blender/make_cosmetics.py)가 있으면 그것을 쓰고, 없으면 아래의 기본 도형과 코드 질감으로 돌아간다.
 
 const CAPE_W: float = 0.62
 const CAPE_H: float = 1.0
@@ -10,6 +11,22 @@ const TEX_W: int = 96
 const TEX_H: int = 128
 
 static var _tex: Dictionary = {}
+static var _glb_cache: Dictionary = {}   # id → PackedScene 또는 null(없음)
+
+
+## Blender로 지은 모양. 없으면 null(기본 도형으로 돌아간다). 같은 크기·방향이라 바로 바꿔 끼운다.
+static func glb(id: StringName) -> Node3D:
+	var key: String = String(id)
+	if not _glb_cache.has(key):
+		var path: String = "res://assets/cosmetics/%s.glb" % key
+		_glb_cache[key] = load(path) as PackedScene if ResourceLoader.exists(path) else null
+	var ps: PackedScene = _glb_cache[key]
+	if ps == null:
+		return null
+	var n := ps.instantiate() as Node3D
+	if n != null:
+		n.name = "Glb"
+	return n
 
 
 # ---------------------------------------------------------------- 망토
@@ -147,6 +164,10 @@ static func cape_material(it: CosmeticItem) -> StandardMaterial3D:
 static func cape(it: CosmeticItem) -> Node3D:
 	var pivot := Node3D.new()
 	pivot.name = "CosCapePivot"
+	var g: Node3D = glb(it.id)
+	if g != null:
+		pivot.add_child(g)
+		return pivot
 	var mi := MeshInstance3D.new()
 	mi.mesh = cape_mesh()
 	mi.material_override = cape_material(it)
@@ -223,6 +244,10 @@ static func _ring(inner: float, outer: float) -> TorusMesh:
 static func head(it: CosmeticItem) -> Node3D:
 	var root := Node3D.new()
 	root.name = "CosHead"
+	var g: Node3D = glb(it.id)
+	if g != null:
+		root.add_child(g)
+		return root
 	var iron: StandardMaterial3D = _std(it.color, 0.75, 0.42)
 	var cloth: StandardMaterial3D = _std(it.color, 0.0, 0.95)
 	var trim: StandardMaterial3D = _std(it.color2, 0.4, 0.6)

@@ -237,7 +237,21 @@ func _ready() -> void:
 	FieldMap.prepare()   # 38단계: 지도의 땅 그림(세션에 한 번, 첫 M이 멈칫하지 않게)
 
 
+## 꾸미기 비밀(CosSecrets, docs/cosmetics.md): 때가 맞는 자리만 모양이 선다.
+var _sec: SecretRun
+
+
+func _sec_ground(c: Vector2) -> float:
+	var p: Vector3 = Grid.cells_to_world(c)
+	return FieldBuilder.walk_height(p.x, p.z)
+
+
+func _sec_ctx() -> Dictionary:
+	return {"weather": String(rules.field_weather), "night": rules.field_night}
+
+
 func _build_props() -> void:
+	_sec = SecretRun.new("field", self, meta, Callable(self, "_sec_ground"))
 	for id in FieldLayout.CACHES:
 		if not meta.field_found.has(id):
 			_props[id] = FieldBuilder.cache(self, id)
@@ -373,6 +387,8 @@ func _process(delta: float) -> void:
 		if not _shown.has(a):
 			_shown[a] = true
 			_hud.area_title(FieldLayout.AREA_NAMES[a])
+	_sec.refresh(_sec_ctx())
+	_sec.animate(delta, _lord.position)
 	_near = ""
 	if rules.lord.riding:   # 39단계: 탄 채로는 들를 곳 안내를 내린다(E는 내리기)
 		_hud.set_prompt("E", "")
@@ -587,6 +603,7 @@ func _on_dismounted(fell: bool) -> void:
 
 func _spots() -> Dictionary:
 	var s := {"gate": FieldLayout.GATE, "trail": FieldLayout.TRAILHEAD, "crypt": FieldLayout.CRYPT_DOOR}
+	s.merge(_sec.spots())
 	if not meta.dropped.is_empty():
 		s["dropped"] = meta.dropped_at()
 	if rules.horse.waiting():
@@ -620,6 +637,8 @@ func _spots() -> Dictionary:
 
 
 func _prompt(key: String) -> String:
+	if key.begins_with("sec_"):
+		return _sec.prompt(key)
 	if key == "gate":
 		return "마을로 돌아간다"
 	if key == "trail":
@@ -720,6 +739,10 @@ func _interact() -> void:
 		var d: SwordData = data.sword_by_id(id)
 		_sfx.play(&"thump", Grid.cells_to_world(rules.lord.pos), -4.0, 1.3)
 		_hud.toast("떨군 검을 되찾았다: %s" % (d.display_name if d else "?"))
+		_saved()
+	elif _near.begins_with("sec_"):
+		_sec.use(_near, _hud)
+		_sfx.play(&"thump", _lord.position, -8.0, 1.4)
 		_saved()
 	elif _near == "horse":
 		rules.mount()

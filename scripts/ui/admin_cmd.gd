@@ -220,6 +220,7 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.cos_owned.clear()
 			meta.cos_worn.clear()
 			meta.cos_seen.clear()
+			meta.cos_secrets.clear()
 			meta.cos_look = meta.cos_worn
 			meta.cos_sync()
 			meta.save()
