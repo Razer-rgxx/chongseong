@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열", "방어"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -56,7 +56,9 @@ static func describe(cmd: Dictionary) -> String:
 		"룬":
 			return "룬 예리|밤|낮|사냥|바람|불굴|연쇄|정예 1~3 (룬 주머니에 하나 넣는다. 대장간 E의 룬 박기 탭에서 박는다. keen night day hunt wind grit chain elite도 된다)"
 		"균열":
-			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨려 건물을 망가뜨린다. 수리는 마을 건물 E)"
+			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨린다 = 다음에 마을에 들어서면 방어전. 수리는 마을 건물 E)"
+		"방어":
+			return "방어 승리 · 패배 (터진 균열의 마을 방어전을 바로 끝낸다: 승리는 보상, 패배는 건물이 망가진다)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -192,10 +194,25 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 					meta.rr_left = 0
 					text = "관리: 균열을 닫았다(보상 없음)"
 				"터짐":
-					var r: Dictionary = RiftRaid.breach(meta, gd)
-					text = "관리: 균열이 터졌다(망가진 건물 %d채%s). 마을에 가면 소식이 뜬다." % [r.hit.size(), ", 마을이 한 단계 내려앉음" if r.dropped else ""]
+					RiftRaid.breach(meta)
+					text = "관리: 균열이 터졌다. 마을에 들어서면 방어전이 선다(`방어 승리`·`방어 패배`로 바로 끝낼 수 있다)."
 			meta.save()
 			return text
+		"방어":
+			if meta == null or a.is_empty() or not ["승리", "패배"].has(a[0]):
+				return "방어 승리, 패배 중 하나를 적으세요."
+			var gd2: GameData = rules.data if rules != null else GameData.load_default()
+			if not meta.rr_breach_pending:
+				return "방어를 기다리는 터진 균열이 없습니다(`균열 터짐`으로 먼저 터뜨리세요)."
+			var t2: String = ""
+			if a[0] == "승리":
+				var w: Dictionary = RiftRaid.defense_win(meta, gd2)
+				t2 = "관리: 방어전 승리(조각 %d개%s)" % [w.shards, ", 룬 " + Meta.rt().rune_name(String(w.rune)) if w.rune != "" else ""]
+			else:
+				var l: Dictionary = RiftRaid.defense_lose(meta, gd2)
+				t2 = "관리: 방어전 패배(망가진 건물 %d채%s). 마을에 가면 소식이 뜬다." % [l.hit.size(), ", 마을이 한 단계 내려앉음" if l.dropped else ""]
+			meta.save()
+			return t2
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

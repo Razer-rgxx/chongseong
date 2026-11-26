@@ -25,12 +25,19 @@ func _village(seed_v: int = 5) -> Meta:
 	return m
 
 
+## 터뜨리고 방어전에서 진 것으로 한다.
+func _lose(m: Meta) -> Dictionary:
+	RiftRaid.breach(m)
+	return RiftRaid.defense_lose(m, d)
+
+
 func _all() -> void:
 	_gate()
 	_open_and_timer()
 	_close_pays_once()
 	_wave_fight()
 	_breach()
+	_defense_flow()
 	_disabled_and_repair()
 	_tier_drop()
 	_save()
@@ -79,7 +86,7 @@ func _open_and_timer() -> void:
 	var r1: String = RiftRaid.after_run(m2, d)
 	check.call(r1 == "ticking" and m2.rr_open and m2.rr_left == left0 - 1, "균열: 판이 하나 끝나면 남은 판이 준다")
 	var r2: String = RiftRaid.after_run(m2, d)
-	check.call(r2 == "breached" and not m2.rr_open, "균열: 남은 판이 0이면 터진다")
+	check.call(r2 == "breached" and not m2.rr_open and m2.rr_breach_pending and m2.rr_ruined.is_empty() and m2.rr_streak == 0, "균열: 남은 판이 0이면 터지지만 건물은 그대로(방어전을 기다린다)")
 
 
 func _close_pays_once() -> void:
@@ -145,8 +152,8 @@ func _breach() -> void:
 	var md: MetaData = d.meta
 	var a := _village(21)
 	var b := _village(21)
-	var ra: Dictionary = RiftRaid.breach(a, d)
-	var rb: Dictionary = RiftRaid.breach(b, d)
+	var ra: Dictionary = _lose(a)
+	var rb: Dictionary = _lose(b)
 	check.call(ra.hit == rb.hit and ra.fled == rb.fled and a.rr_ruined == b.rr_ruined, "균열: 터짐은 같은 씨앗이면 같은 건물이 망가진다")
 	var n: int = a.rr_ruined.size()
 	check.call(n >= md.rift_damage_min and n <= md.rift_damage_max, "균열: 건물 %d채가 망가진다(1~2)" % n)
@@ -163,8 +170,81 @@ func _breach() -> void:
 	# 지은 건물이 없으면 망가질 것이 없다
 	var e := Meta.new()
 	e.anchor_hand = true
-	var re: Dictionary = RiftRaid.breach(e, d)
+	var re: Dictionary = _lose(e)
 	check.call(re.hit.is_empty() and e.rr_ruined.is_empty(), "균열: 지은 건물이 없으면 망가질 것도 없다")
+
+
+func _defense_flow() -> void:
+	var md: MetaData = d.meta
+	# 터져도 건물은 그대로, 대기 표시만 서고 저장된다
+	var m := _village(31)
+	RiftRaid.open(m, md)
+	RiftRaid.breach(m)
+	check.call(m.rr_breach_pending and not m.rr_open and m.rr_ruined.is_empty() and m.rr_fled.is_empty() and m.rr_news == "" and m.rr_streak == 0, "방어: 터지면 건물은 안 망가지고 방어 대기만 선다")
+	check.call(RiftRaid.after_run(m, d) == "" and not m.rr_open, "방어: 방어를 기다리는 동안은 균열이 또 열리지 않는다")
+	var path: String = "user://test_rift_def.json"
+	m.save(path)
+	var m3 := Meta.load_or_new(path)
+	check.call(m3.rr_breach_pending, "방어: 대기 표시가 저장되고 읽힌다")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	check.call(Guide.current(m) == Guide.index_of("rift_close") and Guide.title_of(Guide.index_of("rift_close"), m) == "마을을 지켜라", "방어: 길라잡이는 대기 중 \"마을을 지켜라\"")
+	# 이기면 한 번만 보상, 건물은 그대로
+	var s0: int = m.shards
+	var w: Dictionary = RiftRaid.defense_win(m, d)
+	check.call(not m.rr_breach_pending and int(w.shards) > 0 and m.shards == s0 + int(w.shards) and m.rr_ruined.is_empty() and m.rr_streak == 0, "방어: 이기면 대기가 풀리고 조각을 받고 건물은 멀쩡")
+	check.call(RiftRaid.defense_win(m, d).is_empty() and m.shards == s0 + int(w.shards) and RiftRaid.defense_lose(m, d).is_empty() and m.rr_ruined.is_empty(), "방어: 보상은 한 번만, 끝난 방어는 지지도 않는다")
+	# 지면 같은 씨앗이면 같은 건물이 망가지고 연달아 센 수가 는다
+	var a := _village(32)
+	var b := _village(32)
+	var ra: Dictionary = _lose(a)
+	var rb: Dictionary = _lose(b)
+	check.call(ra.hit == rb.hit and not ra.hit.is_empty() and a.rr_streak == 1 and not a.rr_breach_pending, "방어: 지면 정해진 건물이 망가진다(같은 씨앗이면 같다)")
+	# 이긴 방어는 연달아 센 수를 안 올린다
+	var c := _village(33)
+	for _i in 4:
+		RiftRaid.breach(c)
+		RiftRaid.defense_win(c, d)
+	check.call(c.rr_streak == 0 and c.rr_cut == 0 and c.rr_ruined.is_empty(), "방어: 이긴 방어는 단계 하락에 안 센다")
+	# 싸움: 물결 둘이 북문과 가장자리에 서고 다 쓰러뜨리면 끝난다
+	var rules := Rules.new(d, 55)
+	Grid.size = Vector2i(50, 22)
+	rules.lord.pos = Vector2(17.0, 13.0)
+	rules.start_field()
+	var df := RiftRaid.Defense.new(rules, md)
+	var seen: Array = []
+	df.wave_started.connect(func(n: int, last: bool) -> void: seen.append([n, last]))
+	var done: Array = [false]
+	df.done.connect(func() -> void: done[0] = true)
+	df.start()
+	check.call(seen == [[1, false]] and df.ids.size() == 2, "방어: 시작하면 북문과 가장자리에 무리가 선다")
+	var engaged: bool = true
+	var kinds: Dictionary = {}
+	for e in rules.enemies:
+		kinds[e.data.id] = 1
+	for id in df.ids:
+		engaged = engaged and int(rules.packs[id].state) == Rules.PACK_ENGAGED
+	check.call(engaged and kinds.size() >= 2, "방어: 처음부터 영주에게 덤비고 두 시대 이상이 섞인다 %s" % [kinds.keys()])
+	var full: int = 0
+	var wave_fight := Rules.new(d, 77)
+	wave_fight.start_field(0.0)
+	var rf := RiftRaid.Fight.new(wave_fight, md, Vector2(60, 50))
+	rf.start()
+	full = wave_fight.pack_alive(&"rift_w1")
+	var small: int = 0
+	for id in df.ids:
+		small += rules.pack_alive(id)
+	check.call(small > 0 and small <= full + 2, "방어: 마을은 균열 싸움보다 적이 가볍다(%d, 균열 한 물결 %d)" % [small, full])
+	var guard: int = 0
+	while not done[0] and guard < 20:
+		guard += 1
+		for e in rules.enemies:
+			if not e.dead and String(e.pack).begins_with("def_"):
+				e.dead = true
+		rules._step_field()
+		df.step(md.rift_wave_gap + 0.1)
+		df.step(md.rift_wave_gap + 0.1)
+	check.call(done[0] and df.cleared and seen.size() == RiftRaid.DEF_WAVES and seen.back()[1] == true, "방어: 물결 %d번을 다 쓰러뜨리면 끝난다" % RiftRaid.DEF_WAVES)
+	Grid.size = Vector2i(34, 22)
 
 
 func _disabled_and_repair() -> void:
@@ -218,10 +298,10 @@ func _tier_drop() -> void:
 	m.sheath_lv = 3
 	for i in md.rift_drop_after - 1:
 		RiftRaid.open(m, md)
-		RiftRaid.breach(m, d)
+		_lose(m)
 		check.call(m.village_tier(d) == t0 and m.rr_cut == 0, "균열: 연달아 %d번 터져도 아직 단계가 그대로" % (i + 1))
 	RiftRaid.open(m, md)
-	var r: Dictionary = RiftRaid.breach(m, d)
+	var r: Dictionary = _lose(m)
 	check.call(r.dropped and m.rr_cut == 1 and m.village_tier(d) == t0 - 1, "균열: 안 고치고 %d번 연달아 터지면 마을이 한 단계 내려간다" % md.rift_drop_after)
 	check.call(m.sheath_lv == 3 and m.sheath_id == sheath and m.shards >= 0 and m.has_built(&"cottage"), "균열: 검집과 지은 기록은 그대로(세이브는 안 건드린다)")
 	check.call(RiftRaid.news_text(m, d).find("한 단계") >= 0, "균열: 단계가 내려앉았다는 소식")
@@ -239,19 +319,20 @@ func _tier_drop() -> void:
 func _save() -> void:
 	var m := _village(6)
 	RiftRaid.open(m, d.meta, 2)
-	RiftRaid.breach(m, d)
+	_lose(m)
 	RiftRaid.open(m, d.meta, 1)
+	m.rr_breach_pending = true
 	m.rr_closed = 2
 	m.rr_since = 3
 	m.rr_cut = 1
 	var path: String = "user://test_rift_save.json"
 	m.save(path)
 	var m2 := Meta.load_or_new(path)
-	check.call(m2.rr_open == m.rr_open and m2.rr_spot == 1 and m2.rr_left == m.rr_left and m2.rr_streak == m.rr_streak and m2.rr_ruined == m.rr_ruined and m2.rr_fled == m.rr_fled and m2.rr_news == m.rr_news and m2.rr_closed == 2 and m2.rr_since == 3 and m2.rr_cut == 1, "균열: 저장하고 읽어도 그대로")
+	check.call(m2.rr_open == m.rr_open and m2.rr_spot == 1 and m2.rr_left == m.rr_left and m2.rr_streak == m.rr_streak and m2.rr_ruined == m.rr_ruined and m2.rr_fled == m.rr_fled and m2.rr_news == m.rr_news and m2.rr_breach_pending and m2.rr_closed == 2 and m2.rr_since == 3 and m2.rr_cut == 1, "균열: 저장하고 읽어도 그대로")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	var old := Meta.new()
 	old.from_dict({"shards": 10, "runs": 3})
-	check.call(not old.rr_open and old.rr_ruined.is_empty() and old.rr_fled.is_empty() and old.rr_cut == 0 and old.rr_news == "", "균열: 옛 저장(균열 키 없음)도 그대로 읽는다")
+	check.call(not old.rr_open and old.rr_ruined.is_empty() and old.rr_fled.is_empty() and old.rr_cut == 0 and old.rr_news == "" and not old.rr_breach_pending, "균열: 옛 저장(균열 키 없음)도 그대로 읽는다")
 
 
 func _guide() -> void:
@@ -262,7 +343,7 @@ func _guide() -> void:
 	var shown0: int = Guide.shown_count(m)
 	RiftRaid.open(m, d.meta)
 	check.call(Guide.current(m) == rc, "균열: 열려 있는 동안 길라잡이는 균열 닫기를 맨 앞에 둔다")
-	RiftRaid.breach(m, d)
+	_lose(m)
 	check.call(Guide.shown(rp, m) and Guide.current(m) == rp and Guide.shown_count(m) == shown0, "균열: 건물이 망가져 있는 동안 수리 안내가 앞에 서고 쪽수에는 안 센다")
 	check.call(Guide.hint_for(rp, "lobby", m) == "repair" and Guide.hint_for(rc, "field", m) == "raid", "균열: 방향 자리 이름")
 	for id in m.rr_ruined.keys():

@@ -174,15 +174,17 @@ static func _draw_gem(c: Control, at: Vector2, r: float, filled: bool, col: Colo
 func _refresh() -> void:
 	var cur: int = Guide.current(meta)
 	var total: int = Guide.shown_count(meta)
-	var alert: bool = meta.rr_open or not meta.rr_ruined.is_empty()
+	var alert: bool = meta.rr_open or meta.rr_breach_pending or not meta.rr_ruined.is_empty()
 	_t_alert.visible = alert
 	if meta.rr_open:
 		_t_alert.text = "시대의 균열  ·  터지기까지 %d판" % meta.rr_left
+	elif meta.rr_breach_pending:
+		_t_alert.text = "균열이 터졌다  ·  마을을 지켜라"
 	elif alert:
 		_t_alert.text = "무너진 건물 %d채  ·  고치기 전에는 못 쓴다" % meta.rr_ruined.size()
 	_track.visible = (cur >= 0 or alert) and _win == null
 	_hint_red = false
-	if meta.rr_open:   # 방향 띠도 균열을 붉게 가리킨다(들판에서는 균열 자리, 마을에서는 북문)
+	if meta.rr_open or meta.rr_breach_pending:   # 방향 띠도 균열을 붉게 가리킨다(들판에서는 균열 자리, 마을에서는 북문)
 		var rc: Vector2 = _resolve("raid")
 		if rc != Vector2.INF:
 			_hint_cell = rc
@@ -192,12 +194,12 @@ func _refresh() -> void:
 			_hint_cell = Vector2.INF
 		return
 	_t_head.text = "길라잡이  %d / %d" % [Guide.done_count(meta), total]
-	_t_title.text = Guide.title_of(cur)
+	_t_title.text = Guide.title_of(cur, meta)
 	var fold: bool = meta.guide_fold
 	_t_goal.visible = not fold
 	_t_prog.get_parent().visible = not fold
 	if not fold:
-		_t_goal.text = Guide.goal_of(cur)
+		_t_goal.text = Guide.goal_of(cur, meta)
 		var need: int = int(Guide.STEPS[cur].need)
 		_t_prog.text = "%d / %d" % [Guide.count(cur, meta), need]
 		_t_reward.text = Guide.reward_text(cur)
@@ -241,7 +243,7 @@ func _check(force: bool = false) -> void:
 		meta.save()
 		if hud != null and hud.has_method("refresh_top"):
 			hud.call("refresh_top")
-	var sig: String = "%s|%d|%d|%d|%d" % [meta.rr_open, meta.rr_left, meta.rr_ruined.size(), meta.rr_spot, Guide.current(meta)]
+	var sig: String = "%s|%s|%d|%d|%d|%d" % [meta.rr_open, meta.rr_breach_pending, meta.rr_left, meta.rr_ruined.size(), meta.rr_spot, Guide.current(meta)]
 	if force or not done.is_empty() or sig != _sig:
 		_sig = sig
 		_refresh()

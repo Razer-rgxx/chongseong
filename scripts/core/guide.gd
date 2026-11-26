@@ -32,7 +32,7 @@ const STEPS: Array[Dictionary] = [
 	{"id": "future", "ch": 3, "title": "녹슨 미래로", "goal": "들판에 열린 갈라진 틈에서 E를 눌러 건너간다", "need": 1, "reward": {"shards": 20}, "hint": {"field": "rift"}, "hidden": true},
 	{"id": "traveller", "ch": 3, "title": "시간을 건너는 사람", "goal": "미래의 이야기를 따라가 타임트래블러를 만난다", "need": 1, "reward": {"shards": 30}, "hidden": true},
 	## 시대 균열(docs/rift_raid.md): 3막(흑룡)을 마친 뒤에만 목록에 든다(raid). 열려 있는 동안은 맨 앞 단계가 된다(urgent).
-	{"id": "rift_close", "ch": 3, "title": "균열 닫기", "goal": "들판에 열린 시대의 균열에서 E를 눌러 물결을 이겨 내고 우두머리를 쓰러뜨린다. 못 닫으면 터져 마을이 상한다", "need": 1, "reward": {"shards": 40}, "hint": {"field": "raid", "lobby": "raid"}, "raid": true},
+	{"id": "rift_close", "ch": 3, "title": "균열 닫기", "goal": "들판에 열린 시대의 균열에서 E를 눌러 물결을 이겨 내고 우두머리를 쓰러뜨린다. 못 닫으면 터져 마을에 방어전이 선다(지면 건물이 망가진다)", "need": 1, "reward": {"shards": 40}, "hint": {"field": "raid", "lobby": "raid"}, "raid": true},
 	## 건물 수리: 건물이 망가져 있는 동안에만 나오는 안내(끝나는 단계가 아니라 쪽수에도 안 센다, transient).
 	{"id": "repair", "ch": 0, "title": "무너진 건물 고치기", "goal": "무너진 건물 앞에서 E를 눌러 재료를 내고 수리한다(고치기 전에는 그 건물의 기능을 못 쓴다)", "need": 1, "reward": {}, "hint": {"lobby": "repair"}, "transient": true},
 ]
@@ -151,11 +151,11 @@ static func shown_count(m: Meta) -> int:
 	return n
 
 
-## 급한 단계: 건물이 망가져 있으면 수리, 균열이 열려 있으면 균열 닫기가 맨 앞에 선다.
+## 급한 단계: 건물이 망가져 있으면 수리, 균열이 열려 있거나 터져 방어전을 기다리면 균열 닫기(터졌으면 "마을을 지켜라")가 맨 앞에 선다.
 static func _urgent(i: int, m: Meta) -> bool:
 	match String(STEPS[i].id):
 		"repair": return not m.rr_ruined.is_empty()
-		"rift_close": return m.rr_open and RiftRaid.unlocked(m)
+		"rift_close": return (m.rr_open or m.rr_breach_pending) and RiftRaid.unlocked(m)
 	return false
 
 
@@ -170,11 +170,20 @@ static func current(m: Meta) -> int:
 	return -1
 
 
-static func title_of(i: int) -> String:
+const DEFEND_TITLE: String = "마을을 지켜라"
+const DEFEND_GOAL: String = "균열이 터졌다. 마을에 들어서면 방어전이 서고, 쏟아지는 적을 모두 쓰러뜨려야 한다. 영주가 쓰러지면 건물이 망가진다"
+
+
+## m을 주면 방어전을 기다리는 동안 "균열 닫기" 단계가 "마을을 지켜라"로 보인다.
+static func title_of(i: int, m: Meta = null) -> String:
+	if m != null and m.rr_breach_pending and String(STEPS[i].id) == "rift_close":
+		return DEFEND_TITLE
 	return String(STEPS[i].title)
 
 
-static func goal_of(i: int) -> String:
+static func goal_of(i: int, m: Meta = null) -> String:
+	if m != null and m.rr_breach_pending and String(STEPS[i].id) == "rift_close":
+		return DEFEND_GOAL
 	return String(STEPS[i].goal)
 
 

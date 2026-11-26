@@ -81,6 +81,13 @@ var _low_rects: Array[Rect2] = []
 var _low_circles: Array = []
 var _deco := RandomNumberGenerator.new()
 var _move_fx := MoveFx.new()
+## 마을 방어전(2026-11-26, docs/rift_raid.md): 균열이 터진 채 마을에 들어서면 선다. 적의 몸·효과는 들판과 같은 것을 쓴다.
+var _defense: RiftRaid.Defense = null
+var _def_over: bool = false
+var _fx := HitFx.new()
+var _enemy_fx := EnemyFx.new()
+var _enemies: Dictionary = {}
+var _dying: Array[EnemyView] = []
 var _dummies: Array[Node3D] = []
 var _dummy_enemies: Array[Enemy] = []
 var _wobble: Array[float] = [0.0, 0.0, 0.0]
@@ -166,7 +173,13 @@ func _ready() -> void:
 	_hud.sheath_bought.connect(_on_sheath_bought)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
+	add_child(_fx)
+	add_child(_enemy_fx)
+	_enemy_fx.setup(rules, _enemy_parts)
 	rules.enemy_hit.connect(_on_dummy_hit)
+	rules.enemy_died.connect(_on_enemy_died)
+	rules.lord_hurt.connect(_on_lord_hurt)
+	rules.run_ended.connect(_on_defense_lost)
 	rules.lord_swung.connect(func(big: bool) -> void: _sfx.play(&"swish_big" if big else &"swish", _lord.position, -4.0))
 	rules.lord_landed.connect(func(_at: Vector2) -> void: _sfx.play(&"land", _lord.position, -4.0))
 	_apply_yard_sword()
@@ -186,6 +199,7 @@ func _ready() -> void:
 		_hud.toast(Meta.wake_note if Meta.wake_note != "" else "들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
 		Meta.wake_note = ""
 	_arrival_news()
+	_start_defense()   # 터진 균열이 기다리고 있으면 곧바로 방어전
 	_capture(true)
 	GuideHud.attach(self, meta, rules, "lobby", _hud, guide_spot, _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
@@ -256,7 +270,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _hud.is_open():
+	if _hud.is_open() or _def_over:
 		return
 	_acc += delta
 	var n: int = 0
@@ -265,7 +279,7 @@ func _physics_process(delta: float) -> void:
 		inp.move = _camera.relative_move(Input.get_vector("move_left", "move_right", "move_up", "move_down"))
 		inp.dash = _dash_buf.on()
 		inp.jump = _want_jump and _talker == &""
-		inp.attack = _talker == &"" and Input.is_action_pressed("attack") and _in_yard()
+		inp.attack = _talker == &"" and Input.is_action_pressed("attack") and (_in_yard() or _defense != null)
 		if _camera.third() and inp.attack:
 			inp.aim_valid = true
 			inp.aim = rules.lord.pos + _camera.forward_cells() * 3.0
@@ -279,6 +293,9 @@ func _physics_process(delta: float) -> void:
 			inp.aim = rules.lord.pos + inp.move
 		var _c0: int = rules.powers.dash_charges
 		rules.step(inp)
+		if _defense != null:
+			_defense.step(rules.dt)
+			_defense_admin_check()
 		_dash_buf.end_tick(rules.dt, rules.powers.dash_charges < _c0)
 		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne())
 		_want_jump = false
@@ -324,11 +341,18 @@ func _process(delta: float) -> void:
 	else:
 		_hud.set_prompt("E", _prompt_for(_near))
 	_move_fx.draw(alpha)
+	_enemy_fx.draw(alpha)
+	_sync_enemies(alpha, delta)
+	if _defense != null:
+		_hud.set_hp(rules.lord.hp, rules.max_hp())
+		_near = ""
 	_animate_village(delta)
 	_forge_light.light_energy = lerpf(_forge_light.light_energy, 1.6, delta * 3.0)
 
 
 func _interact() -> void:
+	if _defense != null or _def_over:   # 방어전 동안은 아무 데도 못 들르고 북문도 막혔다
+		return
 	if _talker != &"" and _hud.say_typing():
 		_hud.say_finish()   # 글자가 나오는 중이면 먼저 다 보인다
 		return
@@ -1039,6 +1063,152 @@ func _arrival_news() -> void:
 		_hud.toast("북쪽 들판에 시대의 균열이 열렸다")
 
 
+## 터진 균열의 방어전(2026-11-26): 마을 전체에서 좌클릭이 먹고, 북문과 목책 가장자리에서 시대가 섞인 적이 쏟아져 영주에게 덤빈다.
+## 주민은 숨고 북문은 막힌다. 이기면 보상, 영주가 쓰러지면 건물이 망가진다(RiftRaid.defense_lose). 건물은 체력이 없다.
+func _start_defense() -> void:
+	if not meta.rr_breach_pending or _defense != null or not RiftRaid.unlocked(meta):
+		return
+	rules.yard = false
+	rules.start_field()
+	rules.set_blockers(_rects, _circles, _low_rects, _low_circles)
+	_defense = RiftRaid.Defense.new(rules, data.meta)
+	_defense.wave_started.connect(func(n: int, last: bool) -> void:
+		_camera.add_shake(0.3)
+		_sfx.play(&"thump", _lord.position, -3.0, 0.45)
+		if n > 1:
+			_hud.toast("마지막 물결이 몰려온다" if last else "물결 %d / %d" % [n, RiftRaid.DEF_WAVES]))
+	_defense.done.connect(_on_defense_won)
+	_hide_folk(true)
+	_hud.area_title("균열에서 쏟아져 나왔다 — 마을을 지켜라")
+	_hud.toast("균열에서 쏟아져 나왔다 — 마을을 지켜라")
+	_sfx.play(&"thump", _lord.position, -2.0, 0.4)
+	_defense.start()
+
+
+## 관리 명령(`방어 승리·패배`)이 밖에서 방어를 끝냈으면 맞춘다: 졌으면(소식이 남음) 마을을 다시 열고, 이겼으면 적을 치운다.
+func _defense_admin_check() -> void:
+	if _defense == null or meta.rr_breach_pending:
+		return
+	if meta.rr_news != "":
+		rules.run_ended.emit(false)
+		return
+	_defense = null
+	_end_defense_mode()
+
+
+## 방어전 동안 주민(말 상대·일하는 사람·걷는 사람)을 숨긴다. 끝나면 다시 보인다.
+func _hide_folk(hide: bool) -> void:
+	for id in _folk:
+		(_folk[id].root as Node3D).visible = not hide
+	for r in _res:
+		(r.root as Node3D).visible = not hide and not r.fled
+	for w in _walkers:
+		(w.root as Node3D).visible = not hide
+
+
+func _on_defense_won() -> void:
+	var r: Dictionary = RiftRaid.defense_win(meta, data)
+	if r.is_empty():
+		return
+	_def_over = true
+	_defense = null
+	meta.save()
+	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time * 1.4)
+	_camera.add_shake(data.lord.shake_big * 2.0)
+	_hud.flash(Color(1, 0.84, 0.42), 0.25, 0.9)
+	var bits: Array[String] = ["조각 %d개" % int(r.shards)]
+	if r.rune != "":
+		bits.append(Meta.rt().rune_name(String(r.rune)))
+	_hud.area_title("마을을 지켜 냈다")
+	_hud.toast("마을을 지켜 냈다. " + ", ".join(bits))
+	_end_defense_mode()
+
+
+## 방어전이 끝나 마을로 돌아간다(규칙은 다시 수련장 모드, 적은 치우고 주민이 돌아온다).
+func _end_defense_mode() -> void:
+	for e in rules.enemies.duplicate():
+		if e.pack != &"":
+			e.dead = true
+	rules.enemies = rules.enemies.filter(func(e: Enemy) -> bool: return e.pack == &"" and not e.dead)
+	rules.packs.clear()
+	rules.field = false
+	rules.yard = true
+	rules.nav = null
+	rules.lord.hp = rules.max_hp()
+	_hide_folk(false)
+	_hud.set_hp(rules.lord.hp, rules.max_hp())
+	_def_over = false
+
+
+## 영주가 쓰러졌다(방어전에서만 일어난다): 건물이 망가지고 잠깐 어두워졌다가 마을에서 깬다.
+func _on_defense_lost(_won: bool) -> void:
+	if _defense == null or _def_over:
+		return
+	_def_over = true
+	_defense = null
+	RiftRaid.defense_lose(meta, data)
+	meta.save()
+	Meta.wake_at_gate = true
+	Meta.wake_note = ""
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_hud.flash(Color(0.05, 0.0, 0.0), 0.85, 1.6)
+	await get_tree().create_timer(1.6).timeout
+	SceneLoader.go(get_tree(), "res://scenes/lobby/lobby.tscn")   # 다시 마을: 북문 앞에서 깨고, 망가진 건물 소식이 뜬다
+
+
+## 규칙의 적 목록과 맞춘다(들판과 같다). 마을은 평평하다.
+func _sync_enemies(alpha: float, delta: float) -> void:
+	var alive := {}
+	for e in rules.enemies:
+		if e.data.still:   # 허수아비는 소품이 그린다
+			continue
+		alive[e.id] = true
+		if not _enemies.has(e.id):
+			var v := EnemyView.new()
+			v.setup(e)
+			add_child(v)
+			_enemies[e.id] = v
+	for id in _enemies.keys():
+		var v: EnemyView = _enemies[id]
+		if not alive.has(id) or v.enemy.dead:
+			_enemies.erase(id)
+			v.die()
+			_dying.append(v)
+		else:
+			v.draw(alpha, delta)
+	for i in range(_dying.size() - 1, -1, -1):
+		if _dying[i].draw(alpha, delta):
+			_dying[i].queue_free()
+			_dying.remove_at(i)
+
+
+func _enemy_parts(e: Enemy) -> Dictionary:
+	var v: EnemyView = _enemies.get(e.id)
+	return v.parts if v else {}
+
+
+func _on_lord_hurt(d: float) -> void:
+	_sfx.play(&"hurt", _lord.position, -4.0)
+	_camera.add_shake(0.25)
+	_hud.flash(Color(1, 0.2, 0.25), 0.18, 0.3)
+	var t := FloatText.new()
+	t.text = "-%d" % roundi(d)
+	t.font_size = 34
+	t.modulate = Color(1, 0.42, 0.42)
+	add_child(t)
+	t.global_position = _lord.position + Vector3(0, 2.4, 0)
+
+
+func _on_enemy_died(e: Enemy) -> void:
+	if e.data.still or e.act == &"explode":
+		return
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	if e.data.wraith:
+		_fx.wisp(at + Vector3(0, 1.0, 0), Vector3.UP, true)
+	else:
+		_fx.splat(at, true)
+
+
 func _on_repaired(id: StringName) -> void:
 	var p: BuildingPlot = _plots.get(id)
 	if p != null:
@@ -1192,9 +1362,31 @@ func _on_yard_sword(id: int) -> void:
 	_apply_yard_sword()
 
 
+## 방어전의 적을 맞혔다(들판과 같은 꾸밈).
+func _on_foe_hit(e: Enemy, damage: float, big: bool) -> void:
+	var at: Vector3 = Grid.cells_to_world(e.pos)
+	if _enemies.has(e.id):
+		_enemies[e.id].hit(big)
+	var chest: Vector3 = at + Vector3(0, 0.9 + Grid.cells_to_meters(e.radius) * 1.2, 0)
+	var dir: Vector3 = (at - _lord.position).normalized()
+	if e.data.wraith:
+		_fx.wisp(chest, dir, big)
+	else:
+		_fx.blood(chest, dir, big)
+	var t := FloatText.new()
+	t.text = str(roundi(damage))
+	t.font_size = 52 if big else 34
+	t.modulate = Color(1, 0.86, 0.45) if big else Color.WHITE
+	add_child(t)
+	t.global_position = at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0)
+	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
+	_sfx.play(&"hit_big" if big else &"hit", at, 0.0)
+
+
 func _on_dummy_hit(e: Enemy, damage: float, big: bool) -> void:
 	var i: int = _dummy_enemies.find(e)
 	if i < 0:
+		_on_foe_hit(e, damage, big)
 		return
 	var at: Vector3 = Grid.cells_to_world(e.pos)
 	var d: Vector3 = at - _lord.position

@@ -50,7 +50,8 @@ func _init() -> void:
 	# 균열이 터졌다: 마을에서 망가진 건물
 	meta = field.get("meta")   # 장면이 나갈 때 제 Meta를 다시 저장하니 그 Meta를 고친다
 	meta.rr_open = false
-	var r: Dictionary = RiftRaid.breach(meta, d)
+	RiftRaid.breach(meta)
+	var r: Dictionary = RiftRaid.defense_lose(meta, d)
 	meta.rr_ruined[&"forge"] = 1
 	meta.rr_ruined[&"stable"] = 1
 	meta.rr_ruined[&"cottage"] = 1
