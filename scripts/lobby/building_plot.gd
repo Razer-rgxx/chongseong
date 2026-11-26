@@ -9,6 +9,13 @@ var bd: BuildingData = null
 var wall_lines: Array = []
 
 
+## 균열에 망가진 모습(docs/rift_raid.md): 재질을 검게 그을리고, 지붕 높이의 조각 일부를 떼고, 부서진 더미와 검은 연기를 얹는다. build 전에 켠다.
+var ruined: bool = false
+var _ruin: Node3D = null
+var _hidden: Array[MeshInstance3D] = []
+var _orig: Dictionary = {}   ## 그을리기 전 재질(MeshInstance3D → 재질, 되돌릴 때)
+
+
 func setup(p_bd: BuildingData) -> void:
 	bd = p_bd
 	size = bd.size
@@ -181,3 +188,86 @@ func _chopping(root: Node3D, at: Vector3) -> void:
 	VillageBuilder.cyl(root, 0.33, 0.33, 0.02, at + Vector3(0, 0.555, 0), VillageBuilder.plain(Color(0.6, 0.45, 0.3), 0.9), 10)
 	VillageBuilder.box(root, Vector3(0.05, 0.75, 0.05), at + Vector3(0.1, 0.85, 0.05), VillageBuilder.timber(), Vector3(0.0, 0.0, -0.5))
 	VillageBuilder.box(root, Vector3(0.22, 0.14, 0.03), at + Vector3(-0.05, 0.6, 0.05), VillageBuilder.plain(Color(0.4, 0.39, 0.37), 0.5, 0.8), Vector3(0.0, 0.0, -0.5))
+
+
+# ---------------------------------------------------------------- 균열에 망가진 모습
+
+func _make_root() -> void:
+	super._make_root()
+	if ruined:
+		_ruin_on()
+
+
+func _smoke() -> void:
+	if not ruined:
+		super._smoke()
+
+
+## 망가뜨린다(이미 서 있는 몸에도).
+func set_ruined(on: bool) -> void:
+	if on == ruined:
+		return
+	ruined = on
+	if _body == null:
+		return
+	if on:
+		_ruin_on()
+	else:
+		_ruin_off()
+		_smoke()
+
+
+func _ruin_on() -> void:
+	var all: Array = []
+	_collect(_body, all)
+	var r := RandomNumberGenerator.new()
+	r.seed = 9001 + int(absf(global_position.x) * 7.0 + absf(global_position.z) * 13.0)
+	_hidden = []
+	_orig = {}
+	var charred: Dictionary = {}   # 같은 재질은 같은 그을린 복사본을 쓴다
+	for mi in all:
+		var m: MeshInstance3D = mi
+		var base: Material = m.material_override if m.material_override != null else m.get_active_material(0)
+		if base is StandardMaterial3D:
+			_orig[m] = m.material_override
+			if not charred.has(base):
+				var c: StandardMaterial3D = (base as StandardMaterial3D).duplicate()
+				c.albedo_color = c.albedo_color.darkened(0.7)
+				c.emission_enabled = false
+				charred[base] = c
+			m.material_override = charred[base]
+		if _mid_y(m) > size.y * 0.55 + 1.2 and m.position.y > 1.8 and r.randf() < 0.45:   # 지붕 조각이 떨어져 나갔다
+			m.visible = false
+			_hidden.append(m)
+	_ruin = Node3D.new()
+	add_child(_ruin)
+	var dark := VillageBuilder.plain(Color(0.1, 0.085, 0.075), 0.95)
+	var ember := VillageBuilder.glow(Color(1.0, 0.36, 0.1), 1.6)
+	for i in 14:   # 부서진 판자·돌 더미
+		var sz := Vector3(r.randf_range(0.25, 0.9), r.randf_range(0.08, 0.22), r.randf_range(0.12, 0.3))
+		var at := Vector3(r.randf_range(-size.x * 0.7, size.x * 0.7), sz.y / 2.0, r.randf_range(-size.y * 0.7, size.y * 0.7))
+		VillageBuilder.box(_ruin, sz, at, dark, Vector3(0.0, r.randf() * TAU, r.randf_range(-0.25, 0.25)))
+	for i in 3:
+		VillageBuilder.box(_ruin, Vector3(0.18, 0.1, 0.18), Vector3(r.randf_range(-size.x * 0.4, size.x * 0.4), 0.12, r.randf_range(-size.y * 0.3, size.y * 0.5)), ember)
+	var o := OmniLight3D.new()   # 잉걸 빛(약하게)
+	o.light_color = Color(1.0, 0.4, 0.15)
+	o.omni_range = 4.0
+	o.light_energy = 0.5
+	o.position = Vector3(0, 0.6, 0)
+	o.shadow_enabled = false
+	_ruin.add_child(o)
+	VillageBuilder.smoke(_ruin, Vector3(r.randf_range(-0.6, 0.6), 1.4, 0.0), 1.3)   # 검은 연기
+
+
+func _ruin_off() -> void:
+	if _ruin != null:
+		_ruin.queue_free()
+		_ruin = null
+	for m in _orig:
+		if is_instance_valid(m):
+			(m as MeshInstance3D).material_override = _orig[m]
+	_orig = {}
+	for m in _hidden:
+		if is_instance_valid(m):
+			m.visible = true
+	_hidden = []

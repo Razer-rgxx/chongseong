@@ -31,6 +31,10 @@ const STEPS: Array[Dictionary] = [
 	{"id": "gem_socket", "ch": 0, "title": "보석 박기", "goal": "대장간 E의 보석 탭에서 룬이 새겨진 검에 보석을 박는다(보석은 우두머리·상자에서 가끔 나오고 조각으로도 산다)", "need": 1, "reward": {"shards": 20}, "hint": {"lobby": "forge"}},
 	{"id": "future", "ch": 3, "title": "녹슨 미래로", "goal": "들판에 열린 갈라진 틈에서 E를 눌러 건너간다", "need": 1, "reward": {"shards": 20}, "hint": {"field": "rift"}, "hidden": true},
 	{"id": "traveller", "ch": 3, "title": "시간을 건너는 사람", "goal": "미래의 이야기를 따라가 타임트래블러를 만난다", "need": 1, "reward": {"shards": 30}, "hidden": true},
+	## 시대 균열(docs/rift_raid.md): 3막(흑룡)을 마친 뒤에만 목록에 든다(raid). 열려 있는 동안은 맨 앞 단계가 된다(urgent).
+	{"id": "rift_close", "ch": 3, "title": "균열 닫기", "goal": "들판에 열린 시대의 균열에서 E를 눌러 물결을 이겨 내고 우두머리를 쓰러뜨린다. 못 닫으면 터져 마을이 상한다", "need": 1, "reward": {"shards": 40}, "hint": {"field": "raid", "lobby": "raid"}, "raid": true},
+	## 건물 수리: 건물이 망가져 있는 동안에만 나오는 안내(끝나는 단계가 아니라 쪽수에도 안 센다, transient).
+	{"id": "repair", "ch": 0, "title": "무너진 건물 고치기", "goal": "무너진 건물 앞에서 E를 눌러 재료를 내고 수리한다(고치기 전에는 그 건물의 기능을 못 쓴다)", "need": 1, "reward": {}, "hint": {"lobby": "repair"}, "transient": true},
 ]
 
 
@@ -79,6 +83,8 @@ static func count(i: int, m: Meta) -> int:
 		"stable_horse": n = (1 if m.has_built(&"stable") else 0) + (1 if _ev(m, "horse") > 0 else 0)
 		"stranger": n = 1 if m.stranger_seen >= 1 else 0
 		"future": n = _ev(m, "future_enter")
+		"rift_close": n = m.rr_closed
+		"repair": n = 0   # 끝나는 단계가 아니다(건물을 다 고치면 목록에서 사라진다)
 		"traveller": n = 1 if m.time_traveller else 0
 		"first_rune": n = 1 if m.sword_runes.values().any(func(v): return not (v as Array).is_empty()) else 0
 		"gem_socket": n = 1 if m.sword_gems.values().any(func(v): return not (v as Array).is_empty()) else 0
@@ -99,6 +105,7 @@ static func legacy_ok(i: int, m: Meta) -> bool:
 		"field": return m.seen_count() > 0 or not m.field_found.is_empty() or not m.packs_cleared.is_empty() or m.boss_first
 		"pack": return not m.packs_cleared.is_empty() or m.boss_first or not m.chiefs_first.is_empty() or not m.crypt_cleared.is_empty() or not m.crypt_opened.is_empty()
 		"stable_horse": return m.has_built(&"stable")
+		"rift_close": return m.rr_closed > 0
 		"future": return not m.neon_logs.is_empty() or not m.story_shards.is_empty() or not m.future_hilts.is_empty() or m.time_traveller or m.vault_open
 	return false
 
@@ -114,24 +121,48 @@ static func is_done(i: int, m: Meta) -> bool:
 static func done_count(m: Meta) -> int:
 	var n: int = 0
 	for i in STEPS.size():
-		n += 1 if is_done(i, m) and shown(i, m) else 0
+		n += 1 if is_done(i, m) and shown(i, m) and not _transient(i) else 0
 	return n
 
 
-## 목록에 들어 있나. 숨은 단계(미래·이야기)는 틈이 열린 뒤(Meta.rift_open)에야 들어간다.
+static func _transient(i: int) -> bool:
+	return bool(STEPS[i].get("transient", false))
+
+
+## 목록에 들어 있나. 숨은 단계(미래·이야기)는 틈이 열린 뒤(Meta.rift_open)에야, 균열 단계(raid)는 3막을 마친 뒤에야,
+## 수리 안내(transient)는 건물이 망가져 있는 동안에만 들어간다. 그 전에는 이름도 ???도 안 보인다.
 static func shown(i: int, m: Meta) -> bool:
-	return not bool(STEPS[i].get("hidden", false)) or m.rift_open()
+	var s: Dictionary = STEPS[i]
+	if bool(s.get("hidden", false)) and not m.rift_open():
+		return false
+	if bool(s.get("raid", false)) and not RiftRaid.unlocked(m):
+		return false
+	if bool(s.get("transient", false)) and m.rr_ruined.is_empty():
+		return false
+	return true
 
 
+## 쪽수(n/전체)에 세는 단계 수(수리 안내는 안 센다).
 static func shown_count(m: Meta) -> int:
 	var n: int = 0
 	for i in STEPS.size():
-		n += 1 if shown(i, m) else 0
+		n += 1 if shown(i, m) and not _transient(i) else 0
 	return n
 
 
-## 지금 안내할 단계(끝나지 않은 첫 단계). 모두 끝났으면 -1.
+## 급한 단계: 건물이 망가져 있으면 수리, 균열이 열려 있으면 균열 닫기가 맨 앞에 선다.
+static func _urgent(i: int, m: Meta) -> bool:
+	match String(STEPS[i].id):
+		"repair": return not m.rr_ruined.is_empty()
+		"rift_close": return m.rr_open and RiftRaid.unlocked(m)
+	return false
+
+
+## 지금 안내할 단계(급한 것, 아니면 끝나지 않은 첫 단계). 모두 끝났으면 -1.
 static func current(m: Meta) -> int:
+	for i in STEPS.size():
+		if shown(i, m) and not is_done(i, m) and _urgent(i, m):
+			return i
 	for i in STEPS.size():
 		if shown(i, m) and not is_done(i, m):
 			return i

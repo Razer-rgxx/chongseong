@@ -82,6 +82,11 @@ var _glitch_fx: GlitchOverlay = null
 var _time_ui: TimeUi
 var _rift: FutureRift = null   ## 사이버 카타나를 얻은 뒤 서는 갈라진 틈(3단계)
 var _rifting: bool = false
+## 시대 균열(docs/rift_raid.md): 서 있는 틈(자리 번호, 없으면 -1), 싸움, 낮은 울림까지 남은 초.
+var _tear: RiftTear = null
+var _tear_spot: int = -1
+var _fight: RiftRaid.Fight = null
+var _rumble_t: float = 0.0
 var _wander_P: Dictionary = {}
 var _wander_fire: OmniLight3D = null
 var _wander_at: Vector2 = Vector2.ZERO
@@ -120,7 +125,7 @@ func _ready() -> void:
 		rules.spawn_field_boss()   # 이번 판에 쓰러뜨렸으면 다시 서지 않는다(판이 끝나면 다시 선다)
 	rules.spawn_chiefs(meta.chiefs_down)   # 32단계 곳마다 우두머리: 이번 판에 쓰러뜨린 것은 안 선다
 	rules.allow_horse = true   # 39단계: 말은 들판에서만
-	rules.horse_unlocked = meta.has_built(&"stable")   # 마을의 검 받침터를 지어야 탈 검(H)을 부른다
+	rules.horse_unlocked = meta.in_use(&"stable")   # 마을의 검 받침터를 지어야 탈 검(H)을 부른다
 	rules.lord.pos = FieldLayout.START
 	if Meta.wake_at_crypt:   # 지하 무덤에서 나왔거나 쓰러졌다: 무덤 입구 앞에서 깬다
 		Meta.wake_at_crypt = false
@@ -147,7 +152,7 @@ func _ready() -> void:
 	_fog_base = env.fog_density
 	_fog_color = env.fog_light_color
 	var blockers: Dictionary = FieldBuilder.build(self, env)
-	if not meta.has_built(&"tower"):   # 망루를 짓기 전에는 까마귀 고개로 가는 길이 막혀 있다(마을 키우기 5단계)
+	if not meta.in_use(&"tower"):   # 망루를 짓기 전에는 까마귀 고개로 가는 길이 막혀 있다(마을 키우기 5단계)
 		for r in FieldLayout.PASS_BARRICADES:
 			FieldBuilder.barricade(self, r)
 			(blockers.rects as Array).append(r)
@@ -322,6 +327,8 @@ func _physics_process(delta: float) -> void:
 		var _c0: int = rules.powers.dash_charges
 		var _cd0: float = rules.lord.cooldown
 		rules.step(inp)
+		if _fight != null:
+			_fight.step(rules.dt)
 		_dash_buf.end_tick(rules.dt, rules.powers.dash_charges < _c0)
 		_atk_buf.end_tick(rules.dt, rules.lord.cooldown > _cd0)
 		rules.lord.pos = _push_out(rules.lord.pos, rules.lord.airborne(), data.horse.body_r if rules.lord.riding else Blockers.BODY)
@@ -358,6 +365,7 @@ func _process(delta: float) -> void:
 	_light(delta)
 	_animate_wanderer(delta)
 	_update_stranger(delta)
+	_sync_tear(delta)
 	var p: Vector2 = rules.lord.pos
 	var a: StringName = FieldLayout.area_at(p)
 	if a != _area:
@@ -587,6 +595,8 @@ func _spots() -> Dictionary:
 		s["wanderer"] = _wander_at
 	if _rift != null:
 		s["rift"] = FutureLayout.RIFT_FIELD
+	if _tear != null and (_fight == null or not _fight.active()):
+		s["raid"] = FieldLayout.RIFT_RAID_SPOTS[_tear_spot]
 	if _st_drop != null:
 		s["stranger_drop"] = FieldLayout.STRANGER_SPOTS[meta.stranger_drop]
 	if _lm and _lm.trade_cell() != null:
@@ -622,6 +632,8 @@ func _prompt(key: String) -> String:
 		return "떨군 검을 줍는다"
 	if key == "horse":
 		return "검에 올라선다"
+	if key == "raid":
+		return "균열에 맞선다"
 	if key == "rift":
 		return "갈라진 틈으로 든다"
 	if key == "stranger_drop":
@@ -667,6 +679,9 @@ func guide_spot(id: String) -> Vector2:
 		"rift":
 			if meta.rift_open():
 				return FutureLayout.RIFT_FIELD
+		"raid":
+			if _tear_spot >= 0:
+				return FieldLayout.RIFT_RAID_SPOTS[_tear_spot]
 	return best
 
 
@@ -712,6 +727,8 @@ func _interact() -> void:
 		_wander_talk()
 	elif _near == "stranger_drop":
 		_take_stranger_drop()
+	elif _near == "raid":
+		_start_raid()
 	elif _near == "rift":
 		_enter_rift()
 	elif _near == "crypt":
@@ -797,6 +814,60 @@ func _build_stranger_drop() -> void:
 		_st_drop = null
 	if meta.stranger_drop >= 0:
 		_st_drop = StrangerView.make_drop(self, _stranger_pos3(FieldLayout.STRANGER_SPOTS[meta.stranger_drop]))
+
+
+# ---------------------------------------------------------------- 시대 균열 (docs/rift_raid.md)
+
+## 열린 균열(Meta.rr_open)과 화면의 틈을 맞춘다(관리 명령으로 바뀌어도 따라온다). 가까이 가면 낮은 울림.
+func _sync_tear(delta: float) -> void:
+	var want: int = meta.rr_spot if meta.rr_open else -1
+	if want != _tear_spot:
+		if _tear != null:
+			_tear.queue_free()
+			_tear = null
+		_tear_spot = want
+		if want >= 0:
+			var at: Vector2 = FieldLayout.RIFT_RAID_SPOTS[want]
+			_tear = RiftTear.make(self, Vector3(Grid.cells_to_world(at).x, FieldBuilder.walk_height(Grid.cells_to_world(at).x, Grid.cells_to_world(at).z), Grid.cells_to_world(at).z))
+			_hud.toast("북쪽 들판에 시대의 균열이 열렸다")
+		elif _fight != null:
+			_fight = null
+	if _tear != null:
+		_tear.power = 1.7 if _fight != null and _fight.active() else 1.0
+		_rumble_t -= delta
+		if _rumble_t <= 0.0 and rules.lord.pos.distance_to(FieldLayout.RIFT_RAID_SPOTS[_tear_spot]) < 40.0:
+			_rumble_t = 5.5
+			_sfx.play(&"thump", _tear.position, -9.0, 0.4)   # 낮은 울림(종소리·올라가는 소리는 쓰지 않는다)
+
+
+func _start_raid() -> void:
+	if _tear == null or (_fight != null and _fight.active()):
+		return
+	_fight = RiftRaid.Fight.new(rules, data.meta, FieldLayout.RIFT_RAID_SPOTS[_tear_spot])
+	_fight.wave_started.connect(func(n: int, boss: bool) -> void:
+		_camera.add_shake(0.3)
+		_sfx.play(&"thump", _tear.position if _tear else _lord.position, -3.0, 0.45)
+		_hud.toast("균열에서 우두머리가 걸어 나온다" if boss else "균열의 물결 %d / %d" % [n, data.meta.rift_waves]))
+	_fight.done.connect(_raid_done)
+	_fight.start()
+
+
+func _raid_done() -> void:
+	var r: Dictionary = RiftRaid.close(meta, data)
+	if r.is_empty():
+		return
+	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time * 1.4)
+	_camera.add_shake(data.lord.shake_big * 2.0)
+	_hud.flash(Color(0.6, 0.78, 1.0), 0.25, 0.9)
+	var bits: Array[String] = ["조각 %d개" % int(r.shards)]
+	if r.gem != "":
+		bits.append(Meta.rt().gem_name(String(r.gem)))
+	if int(r.sword) > 0:
+		var sd: SwordData = data.sword_by_id(int(r.sword))
+		bits.append(sd.display_name if sd else "검")
+	_hud.toast("균열이 닫혔다. " + ", ".join(bits))
+	_fight = null
+	_saved()
 
 
 ## 3단계: 사이버 카타나를 얻었으면(Meta.stranger_done) 낯선 사람이 사라진 자리 곁에 흐릿한 틈이 선다.
@@ -1151,6 +1222,8 @@ func _on_enemy_died(e: Enemy) -> void:
 
 
 func _on_pack_cleared(id: StringName) -> void:
+	if String(id).begins_with("rift_"):   # 균열 물결은 보상·기록이 따로다(RiftRaid)
+		return
 	SlowMo.hit(get_tree(), data.lord.finish_slow, data.lord.finish_slow_time)   # 무리의 마지막 하나
 	var n: int = meta.field_clear(String(id))
 	if n > 0:
@@ -1168,6 +1241,11 @@ func _boss_bar() -> void:
 	var b: Enemy = rules.field_boss
 	if b == null or rules.field_boss_state != Rules.BOSS_AWAKE or b.dead:
 		b = rules.awake_chief()
+	if b == null and _fight != null and _fight.active() and _fight.wave > data.meta.rift_waves:   # 균열의 우두머리
+		for e in rules.enemies:
+			if e.pack == _fight.pack_id and not e.dead:
+				b = e
+				break
 	if b != null:
 		_hud.set_boss(b.data.display_name, b.hp, b.max_hp)
 	elif _hud.boss_bar_shown():

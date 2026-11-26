@@ -66,3 +66,28 @@ extends Resource
 @export var bless_step: PackedFloat32Array = PackedFloat32Array([10, 0.08, 1, 10])
 @export var bless_cost: int = 20
 @export var bless_rates: PackedFloat32Array = PackedFloat32Array([90, 80, 70, 60, 50, 40, 35, 30, 25, 20])
+
+@export_group("시대 균열 (2026-11-26, docs/rift_raid.md)")
+## 판(언덕 한 판)이 끝날 때마다 균열이 열릴 확률 = 기본 + 늘림 × (마지막 균열 뒤 지난 판 수 - 1), 위는 상한.
+@export var rift_chance_base: float = 0.25
+@export var rift_chance_step: float = 0.12
+@export var rift_chance_cap: float = 0.85
+## 열린 균열이 터지기까지 남은 판 수.
+@export var rift_runs: int = 2
+## 터지면 망가지는 건물 수(적게~많게)와 도망치는 주민이 돌아오기까지 판 수.
+@export var rift_damage_min: int = 1
+@export var rift_damage_max: int = 2
+@export var rift_flee_runs: int = 2
+## 수리가 안 된 채 이만큼 연달아 터지면 마을 단계가 하나 내려간다(건물을 다 고치면 돌아온다).
+@export var rift_drop_after: int = 3
+## 수리 값 = 건물 짓는 값 × 이 비율(재료마다 올림, 최소 1).
+@export var rift_repair_ratio: float = 0.34
+## 균열 싸움: 물결 수(마지막 우두머리 앞), 세기 구역(1부터), 물결 사이 쉬는 초, 우두머리 체력 배수.
+@export var rift_waves: int = 3
+@export var rift_zone: int = 7
+@export var rift_wave_gap: float = 2.5
+@export var rift_boss_hp: float = 0.5
+## 닫은 보상: 조각, 보석 확률, 검(사이버·높은 등급) 확률.
+@export var rift_reward_shards: int = 150
+@export var rift_gem_chance: float = 1.0
+@export var rift_sword_chance: float = 0.35

@@ -118,6 +118,18 @@ var future_roll_run: int = -1
 ## 과거 3막 「첫 닻」(2026-11-26, StoryPast): 읽은 기억의 돌, 짐승을 쓰러뜨렸나(= 닻의 손 축복).
 var past_memories: Array[int] = []
 var anchor_hand: bool = false
+## 시대 균열(2026-11-26, docs/rift_raid.md; 규칙은 RiftRaid): 열려 있나, 열린 자리(FieldLayout.RIFT_RAID_SPOTS 번호), 터지기까지 남은 판, 마지막 균열 뒤 지난 판,
+## 고치지 않고 연달아 터진 수, 망가진 건물(id → 1), 도망친 주민(이름 → 돌아오기까지 판), 마을에 들어서면 한 번 알릴 소식, 닫은 횟수, 마을 단계를 깎는 수(0~1).
+var rr_open: bool = false
+var rr_spot: int = 0
+var rr_left: int = 0
+var rr_since: int = 0
+var rr_streak: int = 0
+var rr_ruined: Dictionary = {}
+var rr_fled: Dictionary = {}
+var rr_news: String = ""
+var rr_closed: int = 0
+var rr_cut: int = 0
 ## 닻의 선장의 맹세(기억 넷 + 미래 2막 뒤 선착장에서 받는다). 없으면 봉인 제단이 안 열린다.
 var captain_oath: bool = false
 ## 닻의 선장의 희생(2026-11-26): 흑룡을 쓰러뜨리면 선장이 봉인의 첫 닻이 되어 떠난다(beast_slain이 한 번 켠다). 마을 사람처럼 막을 수 없다.
@@ -215,7 +227,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_gems": sword_gems, "sword_names": sword_names, "gem_bag": gem_bag}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_gems": sword_gems, "sword_names": sword_names, "gem_bag": gem_bag, "rr_open": rr_open, "rr_spot": rr_spot, "rr_left": rr_left, "rr_since": rr_since, "rr_streak": rr_streak, "rr_ruined": rr_ruined.keys().map(func(k): return String(k)), "rr_fled": rr_fled, "rr_news": rr_news, "rr_closed": rr_closed, "rr_cut": rr_cut}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -401,6 +413,7 @@ func from_dict(d: Dictionary) -> void:
 	crypt_opened = {}
 	for k in d.get("crypt_opened", {}):
 		crypt_opened[str(k)] = 1
+	RiftRaid.from_dict(self, d)
 	guide_init = d.has("guide_done")   # 길라잡이가 없던 옛 저장은 처음 읽을 때 이미 이룬 것을 보상 없이 끝낸다
 	guide_done = {}
 	for k in d.get("guide_done", {}):
@@ -740,6 +753,8 @@ func gem_add(key: String, n: int = 1) -> bool:
 
 ## 보석을 박는다. 자리가 없거나 주머니에 없으면 거절하고 이유를 돌려준다("ok", "full", "none", "bad").
 func socket_gem(id: int, key: String) -> String:
+	if rr_ruined.has(&"forge"):   # 풀무간이 균열에 망가졌다: 고치기 전에는 못 박는다
+		return "ruined"
 	if not rt().valid_gem(key):
 		return "bad"
 	if int(gem_bag.get(key, 0)) <= 0:
@@ -1084,6 +1099,7 @@ func record_run(rules: Rules, md: MetaData) -> Dictionary:
 	best_chain = maxi(best_chain, rules.chain_best)
 	best = maxi(best, reached)
 	runs += 1
+	r["rift"] = RiftRaid.after_run(self, rules.data)   # 시대 균열: 열리거나 터진다(RiftRaid)
 	return r
 
 
@@ -1958,6 +1974,11 @@ func has_built(id: StringName) -> bool:
 	return built.has(id)
 
 
+## 지었고 균열에 망가지지 않아 쓸 수 있나(시대 균열). 기능(받침터 H, 풀무간, 망루 길, 일터)은 이것으로 본다.
+func in_use(id: StringName) -> bool:
+	return built.has(id) and not rr_ruined.has(id)
+
+
 ## 건물을 짓는다(재료를 낸다). 이미 있거나 모자라면 false.
 func build(b: BuildingData, d: GameData = null) -> bool:
 	if b == null or has_built(b.id) or (d != null and not tier_allows(b, d)) or not pay(b.cost()):
@@ -1970,7 +1991,7 @@ func build(b: BuildingData, d: GameData = null) -> bool:
 func village_made(d: GameData) -> Dictionary:
 	var r := {&"wood": 0, &"stone": 0, &"iron": 0}
 	for b in d.buildings:
-		if has_built(b.id):
+		if in_use(b.id):
 			var m: Dictionary = b.made_with(workers_at(b.id))
 			for id in r:
 				r[id] += int(m[id])
@@ -1995,7 +2016,7 @@ func village_tier(d: GameData) -> int:
 		if not ok:
 			break
 		t = i
-	return t
+	return maxi(0, t - rr_cut)   # 균열이 연달아 터졌으면 하나 낮게(RiftRaid, 건물을 다 고치면 돌아온다)
 
 
 ## 다음 단계까지 모자란 것: {"tier", "buildings", "residents", "wall"(필요하고 아직 없으면 true)}. 끝 단계면 빈 사전.
@@ -2020,7 +2041,7 @@ func start_zones(d: GameData) -> Array[int]:
 
 ## 풀무간이 벼려 주는 검의 등급(풀무간이 없으면 -1).
 func forge_grade(d: GameData) -> int:
-	return d.meta.tier_forge_grade[village_tier(d)] if has_built(&"forge") else -1
+	return d.meta.tier_forge_grade[village_tier(d)] if in_use(&"forge") else -1
 
 
 ## 이 건물을 지금 지을 수 있는 단계인지.
@@ -2047,7 +2068,7 @@ func has_room(d: GameData) -> bool:
 func workers_at(id: StringName) -> int:
 	var n: int = 0
 	for r in residents:
-		n += 1 if r.job == id else 0
+		n += 1 if r.job == id and not rr_fled.has(r.name) else 0
 	return n
 
 
@@ -2057,7 +2078,7 @@ func set_job(i: int, id: StringName, d: GameData) -> bool:
 		return false
 	if id != &"":
 		var b: BuildingData = d.building(id)
-		if b == null or not has_built(id) or b.workers <= 0:
+		if b == null or not in_use(id) or b.workers <= 0:
 			return false
 		if residents[i].job != id and workers_at(id) >= b.workers:
 			return false

@@ -218,6 +218,8 @@ const STRANGER_SPOTS: Array[Vector2] = [
 	Vector2(52, 101), Vector2(48, 72), Vector2(56, 50), Vector2(55, 14),
 	Vector2(100, 61), Vector2(141, 56), Vector2(192, 40), Vector2(167, 95),
 ]
+## 시대 균열(docs/rift_raid.md)이 열리는 자리(칸). 사람이 설 수 있다고 확인된 열린 땅(낯선 사람 자리와 같은 곳)에서 골랐다.
+const RIFT_RAID_SPOTS: Array[Vector2] = [Vector2(56, 50), Vector2(48, 72), Vector2(100, 61), Vector2(52, 101)]
 ## 다섯 사람 id → {name, cond(영입 조건: shards 조각을 낸다 · field_sword 한정 검을 가졌다 · pack 근처 무리를 쓰러뜨렸다 · stones 비석을 읽었다 · chiefs 우두머리를 쓰러뜨렸다), n,
 ## gift(영입하면 생기는 일, 토스트), 말(Band 한 줄씩): greet 처음, ask 조건을 말함, ready 조건이 맞음, join 영입할 때, village 마을에서(돌아가며 한 줄)}.
 const WANDERERS: Dictionary = {

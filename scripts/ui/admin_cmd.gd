@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "보석"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "보석", "균열"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -55,6 +55,8 @@ static func describe(cmd: Dictionary) -> String:
 			return "기억 검번호 벤적수 (예: 기억 1 1000 = 그 검의 벤 적을 1000으로 하고 룬 셋을 새긴다. 이름도 지을 수 있다. 쓰임이 없으면 룬은 표 순서)"
 		"보석":
 			return "보석 홍옥|자수정|청금석|호박|흑요석|월장석 1~3 (주머니에 하나 넣는다. 대장간 E의 보석 박기 탭에서 박는다)"
+		"균열":
+			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨려 건물을 망가뜨린다. 수리는 마을 건물 E)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -176,6 +178,23 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 				meta.harvest_down = true
 			meta.save()
 			return "관리: 첫 닻 기억 %d/%d%s%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), full, ", 선장의 맹세" if meta.captain_oath else "", ", 선장이 남긴 손(선장은 떠남)" if meta.anchor_hand else ""]
+		"균열":
+			if meta == null or a.is_empty() or not ["열기", "닫기", "터짐"].has(a[0]):
+				return "균열 열기, 닫기, 터짐 중 하나를 적으세요."
+			var gd: GameData = rules.data if rules != null else GameData.load_default()
+			var text: String = ""
+			match a[0]:
+				"열기":
+					text = "관리: 균열을 열었다(들판 %d번 자리, %d판 안에 닫아야 한다)" % [meta.rr_spot, meta.rr_left] if RiftRaid.open(meta, gd.meta) else "이미 균열이 열려 있습니다."
+				"닫기":
+					meta.rr_open = false
+					meta.rr_left = 0
+					text = "관리: 균열을 닫았다(보상 없음)"
+				"터짐":
+					var r: Dictionary = RiftRaid.breach(meta, gd)
+					text = "관리: 균열이 터졌다(망가진 건물 %d채%s). 마을에 가면 소식이 뜬다." % [r.hit.size(), ", 마을이 한 단계 내려앉음" if r.dropped else ""]
+			meta.save()
+			return text
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

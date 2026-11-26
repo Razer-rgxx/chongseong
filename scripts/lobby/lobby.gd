@@ -161,6 +161,7 @@ func _ready() -> void:
 	_hud.duel_online_cancel.connect(_cancel_online)
 	_hud.storage_built.connect(_on_storage_built)
 	_hud.building_built.connect(_on_building_built)
+	_hud.repaired.connect(_on_repaired)
 	_hud.job_set.connect(func(_i: int) -> void: _build_residents())
 	_hud.sheath_bought.connect(_on_sheath_bought)
 	add_child(_move_fx)
@@ -184,6 +185,7 @@ func _ready() -> void:
 		_camera.snap()
 		_hud.toast(Meta.wake_note if Meta.wake_note != "" else "들판에서 쓰러졌다. 북문 앞에서 깨어났다.")
 		Meta.wake_note = ""
+	_arrival_news()
 	_capture(true)
 	GuideHud.attach(self, meta, rules, "lobby", _hud, guide_spot, _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, ($Environment as WorldEnvironment).environment, _sun, _camera)   # 웹판에서만 가볍게
@@ -201,6 +203,11 @@ func guide_spot(id: String) -> Vector2:
 		"stable":
 			var b: BuildingData = data.building(&"stable")
 			return b.plot if b != null and not meta.has_built(&"stable") else Vector2.INF
+		"raid": return gate_at   # 균열은 북문 밖 들판에
+		"repair":
+			for bd in data.buildings:
+				if meta.rr_ruined.has(bd.id):
+					return bd.plot
 	return Vector2.INF
 
 
@@ -294,6 +301,8 @@ func _process(delta: float) -> void:
 	for b in data.buildings:
 		spots["bld_" + String(b.id)] = b.plot + b.facing * (b.size.y / Grid.CELL / 2.0 + 0.9)
 	for i in _res.size():
+		if _res[i].fled:
+			continue
 		spots["r_%d" % i] = Grid.world_to_cells((_res[i].root as Node3D).position) + Vector2(0.0, 0.01)
 	for id in VILLAGERS:
 		spots["v_" + id] = VILLAGERS[id][0]
@@ -363,7 +372,9 @@ func _interact() -> void:
 		_ when _near.begins_with("bld_"):
 			var b: BuildingData = data.building(StringName(_near.substr(4)))
 			var open := func() -> void: _hud.open_building(b)
-			if b and meta.has_built(b.id) and b.kind in [&"cottage", &"longhouse"]:
+			if b and meta.rr_ruined.has(b.id):   # 무너진 집 안은 못 들어간다: 수리 창만
+				open.call()
+			elif b and meta.has_built(b.id) and b.kind in [&"cottage", &"longhouse"]:
 				var who: Dictionary = _resident_home(b)
 				_enter(&"house", who.get("name", ""), who.get("look", &""), ["들판에서 꺼내 준 은혜는 잊지 않소.", "불을 지펴 두었소. 쉬었다 가시오."] if not who.is_empty() else [], open)
 			elif b and meta.has_built(b.id) and b.kind == &"forge":
@@ -784,6 +795,7 @@ func _build_buildings() -> void:
 		add_child(p)
 		p.position = Grid.cells_to_world(b.plot)
 		p.rotation.y = VillageBuilder.facing_to(b.facing)
+		p.ruined = meta.has_built(b.id) and meta.rr_ruined.has(b.id)   # 균열에 망가진 모습(docs/rift_raid.md)
 		p.build(meta.has_built(b.id))
 		if b.kind == &"wall" and meta.has_built(b.id):
 			_fence.visible = false
@@ -806,6 +818,8 @@ func _prompt_for(key: String) -> String:
 		var b: BuildingData = data.building(StringName(key.substr(4)))
 		if b == null:
 			return ""
+		if meta.has_built(b.id) and meta.rr_ruined.has(b.id):
+			return "%s을(를) 수리한다" % b.display_name
 		return ("%s에 들른다" if meta.has_built(b.id) else "%s 터를 본다") % b.display_name
 	return PROMPTS.get(key, "")
 
@@ -1004,9 +1018,34 @@ func _build_residents() -> void:
 			face = -b.facing if res.job != &"" else b.facing
 		var holder := VillageBuilder.place(self, Grid.cells_to_world(cell), VillageBuilder.facing_to(face) + PI)
 		var P: Dictionary = VillageProps.villager(res.look, holder)
+		var fled: bool = meta.rr_fled.has(res.name)   # 균열에 놀라 도망쳤다: 몸을 숨기고 말도 못 건다
+		holder.visible = not fled
 		var circ := [cell, 0.4]
-		_circles.append(circ)
-		_res.append({"P": P, "root": holder, "circle": circ})
+		if not fled:
+			_circles.append(circ)
+		_res.append({"P": P, "root": holder, "circle": circ, "fled": fled})
+
+
+## 균열이 마을을 할퀴고 지나갔으면 들어서며 한 번 알린다(큰 글자와 띠). 열려 있는 균열이 있으면 띠로 경고한다.
+func _arrival_news() -> void:
+	var t: String = RiftRaid.news_text(meta, data)
+	if t != "":
+		RiftRaid.clear_news(meta)
+		meta.save()
+		_hud.area_title("균열이 마을을 할퀴고 지나갔다")
+		_hud.toast(t)
+		_sfx.play(&"thump", _lord.position, -4.0, 0.4)   # 낮은 울림
+	elif meta.rr_open:
+		_hud.toast("북쪽 들판에 시대의 균열이 열렸다")
+
+
+func _on_repaired(id: StringName) -> void:
+	var p: BuildingPlot = _plots.get(id)
+	if p != null:
+		p.set_ruined(false)
+	_sfx.play(&"anvil", _lord.position, -6.0)
+	_hud.toast("고쳤다.")
+	_check_tier()
 
 
 func _on_building_built(id: StringName) -> void:

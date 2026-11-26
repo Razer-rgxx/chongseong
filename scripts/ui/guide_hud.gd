@@ -7,6 +7,8 @@ extends CanvasLayer
 const TRACK_W: float = 262.0
 const COMPASS_W: float = 360.0
 const COMPASS_H: float = 30.0
+## 균열 경고의 붉은색(추적 줄 한 줄과 방향 띠의 마름모).
+const RED: Color = Color(0.92, 0.28, 0.22)
 
 var meta: Meta
 var rules: Rules
@@ -24,6 +26,9 @@ var _t_goal: Label
 var _t_prog: Label
 var _t_gem: Control
 var _t_reward: Label
+var _t_alert: Label   ## 균열이 열려 있을 때 추적 줄 맨 위의 붉은 줄(docs/rift_raid.md)
+var _sig: String = ""
+var _hint_red: bool = false
 var _flash: ColorRect
 var _band: Band
 var _compass: Control
@@ -91,7 +96,9 @@ func _wire_events() -> void:
 		rules.path_chosen.connect(func(_i: int, _c: Dictionary) -> void: meta.guide_note("path"))
 		rules.event_used.connect(func(_e: DayEvent, _r: Dictionary) -> void: meta.guide_note("event"))
 	if scene_key == "field":
-		rules.pack_cleared.connect(func(_id: StringName) -> void: meta.guide_note("pack"))
+		rules.pack_cleared.connect(func(id: StringName) -> void:
+			if not String(id).begins_with("rift_"):
+				meta.guide_note("pack"))
 	if scene_key in ["field", "future", "past", "crypt"]:
 		rules.horse_called.connect(func() -> void: meta.guide_note("horse"))
 
@@ -120,6 +127,9 @@ func _build_track() -> void:
 	box.add_theme_constant_override("separation", 5)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_track.add_child(box)
+	_t_alert = UiKit.label("", 14, RED)
+	_t_alert.visible = false
+	box.add_child(_t_alert)
 	_t_head = UiKit.label("", 13, UiKit.MUTED)
 	box.add_child(_t_head)
 	_t_title = UiKit.label("", 18, UiKit.TITLE)
@@ -164,8 +174,22 @@ static func _draw_gem(c: Control, at: Vector2, r: float, filled: bool, col: Colo
 func _refresh() -> void:
 	var cur: int = Guide.current(meta)
 	var total: int = Guide.shown_count(meta)
-	_track.visible = cur >= 0 and _win == null
+	var alert: bool = meta.rr_open or not meta.rr_ruined.is_empty()
+	_t_alert.visible = alert
+	if meta.rr_open:
+		_t_alert.text = "시대의 균열  ·  터지기까지 %d판" % meta.rr_left
+	elif alert:
+		_t_alert.text = "무너진 건물 %d채  ·  고치기 전에는 못 쓴다" % meta.rr_ruined.size()
+	_track.visible = (cur >= 0 or alert) and _win == null
+	_hint_red = false
+	if meta.rr_open:   # 방향 띠도 균열을 붉게 가리킨다(들판에서는 균열 자리, 마을에서는 북문)
+		var rc: Vector2 = _resolve("raid")
+		if rc != Vector2.INF:
+			_hint_cell = rc
+			_hint_red = true
 	if cur < 0:
+		if not _hint_red:
+			_hint_cell = Vector2.INF
 		return
 	_t_head.text = "길라잡이  %d / %d" % [Guide.done_count(meta), total]
 	_t_title.text = Guide.title_of(cur)
@@ -179,7 +203,8 @@ func _refresh() -> void:
 		_t_reward.text = Guide.reward_text(cur)
 		_t_gem.queue_redraw()
 	_track.reset_size()
-	_hint_cell = _resolve(Guide.hint_for(cur, scene_key, meta))
+	if not _hint_red:
+		_hint_cell = _resolve(Guide.hint_for(cur, scene_key, meta))
 
 
 func _resolve(spot: String) -> Vector2:
@@ -216,7 +241,9 @@ func _check(force: bool = false) -> void:
 		meta.save()
 		if hud != null and hud.has_method("refresh_top"):
 			hud.call("refresh_top")
-	if force or not done.is_empty():
+	var sig: String = "%s|%d|%d|%d|%d" % [meta.rr_open, meta.rr_left, meta.rr_ruined.size(), meta.rr_spot, Guide.current(meta)]
+	if force or not done.is_empty() or sig != _sig:
+		_sig = sig
 		_refresh()
 
 
@@ -270,7 +297,7 @@ func _draw_compass() -> void:
 	var half: float = PI / 2.0
 	var x: float = cx + clampf(b / half, -1.0, 1.0) * (cx - 14.0)
 	var y: float = 15.0
-	var col := Color(UiKit.TITLE, 0.95)
+	var col := Color(RED, 0.95) if _hint_red else Color(UiKit.TITLE, 0.95)
 	if absf(b) <= half:
 		_draw_gem(_compass, Vector2(x, y), 6.0, true, col)
 	else:   # 뒤쪽이면 가장자리에서 바깥(그쪽으로 돌라는 뜻)을 가리키는 쐐기

@@ -24,6 +24,8 @@ signal duel_online_cancel()
 signal storage_built()
 ## 바깥 터 건물을 지었다(마을이 집을 올린다).
 signal building_built(id: StringName)
+## 균열에 망가진 건물을 고쳤다(docs/rift_raid.md).
+signal repaired(id: StringName)
 ## 주민 i의 일을 바꿨다(마을이 그 사람을 일터로 옮긴다).
 signal job_set(i: int)
 signal sheath_bought(level: int)
@@ -574,7 +576,7 @@ func _render_gems(msg: String) -> void:
 					if r == "ok":
 						meta.save()
 						forge_changed.emit()
-					_render_forge("보석을 박았다." if r == "ok" else "박을 수 없다."), 32))
+					_render_forge("보석을 박았다." if r == "ok" else ("풀무간이 무너졌다. 먼저 고쳐야 한다." if r == "ruined" else "박을 수 없다.")), 32))
 			var sc := ScrollContainer.new()
 			sc.custom_minimum_size = Vector2(520, 44)
 			sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -745,7 +747,10 @@ func _render_building(msg: String) -> void:
 		c.queue_free()
 	var b := _bld_data
 	var done: bool = meta.has_built(b.id)
-	UiKit.header(_bld_box, b.display_name if done else "%s 터" % b.display_name, close)
+	var ruined: bool = done and meta.rr_ruined.has(b.id)
+	UiKit.header(_bld_box, ("%s (무너짐)" % b.display_name) if ruined else (b.display_name if done else "%s 터" % b.display_name), close)
+	if ruined:
+		_bld_box.add_child(_wrap(UiKit.label("시대의 균열이 할퀴고 간 자리. 고치기 전에는 쓸 수 없다.", 15, UiKit.TITLE)))
 	_bld_box.add_child(_wrap(UiKit.label(b.desc, 15, UiKit.TEXT)))
 	var made: Array[String] = []
 	for id in Meta.MAT_IDS:
@@ -753,11 +758,12 @@ func _render_building(msg: String) -> void:
 			made.append("%s +%d" % [Meta.MAT_NAMES[id], int(b.made()[id])])
 	if not made.is_empty():
 		_bld_box.add_child(UiKit.label("판마다  " + " · ".join(made), 15, UiKit.MUTED))
-	if not done:
+	if not done or ruined:
+		var cost: Dictionary = RiftRaid.repair_cost(b, data.meta) if ruined else b.cost()
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 18)
-		for id in b.cost():
-			var need: int = int(b.cost()[id])
+		for id in cost:
+			var need: int = int(cost[id])
 			var cell := HBoxContainer.new()
 			cell.add_theme_constant_override("separation", 6)
 			var icon := Control.new()
@@ -769,9 +775,11 @@ func _render_building(msg: String) -> void:
 			cell.add_child(UiKit.label("%d / %d" % [meta.mat(id), need], 17, UiKit.TEXT if meta.mat(id) >= need else UiKit.MUTED))
 			row.add_child(cell)
 		_bld_box.add_child(row)
-		var go := UiKit.button("짓기", _build_building, 46)
-		go.disabled = not meta.can_pay(b.cost()) or not meta.tier_allows(b, data)
-		if not meta.tier_allows(b, data):   # 눌리지 않는 까닭(화면에 안 보이는 것)
+		var go := UiKit.button("수리" if ruined else "짓기", _repair_building if ruined else _build_building, 46)
+		go.disabled = not meta.can_pay(cost) or (not ruined and not meta.tier_allows(b, data))
+		if ruined:
+			pass
+		elif not meta.tier_allows(b, data):   # 눌리지 않는 까닭(화면에 안 보이는 것)
 			go.text = "%s이 되어야 지을 수 있다" % data.meta.tier_names[b.min_tier]
 		_bld_box.add_child(go)
 	_msg = UiKit.label(msg, 18, UiKit.TITLE)
@@ -834,6 +842,17 @@ func _pick_job(id: StringName) -> void:
 		meta.save()
 		job_set.emit(_jobs_i)
 	close()
+
+
+func _repair_building() -> void:
+	var b := _bld_data
+	if not RiftRaid.repair(meta, b, data.meta):
+		_render_building("재료가 모자라.")
+		return
+	meta.save()
+	refresh_top()
+	close()
+	repaired.emit(b.id)
 
 
 func _build_building() -> void:
