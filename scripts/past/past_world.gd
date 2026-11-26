@@ -33,9 +33,16 @@ static func build(root: Node3D, meta: Meta) -> Dictionary:
 	_fire_scar(root, fires)
 	_dragon_realm(root, rng, fires)
 	var hoard := hoard_pile(root, _m(PastLayout.hoard_at()), meta != null and meta.field_found.has(PastLayout.HOARD_ID))
-	var ship := sky_ship(root)
+	var gone: bool = meta != null and meta.captain_gone
+	var ship := sky_ship(root, gone)
 	_dock(root)
-	var cap := captain(root, _m(StoryPast.CAPTAIN_AT))
+	var cap: Node3D = null
+	var planted: Node3D = null
+	if gone:   # 선장의 희생 뒤: 선장 대신 외투와 박힌 닻(2026-11-26)
+		coat_post(root, _m(StoryPast.COAT_AT))
+		planted = planted_anchor(root, _m(StoryPast.SEAL_AT + StoryPast.SEAL_ANCHOR_AT))
+	else:
+		cap = captain(root, _m(StoryPast.CAPTAIN_AT))
 	var dragons: Array[Node3D] = []
 	for i in PastLayout.SKY_DRAGONS.size():
 		dragons.append(sky_dragon(root, 0.8 + 0.2 * i))
@@ -45,7 +52,7 @@ static func build(root: Node3D, meta: Meta) -> Dictionary:
 	for i in StoryPast.MEMORIES.size():
 		mem[i] = memory_stone(root, _m(StoryPast.MEMORIES[i].at), meta != null and meta.past_memories.has(i))
 	var smith := spirit(root, _m(StoryPast.SMITH_AT))
-	return {"fires": fires, "seal": seal, "memories": mem, "smith": smith, "captain": cap, "ship": ship, "dragons": dragons, "hoard": hoard}
+	return {"fires": fires, "seal": seal, "memories": mem, "smith": smith, "captain": cap, "planted": planted, "ship": ship, "dragons": dragons, "hoard": hoard}
 
 
 # ---------------------------------------------------------------- 나무 줄
@@ -571,7 +578,7 @@ const SAIL: Color = Color(0.86, 0.8, 0.66)
 
 ## 호수 위에 뜬 하늘배: 배 몸, 선루, 돛대 셋과 돛(닻 무늬), 배 밑의 빛나는 수정 용골, 뱃머리에서 호수의 닻(첫 칼)까지 사슬.
 ## 돌려주는 것은 배 노드(past.gd가 천천히 띄워 흔든다). 닻 칼은 호수에 따로 서 있다.
-static func sky_ship(root: Node3D) -> Node3D:
+static func sky_ship(root: Node3D, empty: bool = false) -> Node3D:
 	var base := _m(PastLayout.SHIP_AT)
 	var hull := PastBuilder._plain("ship_hull", HULL, 0.8)
 	var deck := PastBuilder._plain("ship_deck", DECK, 0.9)
@@ -598,7 +605,7 @@ static func sky_ship(root: Node3D) -> Node3D:
 		PastBuilder._box(g, Vector3(0.08, 0.16, 18.0), Vector3(2.84 * sx, 0.6, 0.5), gold)
 		PastBuilder._box(g, Vector3(0.12, 0.6, 15.0), Vector3(2.7 * sx, 1.7, -0.6), hull)
 	for k in 3:   # 고물 창(따뜻한 빛)
-		PastBuilder._box(g, Vector3(0.9, 0.7, 0.06), Vector3(-1.6 + k * 1.6, 2.6, 11.12), _glow("ship_window", Color(1.0, 0.75, 0.4), 2.0))
+		PastBuilder._box(g, Vector3(0.9, 0.7, 0.06), Vector3(-1.6 + k * 1.6, 2.6, 11.12), _glow("ship_window", Color(1.0, 0.75, 0.4), 2.0) if not empty else _glow("ship_window_dark", Color(0.08, 0.08, 0.1), 0.0))   # 선장이 떠난 배는 창이 어둡다
 	# 돛대와 돛: 돛마다 위아래 두 장, 가운데 큰 돛에 닻 무늬(글자 아님)
 	var masts: Array[Vector2] = [Vector2(-6.0, 12.0), Vector2(0.0, 15.0), Vector2(5.5, 10.0)]
 	for mz in masts:
@@ -640,7 +647,10 @@ static func sky_ship(root: Node3D) -> Node3D:
 	lamp.light_energy = 1.0
 	lamp.omni_range = 8.0
 	lamp.position = Vector3(0, 3.5, 11.5)
-	g.add_child(lamp)
+	if not empty:
+		g.add_child(lamp)
+	else:
+		lamp.free()
 	# 닻 사슬: 뱃머리 아래에서 호수의 닻 칼 고리까지(배에 붙어 같이 흔들린다)
 	var iron := PastBuilder._plain("chain", Color(0.24, 0.22, 0.2), 0.5)
 	iron.metallic = 0.8
@@ -735,7 +745,89 @@ static func captain(root: Node3D, at: Vector3) -> Node3D:
 	return g
 
 
-## 말을 걸면 말하는 동작, 말이 끝나면 다시 서 있기(past.gd가 부른다). 몸 모델이 없으면 아무것도 안 한다.
+## 선장이 떠난 뒤 선착장 말뚝에 걸린 남색 외투(2026-11-26). 말뚝에 가로대, 어깨와 소매가 늘어진 외투.
+static func coat_post(root: Node3D, at: Vector3) -> Node3D:
+	var g := Node3D.new()
+	g.name = "CoatPost"
+	g.position = at
+	root.add_child(g)
+	var wood := PastBuilder._plain("dock_wood", Color(0.34, 0.25, 0.17), 1.0)
+	var coat := PastBuilder._plain("cap_coat", Color(0.1, 0.12, 0.26), 0.9)
+	var trim := PastBuilder._plain("ship_gold", PastLayout.GOLD.darkened(0.15), 0.4, 0.6)
+	PastBuilder._box(g, Vector3(0.22, 2.3, 0.22), Vector3(0, 1.15, 0), wood)
+	PastBuilder._box(g, Vector3(1.0, 0.12, 0.12), Vector3(0, 1.95, 0), wood)
+	PastBuilder._box(g, Vector3(0.9, 0.22, 0.4), Vector3(0, 1.82, 0), trim)   # 견장
+	PastBuilder._box(g, Vector3(0.78, 1.2, 0.3), Vector3(0, 1.22, -0.02), coat)   # 몸판
+	for sx in [-1.0, 1.0]:
+		PastBuilder._box(g, Vector3(0.2, 0.95, 0.2), Vector3(0.5 * sx, 1.35, 0), coat, Vector3(0, 0, 6.0 * sx))   # 늘어진 소매
+	PastBuilder._box(g, Vector3(0.36, 0.7, 0.26), Vector3(0, 0.45, 0), coat, Vector3(0, 0, 3))   # 자락
+	PastBuilder._box(g, Vector3(0.04, 1.1, 0.02), Vector3(0, 1.22, -0.18), trim)   # 단추 줄
+	return g
+
+
+## 선장이 박은 닻(2026-11-26): 오브젝트헤드 닻을 크게 키워 봉인 제단 곁에 박는다. 속에 식은 금빛(Glow 자식)이 남는다.
+static func planted_anchor(root: Node3D, at: Vector3) -> Node3D:
+	var g := Node3D.new()
+	g.name = "PlantedAnchor"
+	g.position = at
+	root.add_child(g)
+	var body := ObjectHead.build(&"anchor")
+	body.scale = Vector3.ONE * 6.5
+	body.position = Vector3(0, 0.5, 0)
+	g.add_child(body)
+	var glow := OmniLight3D.new()
+	glow.name = "Glow"
+	glow.light_color = Color(1.0, 0.82, 0.45)
+	glow.light_energy = 0.7
+	glow.omni_range = 7.0
+	glow.position = Vector3(0, 2.4, 0)
+	g.add_child(glow)
+	return g
+
+
+## 닻이 박힐 때 퍼지는 먼지 고리(꾸밈): 낮은 고리가 넓어지며 흐려져 사라진다. 돌려주는 것은 트윈이 도는 고리 노드.
+static func dust_ring(root: Node3D, at: Vector3) -> Node3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.55, 0.5, 0.42, 0.55)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var t := TorusMesh.new()
+	t.inner_radius = 0.8
+	t.outer_radius = 1.0
+	var mi := MeshInstance3D.new()
+	mi.mesh = t
+	mi.material_override = m
+	mi.position = at + Vector3(0, 0.25, 0)
+	mi.scale = Vector3(1.0, 0.5, 1.0)
+	root.add_child(mi)
+	var tw := mi.create_tween().set_parallel(true)
+	tw.tween_property(mi, "scale", Vector3(9.0, 2.0, 9.0), 1.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(m, "albedo_color:a", 0.0, 1.3)
+	tw.chain().tween_callback(mi.queue_free)
+	return mi
+
+
+## 선장이 녹아드는 차가운 금빛 알갱이(꾸밈). 닻 속으로 가라앉는 데 쓴다.
+static func gold_mote(root: Node3D, at: Vector3) -> MeshInstance3D:
+	var o := SphereMesh.new()
+	o.radius = 0.45
+	o.height = 0.9
+	var mi := MeshInstance3D.new()
+	mi.mesh = o
+	mi.material_override = _glow("anchor_mote", Color(0.95, 0.85, 0.55), 3.0)
+	mi.position = at
+	root.add_child(mi)
+	return mi
+
+
+## 선장 몸의 동작을 바꾼다(걷기·서기·말하기). 몸 모델이 없으면 아무것도 안 한다.
+static func set_npc_state(cap: Node3D, state: String) -> void:
+	var npc: NpcModel = cap.get_meta("npc", null)
+	if npc != null:
+		npc.play(state)
+
+
+## 말하는 동작: 말을 걸면 말하는 동작, 말이 끝나면 다시 서 있기(past.gd가 부른다). 몸 모델이 없으면 아무것도 안 한다.
 static func captain_talk(cap: Node3D, talking: bool) -> void:
 	var npc: NpcModel = cap.get_meta("npc", null)
 	if npc != null:

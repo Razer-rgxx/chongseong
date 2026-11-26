@@ -115,6 +115,24 @@ func _story() -> void:
 	var m2 := Meta.new()
 	m2.from_dict(JSON.parse_string(JSON.stringify(m.to_dict())))
 	check.call(m2.past_memories.size() == StoryPast.MEMORIES.size() and m2.anchor_hand and m2.captain_oath, "첫 닻: 저장하고 다시 읽어도 남는다")
+	check.call(m.captain_gone and m2.captain_gone, "선장의 희생: 흑룡을 쓰러뜨리면 선장이 떠나고(captain_gone) 저장해도 남는다")
+	var pre := Meta.new()
+	pre.past_memories = [0, 1, 2, 3]
+	pre.time_traveller = true
+	pre.harvest_down = true
+	pre.captain_oath = true
+	check.call(not pre.captain_gone and pre.beast_slain() and pre.captain_gone and not pre.beast_slain(), "선장의 희생: captain_gone은 흑룡 뒤에 한 번만 켜진다")
+	var legacy: Dictionary = JSON.parse_string(JSON.stringify(m.to_dict()))
+	legacy.erase("captain_gone")
+	var m4 := Meta.new()
+	m4.from_dict(legacy)
+	check.call(m4.anchor_hand and not m4.captain_gone, "선장의 희생: 옛 저장(captain_gone 없음)은 선장이 남은 채 축복을 그대로 읽는다")
+	var bad: Dictionary = JSON.parse_string(JSON.stringify(Meta.new().to_dict()))
+	bad["captain_gone"] = true
+	var m5 := Meta.new()
+	m5.from_dict(bad)
+	check.call(not m5.captain_gone, "선장의 희생: 축복 없이 captain_gone만 있으면 바로잡는다")
+	check.call(StoryPast.FINAL_LINES.size() >= 3 and StoryPast.FINAL_LINES.size() <= 4 and StoryPast.ANCHOR_SAVED.contains("선장이 남긴 손"), "선장의 희생: 마지막 말 3~4줄, 축복 이름은 선장이 남긴 손")
 	var h := Meta.new()
 	var got: int = h.dragon_hoard()
 	check.call(got == PastLayout.HOARD_SHARDS and h.dragon_hoard() == 0 and h.shards == PastLayout.HOARD_SHARDS, "첫 닻: 용의 보물 더미는 한 번만")
@@ -147,7 +165,7 @@ func _story() -> void:
 	var cmd5: String = AdminCmd.apply(AdminCmd.parse("첫닻 5"), null, mc)
 	check.call(cmd5.contains("맹세") and mc.beast_ready(), "첫 닻: 관리 명령 `첫닻 5`(맹세까지, 흑룡을 깨울 수 있다)")
 	var cmd: String = AdminCmd.apply(AdminCmd.parse("첫닻 6"), null, Meta.new())
-	check.call(cmd.contains("닻의 손"), "첫 닻: 관리 명령 `첫닻 6`")
+	check.call(cmd.contains("남긴 손"), "첫 닻: 관리 명령 `첫닻 6`")
 
 
 ## 닻의 손: 언덕 판마다 처음 부러질 검을 한 번 붙잡는다(들판·결투·마을엔 없다).

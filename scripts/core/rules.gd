@@ -1444,7 +1444,7 @@ func break_slot(k: int) -> void:
 		_break(k)
 
 
-## 과거 3막 축복 「닻의 손」(Meta.anchor_hand, StoryPast): 언덕 판마다 처음 부러질 검을 한 번 붙잡아 내구 ANCHOR_KEEP 몫으로 남긴다.
+## 과거 3막 축복 「선장이 남긴 손」(Meta.anchor_hand, StoryPast): 언덕 판마다 처음 부러질 검을 한 번 붙잡아 내구 ANCHOR_KEEP 몫으로 남긴다.
 var anchor_used: bool = false
 signal anchor_saved(slot: int)
 

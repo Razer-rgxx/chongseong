@@ -50,7 +50,7 @@ static func describe(cmd: Dictionary) -> String:
 		"닻":
 			return "닻 0~6 (미래 2막: 0 처음, 1~5 기록을 그만큼 읽음, 6 대수확자를 쓰러뜨림. 1 이상이면 1막도 마친 것으로)"
 		"첫닻":
-			return "첫닻 0~6 (과거 3막: 0 처음, 1~4 기억의 돌을 그만큼 읽음, 5 아라 선장의 맹세까지(미래 2막도 마친 것으로), 6 흑룡을 쓰러뜨림 = 닻의 손)"
+			return "첫닻 0~6 (과거 3막: 0 처음, 1~4 기억의 돌을 그만큼 읽음, 5 아라 선장의 맹세까지(미래 2막도 마친 것으로), 6 흑룡을 쓰러뜨린 뒤 = 선장이 남긴 손, 선장은 떠남. 장면은 5로 맞추고 봉인 제단에서 흑룡을 쓰러뜨려야 본다)"
 		"머리":
 			if a.size() >= 1 and HEAD_ALIAS.has(a[0]):
 				return "Enter: %s의 머리 하나" % a[0]
@@ -148,11 +148,12 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 				meta.past_memories.append(i)
 			meta.captain_oath = m > full
 			meta.anchor_hand = m > full + 1
+			meta.captain_gone = meta.anchor_hand
 			if meta.captain_oath:
 				meta.set_story(4)
 				meta.harvest_down = true
 			meta.save()
-			return "관리: 첫 닻 기억 %d/%d%s%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), full, ", 선장의 맹세" if meta.captain_oath else "", ", 닻의 손" if meta.anchor_hand else ""]
+			return "관리: 첫 닻 기억 %d/%d%s%s (다음에 과거에 들면 맞춰 선다)" % [meta.past_memories.size(), full, ", 선장의 맹세" if meta.captain_oath else "", ", 선장이 남긴 손(선장은 떠남)" if meta.anchor_hand else ""]
 		"머리":
 			if a.is_empty() or not HEAD_ALIAS.has(a[0]) or meta == null:
 				return "머리 이름을 확인하세요."

@@ -44,7 +44,8 @@ var _blockers: Dictionary = {}
 var _seal: Node3D
 var _mem_nodes: Dictionary = {}
 var _smith: Node3D
-var _captain: Node3D
+var _captain: Node3D   # 선장이 떠났으면 null(Meta.captain_gone)
+var _planted: Node3D
 var _ship: Node3D
 var _ship_base: Vector3
 var _dragons: Array[Node3D] = []
@@ -93,6 +94,7 @@ func _ready() -> void:
 	_mem_nodes = world.memories
 	_smith = world.smith
 	_captain = world.captain
+	_planted = world.planted
 	_ship = world.ship
 	_ship_base = _ship.position
 	_dragons = world.dragons
@@ -253,7 +255,7 @@ func _process(delta: float) -> void:
 	if _captain and _captain.position.distance_to(_lord.position) < 24.0:
 		_captain.rotation.y = lerp_angle(_captain.rotation.y, atan2(_captain.position.x - _lord.position.x, _captain.position.z - _lord.position.z), 1.0 - exp(-3.0 * delta))
 	_animate_sky(delta)
-	if _cap_talk > 0.0:
+	if _cap_talk > 0.0 and _captain != null:
 		_cap_talk -= delta
 		if _cap_talk <= 0.0:
 			PastWorld.captain_talk(_captain, false)
@@ -281,7 +283,11 @@ func _process(delta: float) -> void:
 
 
 func _spots() -> Dictionary:
-	var s := {"exit": PastLayout.EXIT_AT, "altar": PastLayout.ALTAR_AT, "smith": StoryPast.SMITH_AT, "seal": StoryPast.SEAL_AT, "captain": StoryPast.CAPTAIN_AT}
+	var s := {"exit": PastLayout.EXIT_AT, "altar": PastLayout.ALTAR_AT, "smith": StoryPast.SMITH_AT, "seal": StoryPast.SEAL_AT}
+	if meta.captain_gone:
+		s["coat"] = StoryPast.COAT_AT
+	else:
+		s["captain"] = StoryPast.CAPTAIN_AT
 	if not meta.field_found.has(PastLayout.HOARD_ID):
 		s["hoard"] = PastLayout.hoard_at()
 	if not meta.field_found.has(PastLayout.CACHE_ID):
@@ -305,8 +311,10 @@ func _prompt(key: String) -> String:
 			return "닻의 선장과 말한다"
 		"hoard":
 			return "용의 보물 더미를 뒤진다"
+		"coat":
+			return StoryPast.SHIP_EMPTY_PROMPT
 		"seal":
-			return "봉인 제단을 살핀다"
+			return StoryPast.ANCHOR_PROMPT if meta.captain_gone else "봉인 제단을 살핀다"
 	return "성스러운 숲의 함을 연다"
 
 
@@ -361,6 +369,9 @@ func _interact() -> void:
 		_say_t = 6.0
 	elif _near == "captain":
 		_talk_captain()
+	elif _near == "coat":
+		_hud.say("", StoryPast.COAT_LINE, true)
+		_say_t = 6.0
 	elif _near == "hoard":
 		var got: int = meta.dragon_hoard()
 		if got > 0:
@@ -410,7 +421,10 @@ func _talk_captain() -> void:
 
 ## 봉인 제단: 기억 넷과 미래 2막, 선장의 맹세가 있으면 흑룡이 깬다.
 func _use_seal() -> void:
-	if meta.anchor_hand:
+	if meta.captain_gone:
+		_hud.say("", StoryPast.ANCHOR_PLANTED_LINE, true)
+		_say_t = 6.0
+	elif meta.anchor_hand:
 		_hud.toast(StoryPast.SEAL_DONE)
 	elif rules.field_boss != null and not rules.field_boss.dead:
 		_hud.toast(StoryPast.SEAL_BUSY)
@@ -429,15 +443,34 @@ func _use_seal() -> void:
 		rules.spawn_field_boss(StoryPast.BEAST_AT, StoryPast.BEAST_ID, StoryPast.BEAST_ZONE)
 
 
-## 흑룡이 쓰러졌다: 봉인이 식고, 첫 대장장이의 혼이 곁에 서서 선장과 마지막으로 말하고 축복을 준다(한 번만).
+## 흑룡이 쓰러졌다(2026-11-26 사용자: 닻의 선장의 희생): 선장이 봉인 제단으로 걸어와 짧게 말하고, 닻을 박고 금빛이 되어 닻에 가라앉는다.
+## 막을 수 없다(Meta.beast_slain이 captain_gone을 한 번 켜고 저장). 먹먹한 고요 뒤에 소리가 돌아오고 축복을 알린다. 종소리·오르는 소리는 쓰지 않는다.
 func _on_beast(e: Enemy) -> void:
 	if e == null or e.data == null or e.data.id != StoryPast.BEAST_ID or _final_on or not meta.beast_slain():
 		return
 	_final_on = true
 	_saved()
+	var hill := get_node("PastHill") as Node3D
+	var altar := Grid.cells_to_world(StoryPast.SEAL_AT)
 	PastWorld.set_quiet(_seal, true)
-	var ghost := PastWorld.spirit(self, Grid.cells_to_world(StoryPast.SEAL_AT) + Vector3(0, 0.6, 0))
-	_hud.flash(PastLayout.GOLD, 0.3, 0.9)
+	_hud.flash(PastLayout.GOLD.darkened(0.3), 0.2, 0.9)
+	if _captain != null:   # 선착장의 선장은 이미 떠났다
+		_captain.queue_free()
+		_captain = null
+	PastWorld.coat_post(hill, Grid.cells_to_world(StoryPast.COAT_AT))
+	# 1) 선장이 걸어 들어온다
+	var cap := PastWorld.captain(hill, altar + Grid.cells_to_world(StoryPast.CAPTAIN_WALK_FROM))
+	var stand: Vector3 = altar + Grid.cells_to_world(StoryPast.CAPTAIN_STAND)
+	cap.rotation.y = atan2(stand.x - cap.position.x, stand.z - cap.position.z)
+	PastWorld.set_npc_state(cap, "walk")
+	var walk := create_tween()
+	walk.tween_property(cap, "position", stand, 4.5)
+	await get_tree().create_timer(4.6).timeout
+	if not is_inside_tree():
+		return
+	PastWorld.set_npc_state(cap, "talk")
+	cap.rotation.y = atan2(_lord.position.x - cap.position.x, _lord.position.z - cap.position.z)
+	# 2) 마지막 말(어둡고 짧게)
 	for line in StoryPast.FINAL_LINES:
 		if not is_inside_tree():
 			return
@@ -445,16 +478,48 @@ func _on_beast(e: Enemy) -> void:
 		await get_tree().create_timer(3.4).timeout
 	if not is_inside_tree():
 		return
+	_hud.say_end()
+	PastWorld.set_npc_state(cap, "idle")
+	# 3) 닻을 박는다: 위에서 무겁게 내려꽂히고 낮은 쿵과 먼지 고리
+	var spot: Vector3 = altar + Grid.cells_to_world(StoryPast.SEAL_ANCHOR_AT)
+	_planted = PastWorld.planted_anchor(hill, spot + Vector3(0, 7.0, 0))
+	(_planted.get_node("Glow") as OmniLight3D).light_energy = 0.0
+	var drive := create_tween()
+	drive.tween_property(_planted, "position", spot, 0.35).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	await get_tree().create_timer(0.36).timeout
+	if not is_inside_tree():
+		return
+	_sfx.play(&"thump", spot, 1.0, 0.35)
+	_camera.add_shake(0.45)
+	PastWorld.dust_ring(hill, spot)
+	await get_tree().create_timer(0.3).timeout
+	# 4) 짧은 고요: 소리를 끊고 선장이 차가운 금빛이 되어 닻으로 가라앉는다
+	AudioServer.set_bus_mute(0, true)
+	var mote := PastWorld.gold_mote(hill, cap.position + Vector3(0, 1.4, 0))
+	var fade := create_tween().set_parallel(true)
+	fade.tween_property(cap, "scale", Vector3(0.05, 1.15, 0.05), 1.6)
+	fade.tween_property(mote, "position", spot + Vector3(0, 1.0, 0), 2.2).set_delay(0.6).set_ease(Tween.EASE_IN)
+	fade.tween_property(mote, "scale", Vector3(0.15, 0.15, 0.15), 1.0).set_delay(1.8)
+	fade.tween_property(_planted.get_node("Glow"), "light_energy", 0.7, 1.6).set_delay(1.8)
+	await get_tree().create_timer(2.9).timeout
+	cap.queue_free()
+	mote.queue_free()
+	await get_tree().create_timer(1.0).timeout
+	AudioServer.set_bus_mute(0, false)
+	if not is_inside_tree():
+		return
+	# 5) 남긴 것
 	_hud.say("", StoryPast.GOT_LINE % StoryPast.REWARD_SHARDS, true)
 	_hud.refresh_top()
-	_sfx.play(&"glitch", _lord.position, -4.0, 0.7)
-	var tw := create_tween()
-	tw.tween_property(ghost, "scale", Vector3(0.01, 1.6, 0.01), 2.4)
-	tw.tween_callback(ghost.queue_free)
-	await get_tree().create_timer(3.4).timeout
+	await get_tree().create_timer(4.0).timeout
 	if is_inside_tree():
 		_final_on = false
 		_hud.say_end()
+
+
+## 장면이 끝나거나 바뀔 때 고요 속에 있었다면 소리를 되돌린다.
+func _exit_tree() -> void:
+	AudioServer.set_bus_mute(0, false)
 
 
 ## 첫 대장간 제단(E): 조각 PastLayout.REFORGE_COST개로 검집의 검을 다시 벼린다. 검 번호마다 한 번.

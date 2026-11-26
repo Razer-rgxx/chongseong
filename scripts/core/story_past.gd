@@ -5,7 +5,7 @@ extends RefCounted
 ## 그 칼을 닻으로 내려 시간 위에 박았다(그 뒤로 「닻의 선장」). 흑룡은 용의 산맥 꼭대기 아홉 돌 고리 아래 묶였고, 닻이 뽑힐수록 사슬이 느슨해진다(미래의 수확).
 ## 흐름: 기억의 돌 넷(Meta.past_memories) → 첫 대장간 곁 벼리(혼)의 말 → 미래 2막(대수확자)을 마쳤으면 호숫가 선착장의 닻의 선장이
 ## 맹세를 받는다(Meta.captain_oath) → 용의 산맥 봉인 제단에서 시간을 먹는 흑룡(27_devourer)이 깬다 → 쓰러뜨리면 벼리·닻의 선장의 마지막 말과
-## 축복 「닻의 손」(Meta.anchor_hand: 언덕 판마다 처음 부러질 검을 한 번 붙잡는다, Rules._break)과 조각 REWARD_SHARDS.
+## 흑룡이 쓰러지면 선장이 봉인의 첫 닻이 되어 떠난다(Meta.captain_gone, 2026-11-26 사용자 요청). 축복 「선장이 남긴 손」(Meta.anchor_hand: 언덕 판마다 처음 부러질 검을 한 번 붙잡는다, Rules._break)과 조각 REWARD_SHARDS.
 ## 이야기는 띠·말로만(세계에 글자 없음).
 
 const MEMORIES: Array[Dictionary] = [
@@ -30,7 +30,7 @@ const ANCHOR_KEEP: float = 0.3
 
 static func smith_line(memories: int, harvest_down: bool, oath: bool, done: bool) -> String:
 	if done:
-		return "닻은 뽑는 손과 박는 손이 같아야 하지. 이제 너는 둘 다다. 네 칼이 처음 부러지려 할 때, 한 번은 내가 붙잡아 주마."
+		return "선장이 닻이 되었다. 박는 손은 그가 했고, 뽑는 손은 네가 한다. 그가 남긴 손이 네 칼을 한 번은 붙잡아 줄 게다."
 	if memories == 0:
 		return "...시간 밖에서 온 손님이군. 이 칼들이 왜 땅에 꽂혀 있는지 아는가? 들에 남은 기억의 돌 넷을 읽어 보게. 뼈의 들, 수정 호수, 잿불 능선, 그리고 용의 산맥."
 	if memories < MEMORIES.size():
@@ -65,13 +65,21 @@ const SEAL_DONE: String = "고리는 조용하다."
 const SEAL_BUSY: String = "흑룡이 아직 움직인다."
 const HOARD_GOT: String = "용의 보물 더미에서 조각 %d개를 얻었다"
 
-## 마지막 말: [누가, 말].
+## 선장의 마지막 말(흑룡을 쓰러뜨린 뒤 봉인 제단에서, 띠로 차례로): [누가, 말]. 막을 수 없다.
 const FINAL_LINES: Array = [
-	["벼리", "...끝났군. 흑룡은 다시 잠들었다."],
-	["닻의 선장", "사슬이 다시 팽팽하다. 첫 닻호, 닻 고정!"],
-	["벼리", "나는 첫 칼을 벼렸고, 저 선장이 그 칼을 시간에 내렸다. 그게 시작이었다."],
-	["벼리", "먼 뒤의 사람들은 그 칼을 뽑아 빛을 캤지. 칼은 원래 사슬이었다."],
-	["닻의 선장", "언덕으로 돌아가라. 칼을 뽑되, 무엇을 묶고 있었는지 잊지 마라."],
+	["닻의 선장", "...끝났군. 그런데 사슬이 아직 헐겁다."],
+	["닻의 선장", "닻 없이는 봉인이 버티지 못한다. 내가 첫 닻이 되겠다고 맹세했다."],
+	["닻의 선장", "배는 두고 간다. 닻은 여기 남는다."],
+	["닻의 선장", "언덕에 전해라. 검을 놓지 말라고."],
 ]
-const GOT_LINE: String = "첫 닻의 축복 「닻의 손」: 언덕 판마다 처음 부러질 검을 한 번 붙잡는다. 조각 +%d"
-const ANCHOR_SAVED: String = "닻의 손이 부러지려던 칼을 붙잡았다."
+## 선장이 떠난 뒤(Meta.captain_gone)의 한 줄씩.
+const COAT_LINE: String = "선착장 말뚝에 남색 외투가 걸려 있다. 소매에 아직 바닷바람이 배어 있다."
+const ANCHOR_PLANTED_LINE: String = "봉인 제단에 박힌 닻. 손을 얹자 차갑고, 속이 금빛으로 고요하다."
+const SHIP_EMPTY_PROMPT: String = "선착장 말뚝의 외투를 본다"
+const ANCHOR_PROMPT: String = "박힌 닻을 만진다"
+const SEAL_ANCHOR_AT: Vector2 = Vector2(2.2, 0.0)   ## 박힌 닻 자리(봉인 제단 한가운데에서 칸 단위로 비낀 곳)
+const COAT_AT: Vector2 = PastLayout.CAPTAIN_AT      ## 외투 말뚝(선장이 서 있던 자리)
+const CAPTAIN_WALK_FROM: Vector2 = Vector2(-9.0, 0.0)   ## 선장이 걸어 들어오는 시작(제단에서 칸 단위)
+const CAPTAIN_STAND: Vector2 = Vector2(1.2, 0.0)   ## 말하는 자리(닻 곁)
+const GOT_LINE: String = "첫 닻의 축복 「선장이 남긴 손」: 언덕 판마다 처음 부러질 검을 한 번 붙잡는다. 조각 +%d"
+const ANCHOR_SAVED: String = "선장이 남긴 손이 부러지려던 칼을 붙잡았다."
