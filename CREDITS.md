@@ -24,6 +24,7 @@
 | City Kit (Commercial) 2.1 | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 건물·먼 건물 (`assets/future/models/city_commercial/`, 어둡게 덮어 씀) |
 | City Kit (Roads) | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 길 조각과 길가 소품 (`assets/future/models/city_roads/`) |
 | 네온 시가 고층 건물 24종과 벽 질감 4벌 | 코드로 지음(tools/blender/make_city.py, Blender bmesh·numpy) | 이 저장소 | — | 네온 시가 건물·먼 건물 (`assets/future/models/neon_city/`, 바깥 모델·AI 생성 에셋 없음) |
+| 검의 기억 룬 조각 8종(keen·night·day·hunt·wind·grit·chain·elite)과 질감 | 직접 만듦(tools/blender/make_runes.py, Blender bmesh·불리언) | 이 저장소 | CC0 | 칼날에 박힌 룬·대장간 룬 그림 (`assets/runes/`, 바깥 모델·AI 생성 에셋 없음) |
 
 ## 불러오기 화면 그림
 

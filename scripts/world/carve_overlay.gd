@@ -43,6 +43,7 @@ static func apply(m: SwordModel, runes: Array) -> void:
 				n.scale = Vector3.ONE * (sz * 1.2)   # 모델은 가장 긴 변이 1.0, 무늬 면이 +Z(앞)
 				if k == 1:
 					n.rotation.y = PI   # 뒷면 짝은 반대쪽을 본다
+				show_tier(n, tier)
 				root.add_child(n)
 			else:
 				_glyph(root, T.glyph_of(key), pos[k], sz, mat)
@@ -52,6 +53,25 @@ static func apply(m: SwordModel, runes: Array) -> void:
 static func model_of(type: String) -> PackedScene:
 	var path: String = "res://assets/runes/%s.glb" % type
 	return load(path) as PackedScene if ResourceLoader.exists(path) else null
+
+
+## 룬 모델의 단계 장식 노드(make_runes.py: glow_rune_t2 = 2단계부터 빛 상감 점, rune_inlay_t3·glow_rune_t3 = 3단계 은 테두리와 점)를
+## 단계에 맞춰 켜고 끄고, 홈의 빛(glow_rune*)은 단계가 높을수록 조금 밝게. 대장간 그림(ForgeThumbs)은 1단계로 그린다.
+static func show_tier(n: Node, tier: int) -> void:
+	for c in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := c as MeshInstance3D
+		var nm: String = String(mi.name)
+		if nm.ends_with("_t2"):
+			mi.visible = tier >= 2
+		elif nm.ends_with("_t3"):
+			mi.visible = tier >= 3
+		for si in mi.mesh.get_surface_count():
+			var mt := mi.mesh.surface_get_material(si) as StandardMaterial3D
+			if mt and mt.resource_name.begins_with("glow_rune"):
+				var d := mt.duplicate() as StandardMaterial3D
+				d.emission_enabled = true
+				d.emission_energy_multiplier = 0.7 + 0.12 * float(tier)
+				mi.set_surface_override_material(si, d)
 
 
 ## 룬 자리 i(0~2)가 칼에서 놓이는 곳(앞뒤 둘). 빈 자리 고리(ForgePreview)도 같은 곳에 띄운다.

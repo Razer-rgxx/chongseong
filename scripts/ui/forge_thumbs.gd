@@ -96,6 +96,7 @@ func _pump() -> void:
 			if sc == null or rune_cache.has(q[0]):
 				continue
 			var rn := sc.instantiate() as Node3D
+			CarveOverlay.show_tier(rn, 1)   # 단계는 타일이 테두리·점으로 보인다
 			_vp.add_child(rn)
 			_cam.size = 1.15
 			_cam.position = Vector3(0, 0, 4)

@@ -53,6 +53,8 @@
 - 파일: `assets/runes/<종류>.glb`, 종류는 `data/runes.tres`의 키 8개: `keen.glb`, `night.glb`, `day.glb`, `hunt.glb`, `wind.glb`, `grit.glb`, `chain.glb`, `elite.glb`. 단계는 파일을 나누지 않는다(게임이 점·테두리·빛 세기로 보인다).
 - 크기·방향: 원점은 모델 가운데, 가장 긴 변이 1.0(게임이 칼날 너비에 맞춰 약 0.04~0.07배로 줄인다), 무늬가 보이는 앞면이 +Z, 위가 +Y. 두께는 +Z로 얇게(0.15 이하).
 - 칼 위: `CarveOverlay`가 자리마다 앞뒤 두 곳에 놓고 뒷면 쪽은 180도 돌린다. 룬 빛은 모델의 emissive 재질을 쓴다(차가운 푸른빛 권장).
+- **만든 것(2026-11-26, 모양팀):** `tools/blender/make_runes.py`(`blender -b -P tools/blender/make_runes.py [-- 종류 …]`)가 8개를 짓는다. 어두운 돌(night·day·wind·grit)·쇠(keen·hunt·chain·elite) 조각, 종류마다 생김새가 다른 파편·판(예리 긴 쐐기, 밤 둥근 파편, 낮 비석, 사냥 화살촉, 바람 기운 판, 불굴 두꺼운 덩어리, 연쇄 긴 육각, 정예 방패), 불리언으로 깊게 판 각진 문양의 홈 바닥만 `glow_rune`(차가운 푸른빛). 정점 131~421, 질감 512, 두께는 가장 긴 변의 0.12(불굴 0.15).
+- **단계 장식은 파일 안의 노드:** `glow_rune_t2`(2단계부터 빛 상감 점 둘), `rune_inlay_t3`(3단계 은 상감 테두리)·`glow_rune_t3`(점 둘 더). `CarveOverlay.show_tier(노드, 단계)`가 켜고 끄며 홈 빛도 단계마다 조금 밝게 한다. 대장간 그림은 1단계로 그린다.
 - 주머니·가게 아이콘: `ForgeThumbs.want_rune`이 앞(+Z)에서 정사영(`size` 1.15)으로 한 번 그려 타일에 붙인다. 파일이 없으면 납작한 무늬.
 - 정점 800개 아래, 질감 512 권장. 만들면 `CREDITS.md`에 적는다.
 
