@@ -388,9 +388,6 @@ func got_mat(id: StringName, n: int) -> void:
 
 ## 대장간 탭: 0 검집 강화, 1 보석 박기(검의 기억, docs/sword_memory.md).
 var _forge_tab: int = 0
-var _gem_sel: int = -1
-var _gem_buy: String = "ruby:1"
-var _name_edit: LineEdit
 
 
 func open_forge() -> void:
@@ -403,6 +400,8 @@ func open_forge() -> void:
 ## 검집에 넣을 검과 그 카드 → 검집 강화 줄(ForgeTrack: 지금 단계, 각인 단계, 내려가는 단계) → 다음 단계에 무엇이 오르는지(피해·내구 숫자 앞뒤, 각인)
 ## → 성공 확률과 실패하면 어떻게 되는지 → 망치질 단추 → 결과(크게: 성공/그대로/내려감과 바뀐 숫자).
 func _render_forge(msg: String) -> void:
+	if _gems_ui != null and is_instance_valid(_gems_ui) and _gems_ui.get_parent() == _forge_box:
+		_forge_box.remove_child(_gems_ui)
 	for c in _forge_box.get_children():
 		c.queue_free()
 	var md := data.meta
@@ -424,21 +423,36 @@ func _render_forge(msg: String) -> void:
 	if cands.is_empty():
 		_forge_box.add_child(_wrap(UiKit.label("검집에 넣을 검이 아직 없다. 전설 이상을 한 번 손에 넣으면 여기 놓인다(언덕에서 뽑거나 들판에서 얻기).\n강화는 미리 해 둘 수 있다. 나중에 넣는 검에 그 단계가 붙는다.", 15, UiKit.MUTED)))
 	else:
-		var pick := OptionButton.new()
-		pick.focus_mode = Control.FOCUS_NONE
+		# 검집에 넣을 검: 그림 카드 줄(2026-11-26). 이름은 마우스를 올릴 때.
+		var strip := HBoxContainer.new()
+		strip.add_theme_constant_override("separation", 6)
+		var th := ForgeThumbs.ensure(self)
+		var cards: Dictionary = {}
 		for id in cands:
 			var d := data.sword_by_id(id)
-			pick.add_item("%s · %s (%s)" % [data.grades.names[d.grade], Meta.shown_name(d), data.forms[d.form].display_name], id)
-			if id == meta.sheath_id:
-				pick.select(pick.item_count - 1)
-		pick.disabled = _busy
-		pick.item_selected.connect(func(i: int) -> void:
-			meta.sheath_id = pick.get_item_id(i)
-			meta.save()
-			_forge_last = {}
-			forge_changed.emit()
-			_render_forge(""))
-		_forge_box.add_child(pick)
+			var sid: int = id
+			var t := ForgeTile.card(th.want(d, data), data.grades.colors[d.grade], "%s · %s (%s)" % [data.grades.names[d.grade], Meta.shown_name(d), data.forms[d.form].display_name], func() -> void:
+				if _busy:
+					return
+				meta.sheath_id = sid
+				meta.save()
+				_forge_last = {}
+				forge_changed.emit()
+				_render_forge(""))
+			t.set_selected(id == meta.sheath_id)
+			cards[id] = t
+			strip.add_child(t)
+		th.done.connect(func(tid: int) -> void:
+			var ct: ForgeTile = cards.get(tid)
+			if ct != null and is_instance_valid(ct):
+				ct.tex = ForgeThumbs.cache.get(tid)
+				ct.queue_redraw()
+		)
+		var ssc := ScrollContainer.new()
+		ssc.custom_minimum_size = Vector2(520, 82)
+		ssc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		ssc.add_child(strip)
+		_forge_box.add_child(ssc)
 		var card := PanelContainer.new()
 		card.add_theme_stylebox_override("panel", UiKit.style(data.grades.colors[now.grade] if now else Color.GRAY, 2))
 		var r := UiKit.rich(15, 520)
@@ -485,172 +499,19 @@ func _render_forge(msg: String) -> void:
 
 
 # ---------------------------------------------------------------- 보석 박기 (검의 기억)
-
-## 룬이 새겨진 검(찾은 것만) 번호들. 쥐는 검집의 검이 먼저.
-func _rune_swords() -> Array[int]:
-	var out: Array[int] = []
-	for k in meta.sword_runes:
-		var id: int = int(k)
-		if meta.runes_of(id).size() > 0 and meta.has_found(id):
-			out.append(id)
-	out.sort()
-	if meta.sheath_id in out:
-		out.erase(meta.sheath_id)
-		out.push_front(meta.sheath_id)
-	return out
-
-
-func _gem_label(key: String) -> String:
-	var T: RuneTable = Meta.rt()
-	return "[color=#%s]◆ %s[/color]" % [T.gem_color(key).lightened(0.2).to_html(false), T.gem_name(key)]
+## 그림 창(2026-11-26): ForgeGemsUi(scripts/ui/forge_gems_ui.gd)가 검 카드·3D 미리보기·보석 타일을 맡는다.
+var _gems_ui: ForgeGemsUi
 
 
 func _render_gems(msg: String) -> void:
-	var T: RuneTable = Meta.rt()
-	var ids := _rune_swords()
-	if ids.is_empty():
-		_forge_box.add_child(_wrap(UiKit.label("룬이 새겨진 검이 아직 없다. 한 검으로 적을 %d마리 벤다(언덕·들판·무덤·미래·과거 어디서든). 룬이 새겨지면 보석 자리가 열린다." % T.slot_kills[0], 15, UiKit.MUTED)))
-		_forge_box.add_child(_gem_bag_line())
-		_forge_box.add_child(_gem_shop())
-		_msg = UiKit.label(msg, 16, UiKit.TITLE)
-		_forge_box.add_child(_msg)
-		return
-	if not ids.has(_gem_sel):
-		_gem_sel = ids[0]
-	var pick := OptionButton.new()
-	pick.focus_mode = Control.FOCUS_NONE
-	for id in ids:
-		var d := data.sword_by_id(id)
-		pick.add_item("%s · %s (룬 %d)" % [data.grades.names[d.grade], Meta.shown_name(d), meta.runes_of(id).size()], id)
-		if id == _gem_sel:
-			pick.select(pick.item_count - 1)
-	pick.item_selected.connect(func(i: int) -> void:
-		_gem_sel = pick.get_item_id(i)
-		_render_forge(""))
-	_forge_box.add_child(pick)
-	var sd := data.sword_by_id(_gem_sel)
-	var info := UiKit.rich(15, 520)
-	var t: String = "[b][color=#%s]%s[/color][/b]  벤 적 %d\n" % [data.grades.colors[sd.grade].to_html(false), Meta.shown_name(sd), meta.kills_of(_gem_sel)]
-	for key in meta.runes_of(_gem_sel):
-		t += "[color=#7fb8ff]◇ %s[/color]  %s\n" % [T.rune_name(String(key)), T.runes[key].text]
-	var nxt: int = -1
-	for need in T.slot_kills:
-		if meta.kills_of(_gem_sel) < need:
-			nxt = need
-			break
-	if nxt > 0:
-		t += "[color=#8f877a]다음 룬까지 %d마리[/color]\n" % (nxt - meta.kills_of(_gem_sel))
-	info.text = t
-	_forge_box.add_child(info)
-	_forge_box.add_child(UiKit.rule())
-	var gems_now: Array = meta.gems_of(_gem_sel)
-	var sockets: int = meta.socket_count(_gem_sel)
-	for i in sockets:
-		var row := HBoxContainer.new()
-		var rl := UiKit.rich(15, 340)
-		if i < gems_now.size():
-			rl.text = "자리 %d  %s  [color=#8f877a]%s +%d%%[/color]" % [i + 1, _gem_label(String(gems_now[i])), T.gems[String(gems_now[i]).split(":")[0]].text, roundi(T.gem_value(String(gems_now[i])) * 100.0)]
-			row.add_child(rl)
-			var idx: int = i
-			var fee: int = int(T.remove_fee[int(String(gems_now[i]).split(":")[1]) - 1])
-			row.add_child(UiKit.button("빼기 · 조각 %s" % _num(fee), func() -> void:
-				var r: String = meta.unsocket_gem(_gem_sel, idx)
-				if r == "ok":
-					meta.save()
-					forge_changed.emit()
-				_render_forge("보석을 뺐다." if r == "ok" else "조각이 모자라다."), 32))
-		else:
-			rl.text = "자리 %d  [color=#6b625a]비어 있다[/color]" % (i + 1)
-			row.add_child(rl)
-		_forge_box.add_child(row)
-	if sockets > gems_now.size():
-		var bag := _bag_keys()
-		if bag.is_empty():
-			_forge_box.add_child(UiKit.label("주머니에 보석이 없다. 우두머리와 상자에서 가끔 나오고, 아래에서 살 수 있다.", 13, UiKit.MUTED))
-		else:
-			var hb := HBoxContainer.new()
-			for key in bag:
-				var k: String = key
-				hb.add_child(UiKit.button("%s ×%d" % [T.gem_name(k), int(meta.gem_bag[k])], func() -> void:
-					var r: String = meta.socket_gem(_gem_sel, k)
-					if r == "ok":
-						meta.save()
-						forge_changed.emit()
-					_render_forge("보석을 박았다." if r == "ok" else ("풀무간이 무너졌다. 먼저 고쳐야 한다." if r == "ruined" else "박을 수 없다.")), 32))
-			var sc := ScrollContainer.new()
-			sc.custom_minimum_size = Vector2(520, 44)
-			sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-			sc.add_child(hb)
-			_forge_box.add_child(sc)
-	_forge_box.add_child(UiKit.rule())
-	_forge_box.add_child(_gem_bag_line())
-	_forge_box.add_child(_gem_shop())
-	_forge_box.add_child(UiKit.rule())
-	# 검의 이름
-	if meta.can_name(sd, data.grades):
-		var nrow := HBoxContainer.new()
-		nrow.add_child(UiKit.label("검의 이름", 15, UiKit.TITLE))
-		_name_edit = LineEdit.new()
-		_name_edit.max_length = T.name_max
-		_name_edit.placeholder_text = sd.display_name
-		_name_edit.text = String(meta.sword_names.get(str(_gem_sel), ""))
-		_name_edit.custom_minimum_size = Vector2(220, 0)
-		nrow.add_child(_name_edit)
-		nrow.add_child(UiKit.button("짓기", func() -> void:
-			var r: String = meta.set_sword_name(sd, _name_edit.text, data.grades)
-			if r == "ok":
-				meta.save()
-				forge_changed.emit()
-			_render_forge("이름을 지었다." if r == "ok" else "쓸 수 있는 글자는 한글·영문·숫자뿐이다."), 32))
-		_forge_box.add_child(nrow)
-	else:
-		_forge_box.add_child(UiKit.label("룬 %d개가 새겨지면(벤 적 %d) 검에 이름을 지어 줄 수 있다. 무한 등급은 바로." % [T.name_runes, T.slot_kills[T.slot_kills.size() - 1]], 13, UiKit.MUTED))
-	_msg = UiKit.label(msg, 16, UiKit.TITLE)
-	_forge_box.add_child(_msg)
-
-
-func _bag_keys() -> Array[String]:
-	var out: Array[String] = []
-	for k in meta.gem_bag:
-		out.append(String(k))
-	out.sort()
-	return out
-
-
-func _gem_bag_line() -> Control:
-	var T: RuneTable = Meta.rt()
-	var r := UiKit.rich(14, 520)
-	var parts: PackedStringArray = []
-	for k in _bag_keys():
-		parts.append("%s ×%d" % [_gem_label(k), int(meta.gem_bag[k])])
-	r.text = "보석 주머니: " + ("  ".join(parts) if not parts.is_empty() else "[color=#6b625a]비어 있다[/color]") + "   [color=#8f877a]조각 %s[/color]" % _num(meta.shards)
-	return r
-
-
-func _gem_shop() -> Control:
-	var T: RuneTable = Meta.rt()
-	var hb := HBoxContainer.new()
-	hb.add_child(UiKit.label("보석 사기", 14, UiKit.MUTED))
-	var ob := OptionButton.new()
-	ob.focus_mode = Control.FOCUS_NONE
-	var i: int = 0
-	for type in T.gem_order:
-		for tier in range(1, 4):
-			var key: String = "%s:%d" % [type, tier]
-			ob.add_item("%s · 조각 %s" % [T.gem_name(key), _num(int(T.buy_cost[tier - 1]))], i)
-			ob.set_item_metadata(i, key)
-			if key == _gem_buy:
-				ob.select(i)
-			i += 1
-	ob.item_selected.connect(func(n: int) -> void: _gem_buy = String(ob.get_item_metadata(n)))
-	hb.add_child(ob)
-	hb.add_child(UiKit.button("사기", func() -> void:
-		var p: PackedStringArray = _gem_buy.split(":")
-		var r: String = meta.buy_gem(p[0], int(p[1]))
-		if r == "ok":
+	if _gems_ui == null or not is_instance_valid(_gems_ui):
+		_gems_ui = ForgeGemsUi.new()
+		_gems_ui.setup(data, meta, func() -> void:
 			meta.save()
-		_render_forge("%s을(를) 샀다." % T.gem_name(_gem_buy) if r == "ok" else "조각이 모자라다."), 32))
-	return hb
+			forge_changed.emit())
+	_gems_ui.msg_text = msg
+	_forge_box.add_child(_gems_ui)
+	_gems_ui.refresh()
 
 
 const FORGE_GOLD := Color(0.95, 0.78, 0.4)
