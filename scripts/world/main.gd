@@ -242,6 +242,7 @@ func _ready() -> void:
 	if not from.is_empty():
 		_hud.toast(" ".join(from))
 	_capture(true)
+	GuideHud.attach(self, meta, rules, "hill", _hud)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, _env.environment, _sun, _camera)   # 웹판에서만 가볍게
 
 

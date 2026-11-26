@@ -133,6 +133,7 @@ func _ready() -> void:
 		_titled = true
 		_hud.area_title("녹슨 미래")
 		get_tree().create_timer(3.5).timeout.connect(func() -> void: _hud.toast("Tab: 내 검 목록"))
+	GuideHud.attach(self, meta, rules, "future", _hud, Callable(), _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, env, built.sun, _camera)
 
 

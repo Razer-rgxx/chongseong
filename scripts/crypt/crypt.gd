@@ -115,6 +115,7 @@ func _ready() -> void:
 	if not _titled:
 		_titled = true
 		_hud.area_title("지하 무덤")
+	GuideHud.attach(self, meta, rules, "crypt", _hud, Callable(), _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, env, null, _camera)   # 웹판에서만 가볍게
 
 

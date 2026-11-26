@@ -130,6 +130,12 @@ var crypt_cleared: Dictionary = {}
 var crypt_opened: Dictionary = {}
 ## 결투 기록(21단계, 저장): 같은 PC에서는 1P를 나로 센다. 비긴 결투는 세지 않는다. 옛 저장은 0으로 읽힌다.
 var duel_wins: int = 0
+## 길라잡이(2026-11-26, scripts/core/guide.gd): 끝난 단계(id → 1), 장면이 센 일(이름 → 횟수), 옛 저장 정리 여부, 추적 줄 접기.
+var guide_done: Dictionary = {}
+var guide_ev: Dictionary = {}
+var guide_init: bool = false
+var guide_step: int = 0
+var guide_fold: bool = false
 var duel_losses: int = 0
 ## 마을 북문에서 고른 검(SwordData.id, 0은 맨손, -1은 안 골랐다)과 들판에서 쓰러져 북문 앞에서 깰 때의 표시.
 ## 장면을 넘어 이어지는 값이라 static이고 저장하지 않는다.
@@ -192,7 +198,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "time_lock": time_lock, "reforged": reforged}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -377,6 +383,18 @@ func from_dict(d: Dictionary) -> void:
 	crypt_opened = {}
 	for k in d.get("crypt_opened", {}):
 		crypt_opened[str(k)] = 1
+	guide_init = d.has("guide_done")   # 길라잡이가 없던 옛 저장은 처음 읽을 때 이미 이룬 것을 보상 없이 끝낸다
+	guide_done = {}
+	for k in d.get("guide_done", {}):
+		if Guide.index_of(str(k)) >= 0:
+			guide_done[str(k)] = 1
+	guide_ev = {}
+	var gev: Variant = d.get("guide_ev", {})
+	if gev is Dictionary:
+		for k in gev:
+			guide_ev[str(k)] = maxi(0, int(gev[k]))
+	guide_step = int(d.get("guide_step", 0))
+	guide_fold = bool(d.get("guide_fold", false))
 	duel_wins = int(d.get("duel_wins", 0))
 	duel_losses = int(d.get("duel_losses", 0))
 	field_seen = Meta.empty_seen()
@@ -388,6 +406,11 @@ func from_dict(d: Dictionary) -> void:
 
 
 ## 결투가 끝났다(winner: 0은 1P가 이김, 1은 2P가 이김, 그 밖은 비김). 1P를 나로 센다.
+## 길라잡이가 셀 일 하나를 적는다(장면이 부른다. 규칙은 바꾸지 않는다).
+func guide_note(ev: String, n: int = 1) -> void:
+	guide_ev[ev] = int(guide_ev.get(ev, 0)) + n
+
+
 func record_duel(winner: int) -> void:
 	if winner == 0:
 		duel_wins += 1
@@ -608,6 +631,7 @@ func forge_sheath(game: GameData) -> Dictionary:
 		return r
 	shards -= sheath_cost(md)
 	r.paid = true
+	guide_note("spend")
 	var before: int = sheath_lv
 	if rng.randf() * 100.0 < sheath_rate(md):
 		sheath_lv += 1
@@ -663,6 +687,7 @@ func forge_bless(md: MetaData, key: String) -> Dictionary:
 		return r
 	shards -= bless_cost(md, key)
 	r.paid = true
+	guide_note("spend")
 	if rng.randf() * 100.0 < bless_rate(md, key):
 		bless[key] = bless_level(key) + 1
 		r.ok = true
@@ -1361,6 +1386,7 @@ func take_quest(i: int) -> bool:
 	if quest_active >= 0 or i < 0 or i >= quest_board.size():
 		return false
 	quest_active = i
+	guide_note("quest")
 	return true
 
 

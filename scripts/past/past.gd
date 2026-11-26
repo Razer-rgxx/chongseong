@@ -152,6 +152,7 @@ func _ready() -> void:
 	if not _titled:
 		_titled = true
 		_hud.area_title("최초의 대장간")
+	GuideHud.attach(self, meta, rules, "past", _hud, Callable(), _hud.is_open)   # 길라잡이(docs/guide.md)
 	WebQuality.apply(self, env, built.sun, _camera)
 
 
