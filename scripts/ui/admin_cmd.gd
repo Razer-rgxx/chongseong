@@ -9,7 +9,7 @@ const HEAD_ALIAS: Dictionary = {
 	"망루": "chief_tower", "늑대": "chief_grove", "발치": "chief_foot", "방패": "chief_keep", "늪": "chief_marsh",
 	"채석": "chief_quarry", "불탄": "chief_hamlet", "까마귀": "chief_pass", "무덤기사": "boss", "무덤주인": "crypt",
 }
-const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열", "방어"]
+const NAMES: PackedStringArray = ["날씨", "재료", "머리", "낯선이", "미래", "시대", "이야기", "닻", "첫닻", "기억", "룬", "균열", "방어", "리그", "시즌"]
 
 
 ## 입력 글이 명령이면 {name, args}, 아니면 빈 사전.
@@ -57,6 +57,10 @@ static func describe(cmd: Dictionary) -> String:
 			return "룬 예리|밤|낮|사냥|바람|불굴|연쇄|정예 1~3 (룬 주머니에 하나 넣는다. 대장간 E의 룬 박기 탭에서 박는다. keen night day hunt wind grit chain elite도 된다)"
 		"균열":
 			return "균열 열기 · 닫기 · 터짐 (열기: 들판에 균열을 연다 / 닫기: 보상 없이 닫는다 / 터짐: 지금 터뜨린다 = 다음에 마을에 들어서면 방어전. 수리는 마을 건물 E)"
+		"리그":
+			return "리그 녹쇠|청동|은|금|백금|금강|승천|불멸 1~3 RR(0~100) · 리그 언덕의검 · 리그 처음 (랭크 상태를 바로 정한다. 배치는 마친 것으로 한다)"
+		"시즌":
+			return "시즌 다음 (시즌 번호를 하나 올린다: 지난 시즌 최고 티어가 칭호로 남고 3단계 내려간다)"
 		"방어":
 			return "방어 승리 · 패배 (터진 균열의 마을 방어전을 바로 끝낸다: 승리는 보상, 패배는 건물이 망가진다)"
 		"머리":
@@ -198,6 +202,11 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 					text = "관리: 균열이 터졌다. 마을에 들어서면 방어전이 선다(`방어 승리`·`방어 패배`로 바로 끝낼 수 있다)."
 			meta.save()
 			return text
+		"리그", "시즌":
+			var lt: String = league_cmd(a, meta) if cmd.name == "리그" else season_cmd(a, meta)
+			if meta != null:
+				meta.save()
+			return lt
 		"방어":
 			if meta == null or a.is_empty() or not ["승리", "패배"].has(a[0]):
 				return "방어 승리, 패배 중 하나를 적으세요."
@@ -221,3 +230,47 @@ static func apply(cmd: Dictionary, rules: Rules, meta: Meta) -> String:
 			meta.save()
 			return "관리: %s의 머리를 받았다." % a[0]
 	return ""
+
+
+## 관리 `리그 <티어> <단계> <RR>`: 배치를 마친 것으로 하고 걸음과 RR을 바로 정한다. `리그 언덕의검`, `리그 처음`도 된다.
+static func league_cmd(a: PackedStringArray, meta: Meta) -> String:
+	if meta == null or a.is_empty():
+		return "리그 티어 단계 RR 처럼 적으세요 (예: 리그 불멸 3 40)."
+	var ld: LeagueData = League.data()
+	var st: Dictionary = League.state(meta)
+	if a[0] == "처음":
+		meta.league = {}
+		meta.league_last = {}
+		meta.league_sword = false
+		return "관리: 리그 기록을 처음으로 되돌렸다(배치부터)."
+	if a[0] == "언덕의검" or a[0] == ld.top_name.replace(" ", ""):
+		st.step = League.MAX_STEP
+		st.rr = maxi(int(st.rr), 0)
+		st.games = maxi(int(st.games), ld.placement_games)
+		st.peak = League.MAX_STEP
+		meta.league_sword = true
+		return "관리: 언덕의 검(불멸 3, 표시만. 온라인 순위표 위쪽 %d명에 들면 저절로 켜진다)." % ld.top_n
+	var tier: int = ld.tier_names.find(a[0])
+	if tier < 0:
+		return "티어는 %s 중 하나입니다." % " · ".join(ld.tier_names)
+	var div: int = clampi(int(a[1]) if a.size() > 1 and a[1].is_valid_int() else 1, 1, ld.divisions)
+	var rr: int = maxi(0, int(a[2]) if a.size() > 2 and a[2].is_valid_int() else 0)
+	st.step = tier * ld.divisions + div - 1
+	st.rr = rr if st.step >= League.MAX_STEP else mini(rr, ld.rr_max)
+	st.games = maxi(int(st.games), ld.placement_games)
+	st.peak = maxi(int(st.peak), int(st.step))
+	st.mmr = League.nominal(int(st.step), ld)
+	st.shield = true
+	meta.league_sword = false
+	return "관리: 리그 %s · RR %d (순위표에는 올리지 않는 계정이면 로컬에만)" % [League.step_name(int(st.step), ld), int(st.rr)]
+
+
+## 관리 `시즌 다음`: 시즌을 하나 올려 칭호와 부드러운 내려앉음을 바로 본다.
+static func season_cmd(a: PackedStringArray, meta: Meta) -> String:
+	if meta == null or a.is_empty() or a[0] != "다음":
+		return "시즌 다음 으로 적으세요."
+	League.sync_season(meta, League.season_now(meta))   # 날짜로 바뀐 것을 먼저 맞춘다
+	meta.league_offset += 1
+	var r: Dictionary = League.sync_season(meta, League.season_now(meta))
+	var t: String = "" if int(r.title) < 0 else ", 칭호 「S%d %s」" % [int(League.state(meta).season) - 1, League.step_name(int(r.title))]
+	return "관리: 시즌 %d 시작 (%s → %s%s)" % [League.season_now(meta), League.step_name(int(r["from"])), League.step_name(int(r.to)), t]

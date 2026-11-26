@@ -17,6 +17,8 @@ var link: NetLink
 var lockstep: Lockstep
 var pick_id: int = 0
 var done: bool = false
+## 랭크 결투인가(docs/duel_league.md). start 전에 정하고, 결투 장면이 읽는다.
+var ranked: bool = false
 
 
 func _init(p_game: GameData, p_meta: Meta) -> void:
@@ -27,7 +29,12 @@ func _init(p_game: GameData, p_meta: Meta) -> void:
 ## 검(SwordData.id, 0은 맨손)을 정하고 상대를 찾기 시작한다. 링크를 따로 주면(시험) 그것을 쓴다.
 func start(id: int, p_link: NetLink = null) -> void:
 	pick_id = id
-	link = p_link if p_link != null else GdSyncLink.new(game)
+	if p_link != null:
+		link = p_link
+	else:
+		var gl := GdSyncLink.new(game)
+		gl.ranked = ranked
+		link = gl
 	link.status_changed.connect(_on_status)
 	lockstep = Lockstep.new(game, link)
 	lockstep.setup_ready.connect(_on_setup)

@@ -153,6 +153,12 @@ var guide_init: bool = false
 var guide_step: int = 0
 var guide_fold: bool = false
 var duel_losses: int = 0
+## 결투 리그(docs/duel_league.md, 저장): 상태 사전(League.state), 지난 시즌 최고 걸음(시즌 번호 글 → 걸음)과 칭호, 관리자가 넘긴 시즌 수, 마지막 결과, 순위표에서 언덕의 검인가.
+var league: Dictionary = {}
+var league_titles: Dictionary = {}
+var league_offset: int = 0
+var league_last: Dictionary = {}
+var league_sword: bool = false
 ## 검의 기억(2026-11-26, docs/sword_memory.md): 검 번호(글) → 쓰임 센 것 {big, night, day, boss, dash, hurt, chain, elite}.
 ## 벤 적 수는 sword_log의 k(모든 곳 공통). 박은 룬·이름은 검 번호로 따로 둔다.
 var sword_memory: Dictionary = {}
@@ -234,7 +240,7 @@ func save(path: String = SAVE_PATH) -> void:
 
 
 func to_dict() -> Dictionary:
-	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_names": sword_names, "rune_bag": rune_bag, "slot_given": slot_given, "rune_placed": rune_placed, "rr_open": rr_open, "rr_spot": rr_spot, "rr_left": rr_left, "rr_since": rr_since, "rr_streak": rr_streak, "rr_ruined": rr_ruined.keys().map(func(k): return String(k)), "rr_fled": rr_fled, "rr_news": rr_news, "rr_closed": rr_closed, "rr_cut": rr_cut, "rr_breach_pending": rr_breach_pending}
+	return {"shards": shards, "sheath_id": sheath_id, "sheath_lv": sheath_lv, "sheath_peak": sheath_peak, "sheath_ins": Array(sheath_ins), "bless": bless, "found": found, "best": best, "best_kills": best_kills, "best_chain": best_chain, "runs": runs, "mats": {"wood": mat(&"wood"), "stone": mat(&"stone"), "iron": mat(&"iron")}, "mat_spots": Array(mat_spots), "mat_spots_ready": mat_spots_ready, "built": built.keys().map(func(k): return String(k)), "residents": residents.map(func(r): return {"name": r.name, "look": String(r.look), "job": String(r.job)}), "captive_packs": captive_packs, "captives_freed": captives_freed, "captives_ready": captives_ready, "tier_seen": tier_seen, "start_zone": start_zone, "storage_house": storage_house, "storage_lv": storage_lv, "quest_board": quest_board, "quest_active": quest_active, "stock": Array(stock), "pack": Array(pack), "heard": heard, "field_found": field_found, "lore_read": lore_read, "lore_paid": lore_paid, "glints": glints, "glints_ready": glints_ready, "packs_cleared": packs_cleared, "field_clock": field_clock, "field_weather": String(field_weather), "weather_spots": weather_spots.map(func(sp): return [sp.id, String(sp.kind), sp.at.x, sp.at.y, sp.done]), "boss_down": boss_down, "boss_first": boss_first, "chiefs_first": chiefs_first, "chiefs_down": chiefs_down, "recruits": recruits, "wanderer": wanderer, "wanderer_at": wanderer_at, "crypt_cleared": crypt_cleared, "crypt_opened": crypt_opened, "duel_wins": duel_wins, "duel_losses": duel_losses, "league": league, "league_titles": league_titles, "league_offset": league_offset, "league_last": league_last, "league_sword": league_sword, "dropped": dropped, "lost": lost, "sword_log": sword_log, "fallen": fallen, "others": others, "shared_key": shared_key, "field_seen": Marshalls.raw_to_base64(field_seen), "heads": heads.keys(), "head": head, "stranger_seen": stranger_seen, "stranger_done": stranger_done, "stranger_drop": stranger_drop, "story_shards": Array(story_shards), "vault_open": vault_open, "time_traveller": time_traveller, "neon_logs": Array(neon_logs), "harvest_down": harvest_down, "future_hilts": Array(future_hilts), "future_roll_run": future_roll_run, "past_memories": Array(past_memories), "anchor_hand": anchor_hand, "captain_oath": captain_oath, "captain_gone": captain_gone, "time_lock": time_lock, "reforged": reforged, "guide_done": guide_done, "guide_ev": guide_ev, "guide_step": guide_step, "guide_fold": guide_fold, "sword_memory": sword_memory, "sword_runes": sword_runes, "sword_names": sword_names, "rune_bag": rune_bag, "slot_given": slot_given, "rune_placed": rune_placed, "rr_open": rr_open, "rr_spot": rr_spot, "rr_left": rr_left, "rr_since": rr_since, "rr_streak": rr_streak, "rr_ruined": rr_ruined.keys().map(func(k): return String(k)), "rr_fled": rr_fled, "rr_news": rr_news, "rr_closed": rr_closed, "rr_cut": rr_cut, "rr_breach_pending": rr_breach_pending}
 
 
 func from_dict(d: Dictionary) -> void:
@@ -436,6 +442,21 @@ func from_dict(d: Dictionary) -> void:
 	guide_fold = bool(d.get("guide_fold", false))
 	duel_wins = int(d.get("duel_wins", 0))
 	duel_losses = int(d.get("duel_losses", 0))
+	league = {}
+	var lg: Variant = d.get("league", {})
+	if lg is Dictionary:
+		league = (lg as Dictionary).duplicate()
+	league_titles = {}
+	var lt: Variant = d.get("league_titles", {})
+	if lt is Dictionary:
+		for k in lt:
+			league_titles[str(k)] = int(lt[k])
+	league_offset = int(d.get("league_offset", 0))
+	league_last = {}
+	var ll: Variant = d.get("league_last", {})
+	if ll is Dictionary:
+		league_last = (ll as Dictionary).duplicate()
+	league_sword = bool(d.get("league_sword", false))
 	_load_carve(d)
 	field_seen = Meta.empty_seen()
 	var fs: Variant = d.get("field_seen", "")

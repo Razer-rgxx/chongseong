@@ -40,6 +40,8 @@ extends Resource
 ## 공개 방에 붙이는 꼬리표(game, mode, 버전)와 방 이름 머리.
 @export var net_tag_game: String = "geom_hill"
 @export var net_tag_mode: String = "duel"
+## 랭크 결투(docs/duel_league.md)는 이 꼬리표의 방끼리만 모인다(보통 온라인 결투와 섞이지 않는다).
+@export var net_tag_ranked: String = "ranked"
 @export var net_lobby_prefix: String = "gh"
 ## 방을 만들고 기다리는 동안 다른 대기 방이 있나 다시 찾는 간격(초)과, 접속·방 찾기를 기다리는 한계(초).
 @export var net_search_interval: float = 2.5

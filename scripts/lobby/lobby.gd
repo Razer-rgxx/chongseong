@@ -165,6 +165,7 @@ func _ready() -> void:
 	_hud.field_go.connect(_on_field_go)
 	_hud.duel_go.connect(_on_duel_go)
 	_hud.duel_online.connect(_on_duel_online)
+	_hud.duel_ranked.connect(func(id: int) -> void: _on_duel_online(id, true))
 	_hud.duel_online_cancel.connect(_cancel_online)
 	_hud.storage_built.connect(_on_storage_built)
 	_hud.building_built.connect(_on_building_built)
@@ -1324,9 +1325,13 @@ func _on_duel_go(a: int, b: int) -> void:
 
 
 ## 모르는 사람과 겨루기(22단계): 검을 골랐다. 접속하고 방을 찾아 둘이 모이면 결투 장면으로 간다.
-func _on_duel_online(id: int) -> void:
+func _on_duel_online(id: int, ranked: bool = false) -> void:
 	_cancel_online()
+	if ranked and League.can_play() != "":   # 게스트는 랭크가 안 된다(창에서도 막는다)
+		_hud.show_online_failed(League.can_play())
+		return
 	_online = OnlineDuel.new(data, meta)
+	_online.ranked = ranked
 	_online.status_text.connect(_hud.set_online_text)
 	_online.failed.connect(_on_online_failed)
 	_online.ready.connect(_on_online_ready)

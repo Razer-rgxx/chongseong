@@ -305,7 +305,7 @@ func _build_ui() -> void:
 	_menu.modulate.a = 0.0
 	_menu.visible = false
 	root.add_child(_menu)
-	var items: Array = [["시작", _start], ["설정", _settings]]
+	var items: Array = [["시작", _start], ["리그", _league], ["설정", _settings]]
 	if not OS.has_feature("web"):
 		items.append(["끝내기", _quit])   # 웹판에는 끝내기가 없다
 	for item in items:
@@ -395,6 +395,7 @@ func _account_gate() -> void:
 
 ## 관리자 계정이면 오른쪽 위에 작은 놋쇠빛 "관리자" 표.
 func _admin_mark() -> void:
+	_league_mark()
 	if not Account.is_admin() or _ui.get_node_or_null("AdminMark") != null:
 		return
 	var m := UiKit.label("관리자", 15, UiKit.LINE)
@@ -406,6 +407,32 @@ func _admin_mark() -> void:
 	m.offset_top = 16.0
 	m.offset_right = -20.0
 	_ui.add_child(m)
+
+
+## 로그인한 계정이면 왼쪽 위에 내 티어 문장과 RR 막대(결투 리그, docs/duel_league.md). 게스트는 랭크를 못 하니 보이지 않는다.
+func _league_mark() -> void:
+	if _ui.get_node_or_null("LeagueMark") != null or League.can_play() != "":
+		return
+	var m := Meta.load_or_new()
+	League.sync_season(m, League.season_now(m))
+	var c := PanelContainer.new()
+	c.name = "LeagueMark"
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_theme_stylebox_override("panel", UiKit.style(Color(UiKit.LINE, 0.35), 1, Color(0.02, 0.018, 0.015, 0.55)))
+	c.add_child(LeagueUi.card(m, 48.0, 150.0))
+	c.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	c.offset_left = 20.0
+	c.offset_top = 16.0
+	_ui.add_child(c)
+
+
+## 메뉴의 "리그": 리그 창.
+func _league() -> void:
+	if _leaving or _ui.get_node_or_null("UiLeague") != null:
+		return
+	var m := Meta.load_or_new()
+	League.sync_season(m, League.season_now(m))
+	LeagueWindow.open(_ui, m)
 
 
 # ---------------------------------------------------------------- 메뉴

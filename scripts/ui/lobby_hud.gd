@@ -19,6 +19,7 @@ signal field_go(id: int)
 signal duel_go(a: int, b: int)
 ## 22단계: 모르는 사람과 겨루기. 검을 골랐다(찾기 시작) / 찾는 도중에 창을 닫았다(취소).
 signal duel_online(pick: int)
+signal duel_ranked(pick: int)
 signal duel_online_cancel()
 ## 검 보관집(2026-11-21): 터에 집을 지었다(마을이 집을 올린다), 검집을 샀다(그 단계).
 signal storage_built()
@@ -90,6 +91,7 @@ var _duel_box: VBoxContainer
 var _duel_pick: Array[int] = [0, 0]
 ## 온라인 찾는 중이면 true(창을 닫으면 취소가 된다). 상태 글 칸.
 var _online_busy: bool = false
+var _duel_news: String = ""
 var _online_label: Label
 
 
@@ -1144,6 +1146,12 @@ func _render_yard_rack() -> void:
 
 ## 결투 말뚝(21단계): 같은 PC로 겨루기, 모르는 사람과 겨루기(22단계까지 흐리게).
 func open_duel() -> void:
+	_duel_news = ""
+	var left: Dictionary = League.settle_pending(meta)   # 랭크 결투를 끝내기 전에 나갔다면 진 것으로 센다
+	if not left.is_empty():
+		_duel_news = "지난 랭크 결투를 끝내기 전에 나가서 패배로 셌다 (%+d RR)" % int(left.delta)
+	League.sync_season(meta, League.season_now(meta))
+	meta.save()
 	_duel.visible = true
 	_render_duel(false)
 
@@ -1155,6 +1163,9 @@ func _render_duel(picking: bool) -> void:
 	if not picking:
 		_duel_box.add_child(_wrap(UiKit.label("1대1로 겨룬다. 3판 2선승, 각인과 고유 능력은 쓰지 않는다. 지고 이겨도 얻는 것은 기록뿐이다.", 14, UiKit.MUTED)))
 		_duel_box.add_child(UiKit.label("내 기록  이김 %d · 짐 %d" % [meta.duel_wins, meta.duel_losses], 15, UiKit.TEXT))
+		_duel_box.add_child(LeagueUi.card(meta, 64.0, 200.0))   # 티어 문장과 RR 막대
+		if _duel_news != "":
+			_duel_box.add_child(_wrap(UiKit.label(_duel_news, 14, Color(0.85, 0.4, 0.35))))
 		_duel_box.add_child(UiKit.button("같은 PC로 겨루기", func() -> void:
 			_duel_pick = [0, 0]
 			var s := meta.sheath_sword(data)
@@ -1162,7 +1173,9 @@ func _render_duel(picking: bool) -> void:
 				_duel_pick = [meta.sheath_id, meta.sheath_id]
 			_render_duel(true), 40.0))
 		if data.duel.online_enabled:   # 내보내는 데모에서는 끈다(data/duel.tres, 실제 서버 확인 전)
-			_duel_box.add_child(UiKit.button("모르는 사람과 겨루기", _render_online_pick, 40.0))
+			_duel_box.add_child(UiKit.button("모르는 사람과 겨루기", func() -> void: _render_online_pick(false), 40.0))
+			_duel_box.add_child(UiKit.button("랭크 결투", func() -> void: _render_online_pick(true), 40.0))
+		_duel_box.add_child(UiKit.button("리그 보기", func() -> void: LeagueWindow.open(self, meta), 40.0))
 		return
 	_duel_box.add_child(_wrap(UiKit.label("1P는 키보드와 마우스, 2P는 게임패드. 검집의 검이나 맨손을 든다. 결투에서는 부러지지 않는다.", 14, UiKit.MUTED)))
 	var ids: Array[int] = [0]
@@ -1186,10 +1199,13 @@ func _render_duel(picking: bool) -> void:
 
 
 ## 모르는 사람과 겨루기(22단계): 키가 없으면 안내만, 있으면 내 검을 고르고 찾는다.
-func _render_online_pick() -> void:
+func _render_online_pick(ranked: bool = false) -> void:
 	for c in _duel_box.get_children():
 		c.queue_free()
-	UiKit.header(_duel_box, "모르는 사람과 겨루기", func() -> void: _render_duel(false))
+	UiKit.header(_duel_box, "랭크 결투" if ranked else "모르는 사람과 겨루기", func() -> void: _render_duel(false))
+	if ranked and League.can_play() != "":   # 게스트와 로그인 안 한 사람은 랭크를 못 한다
+		show_online_failed(League.can_play())
+		return
 	if not GdSyncLink.has_keys():
 		show_online_failed(OnlineDuel.key_help())
 		return
@@ -1209,19 +1225,25 @@ func _render_online_pick() -> void:
 	pick.select(ids.size() - 1)
 	pick.item_selected.connect(func(i: int) -> void: pick_id[0] = pick.get_item_id(i))
 	_duel_box.add_child(pick)
-	_duel_box.add_child(UiKit.button("상대를 찾는다", func() -> void: _render_online_wait(pick_id[0]), 40.0))
+	if ranked:
+		_duel_box.add_child(LeagueUi.card(meta, 56.0, 200.0))
+		_duel_box.add_child(_wrap(UiKit.label("랭크: 이기고 지면 RR이 오르내린다. 끝나기 전에 나가면 진 것으로 센다. 상대는 MMR과 상관없이 랭크를 찾는 아무나다.", 13, UiKit.MUTED)))
+	_duel_box.add_child(UiKit.button("상대를 찾는다", func() -> void: _render_online_wait(pick_id[0], ranked), 40.0))
 
 
-func _render_online_wait(pick_id: int) -> void:
+func _render_online_wait(pick_id: int, ranked: bool = false) -> void:
 	for c in _duel_box.get_children():
 		c.queue_free()
-	UiKit.header(_duel_box, "모르는 사람과 겨루기", close)
+	UiKit.header(_duel_box, "랭크 결투" if ranked else "모르는 사람과 겨루기", close)
 	_online_label = UiKit.label("서버에 접속하는 중", 18, UiKit.TEXT)
 	_duel_box.add_child(_online_label)
 	_duel_box.add_child(_wrap(UiKit.label("창을 닫으면 찾기를 그만둔다.", 14, UiKit.MUTED)))
 	_duel_box.add_child(UiKit.button("취소", close, 40.0))
 	_online_busy = true
-	duel_online.emit(pick_id)
+	if ranked:
+		duel_ranked.emit(pick_id)
+	else:
+		duel_online.emit(pick_id)
 
 
 ## 찾는 중의 한 줄(접속, 찾는 중, 기다리는 중, 준비).

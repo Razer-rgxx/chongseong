@@ -32,6 +32,10 @@ var _rng := RandomNumberGenerator.new()
 var _closed: bool = false
 
 
+## 랭크 결투 방(꼬리표 mode가 달라 보통 결투와 섞이지 않는다, docs/duel_league.md). find_match 전에 정한다.
+var ranked: bool = false
+
+
 func _init(p_game: GameData = null) -> void:
 	game = p_game if p_game != null else GameData.load_default()
 	_rng.randomize()
@@ -191,7 +195,7 @@ func _search() -> void:
 
 
 func _tags() -> Dictionary:
-	return {"game": game.duel.net_tag_game, "mode": game.duel.net_tag_mode, "ver": game.duel.net_version}
+	return {"game": game.duel.net_tag_game, "mode": game.duel.net_tag_ranked if ranked else game.duel.net_tag_mode, "ver": game.duel.net_version}
 
 
 func _is_ours(lobby: Dictionary) -> bool:

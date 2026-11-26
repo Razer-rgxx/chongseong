@@ -59,6 +59,8 @@ var _net: Lockstep = null
 var _my: int = 0
 var _stall_msg: float = 0.0
 var _ended: bool = false
+## 랭크 결투(docs/duel_league.md): 온라인이고 마을에서 랭크로 찾았다. 끝나기 전에 나가면 진 것, 어긋남·시간 초과는 무효.
+var _ranked: bool = false
 
 @onready var _env: WorldEnvironment = $Environment
 @onready var _sun: DirectionalLight3D = $Sun
@@ -78,6 +80,7 @@ func _ready() -> void:
 	var b: Sword
 	if online != null and online.lockstep != null and online.lockstep.setup != null:
 		_net = online.lockstep
+		_ranked = online.ranked and League.can_play() == ""
 		_my = _net.link_seat()
 		s = _net.setup.seed_value
 		var made: Array[Sword] = _net.setup.make_swords(data)
@@ -92,7 +95,9 @@ func _ready() -> void:
 		_net.bind(rules)
 		_net.desync.connect(_on_desync)
 		_net.peer_lost.connect(_on_peer_lost)
-		_hud.set_online(_my)
+		_hud.set_online(_my, League.title_text(meta) if _ranked else "")
+		if _ranked:
+			League.begin_match(meta)   # 꺼지면 다음에 진 것으로 센다
 	_hud.set_swords(a.label() if a else "", b.label() if b else "")   # 검의 기억: 지은 이름
 	HillBuilder.build(self, _env.environment, data.forms)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
@@ -345,13 +350,20 @@ func _on_round_ended(winner: int) -> void:
 func _on_over(winner: int) -> void:
 	_ended = true
 	# 온라인은 내가 이기고 진 것으로 센다(같은 PC는 1P가 나)
-	meta.record_duel(winner if _net == null else (0 if winner == _my else (1 if winner == 1 - _my else -1)))
+	var mine: int = winner if _net == null else (0 if winner == _my else (1 if winner == 1 - _my else -1))
+	meta.record_duel(mine)
+	var league: Dictionary = {}
+	if _ranked:
+		if mine < 0:
+			League.void_match(meta)   # 비긴 판은 RR이 없다
+		else:
+			league = _ranked_result(mine == 0)
 	meta.save()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	await get_tree().create_timer(result_delay).timeout
 	if _left:
 		return
-	_hud.show_result(winner, rules.duel_wins, Vector2i(meta.duel_wins, meta.duel_losses))
+	_hud.show_result(winner, rules.duel_wins, Vector2i(meta.duel_wins, meta.duel_losses), league)
 
 
 ## 온라인이 끊겼다(기록하지 않는다).
@@ -361,7 +373,16 @@ func _on_peer_lost(reason: String) -> void:
 	_ended = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var text: String = "상대가 방을 나갔다." if reason == "left" else ("상대의 입력이 오래 오지 않아 끊었다." if reason == "timeout" else "버전이 달라 겨룰 수 없다.")
-	_hud.show_notice("연결이 끊겼다", text + " 이 결투는 기록하지 않는다.")
+	if _ranked and reason == "left":
+		# 상대가 먼저 나갔다: 나간 쪽이 진 것이니 내가 이긴 것으로 센다(시간 초과는 누가 끊었는지 몰라 무효)
+		meta.record_duel(0)
+		var lr: Dictionary = _ranked_result(true)
+		meta.save()
+		_hud.show_notice("상대가 나갔다", "나간 쪽이 진 것으로 센다.", lr)
+		return
+	if _ranked:
+		League.void_match(meta)
+	_hud.show_notice("연결이 끊겼다", text + (" 랭크 결투는 RR 변화 없이 무효다." if _ranked else " 이 결투는 기록하지 않는다."))
 
 
 ## 두 쪽의 규칙 결과가 어긋났다(기록하지 않는다).
@@ -370,10 +391,24 @@ func _on_desync(tick: int) -> void:
 		return
 	_ended = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_hud.show_notice("어긋났다", "두 쪽의 결과가 달라졌다(%d틱). 이 결투는 기록하지 않는다." % tick)
+	if _ranked:
+		League.void_match(meta)
+	_hud.show_notice("어긋났다", "두 쪽의 결과가 달라졌다(%d틱). 이 결투는 기록하지 않는다%s." % [tick, "(RR 변화 없음)" if _ranked else ""])
+
+
+## 랭크 결과를 센다(칭호·시즌은 마을에서 이미 맞췄다). 순위표에는 일반 계정만 올린다.
+func _ranked_result(win: bool) -> Dictionary:
+	League.sync_season(meta, League.season_now(meta))
+	var r: Dictionary = League.record(meta, win)
+	meta.save()
+	LeagueBoard.submit(get_tree(), meta)   # 기다리지 않는다(관리자·게스트는 안에서 걸러진다)
+	return r
 
 
 func _leave() -> void:
+	if _ranked and not _ended and not _left:
+		_ended = true
+		_ranked_result(false)   # 끝나기 전에 나가면 진 것
 	if _net != null:
 		_net.close()   # 방을 나가고 접속을 끊는다
 	_left = true

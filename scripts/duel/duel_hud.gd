@@ -79,10 +79,12 @@ func _ready() -> void:
 
 
 ## 온라인이면 이름을 "나"와 "상대"로 바꾼다(my_seat: 내 자리).
-func set_online(my_seat: int) -> void:
+func set_online(my_seat: int, title: String = "") -> void:
 	_online = true
 	_names = ["", ""]
 	_names[my_seat] = Account.display_name(ONLINE_NAMES[0])
+	if title != "":
+		_names[my_seat] = "「%s」 %s" % [title, _names[my_seat]]   # 지난 시즌 칭호(docs/duel_league.md)
 	_names[1 - my_seat] = ONLINE_NAMES[1]
 	for i in 2:
 		_name_labels[i].text = _names[i]
@@ -120,7 +122,7 @@ func flash(c: Color, strength: float, time: float = 0.4) -> void:
 
 
 ## 결과 창. winner: 0, 1, -1(비김). wins: 이긴 판 수, record: Meta의 이김·짐.
-func show_result(winner: int, wins: Array[int], record: Vector2i) -> void:
+func show_result(winner: int, wins: Array[int], record: Vector2i, league: Dictionary = {}) -> void:
 	for c in _result_box.get_children():
 		c.queue_free()
 	var title: String = "비겼다" if winner < 0 else ("%s가 이겼다" % _names[winner] if _online else "%s 이김" % NAMES[winner])
@@ -129,12 +131,15 @@ func show_result(winner: int, wins: Array[int], record: Vector2i) -> void:
 	_result_box.add_child(UiKit.rule())
 	_result_box.add_child(UiKit.label("판 점수  %d : %d" % [wins[0], wins[1]], 20, UiKit.TEXT))
 	_result_box.add_child(UiKit.label("내 기록%s  이김 %d · 짐 %d" % ["" if _online else "(1P)", record.x, record.y], 15, UiKit.MUTED))
+	if not league.is_empty():
+		_result_box.add_child(UiKit.rule())
+		_result_box.add_child(LeagueUi.result_panel(league))
 	_result_box.add_child(UiKit.button("마을로", func() -> void: back_to_village.emit(), 40.0))
 	_result.visible = true
 
 
 ## 온라인이 끊겼거나 어긋나 더 못 겨룬다(기록하지 않는다). 창 하나와 마을로 버튼.
-func show_notice(title: String, text: String) -> void:
+func show_notice(title: String, text: String, league: Dictionary = {}) -> void:
 	for c in _result_box.get_children():
 		c.queue_free()
 	_result_box.add_child(UiKit.label(title, 28, UiKit.TITLE))
@@ -143,5 +148,7 @@ func show_notice(title: String, text: String) -> void:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(460, 0)
 	_result_box.add_child(l)
+	if not league.is_empty():
+		_result_box.add_child(LeagueUi.result_panel(league))
 	_result_box.add_child(UiKit.button("마을로", func() -> void: back_to_village.emit(), 40.0))
 	_result.visible = true
