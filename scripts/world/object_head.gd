@@ -132,6 +132,11 @@ static func attach(skel: Skeleton3D, kind: StringName) -> Node3D:
 	mod.holder = holder
 	if obj == &"hill":
 		mod.size = 1.7   # 주인공 머리는 눈에 띄게
+	elif obj == &"anchor":
+		# 닻의 선장(사용자 "머리가 조금 더 자연스럽게"): 사람 머리 크기에 가깝게 줄이고, 흰 주름 깃 대신 외투 빛 목깃
+		mod.size = 0.82
+		collar.material_override = _m(Color(0.1, 0.12, 0.22))
+		collar.scale = Vector3(1.15, 0.7, 1.15)
 	return holder
 
 
@@ -265,7 +270,7 @@ static func build(obj: StringName) -> Node3D:
 			var rune := _m(Color(0.45, 0.85, 1.0))
 			rune.emission_enabled = true
 			rune.emission = Color(0.4, 0.85, 1.0)
-			rune.emission_energy_multiplier = 3.0
+			rune.emission_energy_multiplier = 1.8
 			var arc: int = 9
 			for k in arc - 1:   # 아래 반원 팔(왼쪽 끝 → 아래 → 오른쪽 끝), 가운데가 두껍다
 				var a0: float = PI * (1.1 + 0.8 * k / float(arc - 1))
@@ -274,21 +279,23 @@ static func build(obj: StringName) -> Node3D:
 				var p1 := Vector3(cos(a1) * 0.17, 0.19 + sin(a1) * 0.17, 0)
 				var mid: Vector3 = (p0 + p1) * 0.5
 				var thick: float = 0.06 - absf(k - (arc - 2) * 0.5) * 0.005
-				_box(n, Vector3(p0.distance_to(p1) + 0.014, thick, 0.06), mid, dark, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
-				_box(n, Vector3(p0.distance_to(p1) + 0.014, 0.01, 0.064), mid + Vector3(0, -thick * 0.5, 0), gold, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, thick, 0.085), mid, dark, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
+				_box(n, Vector3(p0.distance_to(p1) + 0.014, 0.01, 0.089), mid + Vector3(0, -thick * 0.5, 0), gold, Vector3(0, 0, atan2(p1.y - p0.y, p1.x - p0.x)))
 			for sx in [-1.0, 1.0]:   # 갈고리(금테 화살촉, 바깥으로 젖힘)
 				var ang: float = PI * (1.5 - 0.4 * sx)
 				var tip := Vector3(cos(ang) * 0.17, 0.19 + sin(ang) * 0.17, 0)
-				_box(n, Vector3(0.1, 0.1, 0.045), tip + Vector3(0.02 * sx, 0.045, 0), dark, Vector3(0, 0, PI / 4))
+				_box(n, Vector3(0.1, 0.1, 0.07), tip + Vector3(0.02 * sx, 0.045, 0), dark, Vector3(0, 0, PI / 4))
 				_box(n, Vector3(0.11, 0.016, 0.05), tip + Vector3(0.045 * sx, 0.07, 0), gold, Vector3(0, 0, -0.75 * sx))
 				_box(n, Vector3(0.016, 0.11, 0.05), tip + Vector3(-0.005 * sx, 0.09, 0), gold, Vector3(0, 0, -0.75 * sx + PI / 2 * 0.0))
-			_ball(n, 0.05, Vector3(0, 0.03, 0), dark, Vector3(1.2, 0.8, 1.0))   # 팔이 만나는 곳
-			_ball(n, 0.028, Vector3(0, 0.035, -0.04), rune)   # 푸른 눈
-			_box(n, Vector3(0.07, 0.4, 0.022), Vector3(0, 0.25, 0), steel)   # 자루 = 칼날
-			_box(n, Vector3(0.012, 0.34, 0.026), Vector3(0, 0.25, 0), rune)   # 룬 홈
-			_box(n, Vector3(0.09, 0.08, 0.035), Vector3(0, 0.07, 0), dark)
-			_box(n, Vector3(0.34, 0.05, 0.07), Vector3(0, 0.44, 0), gold)   # 가로대 = 금빛 칼코등이
-			_box(n, Vector3(0.3, 0.02, 0.074), Vector3(0, 0.44, 0), dark)
+			_ball(n, 0.065, Vector3(0, 0.03, 0), dark, Vector3(1.2, 0.85, 1.1))   # 팔이 만나는 곳(정수리 아래 턱처럼 둥글게)
+			_cyl(n, 0.07, 0.085, 0.07, Vector3(0, -0.03, 0), dark)   # 목에 끼운 쇠 테: 닻이 목에서 자라난 것처럼
+			_cyl(n, 0.088, 0.088, 0.014, Vector3(0, -0.005, 0), gold)
+			_ball(n, 0.026, Vector3(0, 0.04, -0.06), rune)   # 푸른 눈
+			_box(n, Vector3(0.07, 0.4, 0.034), Vector3(0, 0.25, 0), steel)   # 자루 = 칼날
+			_box(n, Vector3(0.012, 0.34, 0.038), Vector3(0, 0.25, 0), rune)   # 룬 홈
+			_box(n, Vector3(0.1, 0.09, 0.06), Vector3(0, 0.08, 0), dark)
+			_box(n, Vector3(0.34, 0.05, 0.08), Vector3(0, 0.44, 0), gold)   # 가로대 = 금빛 칼코등이
+			_box(n, Vector3(0.3, 0.02, 0.084), Vector3(0, 0.44, 0), dark)
 			for sx in [-1.0, 1.0]:
 				_box(n, Vector3(0.06, 0.06, 0.06), Vector3(sx * 0.18, 0.44, 0), gold, Vector3(0, 0, PI / 4))
 			_box(n, Vector3(0.035, 0.07, 0.035), Vector3(0, 0.5, 0), dark)
@@ -301,7 +308,7 @@ static func build(obj: StringName) -> Node3D:
 			ring.position = Vector3(0, 0.575, 0)
 			ring.rotation = Vector3(PI / 2, 0, 0)
 			n.add_child(ring)
-			_ball(n, 0.026, Vector3(0, 0.575, 0), rune, Vector3(1, 1.3, 0.6))   # 고리 안의 수정
+			_ball(n, 0.02, Vector3(0, 0.575, 0), rune, Vector3(1, 1.3, 0.6))   # 고리 안의 수정
 			var link := TorusMesh.new()   # 고리에서 오른팔 쪽으로 늘어진 사슬
 			link.inner_radius = 0.008
 			link.outer_radius = 0.016
@@ -316,7 +323,7 @@ static func build(obj: StringName) -> Node3D:
 				n.add_child(li)
 			var gl := OmniLight3D.new()
 			gl.light_color = Color(0.45, 0.85, 1.0)
-			gl.light_energy = 0.5
+			gl.light_energy = 0.35
 			gl.omni_range = 1.6
 			gl.position = Vector3(0, 0.3, -0.12)
 			n.add_child(gl)
