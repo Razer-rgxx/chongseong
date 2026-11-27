@@ -563,28 +563,40 @@ func _build_forge() -> void:
 	# 뒤의 대장장이 집과, 앞으로 내민 차양(모루와 화덕을 덮는다)
 	var top := VillageBuilder.house(self, at + Vector3(0, 0, -1.6), 0.0, Vector2(7.0, 4.4), true, _deco)
 	VillageBuilder.smoke(self, top, 1.6)
-	var lean := VillageBuilder.box(self, Vector3(7.6, 0.16, 3.6), at + Vector3(0, 2.35, 2.2), VillageBuilder.roof())
-	lean.rotation.x = 0.32
-	for x in [-3.4, 3.4]:
-		VillageBuilder.box(self, Vector3(0.2, 1.9, 0.2), at + Vector3(x, 0.95, 3.7), VillageBuilder.timber())
-	VillageBuilder.box(self, Vector3(7.0, 0.2, 0.2), at + Vector3(0, 1.85, 3.7), VillageBuilder.timber())
+	if VillageModels.available("forge_shed"):
+		VillageModels.put(self, "forge_shed", at)
+	else:
+		var lean := VillageBuilder.box(self, Vector3(7.6, 0.16, 3.6), at + Vector3(0, 2.35, 2.2), VillageBuilder.roof())
+		lean.rotation.x = 0.32
+		for x in [-3.4, 3.4]:
+			VillageBuilder.box(self, Vector3(0.2, 1.9, 0.2), at + Vector3(x, 0.95, 3.7), VillageBuilder.timber())
+		VillageBuilder.box(self, Vector3(7.0, 0.2, 0.2), at + Vector3(0, 1.85, 3.7), VillageBuilder.timber())
 	# 화덕 옆 물통, 장작, 숫돌, 벽에 기댄 칼들
 	VillageBuilder.barrel(self, at + Vector3(-3.2, 0, 2.2), _deco)
 	VillageBuilder.firewood(self, at + Vector3(3.0, 0, 1.3), PI / 2.0)
-	VillageBuilder.cyl(self, 0.4, 0.4, 0.15, at + Vector3(2.0, 0.75, 2.8), VillageBuilder.stone(), 14).rotation.x = PI / 2.0
-	VillageBuilder.box(self, Vector3(0.2, 0.7, 0.4), at + Vector3(2.0, 0.35, 2.8), VillageBuilder.timber())
-	for i in 3:
-		VillageBuilder.box(self, Vector3(0.06, 1.3, 0.12), at + Vector3(-0.8 + i * 0.35, 0.65, 0.75), _mat(Color(0.6, 0.62, 0.66), 0.8, 0.35), Vector3(0.18, 0, 0))
+	if VillageModels.available("grindstone"):
+		VillageModels.put(self, "grindstone", at + Vector3(2.0, 0.0, 2.8))
+	else:
+		VillageBuilder.cyl(self, 0.4, 0.4, 0.15, at + Vector3(2.0, 0.75, 2.8), VillageBuilder.stone(), 14).rotation.x = PI / 2.0
+		VillageBuilder.box(self, Vector3(0.2, 0.7, 0.4), at + Vector3(2.0, 0.35, 2.8), VillageBuilder.timber())
+	if VillageModels.available("blades"):
+		VillageModels.put(self, "blades", at + Vector3(-0.8, 0.0, 0.75))
+	else:
+		for i in 3:
+			VillageBuilder.box(self, Vector3(0.06, 1.3, 0.12), at + Vector3(-0.8 + i * 0.35, 0.65, 0.75), _mat(Color(0.6, 0.62, 0.66), 0.8, 0.35), Vector3(0.18, 0, 0))
 	_rects.append(Rect2(forge_at + Vector2(-1.85, -1.95), Vector2(3.7, 2.3)))
 	_circles.append([forge_at + Vector2(0.3, 1.3), 0.55])
 	_circles.append([forge_at + Vector2(-1.1, 0.8), 0.6])
 	_low_circles.append([forge_at + Vector2(-1.6, 1.1), 0.35])   # 물통(1m)
-	var furnace := _box(Vector3(1.6, 1.4, 1.2), VillageMaterials.get_mat("stone_wall", Color(0.2, 0.18, 0.17), 1.5, Color(0.6, 0.55, 0.5)))
-	furnace.position = at + Vector3(-2.2, 0.7, 1.6)
-	add_child(furnace)
-	var fire := _box(Vector3(0.9, 0.5, 0.1), _mat(Color(1.0, 0.45, 0.15), 0.0, 1.0, true))
-	fire.position = at + Vector3(-2.2, 0.6, 2.21)
-	add_child(fire)
+	if VillageModels.available("forge_furnace"):
+		VillageModels.put(self, "forge_furnace", at + Vector3(-2.2, 0.0, 1.6))
+	else:
+		var furnace := _box(Vector3(1.6, 1.4, 1.2), VillageMaterials.get_mat("stone_wall", Color(0.2, 0.18, 0.17), 1.5, Color(0.6, 0.55, 0.5)))
+		furnace.position = at + Vector3(-2.2, 0.7, 1.6)
+		add_child(furnace)
+		var fire := _box(Vector3(0.9, 0.5, 0.1), _mat(Color(1.0, 0.45, 0.15), 0.0, 1.0, true))
+		fire.position = at + Vector3(-2.2, 0.6, 2.21)
+		add_child(fire)
 	_forge_light.light_color = Color(1.0, 0.55, 0.25)
 	_forge_light.omni_range = 9.0
 	_forge_light.light_energy = 1.6
@@ -592,29 +604,32 @@ func _build_forge() -> void:
 	_forge_light.position = at + Vector3(-1.4, 1.6, 2.6)
 	add_child(_forge_light)
 	# 모루: 받침, 몸통, 뿔. 그 위에 검집의 검이 눕는다
-	var iron := _mat(Color(0.18, 0.19, 0.21), 0.7, 0.45)
-	var stump := MeshInstance3D.new()
-	var sc := CylinderMesh.new()
-	sc.top_radius = 0.45
-	sc.bottom_radius = 0.5
-	sc.height = 0.6
-	stump.mesh = sc
-	stump.material_override = _mat(Color(0.3, 0.22, 0.15))
-	stump.position = at + Vector3(0.6, 0.3, 2.6)
-	add_child(stump)
-	var body := _box(Vector3(1.1, 0.35, 0.45), iron)
-	body.position = at + Vector3(0.6, 0.78, 2.6)
-	add_child(body)
-	var horn := MeshInstance3D.new()
-	var hc := CylinderMesh.new()
-	hc.top_radius = 0.0
-	hc.bottom_radius = 0.18
-	hc.height = 0.55
-	horn.mesh = hc
-	horn.material_override = iron
-	horn.rotation.z = PI / 2.0
-	horn.position = at + Vector3(1.42, 0.86, 2.6)
-	add_child(horn)
+	if VillageModels.available("anvil"):
+		VillageModels.put(self, "anvil", at + Vector3(0.6, 0.0, 2.6))
+	else:
+		var iron := _mat(Color(0.18, 0.19, 0.21), 0.7, 0.45)
+		var stump := MeshInstance3D.new()
+		var sc := CylinderMesh.new()
+		sc.top_radius = 0.45
+		sc.bottom_radius = 0.5
+		sc.height = 0.6
+		stump.mesh = sc
+		stump.material_override = _mat(Color(0.3, 0.22, 0.15))
+		stump.position = at + Vector3(0.6, 0.3, 2.6)
+		add_child(stump)
+		var body := _box(Vector3(1.1, 0.35, 0.45), iron)
+		body.position = at + Vector3(0.6, 0.78, 2.6)
+		add_child(body)
+		var horn := MeshInstance3D.new()
+		var hc := CylinderMesh.new()
+		hc.top_radius = 0.0
+		hc.bottom_radius = 0.18
+		hc.height = 0.55
+		horn.mesh = hc
+		horn.material_override = iron
+		horn.rotation.z = PI / 2.0
+		horn.position = at + Vector3(1.42, 0.86, 2.6)
+		add_child(horn)
 	_anvil_sword.position = at + Vector3(0.55, 0.98, 2.6)
 	_anvil_sword.rotation.y = 0.25
 	add_child(_anvil_sword)

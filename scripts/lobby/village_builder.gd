@@ -342,7 +342,16 @@ static func rock(parent: Node3D, at: Vector3, rng: RandomNumberGenerator, size: 
 
 # ---------------------------------------------------------------- 소품
 
+## 꾸밈용 rng의 부름 수를 기본 도형일 때와 같게 맞춘다(모델로 바꿔도 뒤따르는 집·창의 무작위가 달라지지 않게).
+static func _burn(rng: RandomNumberGenerator, n: int) -> void:
+	for i in n:
+		rng.randf()
+
+
 static func barrel(parent: Node3D, at: Vector3, rng: RandomNumberGenerator) -> void:
+	if VillageModels.available("barrel"):
+		VillageModels.put(parent, "barrel", at, rng.randf() * TAU)
+		return
 	var b := cyl(parent, 0.38, 0.34, 1.0, at + Vector3(0, 0.5, 0), planks(), 12)
 	b.rotation.y = rng.randf() * TAU
 	for y in [0.15, 0.85]:
@@ -350,15 +359,24 @@ static func barrel(parent: Node3D, at: Vector3, rng: RandomNumberGenerator) -> v
 
 
 static func crate(parent: Node3D, at: Vector3, rng: RandomNumberGenerator, s: float = 0.8) -> void:
+	if VillageModels.available("crate"):
+		VillageModels.put(parent, "crate", at, rng.randf() * TAU, s / 0.8)
+		return
 	box(parent, Vector3(s, s, s), at + Vector3(0, s / 2.0, 0), planks(), Vector3(0, rng.randf() * TAU, 0))
 
 
 static func hay(parent: Node3D, at: Vector3, rng: RandomNumberGenerator) -> void:
+	if VillageModels.available("hay"):
+		VillageModels.put(parent, "hay", at, rng.randf() * TAU)
+		return
 	var c := cyl(parent, 0.6, 0.6, 1.1, at + Vector3(0, 0.6, 0), noise_mat("hay", Color(0.45, 0.36, 0.17), Color(0.7, 0.6, 0.32), 1.0, 0.2), 14)
 	c.rotation = Vector3(PI / 2.0, rng.randf() * TAU, 0)
 
 
 static func firewood(parent: Node3D, at: Vector3, facing: float) -> void:
+	if VillageModels.available("firewood"):
+		VillageModels.put(parent, "firewood", at, facing)
+		return
 	var f := place(parent, at, facing)
 	for row in 4:
 		for i in 6 - row:
@@ -367,6 +385,9 @@ static func firewood(parent: Node3D, at: Vector3, facing: float) -> void:
 
 
 static func bench(parent: Node3D, at: Vector3, facing: float) -> void:
+	if VillageModels.available("bench"):
+		VillageModels.put(parent, "bench", at, facing)
+		return
 	var b := place(parent, at, facing)
 	box(b, Vector3(1.8, 0.08, 0.4), Vector3(0, 0.45, 0), planks())
 	for x in [-0.75, 0.75]:
@@ -375,6 +396,9 @@ static func bench(parent: Node3D, at: Vector3, facing: float) -> void:
 
 ## 우물: 돌 둘레, 나무 기둥 둘과 작은 지붕, 도르래.
 static func well(parent: Node3D, at: Vector3) -> void:
+	if VillageModels.available("well"):
+		VillageModels.put(parent, "well", at).name = "Well"
+		return
 	var st := stone()
 	var ring := cyl(parent, 1.0, 1.05, 0.9, at + Vector3(0, 0.45, 0), st, 16)
 	ring.name = "Well"
@@ -389,6 +413,10 @@ static func well(parent: Node3D, at: Vector3) -> void:
 
 ## 장터 좌판: 나무 탁자, 기둥 넷, 천 차양, 위에 자루와 바구니.
 static func stall(parent: Node3D, at: Vector3, facing: float, cloth: Color, rng: RandomNumberGenerator) -> void:
+	if VillageModels.available("stall"):
+		_burn(rng, 13)
+		VillageModels.put(parent, "stall", at, facing, 1.0, {"cloth": cloth.lerp(Color.WHITE, 0.12)})
+		return
 	var s := place(parent, at, facing)
 	box(s, Vector3(2.6, 0.1, 1.2), Vector3(0, 0.9, 0), planks())
 	box(s, Vector3(2.6, 0.8, 0.08), Vector3(0, 0.45, 0.55), planks())
@@ -408,6 +436,16 @@ static func stall(parent: Node3D, at: Vector3, facing: float, cloth: Color, rng:
 ## 등불 기둥: 기둥, 팔, 빛나는 등, 따뜻한 빛.
 static func lantern(parent: Node3D, at: Vector3, facing: float, light: bool) -> void:
 	var l := place(parent, at, facing)
+	if VillageModels.available("lantern"):
+		VillageModels.put(l, "lantern", Vector3.ZERO)
+		if light:
+			var ol := OmniLight3D.new()
+			ol.light_color = Color(1.0, 0.7, 0.42)
+			ol.omni_range = 8.0
+			ol.light_energy = 1.1
+			ol.position = Vector3(0, 2.3, 0.6)
+			l.add_child(ol)
+		return
 	box(l, Vector3(0.14, 2.8, 0.14), Vector3(0, 1.4, 0), timber())
 	box(l, Vector3(0.08, 0.08, 0.7), Vector3(0, 2.7, 0.3), timber())
 	box(l, Vector3(0.26, 0.36, 0.26), Vector3(0, 2.38, 0.6), glow(Color(1.0, 0.62, 0.3), 1.4))
@@ -423,6 +461,15 @@ static func lantern(parent: Node3D, at: Vector3, facing: float, light: bool) -> 
 
 ## 횃불(문 기둥에): 막대와 불꽃, 빛.
 static func torch(parent: Node3D, at: Vector3) -> void:
+	if VillageModels.available("torch"):
+		VillageModels.put(parent, "torch", at)
+		var ot := OmniLight3D.new()
+		ot.light_color = Color(1.0, 0.58, 0.28)
+		ot.omni_range = 7.0
+		ot.light_energy = 1.2
+		ot.position = at + Vector3(0, 0.6, 0)
+		parent.add_child(ot)
+		return
 	cyl(parent, 0.05, 0.05, 0.7, at, timber(), 6)
 	ball(parent, 0.14, at + Vector3(0, 0.45, 0), glow(Color(1.0, 0.5, 0.18), 4.0), Vector3(1, 1.5, 1))
 	var o := OmniLight3D.new()
@@ -493,6 +540,9 @@ static func stone_wall(parent: Node3D, from: Vector3, to: Vector3) -> void:
 
 
 static func palisade(parent: Node3D, from: Vector3, to: Vector3, rng: RandomNumberGenerator) -> void:
+	if VillageModels.available("palisade_a"):
+		_palisade_models(parent, from, to, rng)
+		return
 	var len: float = from.distance_to(to)
 	var n: int = maxi(1, int(len / 0.36))
 	var shaft := CylinderMesh.new()
@@ -529,3 +579,39 @@ static func palisade(parent: Node3D, from: Vector3, to: Vector3, rng: RandomNumb
 	for y in [0.7, 2.0]:
 		var b := box(parent, Vector3(0.12, 0.14, len), (from + to) / 2.0 + Vector3(0, y, 0), timber())
 		b.look_at_from_position(b.position, to + Vector3(0, y, 0), Vector3.UP)
+
+
+## 목책(모델판): 통나무 세 가지를 MultiMesh로 세우고, 가로대는 통나무 토막을 잇는다. rng를 부르는 수는 기본 도형판과 같다.
+static func _palisade_models(parent: Node3D, from: Vector3, to: Vector3, rng: RandomNumberGenerator) -> void:
+	var len: float = from.distance_to(to)
+	var n: int = maxi(1, int(len / 0.36))
+	var variants: Array[String] = ["palisade_a", "palisade_b", "palisade_c"]
+	var mms: Array[MultiMesh] = []
+	for v in 3:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = VillageModels.mesh_of(variants[v])
+		mm.instance_count = int(ceil(float(n - v) / 3.0)) if n > v else 0
+		mms.append(mm)
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		parent.add_child(mi)
+	var used: Array[int] = [0, 0, 0]
+	for i in n:
+		var p: Vector3 = from.lerp(to, (i + 0.5) / n)
+		var h: float = rng.randf_range(2.4, 3.1)
+		var tilt := Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.05))
+		var v: int = i % 3
+		var k: float = (h + 0.445) / 3.1
+		var b: Basis = tilt * Basis().scaled(Vector3(lerpf(1.0, k, 0.35), k, lerpf(1.0, k, 0.35))) * Basis(Vector3.UP, float(i) * 2.399)
+		mms[v].set_instance_transform(used[v], Transform3D(b, p))
+		used[v] += 1
+	# 가로 띠 둘: 통나무 토막(+Z로 1m)을 이어 놓는다
+	var dir: Vector3 = (to - from) / maxf(len, 0.001)
+	var yaw: float = atan2(dir.x, dir.z)
+	var pieces: int = maxi(1, int(ceil(len / 1.0)))
+	for y in [0.7, 2.0]:
+		for q in pieces:
+			var a: Vector3 = from.lerp(to, float(q) / pieces) + Vector3(0, y, 0)
+			var r := VillageModels.put(parent, "palisade_rail", a, yaw)
+			r.scale = Vector3(1, 1, len / pieces / 1.0)

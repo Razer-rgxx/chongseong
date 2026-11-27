@@ -28,6 +28,10 @@ const LOOKS: Dictionary = {
 ## 의뢰판: 기둥 둘, 널빤지, 붙은 종이 카드들.
 static func board(parent: Node3D, at: Vector3, facing: float, rng: RandomNumberGenerator) -> void:
 	var b := VillageBuilder.place(parent, at, facing)
+	if VillageModels.available("board"):
+		VillageBuilder._burn(rng, 20)
+		VillageModels.put(b, "board", Vector3.ZERO)
+		return
 	for x in [-1.3, 1.3]:
 		VillageBuilder.box(b, Vector3(0.18, 2.5, 0.18), Vector3(x, 1.25, 0), VillageBuilder.timber())
 	VillageBuilder.box(b, Vector3(2.9, 1.5, 0.1), Vector3(0, 1.55, 0.05), VillageBuilder.planks())
@@ -45,11 +49,15 @@ static func board(parent: Node3D, at: Vector3, facing: float, rng: RandomNumberG
 static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vector2], rack_at: Vector2, rng: RandomNumberGenerator) -> Array[Node3D]:
 	var wood := VillageBuilder.timber()
 	var corners := [area.position, Vector2(area.end.x, area.position.y), area.end, Vector2(area.position.x, area.end.y)]
+	var modelled: bool = VillageModels.available("fence_unit")
 	for i in 4:
 		var a: Vector2 = corners[i]
 		var c: Vector2 = corners[(i + 1) % 4]
 		var len: float = a.distance_to(c)
 		var n: int = int(len / 0.6)
+		if modelled:
+			_fence_side(parent, a, c, n, i == 3, gap)
+			continue
 		for k in n + 1:
 			var p: Vector2 = a.lerp(c, float(k) / float(n))
 			# 서쪽(마당 들머리)의 틈
@@ -71,6 +79,10 @@ static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vecto
 		piv.position = Grid.cells_to_world(d)
 		piv.set_meta("base", piv.position)
 		parent.add_child(piv)
+		if VillageModels.available("scarecrow"):
+			VillageModels.put(piv, "scarecrow", Vector3.ZERO)
+			out.append(piv)
+			continue
 		VillageBuilder.box(piv, Vector3(0.12, 1.7, 0.12), Vector3(0, 0.85, 0), wood)
 		VillageBuilder.box(piv, Vector3(1.1, 0.1, 0.1), Vector3(0, 1.25, 0), wood)
 		VillageBuilder.cyl(piv, 0.25, 0.32, 0.8, Vector3(0, 1.0, 0.0), straw, 8)
@@ -80,6 +92,10 @@ static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vecto
 		out.append(piv)
 	# 검 걸이: 두 기둥 사이 가로대에 칼 몇 자루
 	var r := VillageBuilder.place(parent, Grid.cells_to_world(rack_at), 0.0)
+	if VillageModels.available("sword_rack"):
+		VillageBuilder._burn(rng, 4)
+		VillageModels.put(r, "sword_rack", Vector3.ZERO)
+		return out
 	for x in [-0.9, 0.9]:
 		VillageBuilder.box(r, Vector3(0.12, 1.5, 0.12), Vector3(x, 0.75, 0), wood)
 	VillageBuilder.box(r, Vector3(2.0, 0.08, 0.1), Vector3(0, 1.3, 0), wood)
@@ -90,9 +106,33 @@ static func yard(parent: Node3D, area: Rect2, gap: Vector2, dummies: Array[Vecto
 	return out
 
 
+## 수련장 울타리 한 변(모델판): 칸 a→c, 말뚝 n+1개, 틈(gap은 y 범위, 서쪽 변만)에는 말뚝도 가로대도 없다.
+static func _fence_side(parent: Node3D, a: Vector2, c: Vector2, n: int, west: bool, gap: Vector2) -> void:
+	var wa: Vector3 = Grid.cells_to_world(a)
+	var wc: Vector3 = Grid.cells_to_world(c)
+	var dir: Vector3 = (wc - wa).normalized()
+	var yaw: float = atan2(dir.x, dir.z)
+	var step: float = wa.distance_to(wc) / float(n)
+	var in_gap := func(k: int) -> bool:
+		var p: Vector2 = a.lerp(c, float(k) / float(n))
+		return west and p.y > gap.x and p.y < gap.y
+	for k in n + 1:
+		if in_gap.call(k):
+			continue
+		var at: Vector3 = wa.lerp(wc, float(k) / float(n))
+		if k == n or in_gap.call(k + 1):
+			VillageModels.put(parent, "fence_end", at, yaw + float(k) * 1.7)
+		else:
+			var u := VillageModels.put(parent, "fence_unit", at, yaw)
+			u.scale = Vector3(1, 1, step / 0.6)
+
+
 ## 결투 말뚝(21단계): 밟아 다진 둥근 마당, 굵은 말뚝에 엇갈려 꽂힌 칼 둘, 양쪽에 걸린 천(1P 금빛, 2P 검붉음). 기본 도형.
 static func duel_post(parent: Node3D, at: Vector3) -> void:
 	var d := VillageBuilder.place(parent, at, 0.0)
+	if VillageModels.available("duel_post"):
+		VillageModels.put(d, "duel_post", Vector3.ZERO)
+		return
 	VillageBuilder.cyl(d, 2.0, 2.1, 0.05, Vector3(0, 0.025, 0), VillageBuilder.dirt(), 24)
 	var stone := VillageBuilder.plain(Color(0.36, 0.35, 0.34), 0.95)
 	for i in 10:
@@ -112,6 +152,9 @@ static func duel_post(parent: Node3D, at: Vector3) -> void:
 ## 거울(영주 꾸미기, docs/cosmetics.md): 나무 틀에 선 키 큰 거울, 옆 걸대에 걸린 망토와 쇠모자. 기본 도형. 앞이 +Z.
 static func mirror(parent: Node3D, at: Vector3, facing: float) -> void:
 	var m := VillageBuilder.place(parent, at, facing)
+	if VillageModels.available("mirror"):
+		VillageModels.put(m, "mirror", Vector3.ZERO)
+		return
 	var wood := VillageBuilder.timber()
 	VillageBuilder.cyl(m, 0.8, 0.85, 0.06, Vector3(0, 0.03, 0), VillageBuilder.dirt(), 18)
 	for k in [-1.0, 1.0]:
@@ -133,6 +176,9 @@ static func mirror(parent: Node3D, at: Vector3, facing: float) -> void:
 ## 떠돌이 상인의 짐수레: 짐칸, 바퀴 둘, 천 덮개, 자루와 통, 끌채.
 static func cart(parent: Node3D, at: Vector3, facing: float) -> void:
 	var c := VillageBuilder.place(parent, at, facing)
+	if VillageModels.available("cart"):
+		VillageModels.put(c, "cart", Vector3.ZERO, 0.0, 1.0, {"cloth": Color(0.3, 0.14, 0.32)})
+		return
 	VillageBuilder.box(c, Vector3(2.2, 0.15, 1.3), Vector3(0, 0.75, 0), VillageBuilder.planks())
 	VillageBuilder.box(c, Vector3(2.2, 0.45, 0.08), Vector3(0, 1.0, 0.62), VillageBuilder.planks())
 	VillageBuilder.box(c, Vector3(2.2, 0.45, 0.08), Vector3(0, 1.0, -0.62), VillageBuilder.planks())
