@@ -91,6 +91,7 @@ var _fx: SlashFx = null
 var cos_slash: Color = Color(0, 0, 0, 0)
 var _cos_cape: Node3D = null
 var _cape_scale := Vector3.ONE
+var _cape_skel: Skeleton3D = null   # Blender 망토의 뼈 마디(있으면 아래쪽만 흔든다)
 var _sword_now: Sword = null
 var _grades_now: GradeTable = null
 var _last_pos := Vector3.ZERO
@@ -205,6 +206,7 @@ func set_cosmetics(worn: Dictionary) -> void:
 	cos_slash = r.slash
 	_cos_cape = r.cape as Node3D
 	_cape_scale = _cos_cape.scale if _cos_cape != null else Vector3.ONE
+	_cape_skel = CosmeticArt.cape_skeleton(_cos_cape)
 	if _fx != null and cos_slash.a > 0.0:
 		_fx.color = cos_slash
 	elif _fx != null:
@@ -300,6 +302,12 @@ func _sway_cape(delta: float) -> void:
 	var speed: float = clampf(step / maxf(delta, 0.001) / 8.0, 0.0, 1.0)
 	_cape_swing = lerpf(_cape_swing, speed, 1.0 - exp(-8.0 * delta))
 	var swing: float = -0.08 - 0.5 * _cape_swing + sin(Time.get_ticks_msec() * 0.011) * 0.04 * _cape_swing
+	if _cape_skel != null:
+		# 뼈 망토: 어깨는 등에 붙어 있고 아래 마디일수록 뒤로 날린다(통째로 젖히면 다리와 뚫린다). 서 있어도 아주 조금 일렁인다.
+		var t: float = Time.get_ticks_msec() * 0.001
+		var total: float = -0.02 - 0.34 * _cape_swing + sin(t * 1.7) * 0.012 + sin(t * 10.5) * 0.035 * _cape_swing
+		CosmeticArt.sway(_cape_skel, total)
+		swing = 0.0
 	# 망토는 중력대로 늘어진다: 어깨의 자리와 몸통이 도는 쪽(yaw)만 따르고, 몸통이 숙이거나 젖혀도 곧게 드리운다.
 	var par := _cos_cape.get_parent() as Node3D
 	if par != null and par.is_inside_tree():

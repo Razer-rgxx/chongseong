@@ -160,6 +160,32 @@ static func cape_material(it: CosmeticItem) -> StandardMaterial3D:
 	return m
 
 
+## Blender 망토 안의 뼈대(CapeBone0~2). 없으면 null(기본 도형 망토).
+static func cape_skeleton(pivot: Node) -> Skeleton3D:
+	if pivot == null:
+		return null
+	var sk := pivot.find_child("Skeleton3D", true, false) as Skeleton3D
+	if sk == null or sk.find_bone("CapeBone0") < 0:
+		return null
+	return sk
+
+
+## 뼈 마디를 X축으로 굽힌다. total은 맨 아래 마디의 누적 각도(음수 = 뒤로), 위 마디는 조금만.
+static func sway(sk: Skeleton3D, total: float) -> void:
+	var share: Array[float] = [0.1, 0.35, 0.55]
+	var acc: float = 0.0
+	for k in 3:
+		var b: int = sk.find_bone("CapeBone%d" % k)
+		if b < 0:
+			return
+		var par: int = sk.get_bone_parent(b)
+		var pg: Basis = sk.get_bone_global_rest(par).basis if par >= 0 else Basis.IDENTITY
+		var g: Basis = sk.get_bone_global_rest(b).basis
+		var step: float = total * share[k]
+		sk.set_bone_pose_rotation(b, (pg.inverse() * Basis(Vector3.RIGHT, step) * g).get_rotation_quaternion())
+		acc += step
+
+
 ## 망토 노드 한 벌: 어깨에서 늘어지는 면. 돌려주는 노드 원점이 어깨 가운데(흔들 때 축).
 static func cape(it: CosmeticItem) -> Node3D:
 	var pivot := Node3D.new()

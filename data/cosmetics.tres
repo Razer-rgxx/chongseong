@@ -23,8 +23,8 @@ id = &"cape_moss"
 title = "이끼빛 망토"
 unlock = &"shards"
 need = 40
-color = Color(0.17, 0.26, 0.17, 1)
-color2 = Color(0.17, 0.26, 0.17, 1)
+color = Color(0.14, 0.21, 0.14, 1)
+color2 = Color(0.14, 0.21, 0.14, 1)
 
 [sub_resource type="Resource" id="Resource_gw4r7"]
 script = ExtResource("1_4ru5s")
@@ -43,8 +43,8 @@ title = "줄무늬 망토"
 unlock = &"secret"
 key = &"marsh_hermit"
 style = &"stripe"
-color = Color(0.45, 0.12, 0.12, 1)
-color2 = Color(0.14, 0.13, 0.12, 1)
+color = Color(0.34, 0.09, 0.09, 1)
+color2 = Color(0.12, 0.11, 0.1, 1)
 
 [sub_resource type="Resource" id="Resource_yjofd"]
 script = ExtResource("1_4ru5s")
@@ -82,7 +82,7 @@ title = "무덤 주인의 수의"
 unlock = &"secret"
 key = &"crypt_low"
 style = &"ragged"
-color = Color(0.72, 0.7, 0.62, 1)
+color = Color(0.46, 0.42, 0.33, 1)
 color2 = Color(0.18, 0.16, 0.15, 1)
 
 [sub_resource type="Resource" id="Resource_rnm6v"]
@@ -93,7 +93,7 @@ unlock = &"rune"
 need = 1
 style = &"rune"
 color = Color(0.14, 0.12, 0.1, 1)
-color2 = Color(0.35, 0.62, 0.85, 1)
+color2 = Color(0.3, 0.52, 0.7, 1)
 
 [sub_resource type="Resource" id="Resource_8palu"]
 script = ExtResource("1_4ru5s")
@@ -102,8 +102,8 @@ title = "백금 외투"
 unlock = &"league"
 need = 4
 style = &"trim"
-color = Color(0.66, 0.68, 0.72, 1)
-color2 = Color(0.3, 0.33, 0.4, 1)
+color = Color(0.4, 0.42, 0.46, 1)
+color2 = Color(0.22, 0.25, 0.31, 1)
 
 [sub_resource type="Resource" id="Resource_6mqcs"]
 script = ExtResource("1_4ru5s")
@@ -123,7 +123,7 @@ unlock = &"story"
 key = &"act1"
 style = &"trim"
 color = Color(0.07, 0.09, 0.11, 1)
-color2 = Color(0.2, 0.8, 0.9, 1)
+color2 = Color(0.15, 0.4, 0.44, 1)
 
 [sub_resource type="Resource" id="Resource_j27tu"]
 script = ExtResource("1_4ru5s")
@@ -133,7 +133,7 @@ unlock = &"story"
 key = &"act3"
 style = &"emblem"
 color = Color(0.1, 0.2, 0.3, 1)
-color2 = Color(0.8, 0.85, 0.9, 1)
+color2 = Color(0.62, 0.68, 0.74, 1)
 
 [sub_resource type="Resource" id="Resource_ucrek"]
 script = ExtResource("1_4ru5s")
@@ -206,7 +206,7 @@ unlock = &"secret"
 key = &"quarry_storm"
 style = &"horn"
 color = Color(0.38, 0.38, 0.4, 1)
-color2 = Color(0.85, 0.8, 0.7, 1)
+color2 = Color(0.68, 0.62, 0.5, 1)
 
 [sub_resource type="Resource" id="Resource_mtw25"]
 script = ExtResource("1_4ru5s")
@@ -227,7 +227,7 @@ title = "뼈관"
 unlock = &"secret"
 key = &"crypt_low"
 style = &"spikes"
-color = Color(0.8, 0.78, 0.7, 1)
+color = Color(0.66, 0.62, 0.52, 1)
 color2 = Color(0.3, 0.28, 0.25, 1)
 
 [sub_resource type="Resource" id="Resource_de2v3"]
@@ -249,8 +249,8 @@ title = "승천의 투구"
 unlock = &"league"
 need = 6
 style = &"plume"
-color = Color(0.7, 0.72, 0.76, 1)
-color2 = Color(0.85, 0.7, 0.3, 1)
+color = Color(0.5, 0.52, 0.56, 1)
+color2 = Color(0.7, 0.55, 0.25, 1)
 
 [sub_resource type="Resource" id="Resource_gib6m"]
 script = ExtResource("1_4ru5s")
@@ -272,7 +272,7 @@ unlock = &"story"
 key = &"act3"
 style = &"circlet"
 color = Color(0.55, 0.65, 0.75, 1)
-color2 = Color(0.75, 0.88, 1, 1)
+color2 = Color(0.55, 0.75, 0.9, 1)
 
 [sub_resource type="Resource" id="Resource_ld4ti"]
 script = ExtResource("1_4ru5s")

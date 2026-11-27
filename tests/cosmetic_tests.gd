@@ -306,6 +306,33 @@ func _art() -> void:
 	CosmeticArt._glb_cache.erase("head_helm")
 	if keep != null:
 		CosmeticArt._glb_cache["cape_grey"] = keep
+	# 천 시뮬 망토(2026-11-27): 뼈 세 마디가 있고, 주름이 굳어 있어(깊이 0.1m 넘게 울퉁불퉁) 판때기가 아니며, 흔들면 아래가 더 움직인다
+	var cloth_ok: int = 0
+	var cloth_bad: PackedStringArray = PackedStringArray()
+	for it in t.items:
+		if it.slot != &"cape" or it.id == t.default_of(&"cape"):
+			continue
+		var cp: Node3D = CosmeticArt.cape(it)
+		var sk: Skeleton3D = CosmeticArt.cape_skeleton(cp)
+		var meshes: Array[Node] = cp.find_children("*", "MeshInstance3D", true, false)
+		var depth: float = 0.0
+		if not meshes.is_empty():
+			depth = (meshes[0] as MeshInstance3D).get_aabb().size.z
+		if sk != null and depth > 0.1:
+			CosmeticArt.sway(sk, -0.4)
+			var ang: Array[float] = []
+			for k in 3:
+				var bi: int = sk.find_bone("CapeBone%d" % k)
+				ang.append(sk.get_bone_pose_rotation(bi).angle_to(sk.get_bone_rest(bi).basis.get_rotation_quaternion()))
+			sk.reset_bone_poses()
+			if ang[0] < ang[1] and ang[1] < ang[2] and ang[2] > 0.1 and ang[0] < 0.06:
+				cloth_ok += 1
+			else:
+				cloth_bad.append(String(it.id))
+		else:
+			cloth_bad.append(String(it.id))
+		cp.free()
+	check.call(cloth_bad.is_empty() and cloth_ok == 13, "꾸미기: 천 시뮬 망토 13개는 뼈 세 마디를 갖고 주름이 굳어 있으며 어깨는 고정·아래가 흔들린다 %s" % str(cloth_bad))
 	check.call(Cosmetics.slash_color({"slash": "slash_ember"}) == Color(1.0, 0.5, 0.15) and Cosmetics.slash_color({}).a == 0.0 and Cosmetics.slash_color({"slash": "cape_moss"}).a == 0.0, "꾸미기: 베기 빛 색(안 입으면 알파 0 = 검 본래 빛, 다른 자리 항목은 무시)")
 	var fx := MoveFx.new()
 	Meta.cos_look = {"slash": "slash_blood"}

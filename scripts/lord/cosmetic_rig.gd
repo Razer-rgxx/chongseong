@@ -15,10 +15,11 @@ const PRIM_CAPE_SCALE: Vector3 = Vector3(1.25, 1.0, 1.0)
 ## 기사 모델: 머리 뼈 원점에서 머리 가운데까지, 머리 반지름, 등 뼈에서 망토를 다는 자리.
 const CHAR_HEAD_BONE: String = "mixamorig_Head"
 const CHAR_HEAD_AT: Vector3 = Vector3(0, 0.11, 0.0)
-const CHAR_HEAD_SCALE: float = 0.115
+const CHAR_HEAD_SCALE: float = 0.105
 const CHAR_BACK_BONE: String = "mixamorig_Spine2"
 const CHAR_CAPE_AT: Vector3 = Vector3(0, 0.15, 0.13)
-const CHAR_CAPE_SCALE: Vector3 = Vector3(0.9, 0.9, 1.0)
+## Blender 망토는 이 받침 좌표(영주 몸 단면, scripts/debug/dump_body_profile.gd)에 맞춰 짓는다: 크기 1.
+const CHAR_CAPE_SCALE: Vector3 = Vector3.ONE
 
 
 ## 입힌다. 이미 입힌 것은 걷어 내고 다시 입힌다. 돌려주는 값: {slash: 베기 빛 색(알파 0이면 검 본래 빛), cape: 흔들 망토 축 노드 또는 null}.
