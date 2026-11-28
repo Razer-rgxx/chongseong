@@ -30,6 +30,10 @@ static func card(tx: Texture2D, grade_col: Color, tip: String, on_press: Callabl
 	t.custom_minimum_size = Vector2(64, 64)
 	t.tooltip_text = tip
 	t.pressed.connect(on_press)
+	var tilt := CardTilt.attach(t, grade_col, 5.0)   # 커서 쪽으로 기울기·등급 색 빛 받침줄(2026-11-28)
+	tilt.gap = 4.0
+	tilt.lift = 1.06
+	tilt.rest_glow = 0.0   # 촘촘한 격자라 받침줄은 올렸을 때만
 	return t
 
 

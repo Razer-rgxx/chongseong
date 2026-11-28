@@ -14,6 +14,8 @@ signal path_picked(index: int)
 @export var choice_guard: float = 0.8
 @export var toast_time: float = 4.0
 
+const BLUR_DIM: Shader = preload("res://assets/ui/blur_dim.gdshader")
+
 var _life: LifeBar
 var _zone: Label
 var _sub: Label
@@ -259,9 +261,11 @@ func flash(c: Color, strength: float = 0.7, time: float = 0.5) -> void:
 
 ## 새 검(위)과 칸마다 지금 든 검(아래 한 줄, 칸 수만큼). 칸 버튼이나 1~4로 바꾼다.
 ## grades: [새 검 등급, 칸0 등급, …](버릴까요?를 물을지 정한다). 비우면 늘 묻는다.
-func open_choice(new_text: String, slot_texts: Array, grades: Array = []) -> void:
+## colors: [새 검 색, 칸0 색, …](카드 아래 빛 받침줄, 2026-11-28 카드 손맛). 비우면 놋쇠빛.
+func open_choice(new_text: String, slot_texts: Array, grades: Array = [], colors: Array = []) -> void:
 	_ch_new.text = new_text
 	_choice_grades = grades
+	CardTilt.attach(_ch_new.get_parent() as Control, _card_col(colors, 0), 2.0)
 	_slot_btns.clear()
 	for c in _ch_slots.get_children():
 		c.queue_free()
@@ -269,10 +273,11 @@ func open_choice(new_text: String, slot_texts: Array, grades: Array = []) -> voi
 	var w: float = 320.0 if n <= 2 else (260.0 if n == 3 else 210.0)
 	for k in n:
 		var col := VBoxContainer.new()
-		col.add_theme_constant_override("separation", 6)
+		col.add_theme_constant_override("separation", 16)   # 카드 아래 빛 받침줄 자리
 		var r := _choice_card(w, false)
 		r.text = str(slot_texts[k])
 		col.add_child(r.get_parent())
+		CardTilt.attach(r.get_parent() as Control, _card_col(colors, k + 1))
 		var b := Button.new()
 		b.text = "바꾸기 (%d)" % (k + 1)
 		b.focus_mode = Control.FOCUS_NONE
@@ -287,6 +292,16 @@ func open_choice(new_text: String, slot_texts: Array, grades: Array = []) -> voi
 	_discard.text = "두고 간다 (X)"
 	_choice_t = 0.0
 	_choice.visible = true
+	var sm := _choice.material as ShaderMaterial
+	if sm:   # 뒤 화면이 0.2초에 걸쳐 흐려지고 어두워진다
+		sm.set_shader_parameter("dim", 0.0)
+		create_tween().tween_method(func(v: float) -> void: sm.set_shader_parameter("dim", v), 0.0, 1.0, 0.2).set_ease(Tween.EASE_OUT)
+
+
+func _card_col(colors: Array, i: int) -> Color:
+	if i < colors.size() and colors[i] is Color:
+		return colors[i]
+	return Color(0.72, 0.6, 0.4)
 
 
 func choice_open() -> bool:
@@ -375,6 +390,9 @@ func chain(n: int, paid: int, window: float, every: int) -> void:
 
 func _build_choice() -> void:
 	_choice = _dim()
+	var blur := ShaderMaterial.new()   # 뒤 화면을 흐리고 어둡게(2026-11-28 카드 손맛)
+	blur.shader = BLUR_DIM
+	_choice.material = blur
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	var panel := _panel(box).get_parent() as PanelContainer

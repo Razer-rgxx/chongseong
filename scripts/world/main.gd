@@ -872,10 +872,12 @@ func _open_choice(s: Sword) -> void:
 		return
 	var slot_texts: Array = []
 	var grades: Array = [s.grade]
+	var cols: Array = [data.grades.colors[s.grade]]
 	for k in rules.slots.size():
 		slot_texts.append(_card(rules.slots[k], k, false))
 		grades.append(rules.slots[k].grade if rules.slots[k] else -1)
-	_hud.open_choice(_card(s, -1, false), slot_texts, grades)
+		cols.append(data.grades.colors[rules.slots[k].grade] if rules.slots[k] else Color(0.4, 0.45, 0.55))
+	_hud.open_choice(_card(s, -1, false), slot_texts, grades, cols)
 	_capture(false)
 
 

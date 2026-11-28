@@ -69,6 +69,7 @@ func _build() -> void:
 		c.mouse_exited.connect(func() -> void: _set_hover(-1 if _hover == k else _hover))
 		row.add_child(c)
 		_cards.append(c)
+		CardTilt.attach(c, Color(0.72, 0.6, 0.4), 2.0)   # 커서 쪽으로 기울기·빛 받침줄(2026-11-28)
 	_track = Control.new()
 	_track.custom_minimum_size = Vector2(card_width * 2.0 + card_gap, fork_height)
 	_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
