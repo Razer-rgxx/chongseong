@@ -33,13 +33,17 @@ static var logged_in: bool = false
 static var admin: bool = false
 ## 웹판 관리자(2026-11-26 사용자): 웹판은 GD-Sync 키가 없어 로그인을 못 하니, 주소 끝 ?admin=<비밀 문구>의 SHA-256이 이것과 같으면 관리자로 켠다. 문구는 저장소에 쓰지 않는다.
 const WEB_ADMIN_HASH: String = "b5b1d0076cd9b5c9c37534c4e9fe5f578fec64476186e63ea2dfb1b4028f9105"
+## 임시 개발용(2026-11-28 사용자): 켜 두면 게임 중 숫자 1 키를 처음 누를 때 이 세션만 관리자가 된다(AdminHost._input).
+## 저장하지 않는다. **출시 때 false로 바꿀 것.**
+const DEV_ADMIN_KEY: bool = true
+static var dev_admin: bool = false
 static var _web_checked: bool = false
 static var _web_admin: bool = false
 
 
 ## 관리자인가: 로그인한 관리자 이메일이거나, 웹판에서 비밀 문구로 연 경우.
 static func is_admin() -> bool:
-	if admin:
+	if admin or dev_admin:
 		return true
 	if not _web_checked:
 		_web_checked = true

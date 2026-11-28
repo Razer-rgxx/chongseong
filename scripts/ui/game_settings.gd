@@ -29,6 +29,8 @@ static func ensure() -> void:
 	if _loaded:
 		return
 	_loaded = true
+	if Account.DEV_ADMIN_KEY:
+		AdminHost.ensure()   # 임시: 1키 관리자(출시 때 DEV_ADMIN_KEY를 false로)
 	ButtonJuice.install(Engine.get_main_loop() as SceneTree)   # 단추 손맛(2026-11-24): 트리에 붙는 단추마다
 	for a in ACTIONS:
 		var evs := InputMap.action_get_events(a[0])

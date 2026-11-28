@@ -123,7 +123,7 @@ func hit_light(at: Vector3, big: bool, scale: float = 1.0, color: Color = Juice.
 
 ## 알갱이를 멈춤 프레임 동안 그 자리에 붙잡았다가 풀어 흩어지게 한다.
 func _hold(p: CPUParticles3D, big: bool) -> void:
-	var t: float = Juice.HOLD_TIME_BIG if big else Juice.HOLD_TIME
+	var t: float = maxf(Juice.HOLD_MIN, Juice.HOLD_TIME_BIG if big else Juice.HOLD_TIME)   # 멈춤 프레임이 없어도 최소 HOLD_MIN
 	p.speed_scale = Juice.HOLD_SPEED
 	_held.append([p, 0.0, t])
 

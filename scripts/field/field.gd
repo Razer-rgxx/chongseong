@@ -187,6 +187,7 @@ func _ready() -> void:
 	var _kick := PropKick.new()   # 꾸밈 물건 튀기(docs/hit_juice.md)
 	add_child(_kick)
 	_kick.setup(rules)
+	_kick.height_of = FieldBuilder.walk_height
 	_move_fx.height_of = FieldBuilder.walk_height   # 땅 자국·흙먼지(내려앉기 포함)가 들판의 땅 위에
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)

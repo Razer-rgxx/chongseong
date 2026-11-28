@@ -354,7 +354,7 @@ static func _torches(root: Node3D, id: StringName) -> Array[OmniLight3D]:
 		var l := OmniLight3D.new()
 		l.light_color = TORCH_COLOR
 		l.light_energy = TORCH_ENERGY
-		l.omni_range = TORCH_RANGE
+		l.omni_range = TORCH_RANGE * Juice.TORCH_RANGE_MUL
 		l.omni_attenuation = Juice.TORCH_ATTEN
 		l.position = Vector3(0, 2.4, 0)
 		l.set_meta("base", TORCH_ENERGY)

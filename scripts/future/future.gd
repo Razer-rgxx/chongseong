@@ -87,6 +87,9 @@ func _ready() -> void:
 	_lord.torch.light_energy = 0.8
 	_lord.torch.light_color = Color(0.55, 0.75, 1.0)
 	add_child(_fx)
+	var _kick := PropKick.new()
+	add_child(_kick)
+	_kick.setup(rules)
 	_pfx.setup(rules)
 	add_child(_pfx)
 	add_child(_move_fx)
@@ -478,6 +481,7 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 	var chest: Vector3 = at + Vector3(0, 0.9 + Grid.cells_to_meters(e.radius) * 1.2, 0)
 	var dir: Vector3 = (at - _lord.position).normalized()
 	_fx.blood(chest, dir, big)
+	_fx.struck(e, chest, dir, big, _camera)
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(0.6, 0.85, 1.0) if big else Color.WHITE, 52 if big else 34)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_sfx.play(&"hit_big" if big else &"hit", at, 0.0)

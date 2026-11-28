@@ -121,6 +121,10 @@ func _ready() -> void:
 	add_child(_lord)
 	QuarterRing.attach(_lord, _camera)   # 쿼터뷰(V)일 때만 발밑 고리(docs/hit_juice.md)
 	add_child(_fx)
+	var _kick := PropKick.new()   # 작은 꾸밈 물건 튀기(docs/hit_juice.md)
+	add_child(_kick)
+	_kick.height_of = HillBuilder.height
+	_kick.setup(rules)
 	_pfx.setup(rules)
 	add_child(_pfx)
 	_pull_fx.env = _env.environment

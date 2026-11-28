@@ -16,3 +16,11 @@
 | 10 | 쿼터뷰(V)일 때만 영주 발밑 옅은 고리 | `QuarterRing`(main·field·crypt) |
 
 그림: `scripts/debug/shots/shot_juice.gd -- before|after [hill crypt quarter field]`(`--fixed-fps 30`, 한 장면에 몇 분) → `/home/claude/shots/juice_*.png`.
+
+## 2026-11-28 보강
+- 화각 조임: 목표로 빠르게 들어가고(`FOV_PINCH_ATTACK`) 0.05초 머문 뒤 `FOV_PINCH_DECAY`로 돌아온다. 큰 베기 5도, 마무리 6.5도. 미래·과거·마을 방어전도 `HitFx.struck`를 부른다.
+- 피 붙잡기: 멈춤 프레임이 없어도 최소 `HOLD_MIN`(0.06초).
+- 물건 튀기: `PropKick.setup`이 한 프레임 뒤 장면을 훑어(`_scan`) 작은 꾸밈(발자국 `SCAN_XZ`, 높이 `SCAN_Y_MIN~MAX`)을 모은다. 스크립트·빛·입자·뼈대·막힘 표 위의 것과 큰 것은 뺀다. 언덕·들판·무덤·미래·과거에 붙는다(마을 아님). 8m 칸 공간 해시로 근처만 검사, 튄 뒤 `height_of`로 비탈에 내려앉는다.
+- 체력 젖음: 재질을 바꾸지 않고 몸 메시마다 `material_overlay`(어두운 핏빛, 체력 90% 아래부터, 0이면 `WOUND_ALPHA`)를 얹어 Mixamo·셰이더·도형을 모두 덮는다.
+- 빛: 환경광 `AMBIENT_*_MUL` 더 낮게, 횃불 반경 `TORCH_RANGE_MUL`·세기 `TORCH_ENERGY_MUL` 키움. 가장자리 안개는 장막 둘(안쪽 `EDGE_FOG_INSET`), 높이 7m.
+

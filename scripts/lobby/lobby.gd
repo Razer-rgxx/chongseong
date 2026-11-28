@@ -1413,6 +1413,7 @@ func _on_foe_hit(e: Enemy, damage: float, big: bool) -> void:
 		_fx.wisp(chest, dir, big)
 	else:
 		_fx.blood(chest, dir, big)
+	_fx.struck(e, chest, dir, big, _camera)
 	var t := FloatText.new()
 	t.text = str(roundi(damage))
 	t.font_size = 52 if big else 34

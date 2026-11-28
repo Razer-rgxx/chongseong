@@ -25,6 +25,27 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
+## 임시 개발용(Account.DEV_ADMIN_KEY, 출시 때 false): 숫자 1을 처음 누르면 이 세션만 관리자. 키는 소비하지 않아
+## 검 칸 고르기 같은 원래 쓰임은 그대로 일어난다. 이미 관리자면 아무 일도 안 한다.
+func _input(event: InputEvent) -> void:
+	if not Account.DEV_ADMIN_KEY or Account.is_admin():
+		return
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo or k.physical_keycode != KEY_1:
+		return
+	Account.dev_admin = true
+	_notify("관리자 켜짐 (이 판만) · ` 또는 F6")
+
+
+func _notify(text: String) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 101
+	add_child(layer)
+	var b := Band.make(layer, 90.0, 720.0, 46.0, 20)
+	b.show_for(text, 2.2)
+	get_tree().create_timer(3.0).timeout.connect(layer.queue_free)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo or not Account.is_admin():

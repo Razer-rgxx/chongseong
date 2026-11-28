@@ -43,6 +43,9 @@ const CLOAK_SHADER: Shader = preload("res://scripts/enemies/wraith_cloak.gdshade
 
 var enemy: Enemy
 var _mats: Array[StandardMaterial3D] = []
+var _wound_mat: StandardMaterial3D = null
+var _wound_on: bool = false
+var _wound_meshes: Array[MeshInstance3D] = []
 var _base: Array[Color] = []
 var _cloaks: Array[ShaderMaterial] = []
 var _flash: float = 0.0
@@ -398,6 +401,44 @@ func _paint() -> void:
 	for c in _cloaks:
 		c.set_shader_parameter("tint", Vector4(tint.r, tint.g, tint.b, tint.a))
 		c.set_shader_parameter("flash", w * 0.8)
+	_paint_wound()
+
+
+## 몸이 어떤 재질(Mixamo 질감·셰이더·도형)이든 덮이도록, 모든 몸 메시에 재질 겹침(material_overlay) 하나를 얹는다.
+## 체력이 깎이면 겹침의 알파가 오른다(Juice.WOUND_*). 상처가 없으면 겹침을 떼어 비용을 안 쓴다.
+func _paint_wound() -> void:
+	var frac: float = 1.0
+	if enemy.max_hp < 9999.0 and enemy.max_hp > 0.0:
+		frac = clampf(enemy.hp / enemy.max_hp, 0.0, 1.0)
+	var k: float = clampf((Juice.WOUND_START - frac) / Juice.WOUND_START, 0.0, 1.0)
+	var a: float = Juice.WOUND_ALPHA * k
+	if a < 0.02:
+		if _wound_on:
+			_wound_on = false
+			for mi in _wound_meshes:
+				if is_instance_valid(mi):
+					mi.material_overlay = null
+		return
+	if _wound_mat == null:
+		_wound_mat = StandardMaterial3D.new()
+		_wound_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_wound_mat.roughness = 0.3
+		_wound_mat.metallic_specular = 0.8
+	_wound_mat.albedo_color = Color(Juice.WOUND_COLOR_LIVE, a)
+	if not _wound_on:
+		_wound_on = true
+		if _wound_meshes.is_empty():
+			for n in _body.find_children("*", "MeshInstance3D", true, false):
+				var mi := n as MeshInstance3D
+				if mi == null or mi.name.begins_with("Eye") or _eye_nodes.has(mi):
+					continue
+				var sm := mi.material_override as StandardMaterial3D
+				if sm != null and sm.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+					continue   # 빛나는 부품(눈·불)은 안 덮는다
+				_wound_meshes.append(mi)
+		for mi in _wound_meshes:
+			if is_instance_valid(mi):
+				mi.material_overlay = _wound_mat
 
 
 # ---------------------------------------------------------------- 공통 부품

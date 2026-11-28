@@ -18,3 +18,4 @@ GD-Sync 계정 API(`account_create/login/verify/login_from_session/logout`)를 �
 - 참고: 마을 입장 때 `FallenShare`가 따로 만드는 자동 계정(lordxxxxxx)은 이 계정과 별개다. 이메일 인증을 켜면 그 자동 계정 로그인이 막혀 "다른 영주의 검"이 조용히 빠진다(순위표 `fallen_swords`).
 
 - 웹판 관리자(2026-11-26): 웹판은 GD-Sync 키가 없어 로그인을 못 하므로, 주소 끝 `?admin=<비밀 문구>`의 SHA-256이 `Account.WEB_ADMIN_HASH`와 같으면 관리자(`Account.is_admin()`). 문구는 저장소에 쓰지 않고 사용자만 안다.
+- **출시 전 끌 것**(임시, 2026-11-28 사용자): `Account.DEV_ADMIN_KEY`(scripts/net/account.gd)가 true면 숫자 1 키를 처음 누를 때 그 세션만 관리자(`Account.dev_admin`, 저장 안 함, `AdminHost._input`이 Band로 알림, 1키 원래 쓰임은 그대로). 출시 때 false.

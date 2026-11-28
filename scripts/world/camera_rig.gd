@@ -62,6 +62,8 @@ var _blur: MeshInstance3D = null
 var _blur_mat: ShaderMaterial = null
 var _prev_xf: Transform3D = Transform3D.IDENTITY
 var _base_fov: float = 75.0
+var _pinch_now: float = 0.0
+var _pinch_hold: float = 0.0
 var _radial: float = 0.0
 
 
@@ -135,8 +137,13 @@ func _process(delta: float) -> void:
 		global_position = _focus + off + sh
 		look_at(_focus + sh, Vector3.UP)
 	fov_kick = maxf(0.0, fov_kick - delta * fov_kick_decay)
-	fov_pinch = maxf(0.0, fov_pinch - delta * Juice.FOV_PINCH_DECAY)
-	fov = _base_fov + fov_kick - fov_pinch
+	# 조임: 목표(fov_pinch)로 빠르게 들어가고(attack), 잠깐 머문 뒤(hold) 일정 속도로 돌아온다. 3인칭·쿼터뷰 같다.
+	if _pinch_hold > 0.0:
+		_pinch_hold -= delta
+	else:
+		fov_pinch = maxf(0.0, fov_pinch - delta * Juice.FOV_PINCH_DECAY)
+	_pinch_now = lerpf(_pinch_now, fov_pinch, 1.0 - exp(-Juice.FOV_PINCH_ATTACK * delta))
+	fov = _base_fov + fov_kick - _pinch_now
 	_radial = lerpf(_radial, speed_blur, 1.0 - exp(-12.0 * delta))
 	if _blur:
 		_blur.visible = blur_allowed and (motion_blur > 0.0 or _radial > 0.001)
@@ -150,6 +157,7 @@ func _process(delta: float) -> void:
 ## 시야각을 deg도 좁힌다(줄어들며 돌아온다). 더 큰 값이 이미 있으면 그대로 둔다.
 func pinch(deg: float) -> void:
 	fov_pinch = maxf(fov_pinch, deg)
+	_pinch_hold = Juice.FOV_PINCH_HOLD
 
 
 func kick(deg: float) -> void:
