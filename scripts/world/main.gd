@@ -119,6 +119,7 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
+	QuarterRing.attach(_lord, _camera)   # 쿼터뷰(V)일 때만 발밑 고리(docs/hit_juice.md)
 	add_child(_fx)
 	_pfx.setup(rules)
 	add_child(_pfx)
@@ -193,7 +194,9 @@ func _ready() -> void:
 		_ghosts.erase(g.id)
 		if v:
 			v.leave())
-	rules.draw_countered.connect(func(_at: Vector2) -> void:
+	rules.draw_countered.connect(func(at: Vector2) -> void:
+		var w: Vector3 = Grid.cells_to_world(at) + Vector3(0, 1.1, 0)
+		_fx.sparks(w, (w - _lord.position).normalized(), true)   # 칼끼리 부딪힌 불꽃
 		_hud.toast("발검 반격 · 뽑기 값을 돌려받았다"))
 	rules.choice_needed.connect(_on_choice_needed)
 	rules.slots_changed.connect(_refresh_cards)
@@ -933,6 +936,7 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 		_fx.wisp(chest, dir, gush)
 	else:
 		_fx.blood(chest, dir, gush)
+	_fx.struck(e, chest, dir, big, _camera)
 	var grow: float = 1.0 + data.lord.chain_number_grow * minf(ch, 15)
 	var col: Color = Color(1, 0.86, 0.45) if big else Color.WHITE.lerp(ChainMeter.HOT, clampf((ch - 2) / 14.0, 0.0, 0.6))
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), col, roundi((big_number_size if big else hit_number_size) * grow))
@@ -1258,9 +1262,9 @@ func _set_light(night: bool, instant: bool = false) -> void:
 	tw.tween_property(env, "fog_light_color", night_fog if night else day_fog, t)
 	env.ambient_light_color = night_ambient_color
 	tw.tween_property(env, "ambient_light_sky_contribution", 0.15 if night else 1.0, t)
-	tw.tween_property(env, "ambient_light_energy", night_ambient if night else day_ambient, t)
+	tw.tween_property(env, "ambient_light_energy", night_ambient * Juice.AMBIENT_NIGHT_MUL if night else day_ambient, t)
 	tw.tween_property(env, "background_color", Color(0.01, 0.015, 0.03) if night else Color(0.06, 0.08, 0.12), t)
-	tw.tween_property(_lord.torch, "light_energy", torch_energy if night else 0.0, t)
+	tw.tween_property(_lord.torch, "light_energy", torch_energy * Juice.TORCH_ENERGY_MUL if night else 0.0, t)
 	if HillBuilder.sky_material:
 		tw.tween_property(HillBuilder.sky_material, "shader_parameter/night", 1.0 if night else 0.0, t)
 
@@ -1268,6 +1272,7 @@ func _set_light(night: bool, instant: bool = false) -> void:
 ## 언덕 꼭대기(싸움터)와 둘레의 땅, 하늘, 바위, 꽂힌 검. 에셋을 바꿀 때는 HillBuilder만 고친다.
 func _build_world() -> void:
 	HillBuilder.build(self, _env.environment, data.forms)
+	EdgeFog.build(self, Vector2(Grid.size) * Grid.CELL)   # 싸움터 가장자리 낮은 안개(docs/hit_juice.md)
 	_sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
 
 

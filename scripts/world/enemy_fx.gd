@@ -69,8 +69,8 @@ const ARROW_MAX_AGE: float = 3.0
 ## 부러지는 자리(촉에서 m).
 const ARROW_CUT: float = 0.42
 
-const RED := Color(0.34, 0.035, 0.025)
-const RED_HOT := Color(0.6, 0.09, 0.045)
+const RED := Juice.DANGER_DARK
+const RED_HOT := Juice.DANGER_HOT
 ## 먼지·재·연기·안개(빛을 받는 바탕색).
 const DUST := Color(0.45, 0.4, 0.34)
 const EMBER := Color(1.0, 0.42, 0.12)

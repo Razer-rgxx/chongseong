@@ -169,6 +169,7 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
+	QuarterRing.attach(_lord, _camera)   # 쿼터뷰(V)일 때만 발밑 고리(docs/hit_juice.md)
 	_horse = RideSwordView.new()
 	_horse.setup(rules)
 	_horse.height_of = FieldBuilder.walk_height
@@ -183,6 +184,9 @@ func _ready() -> void:
 	add_child(_pfx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
+	var _kick := PropKick.new()   # 꾸밈 물건 튀기(docs/hit_juice.md)
+	add_child(_kick)
+	_kick.setup(rules)
 	_move_fx.height_of = FieldBuilder.walk_height   # 땅 자국·흙먼지(내려앉기 포함)가 들판의 땅 위에
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)
@@ -471,9 +475,9 @@ func _apply_day_night(k: float) -> void:
 		tint = tint.lerp((_wx.tint as Color).darkened(0.6 * k), float(_wx.amt) * 0.8)
 		HillBuilder.sky_material.set_shader_parameter("tint", tint.lerp(FieldLayout.FIELD_SKY_TINT_DUSK, sin(k * PI) * 0.6))
 	_env.ambient_light_color = _ambient_day.lerp(FieldLayout.FIELD_AMBIENT_NIGHT, k)
-	_env.ambient_light_energy = lerpf(_ambient_day_energy, FieldLayout.FIELD_AMBIENT_NIGHT_ENERGY, k)
+	_env.ambient_light_energy = lerpf(_ambient_day_energy, FieldLayout.FIELD_AMBIENT_NIGHT_ENERGY * Juice.AMBIENT_NIGHT_MUL, k)
 	_env.ambient_light_sky_contribution = lerpf(1.0, FieldLayout.FIELD_AMBIENT_NIGHT_SKY, k)
-	_lord.torch.light_energy = lerpf(FieldLayout.FIELD_TORCH_DAY, FieldLayout.FIELD_TORCH_NIGHT, smoothstep(0.2, 0.9, k))
+	_lord.torch.light_energy = lerpf(FieldLayout.FIELD_TORCH_DAY, FieldLayout.FIELD_TORCH_NIGHT * Juice.TORCH_ENERGY_MUL, smoothstep(0.2, 0.9, k))
 
 
 ## 날씨가 바뀌었다(docs/weather.md): 입자를 켜고 끄고 한 줄을 띄운다. 잿바람이면 쓰지 않은 철 자리가 더 선다. 사건 자리는 해·새벽 신호(_build_weather_props)가 세운다.
@@ -1224,6 +1228,7 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 		_fx.wisp(chest, dir, big)
 	else:
 		_fx.blood(chest, dir, big)
+	_fx.struck(e, chest, dir, big, _camera)
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, 52 if big else 34)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_sfx.play(&"hit_big" if big else &"hit", at, 0.0)

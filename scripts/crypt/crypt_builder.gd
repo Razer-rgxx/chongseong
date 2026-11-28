@@ -99,6 +99,7 @@ static func build(parent: Node3D) -> Dictionary:
 		_slab(root, CryptLayout.DOORS[d].gap, -0.2, 0.4, dark)
 	_walls(root, dark)
 	_rubble(root)
+	_props(root)
 	_exit_arch(root, st)
 	var out := {"doors": {}, "coffins": {}, "torches": [], "root": root}
 	for d in CryptLayout.DOORS:
@@ -184,7 +185,24 @@ static func _rubble(root: Node3D) -> void:
 		for k in 5:
 			var c := Vector2(R.position.x + (1.5 if k % 2 == 0 else R.size.x - 1.5), R.position.y + (1.5 if k < 2 else R.size.y - 1.5 if k < 4 else R.size.y * 0.5))
 			c += Vector2(rng.randf_range(-0.8, 0.8), rng.randf_range(-0.8, 0.8))
-			HillBuilder.put_flat(root, parts[rng.randi() % parts.size()], _w(c), rng.randf() * TAU, rng.randf_range(0.35, 0.7), 0.35)
+			var rock := HillBuilder.put_flat(root, parts[rng.randi() % parts.size()], _w(c), rng.randf() * TAU, rng.randf_range(0.35, 0.7), 0.35)
+			if rock != null:
+				PropKick.tag(rock, 2.2)   # 베기 근처면 화면에서만 튄다(docs/hit_juice.md)
+
+
+## 방 왼쪽 모서리 둘레에 통·상자·항아리(막힘 아님, 관 가까이는 뺀다). 꾸밈 랜덤은 따로 둔다.
+static func _props(root: Node3D) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	var kinds: Array[StringName] = [&"barrel", &"crate", &"jar", &"jar", &"crate"]
+	for id in CryptLayout.ROOM_ORDER:
+		var R: Rect2 = CryptLayout.ROOMS[id].rect
+		var coffin: Vector2 = CryptLayout.ROOMS[id].coffin
+		for k in 3:
+			var c := Vector2(R.position.x + 2.6 + rng.randf_range(0.0, 1.0), R.position.y + [2.8, R.size.y * 0.5, R.size.y - 2.8][k] + rng.randf_range(-0.6, 0.6))
+			var kind: StringName = kinds[rng.randi() % kinds.size()]
+			if c.distance_to(coffin) > 3.5:
+				PropKick.make(root, kind, _w(c), rng.randf() * TAU)
 
 
 ## 나가는 문: 남쪽 벽에 돌 틀과 희미한 푸른 빛(밖에서 들어오는 빛).
@@ -337,7 +355,7 @@ static func _torches(root: Node3D, id: StringName) -> Array[OmniLight3D]:
 		l.light_color = TORCH_COLOR
 		l.light_energy = TORCH_ENERGY
 		l.omni_range = TORCH_RANGE
-		l.omni_attenuation = 1.3
+		l.omni_attenuation = Juice.TORCH_ATTEN
 		l.position = Vector3(0, 2.4, 0)
 		l.set_meta("base", TORCH_ENERGY)
 		n.add_child(l)

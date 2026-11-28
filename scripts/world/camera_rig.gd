@@ -42,6 +42,8 @@ var follow_boost: float = 0.0
 ## 시야각을 잠깐 넓히는 값(도). 줄어들며 원래대로 돌아온다.
 var fov_kick: float = 0.0
 @export var fov_kick_decay: float = 18.0
+## 큰 베기·마무리 때 시야각을 잠깐 좁혔다 돌아오는 값(도, 흔들기·fov_kick과 따로). 수치는 Juice.FOV_PINCH_*.
+var fov_pinch: float = 0.0
 ## 39단계 말: 탄 정도(0~1, 장면이 HorseData.camera_blend초에 걸쳐 바꾼다). 탔으면 거리 × ride_far, 보는 점이 ride_up m 높아진다.
 var ride: float = 0.0
 var ride_far: float = 1.35
@@ -133,7 +135,8 @@ func _process(delta: float) -> void:
 		global_position = _focus + off + sh
 		look_at(_focus + sh, Vector3.UP)
 	fov_kick = maxf(0.0, fov_kick - delta * fov_kick_decay)
-	fov = _base_fov + fov_kick
+	fov_pinch = maxf(0.0, fov_pinch - delta * Juice.FOV_PINCH_DECAY)
+	fov = _base_fov + fov_kick - fov_pinch
 	_radial = lerpf(_radial, speed_blur, 1.0 - exp(-12.0 * delta))
 	if _blur:
 		_blur.visible = blur_allowed and (motion_blur > 0.0 or _radial > 0.001)
@@ -142,6 +145,11 @@ func _process(delta: float) -> void:
 		_blur_mat.set_shader_parameter("mask_near", blur_mask_near)
 		_blur_mat.set_shader_parameter("radial", _radial)
 	_prev_xf = global_transform
+
+
+## 시야각을 deg도 좁힌다(줄어들며 돌아온다). 더 큰 값이 이미 있으면 그대로 둔다.
+func pinch(deg: float) -> void:
+	fov_pinch = maxf(fov_pinch, deg)
 
 
 func kick(deg: float) -> void:

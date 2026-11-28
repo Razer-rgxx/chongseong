@@ -62,6 +62,7 @@ func _ready() -> void:
 	_hud.setup(data, meta)
 	var env: Environment = ($Environment as WorldEnvironment).environment
 	CryptBuilder.environment(env)
+	env.ambient_light_energy *= Juice.AMBIENT_CRYPT_MUL   # 불빛 웅덩이가 더 도드라지게
 	var built: Dictionary = CryptBuilder.build(self)
 	_doors = built.doors
 	_coffins = built.coffins
@@ -73,12 +74,16 @@ func _ready() -> void:
 	_lord = LORD_SCENE.instantiate()
 	_lord.setup(rules)
 	add_child(_lord)
+	QuarterRing.attach(_lord, _camera)   # 쿼터뷰(V)일 때만 발밑 고리(docs/hit_juice.md)
 	_lord.torch.light_energy = 1.8
 	add_child(_fx)
 	_pfx.setup(rules)
 	add_child(_pfx)
 	add_child(_move_fx)
 	_move_fx.setup(rules)
+	var _kick := PropKick.new()   # 꾸밈 물건 튀기(docs/hit_juice.md)
+	add_child(_kick)
+	_kick.setup(rules)
 	add_child(_enemy_fx)
 	_enemy_fx.setup(rules, _enemy_parts)
 	_enemy_fx.quaked.connect(func(_at: Vector3, k: float) -> void: _camera.add_shake(0.4 * k))   # 보스 패턴의 땅 울림
@@ -364,6 +369,7 @@ func _on_enemy_hit(e: Enemy, damage: float, big: bool) -> void:
 		_fx.wisp(chest, dir, big)
 	else:
 		_fx.blood(chest, dir, big)
+	_fx.struck(e, chest, dir, big, _camera)
 	_float(at + Vector3(0, 1.2 + Grid.cells_to_meters(e.radius) * 2.2, 0), str(roundi(damage)), Color(1, 0.86, 0.45) if big else Color.WHITE, 52 if big else 34)
 	_camera.add_shake(data.lord.shake_big if big else data.lord.shake)
 	_sfx.play(&"hit_big" if big else &"hit", at, 0.0)

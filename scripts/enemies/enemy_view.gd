@@ -364,8 +364,8 @@ func _paint_eyes(delta: float) -> void:
 	var size: float = lerpf(lerpf(1.0, token_eye_size, _token_glow), soon_eye_size, _soon_glow)
 	for i in _eye_mats.size():
 		var c: Color = _eye_base[i]
-		# 번쩍일 때는 흰빛으로 조금 기운다
-		c = c.lerp(Color.WHITE, 0.3 * _soon_glow)
+		# 때리기 직전에는 위험 예고의 붉은빛으로 기운다(색 역할: Juice)
+		c = c.lerp(Juice.DANGER_EYE, Juice.DANGER_EYE_MIX * _soon_glow)
 		_eye_mats[i].albedo_color = Color(c.r * bright, c.g * bright, c.b * bright, 1.0)
 		_eye_mats[i].emission = _eye_mats[i].albedo_color
 	for i in _eye_nodes.size():
@@ -386,9 +386,15 @@ func _paint() -> void:
 		tint = Color(0.45, 0.65, 1.0, 0.35)
 	elif enemy.bleed_t > 0.0:
 		tint = Color(0.6, 0.0, 0.0, 0.35)
+	# 체력이 깎일수록 몸이 아주 약하게 어둡고 붉게 젖는다(Juice.WOUND_*). 막대 없는 허수아비 같은 것은 제외
+	var wound: float = 0.0
+	if enemy.max_hp < 9999.0 and enemy.max_hp > 0.0:
+		wound = Juice.WOUND_MAX * clampf(1.0 - enemy.hp / enemy.max_hp, 0.0, 1.0)
 	for i in _mats.size():
-		var c: Color = _base[i].lerp(Color(tint.r, tint.g, tint.b), tint.a)
+		var c: Color = _base[i].lerp(Juice.WOUND_COLOR, wound).lerp(Color(tint.r, tint.g, tint.b), tint.a)
 		_mats[i].albedo_color = c.lerp(Color.WHITE, w)
+	if tint.a < wound:
+		tint = Color(Juice.WOUND_COLOR, wound)
 	for c in _cloaks:
 		c.set_shader_parameter("tint", Vector4(tint.r, tint.g, tint.b, tint.a))
 		c.set_shader_parameter("flash", w * 0.8)
@@ -468,7 +474,7 @@ func _build_wraith(s: float, c: Color) -> void:
 	void_m.albedo_color = Color(0.0, 0.0, 0.0)
 	void_m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_add(_body, face, void_m, Vector3(0, 1.8 * s, -0.09 * s))
-	_eyes_at(_body, Vector3(0, 1.82 * s, -0.21 * s), 0.055 * s, 0.03 * s, Color(0.9, 0.88, 1.0))
+	_eyes_at(_body, Vector3(0, 1.82 * s, -0.21 * s), 0.055 * s, 0.03 * s, Juice.EYE_COLD)
 	# 늘어진 소매(팔): 어깨에서 앞으로 뻗는다
 	for side in [-1.0, 1.0]:
 		var pivot := Node3D.new()
@@ -625,7 +631,7 @@ func _build_wolf(s: float, c: Color) -> void:
 	nose.radius = 0.022
 	nose.height = 0.03
 	_add(_head, nose, _mat(Color(0.03, 0.03, 0.03)), Vector3(0, -0.025, -0.36))
-	_eyes_at(_head, Vector3(0, 0.045, -0.165), 0.055, 0.017, Color(1.0, 0.72, 0.25))
+	_eyes_at(_head, Vector3(0, 0.045, -0.165), 0.055, 0.017, Juice.EYE_COLD)
 	# 꼬리
 	_tail = Node3D.new()
 	_tail.position = Vector3(0, 0.66, 0.58)
@@ -739,7 +745,7 @@ func _build_knight(grow: float, c: Color, boss: bool, own: String = "") -> void:
 	# 투구 안의 눈. 뼈의 방향이 모델마다 달라서 첫 프레임에 머리 앞에 맞춘다(_place_eyes)
 	_eyes = Node3D.new()
 	_knight.attach("mixamorig_Head", _eyes)
-	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.022, Color(1.0, 0.35, 0.15) if boss or chief else Color(0.7, 0.85, 1.0))
+	_eyes_at(_eyes, Vector3.ZERO, 0.035, 0.022, Juice.EYE_ELITE if boss or chief else Juice.EYE_COLD)
 	_knight.play("idle")
 
 
@@ -818,7 +824,7 @@ func _build_giant(r: float, c: Color, boss: bool) -> void:
 		var hm := _mat(Color(0.1, 0.02, 0.03))
 		_add(_body, horn, hm, Vector3(-r * 0.3, r * 4.5, 0), Vector3(0, 0, 0.5))
 		_add(_body, horn, hm, Vector3(r * 0.3, r * 4.5, 0), Vector3(0, 0, -0.5))
-	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Color(1.0, 0.8, 0.35) if boss or enemy.data.kind != &"" else Color(0.75, 0.9, 1.0))
+	_eyes_at(_body, Vector3(0, r * 4.05, -r * 0.48), r * 0.15, r * 0.07, Juice.EYE_ELITE if boss or enemy.data.kind != &"" else Juice.EYE_COLD)
 	if enemy.data.model_scale > 0.0:
 		# 무덤 기사: 녹슨 도형 몸에 큰 칼을 든 오른팔(어깨에서 돌린다)
 		_arm_pivot = Node3D.new()

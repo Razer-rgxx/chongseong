@@ -165,7 +165,8 @@ func _ready() -> void:
 		_blade.mesh = (_blade.mesh as BoxMesh).duplicate()
 	_build_rope()
 	torch.position = Vector3(0.4, 2.2, 0.3)
-	torch.light_color = Color(1.0, 0.72, 0.45)
+	torch.light_color = Juice.LORD_LIGHT
+	torch.omni_attenuation = Juice.TORCH_ATTEN   # 둥글게 모이는 빛 웅덩이
 	torch.omni_range = 9.0
 	torch.light_energy = 0.0
 	torch.shadow_enabled = true

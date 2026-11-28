@@ -46,11 +46,11 @@ const KINDS: Array[StringName] = [&"archer", &"shield", &"charger", &"bomber", &
 
 ## 종류마다 눈 색. 정예는 EnemyView가 금빛으로 바꾼다.
 const EYE_COLORS: Dictionary = {
-	&"archer": Color(0.95, 0.9, 0.72),
-	&"shield": Color(0.7, 0.85, 1.0),
-	&"charger": Color(1.0, 0.2, 0.08),
-	&"bomber": Color(1.0, 0.62, 0.2),
-	&"caller": Color(0.7, 1.0, 0.78),
+	&"archer": Juice.EYE_COLD,
+	&"shield": Juice.EYE_COLD,
+	&"charger": Juice.EYE_COLD,
+	&"bomber": Juice.EYE_COLD,
+	&"caller": Juice.EYE_COLD,
 }
 
 ## 화살(arrow_mesh): 원점 = 화살촉 끝, 깃 쪽 끝이 +Z로 ARROW_LENGTH. 날아가는 쪽은 -Z.

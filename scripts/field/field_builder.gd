@@ -1111,7 +1111,9 @@ static func _scatter(parent: Node3D, r: Rect2, count: int, spread: float, m: Mat
 		var x: float = (r.position.x + r.size.x * rng.randf()) * Grid.CELL + rng.randf_range(-spread, spread)
 		var z: float = (r.position.y + r.size.y * rng.randf()) * Grid.CELL + rng.randf_range(-spread, spread)
 		var sz: float = rng.randf_range(smin, smax)
-		_box(parent, Vector3(sz, sz * 0.7, sz * 1.2), Vector3(x, height(x, z) + sz * 0.2, z), m, Vector3(rng.randf() * 0.5, rng.randf() * TAU, rng.randf() * 0.5), 110.0)
+		var stone_mi: MeshInstance3D = _box(parent, Vector3(sz, sz * 0.7, sz * 1.2), Vector3(x, height(x, z) + sz * 0.2, z), m, Vector3(rng.randf() * 0.5, rng.randf() * TAU, rng.randf() * 0.5), 110.0)
+		if stone_mi != null and sz < 0.8:
+			PropKick.tag(stone_mi, 1.0 + sz * 2.0)   # 작은 돌만 베기에 튄다(docs/hit_juice.md)
 
 
 ## 버려진 채석장: 파인 구덩이(땅 높이 new_land), 돌 벼랑, 잘린 돌덩이, 나무 비계 둘. 글자 없음.
@@ -1190,6 +1192,15 @@ static func _hamlet(parent: Node3D, rects: Array[Rect2], low_rects: Array[Rect2]
 		for i in 3:
 			_box(parent, Vector3(0.22, 0.22, rng.randf_range(2.2, 4.0)), Vector3(c.x + rng.randf_range(-1.5, 1.5), base + 0.5 + i * 0.15, c.y + rng.randf_range(-1.2, 1.2)), ch, Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * PI, rng.randf_range(-0.25, 0.25)))
 		_scatter(parent, hz, 5, 0.5, ch, rng, 0.3, 0.7)
+		# 타다 남은 통·상자·항아리(막힘 아님, 베기에 튄다). 꾸밈 랜덤은 따로 둔다
+		var prng := RandomNumberGenerator.new()
+		prng.seed = 700 + int((hz as Rect2).position.x) * 7 + int((hz as Rect2).position.y)
+		for k in 2:
+			var pc: Vector2 = (hz as Rect2).position + Vector2(prng.randf_range(0.5, (hz as Rect2).size.x - 0.5), prng.randf_range(0.5, (hz as Rect2).size.y - 0.5))
+			var pkind: StringName = [&"barrel", &"crate", &"jar"][prng.randi() % 3]
+			var px: float = pc.x * Grid.CELL
+			var pz: float = pc.y * Grid.CELL
+			PropKick.make(parent, pkind, Vector3(px, height(px, pz), pz), prng.randf() * TAU)
 	# 우물: 돌 테두리와 부러진 두레박 기둥
 	var well: Rect2 = FieldLayout.HAMLET_WELL
 	var wc: Vector2 = well.get_center() * Grid.CELL
