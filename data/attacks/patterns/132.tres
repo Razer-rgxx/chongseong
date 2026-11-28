@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PatternData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/pattern_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 132
+display_name = "피의 물러나고 베고 찌르고 십자 베기"
+grade = 4
+moves = PackedStringArray("retreat", "sweep", "thrust", "cross")
+element = &"blood"
+echo = true

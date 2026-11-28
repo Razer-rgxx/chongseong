@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 392
+display_name = "오니마루 Type-88 「해무 궤도」"
+grade = 1
+form = 1
+attack = 65
+inscriptions = PackedStringArray("흡혈")
+unique_text = "산탄: 큰 베기 끝에 앞으로 산탄이 퍼진다(부채꼴, 멀수록 약하지 않다)."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "오니마루"
+cyber_powers = PackedStringArray("산탄")

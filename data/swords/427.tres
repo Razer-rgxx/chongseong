@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 427
+display_name = "카타나 KT-66 「해무 그림자」"
+grade = 0
+form = 3
+attack = 10
+inscriptions = PackedStringArray("밀쳐내기")
+unique_text = "오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시)."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "카타나"
+cyber_powers = PackedStringArray("오버클럭")

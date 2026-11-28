@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 377
+display_name = "대검 Juggernaut 「심야 열차」"
+grade = 5
+form = 2
+attack = 149
+inscriptions = PackedStringArray("잔상", "거인 베기")
+unique_text = "레일: 큰 베기에 화면 가로지르는 긴 선을 맞힌다.\n반동 돌진: 큰 베기에 탄을 쏘고 반동으로 뒤로 밀려난다."
+unique_ready = true
+unbreakable = false
+story = "선로 위의 것은 모두 치인다."
+field_only = false
+cyber = true
+sub_type = "대검"
+cyber_powers = PackedStringArray("레일", "반동 돌진")

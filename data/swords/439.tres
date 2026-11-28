@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 439
+display_name = "카타나 Mk.II 「검은 문지기」"
+grade = 2
+form = 3
+attack = 101
+inscriptions = PackedStringArray("불씨")
+unique_text = "레일: 큰 베기에 화면 가로지르는 긴 선을 맞힌다.\n오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시)."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "카타나"
+cyber_powers = PackedStringArray("레일", "오버클럭")

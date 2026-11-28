@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 468
+display_name = "단검 Mk.VII 「마지막 적귀」"
+grade = 4
+form = 0
+attack = 135
+inscriptions = PackedStringArray("꿰뚫기", "서리")
+unique_text = "오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시).\n탄창: 4번 휘두를 때마다 탄이 한 발 나간다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("오버클럭", "탄창")

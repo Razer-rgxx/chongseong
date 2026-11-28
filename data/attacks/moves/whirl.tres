@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"whirl"
+display_name = "소용돌이"
+link_name = "휘몰아치고"
+end_name = "소용돌이"
+role = "finish"
+shape = &"circle"
+damage = 0.5
+hits = 4
+interval = 0.15
+stun = 0.0
+knock = 0.4
+cooldown = 1.0
+time = 0.6
+delay = 0.0
+lock = 0.0
+walk = 0.6
+reach = 1.0
+arc = 1.0
+radius_reach = 0.9

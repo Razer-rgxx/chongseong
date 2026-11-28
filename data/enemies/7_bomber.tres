@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"bomber"
+display_name = "자폭병"
+hp = 10
+damage = 22
+speed = 2.6
+radius = 0.24
+cooldown = 1.0
+color = Color(0.85, 0.45, 0.18, 1)
+knockback_mult = 1.0
+big = false
+wraith = false
+boss = false
+token_cost = 1
+fuse_range = 1.2
+fuse_time = 0.9
+blast_radius = 2.2
+blast_enemy_mult = 1.0
+blast_knock = 0.6

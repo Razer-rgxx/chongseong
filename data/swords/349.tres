@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 349
+display_name = "카타나 Mk.X 「절단선」"
+grade = 5
+form = 3
+attack = 146
+inscriptions = PackedStringArray("가벼운 손", "첫 타")
+unique_text = "레일: 큰 베기에 화면 가로지르는 긴 선을 맞힌다.\n글리치 순간베기: 큰 베기에 가까운 적 뒤로 순간 이동해 벤다(재사용 대기 있음)."
+unique_ready = true
+unbreakable = false
+story = "베기 전에 선이 먼저 그어진다."
+field_only = false
+cyber = true
+sub_type = "카타나"
+cyber_powers = PackedStringArray("레일", "글리치 순간베기")

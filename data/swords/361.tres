@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 361
+display_name = "카타나 Rev.22 「역광 암호」"
+grade = 2
+form = 3
+attack = 81
+inscriptions = PackedStringArray("마지막 일격")
+unique_text = "글리치 순간베기: 큰 베기에 가까운 적 뒤로 순간 이동해 벤다(재사용 대기 있음).\n오버클럭: 쓰러뜨릴수록 공격이 빨라진다(잠시)."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "카타나"
+cyber_powers = PackedStringArray("글리치 순간베기", "오버클럭")

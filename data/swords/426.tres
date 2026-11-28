@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 426
+display_name = "단검 Type-65 「회로 신호」"
+grade = 2
+form = 0
+attack = 86
+inscriptions = PackedStringArray("날랜 발")
+unique_text = "조준: 체력이 거의 가득한 적에게 첫 타 피해가 크다.\n연사: 작은 베기마다 약한 탄이 연달아 나간다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("조준", "연사")

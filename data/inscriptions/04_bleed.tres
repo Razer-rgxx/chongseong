@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="InscriptionData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/inscription_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+key = "출혈"
+text = "벤 적이 3초 동안 N 피해를 더 입음"
+values = PackedFloat32Array(6, 8, 10, 13, 19, 28)

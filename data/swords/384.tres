@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 384
+display_name = "단검 Ω-01 「무음의 송곳니」"
+grade = 5
+form = 0
+attack = 150
+inscriptions = PackedStringArray("무리 베기", "꿰뚫기")
+unique_text = "연사: 작은 베기마다 약한 탄이 연달아 나간다.\n글리치 순간베기: 큰 베기에 가까운 적 뒤로 순간 이동해 벤다(재사용 대기 있음)."
+unique_ready = true
+unbreakable = false
+story = "소리 없이 열 발을 쏘고 등 뒤에 선다."
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("연사", "글리치 순간베기")

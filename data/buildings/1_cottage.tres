@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"cottage"
+display_name = "오두막"
+desc = "들판에서 풀어 준 사람 둘이 들어와 산다."
+cost_wood = 12
+cost_stone = 4
+plot = Vector2(38.5, 7)
+size = Vector2(4.5, 4.0)
+facing = Vector2(0, 1)
+kind = &"cottage"
+housing = 2

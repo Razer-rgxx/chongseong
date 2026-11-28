@@ -1,0 +1,106 @@
+class_name PowerTable
+extends Resource
+## 각인과 고유 능력의 규칙 수치. 각인의 등급별 값은 InscriptionData에 있고, 여기는 그 밖의 정해진 수치다
+## (처형이 듣는 체력, 서리가 느리게 하는 정도, 고유 능력마다의 수치 등). data/powers.tres 한 장.
+## 고유 능력은 검 이름으로 찾는다. 값을 바꾸려면 .tres를 고친다.
+
+## 각인 규칙의 정해진 수치.
+@export var ins: Dictionary = {
+	"처형_체력": 0.3, "출혈_시간": 3.0, "서리_느림": 0.3, "무리베기_수": 3,
+	"새벽_남은시간": 30.0, "투박함_피해": 0.9, "무거움_속도": 0.9, "피의값_체력": 1.0,
+	"마지막일격_반경": 2.0, "불씨_시간": 2.0, "불_초당": 6.0, "불_등급당": 5.0, "불_번짐": 1.5,
+	"번개_대상": 3, "아군_속도": 4.5, "아군_사거리": 1.2, "아군_주기": 0.8, "아군_탐색": 9.0, "아군_곁": 2.0, "번개_피해": 0.6, "등뒤_내적": 0.3, "날랜발_상한": 0.8, "버팀_상한": 0.8, "막기_상한": 0.8,
+}
+
+## 고유 능력: 검 이름 → 수치들.
+@export var uniques: Dictionary = {
+	"성주의 저울": {"hp": 0.5, "dmg": 1.4, "taken": 0.6},
+	"백 명의 이름": {"per": 10, "step": 0.02, "max": 0.6},
+	"백 년 전쟁": {"every": 10.0, "step": 0.05},
+	"부러지지 않는 맹세": {"dmg_step": 0.01, "dmg_max": 1.5, "spd_step": 0.003, "spd_max": 0.45},
+	"바람의 왕": {"reach": 40.0},
+	"마지막 숨": {"hp": 0.2},
+	"핏빛 맹세": {"cost": 5.0, "mult": 2.0},
+	"처음이자 마지막 칼": {"boss": 0.5},
+	"메아리 계곡": {"delay": 0.5},
+	"언덕의 심장": {"range": 4.5, "count": 5, "mult": 0.4},
+	"폭풍 부르는 자": {"reach": 5.0, "arc": 1.3, "mult": 0.8},
+	"떨어진 검": {"every": 3, "delay": 0.45, "radius": 4.0, "mult": 3.0, "ahead": 1.5},
+	"굶주린 칼": {"refill": 3.0, "starve": 10.0, "drain": 1.0},
+	"얼음 무덤": {"freeze": 1.5, "mult": 1.5, "spread": 2.0, "slow": 0.3, "slow_t": 2.0},
+	"끝나지 않는 겨울": {"slow": 0.2, "freeze": 1.0},
+	"거인의 무릎": {"hits": 3, "vuln": 3.0, "stun": 1.0},
+	"끌어당기는 손": {"dist": 1.1},
+	"구름 가르는 천둥": {"every": 5, "count": 3, "mult": 4.0},
+	"화형대": {"radius": 1.5, "burn": 2.0},
+	"꺼지지 않는 불": {"radius": 1.5, "burn": 2.0},
+	"거인 왕의 뼈": {"time": 10.0, "mult": 1.5},
+	"산 자의 몫": {"chance": 0.1},
+	"행운의 녹": {"luck": 3.0},
+	"모래시계": {"radius": 3.5, "slow": 0.7, "time": 1.0},
+	"멈춘 순간": {"time": 1.5, "cooldown": 12.0},
+	"바람 가르는 깃": {"charges": 2},
+	"무너진 왕좌": {"radius": 3.0, "step": 0.05, "max": 0.5},
+	"충신": {"hp": 30.0, "invuln": 1.5},
+	"영원한 파수": {"time": 10.0},
+	"새벽 나팔": {"left": 30.0, "dmg": 0.5},
+	"피의 왕좌": {"max": 100.0},
+	"첫 번째 왕": {"mult": 1.5},
+	"언덕의 첫 검": {"dur": 0.2},
+	"마지막 장례": {"max": 4},
+	"겨울의 끝": {"reach": 40.0},
+	"늪지기": {"time": 2.0, "radius": 1.2, "slow": 0.6},
+	"대화재": {"time": 3.0, "radius": 1.3, "burn": 2.0},
+	"피의 강": {"time": 6.0, "radius": 0.9, "heal": 5.0},
+	"망각": {"time": 3.0},
+	"꺾인 깃발": {"step": 0.02, "max": 0.4},
+	"망자들의 왕관": {"max": 8, "time": 10.0, "mult": 0.5},
+	"무덤 파수": {"chance": 0.3, "max": 8, "time": 10.0, "mult": 0.5},
+	"천 명의 기사": {"count": 3, "mult": 0.3, "reach": 2.2, "arc": 2.0, "ring": 1.6},
+	"그림자 왕": {"max": 3, "time": 5.0, "mult": 0.6},
+	"쇠말뚝": {"time": 4.0, "radius": 0.7, "ahead": 2.0, "max": 4},
+	"언덕을 쌓은 검": {"time": 5.0, "radius": 0.5, "half": 1.4, "ahead": 2.0, "max": 3},
+	"되돌아오는 칼": {"dist": 7.0, "speed": 20.0, "width": 1.0, "mult": 1.0, "max": 3, "max_time": 4.0},
+	"운명 베기": {"cost": 30.0, "per_day": 3},
+	"쌍칼 서약": {}, "언덕": {}, "두 번째 기회": {}, "상처 세는 자": {}, "모든 검의 어머니": {}, "이름을 잃은 검": {},
+}
+
+
+## 사이버 능력(docs/cyber_swords.md): 이름 → 수치들. 피해 배수(mult)는 등급마다 `grade_scale`만큼씩 오른다(무한 ×1.6).
+@export var cyber: Dictionary = {
+	"산탄": {"reach": 5.0, "arc": 1.2, "mult": 0.9, "knock": 1.4},
+	"관통탄": {"mult": 1.6, "speed": 34.0, "width": 0.7, "dist": 16.0},
+	"과열": {"stacks": 4, "radius": 1.8, "mult": 2.0, "burn": 2.0, "keep": 4.0},
+	"EMP": {"radius": 4.0, "stun": 1.4, "slow": 0.5, "slow_t": 2.5},
+	"해킹": {"every": 4, "time": 3.0},
+	"글리치 순간베기": {"range": 7.0, "cd": 4.0, "mult": 2.2, "behind": 1.1},
+	"플라즈마 칼날": {"time": 2.0, "radius": 1.1, "burn": 2.0, "max": 12},
+	"탄창": {"every": 4, "mult": 0.9, "speed": 30.0, "width": 0.5, "dist": 12.0},
+	"반동 돌진": {"mult": 1.4, "speed": 34.0, "width": 0.6, "dist": 14.0, "push": 16.0},
+	"레일": {"reach": 18.0, "width": 0.9, "mult": 2.4},
+	"연사": {"count": 2, "gap": 0.09, "mult": 0.35, "speed": 38.0, "width": 0.4, "dist": 9.0},
+	"오버클럭": {"step": 0.07, "max": 6, "time": 4.0},
+	"방벽": {"every": 6, "shield": 12.0, "max": 40.0},
+	"조준": {"mult": 1.5, "hp": 0.9},
+}
+## 사이버 능력 피해 배수가 등급(0~5)마다 이만큼씩 오른다(1 + 이 값 × 등급).
+## 2026-11-26 밸런스(scripts/debug/balance_sim.gd): 0.12에서 같은 등급 일반 검보다 잃는 체력이 25%쯤 적어서 0.09로.
+@export var cyber_grade_scale: float = 0.09
+## 사이버 검의 내구 배수(2026-11-26): 다시 벼린 옛 칼이라 쉽게 부러진다. 세지만 빨리 닳는 맞바꿈.
+@export var cyber_durability: float = 0.75
+## 낯선 사람 이야기를 마친 뒤 언덕 뽑기에서 사이버 검이 나올 확률.
+@export var cyber_pull_share: float = 0.25
+
+
+func cy(name: String, key: String) -> float:
+	var d: Dictionary = cyber.get(name, {})
+	return float(d.get(key, 0.0))
+
+
+func i(key: String) -> float:
+	return float(ins.get(key, 0.0))
+
+
+func u(name: String, key: String) -> float:
+	var d: Dictionary = uniques.get(name, {})
+	return float(d.get(key, 0.0))

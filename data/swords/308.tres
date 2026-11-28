@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 308
+display_name = "까마귀의 몫"
+grade = 3
+form = 1
+attack = 115
+inscriptions = PackedStringArray("처형", "사냥")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "고개를 넘는 이는 셋 중 하나를 까마귀에게 남겼다. 이 칼이 그 몫을 셌다."
+field_only = true

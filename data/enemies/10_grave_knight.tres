@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"grave_knight"
+display_name = "무덤 기사"
+hp = 1800
+damage = 22
+speed = 1.1
+radius = 0.8
+cooldown = 1.4
+color = Color(0.62, 0.36, 0.2, 1)
+knockback_mult = 0.15
+big = true
+wraith = false
+boss = true
+token_cost = 0
+turn_rate = 4.0
+act_after = 0.5
+wind_time = 0.9
+charge_min = 4.0
+charge_max = 8.0
+charge_speed = 12.0
+charge_length = 8.0
+charge_knock = 6.0
+stagger_time = 1.4
+stagger_mult = 1.5
+summon_kind = &"wraith"
+summon_count = 4
+summon_interval = 3.0
+summon_time = 1.2
+summon_radius = 3.0
+summon_max = 4
+swing_arc = 150.0
+swing_range = 3.4
+swing_time = 0.8
+charge_chance = 0.6
+charge_retry = 0.8
+rage_hp = 0.5
+rage_mult = 1.2
+summon_below = 0.5
+model_scale = 2.2
+combo_rage = 1
+combo_wind = 0.55
+cleave_chance = 0.4
+cleave_range = 9.0
+cleave_time = 0.8
+cleave_speed = 12.0
+cleave_width = 1.0
+cleave_mult = 0.7

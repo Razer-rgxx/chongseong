@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RuneTable" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/rune_table.gd" id="1_g0361"]
+
+[resource]
+script = ExtResource("1_g0361")
+slot_kills = PackedInt32Array(100, 400, 1000)
+rune_order = PackedStringArray("keen", "night", "day", "hunt", "wind", "grit", "chain", "elite")
+tier_names = PackedStringArray("거친", "고운", "또렷한")
+buy_cost = PackedInt32Array(60, 180, 500)
+remove_fee = PackedInt32Array(10, 30, 80)
+tier_weights_cache = PackedFloat32Array(0.7, 0.27, 0.03)
+tier_weights_boss = PackedFloat32Array(0.5, 0.38, 0.12)

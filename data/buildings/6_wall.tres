@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"wall"
+display_name = "돌담"
+desc = "마을 둘레의 목책을 돌담으로 바꾼다. 성읍이 되려면 있어야 한다."
+cost_wood = 8
+cost_stone = 40
+cost_iron = 4
+plot = Vector2(35.4, 8.4)
+size = Vector2(2.4, 1.6)
+facing = Vector2(0, 1)
+kind = &"wall"
+min_tier = 2

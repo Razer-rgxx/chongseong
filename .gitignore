@@ -2,3 +2,18 @@
 .godot/
 /android/
 *.tmp
+
+# Mixamo 캐릭터와 동작은 원본 파일을 다시 나눠 주면 안 되어 공개 저장소에 올리지 않는다.
+# 사용자 PC에만 둔다. 무엇을 어디에 두는지는 assets/characters/README.md에 있다.
+assets/characters/*
+!assets/characters/README.md
+
+# 소리 팩(itch.io)은 원본을 다시 나눠 주는 걸 막는 약관이 흔하고 이 팩들은 약관 문구가 없어서 공개 저장소에 올리지 않는다.
+# 다듬은 파일은 사용자 PC에만 둔다. 무엇을 어디에 두는지는 assets/sound/README.md에 있다.
+assets/sound/*
+!assets/sound/README.md
+
+# GD-Sync 키(플러그인이 쓰는 자리). 이 프로젝트는 user://gdsync_keys.cfg를 쓰지만 같이 막아 둔다. 절대 올리지 않는다.
+addons/GD-Sync/keys.cfg
+*.bundle
+__pycache__/

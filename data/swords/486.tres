@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 486
+display_name = "단검 Ω-02 「잔광」"
+grade = 5
+form = 0
+attack = 145
+inscriptions = PackedStringArray("잔상", "거인 베기")
+unique_text = "탄창: 4번 휘두를 때마다 탄이 한 발 나간다.\n과열: 같은 적을 4번 맞히면 과열해 터진다(둘레에 피해와 불)."
+unique_ready = true
+unbreakable = false
+story = "쏜 자리에 열이 남아 한참 식지 않는다."
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("탄창", "과열")

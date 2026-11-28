@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 490
+display_name = "중장도 「철의 장례」"
+grade = 5
+form = 2
+attack = 147
+inscriptions = PackedStringArray("행운", "첫 타")
+unique_text = "EMP: 큰 베기가 전자기 파동을 낸다. 드론·기계는 기절하고 나머지는 느려진다.\n방벽: 6명 쓰러뜨릴 때마다 방어막이 생긴다."
+unique_ready = true
+unbreakable = false
+story = "기계의 마지막 날을 알리는 종도 없이."
+field_only = false
+cyber = true
+sub_type = "중장도"
+cyber_powers = PackedStringArray("EMP", "방벽")

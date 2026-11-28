@@ -1,3 +1,32 @@
 # 에셋 출처
 
-에셋을 넣으면 이름, 작가, 라이선스, 링크를 적는다. 아직 없다(기본 도형만 쓴다).
+에셋을 넣으면 이름, 작가, 라이선스, 링크를 적는다. Mixamo 파일은 약관상 저장소에 올리지 않고 사용자 PC에만 둔다(assets/characters/README.md).
+
+| 에셋 | 작가 | 라이선스 | 링크 | 쓰는 곳 |
+| --- | --- | --- | --- | --- |
+| Stone Wall (질감, 2K로 줄임) | Charlotte Baglioni(사진), Dario Barresi(처리) / Poly Haven | CC0 | https://polyhaven.com/a/stone_wall | 마을의 언덕 길 문, 대장간 굴뚝과 화덕 |
+| Medieval Blocks 03 (질감, 2K로 줄임) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/medieval_blocks_03 | 마을의 성소, 언덕의 숫돌 제단 |
+| Medieval Red Brick (질감, 2K로 줄임) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/medieval_red_brick | 마을의 집 벽 |
+| Raw Plank Wall (질감, 2K로 줄임) | Dimitrios Savva / Poly Haven | CC0 | https://polyhaven.com/a/raw_plank_wall | 마을의 대장간 벽, 울타리, 검 진열대, 들판의 나무(어둡게) |
+| Forrest Ground 01, Forest Ground 04, Lichen Rock (질감, 2K로 다시 압축) | Rob Tuytel, Rico Cilliers / Poly Haven | CC0 | https://polyhaven.com/a/forrest_ground_01 · https://polyhaven.com/a/forest_ground_04 · https://polyhaven.com/a/lichen_rock | 언덕의 풀·흙·바위 땅, 마을의 풀과 흙길 |
+| Stone Wall 02, Stone Brick Wall 001, Rustic Stone Wall, Rock Wall 12 (질감, 1K로 줄임) | Poly Haven | CC0 | https://polyhaven.com/a/stone_wall_02 · https://polyhaven.com/a/stone_brick_wall_001 · https://polyhaven.com/a/rustic_stone_wall · https://polyhaven.com/a/rock_wall_12 | 들판의 막돌 담·비석, 무너진 성채 벽, 불탄 마을(어둡게), 채석장 바위 |
+| Bark Brown 02 (질감, 1K) | Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/a/bark_brown_02 | 언덕과 마을의 잎 없는 나무 |
+| Rock Moss Set 01·02, Rock Face 01·02, Boulder 01, Dead Tree Trunk 02, Tree Stump 01, Dry Branches Medium 01 (모델, 1K 질감) | Kless Gyzen, Dario Barresi, Rico Cilliers, Jenelle van Heerden, Rob Tuytel / Poly Haven | CC0 | https://polyhaven.com/models | 언덕 둘레의 바위·벼랑·쓰러진 나무·가지, 싸움터 바닥 돌멩이, 마을의 돌 |
+| Overcast Soil (Pure Sky), Kloppenheim 02 (Pure Sky) (하늘 HDRI, 2K) | Sergej Majboroda, Greg Zaal, Jarod Guest / Poly Haven | CC0 | https://polyhaven.com/a/overcast_soil_puresky · https://polyhaven.com/a/kloppenheim_02_puresky | 언덕의 낮·밤 하늘, 마을의 저녁 하늘 |
+| Paladin J Nordstrom (캐릭터) | Adobe Mixamo | Mixamo 이용 약관(게임에 써도 되고, 원본 파일만 따로 나눠 주면 안 됨) | https://www.mixamo.com | 영주, 거인과 언덕지기(어둡게 칠하고 키움) (저장소에는 없음) |
+| 적 캐릭터들(고르는 대로, assets/characters/README.md "적 모델") | Adobe Mixamo | Mixamo 이용 약관 | https://www.mixamo.com | 적 모델(24단계, 넣은 것만) (저장소에는 없음) |
+| 던파 연단된 칼날 DNF Forged Blade (글꼴, Medium·Bold, 고치지 않음) | (주)넥슨코리아 | 넥슨 서체 라이선스(무료, 상업·임베딩 가능, 수정 재배포 금지; `assets/ui/fonts/LICENSE-DNF.txt`) | https://df.nexon.com/data/font/dnfforgedblade | 모든 글자(UI, 제목, 피해 숫자) |
+| Noto Serif KR (글꼴, 쓰는 글자만 남김) | Google / Adobe | SIL OFL 1.1 | https://fonts.google.com/noto/specimen/Noto+Serif+KR | 던파 글꼴에 없는 기호(›, ≈ 등) |
+| Medieval Melee Weapon SFX (소리, 다듬음) | Gravity Sound | itch.io 무료 배포, 팩 안에 약관 문구 없음(팔기 전에 작가에게 확인) | https://gravity-sound.itch.io/medieval-melee-weapon-sfx | 휘두르기, 망치질, 뽑기, 부러짐 (저장소에는 없음) |
+| Sword Combat Sound Effects Pack Free Version (소리, 다듬음) | Hove Audio | itch.io 무료 배포(Royalty Free 표시, 작가가 출처 표기는 안 해도 된다고 함) | https://hoveaudio.itch.io/sword-combat-sound-effects-pack-free-version | 베기, 구르기, 기합, 맞는 소리 (저장소에는 없음) |
+| GD-Sync 1.0.2 (멀티플레이 플러그인, 소스 그대로) | GD-Sync | 소스 형태 재배포 허용(저작권·면책 문구 유지, 이름을 홍보에 쓰지 않음). BSD-2가 아니라 비슷한 자체 글이다: `addons/GD-Sync/LICENSE` | https://github.com/GD-Sync/GD-Sync · https://www.gd-sync.com | 온라인 결투 매칭과 입력 전달(22단계, `scripts/net/gdsync_link.gd`). 키는 저장소에 없다 |
+| Asphalt 02, Concrete Wall 004, Cracked Concrete, Rusty Metal 02 (질감, 1k jpg) | Poly Haven 작가들 | CC0 | https://polyhaven.com/a/asphalt_02 · https://polyhaven.com/a/concrete_wall_004 · https://polyhaven.com/a/cracked_concrete · https://polyhaven.com/a/rusty_metal_02 | 녹슨 미래 구역의 바닥, 건물 벽, 포장 조각, 자동차·철근 (`assets/future/textures/`) |
+| City Kit (Commercial) 2.1 | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 건물·먼 건물 (`assets/future/models/city_commercial/`, 어둡게 덮어 씀) |
+| City Kit (Roads) | Kenney | CC0 | https://kenney.nl | 녹슨 미래 구역의 길 조각과 길가 소품 (`assets/future/models/city_roads/`) |
+| 네온 시가 고층 건물 24종과 벽 질감 4벌 | 코드로 지음(tools/blender/make_city.py, Blender bmesh·numpy) | 이 저장소 | — | 네온 시가 건물·먼 건물 (`assets/future/models/neon_city/`, 바깥 모델·AI 생성 에셋 없음) |
+| 검의 기억 룬 조각 8종(keen·night·day·hunt·wind·grit·chain·elite)과 질감 | 직접 만듦(tools/blender/make_runes.py, Blender bmesh·불리언) | 이 저장소 | CC0 | 칼날에 박힌 룬·대장간 룬 그림 (`assets/runes/`, 바깥 모델·AI 생성 에셋 없음) |
+| 마을 소품 모델 26종(통·궤짝·건초·장작·의자·우물·좌판·등불·횃불·의뢰판·짐수레·거울·결투 말뚝·울타리·허수아비·검 걸이·목책·대장간 차양·화덕·모루·숫돌·벽에 기댄 칼) | 코드로 지음(tools/blender/make_village.py, Blender bmesh) | 이 저장소 | CC0 | 마을 집 둘레 소품 (`assets/village/models/`, 질감은 이미 쓰는 Poly Haven CC0 그대로, 바깥 모델·AI 생성 에셋 없음) |
+
+## 불러오기 화면 그림
+
+- `assets/ui/loading/hill.jpg`: 이 게임의 시작 화면을 Godot으로 찍은 것(2026-11-24). 게임 안 불러오기 화면(`SceneLoader`)과 웹판 첫 화면이 같이 쓴다.

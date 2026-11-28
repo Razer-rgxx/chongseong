@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 307
+display_name = "이름 없는 재"
+grade = 2
+form = 2
+attack = 99
+inscriptions = PackedStringArray("불씨")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "불탄 마을 사람들은 이름을 적을 새도 없었다. 재 속에서 이 칼만 식지 않았다."
+field_only = true

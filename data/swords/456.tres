@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 456
+display_name = "단검 CZ-31 「끊어진 심장」"
+grade = 1
+form = 0
+attack = 70
+inscriptions = PackedStringArray("돌진 베기")
+unique_text = "연사: 작은 베기마다 약한 탄이 연달아 나간다."
+unique_ready = true
+unbreakable = false
+story = ""
+field_only = false
+cyber = true
+sub_type = "단검"
+cyber_powers = PackedStringArray("연사")

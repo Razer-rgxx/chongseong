@@ -1,28 +1,57 @@
 class_name BuildingData
 extends Resource
-## 건물 표 한 줄. 값(나무, 돌), 생산량, 손님 운은 등급마다 달라서 TierTable에 있다.
+## 마을 건물 하나(2026-11-21 마을 키우기 2단계, docs/village_growth.md). 데이터는 data/buildings/*.tres(파일 이름 순서).
+## 바깥 터(동쪽 목책 너머)의 제 자리(plot)에 재료로 짓는다. 지으면 집이 아래부터 한 조각씩 올라간다(BuildingPlot).
 
-enum Role { RECRUIT, PRODUCE, DEFEND, PROMOTE }
+@export var id: StringName = &""
+@export var display_name: String = ""
+## 하는 일(눈에 안 보이는 것만). 창에 한 줄.
+@export var desc: String = ""
+@export_group("값(재료)")
+@export var cost_wood: int = 0
+@export var cost_stone: int = 0
+@export var cost_iron: int = 0
+@export_group("자리와 생김새")
+## 집 가운데(마을 칸 좌표)와 너비 × 깊이(m), 앞이 보는 쪽(마을 칸 방향).
+@export var plot: Vector2 = Vector2.ZERO
+@export var size: Vector2 = Vector2(4.5, 4.0)
+@export var facing: Vector2 = Vector2(-1, 0)
+## 생김새: cottage(오두막), woodcutter(나무꾼 움막: 열린 헛간과 장작), mason(석공 마당: 돌 헛간과 다듬은 돌),
+## longhouse(긴 집), wall(돌담: 마을 둘레의 목책을 돌담으로 바꾼다, 터에는 돌 더미만).
+@export var kind: StringName = &"cottage"
+## 이 마을 단계(Meta.village_tier)가 되어야 지을 수 있다.
+@export var min_tier: int = 0
+@export_group("하는 일")
+## 언덕 판이 끝날 때마다 모아 두는 재료.
+@export var made_wood: int = 0
+@export var made_stone: int = 0
+@export var made_iron: int = 0
+## 살 수 있는 주민 수(3단계).
+@export var housing: int = 0
+## 일자리 수와 일꾼 하나가 판마다 더 모으는 몫(이 건물이 모으는 재료로).
+@export var workers: int = 0
+@export var per_worker: int = 0
 
-@export var id: StringName
-@export var display_name: String
-@export_range(0, 7) var tier: int = 0
-@export var role: Role = Role.RECRUIT
-## 생산: wood, stone, both. 방어: shoot, splash, slow, block, heart. 나머지는 비워 둔다.
-@export var kind: StringName
-@export_multiline var description: String
-## 체력 배수(쇠살문 4). 기본 체력은 RunData.building_hp_base × building_hp_growth^tier.
-@export var hp_mult: float = 1.0
-## 길찾기 비용. 0이면 RunData.cost_building을 쓴다(쇠살문 18).
-@export var path_cost: float = 0.0
 
-@export_group("방어")
-@export var damage: float = 0.0
-@export var attack_range: float = 0.0
-@export var cooldown: float = 0.0
-## 돌이 떨어진 곳의 피해 반경(칸). 0이면 한 명만 맞힌다.
-@export var splash_radius: float = 0.0
-## 느리게 하는 시간(초). 0이면 느리게 하지 않는다.
-@export var slow_time: float = 0.0
-## 투사체 종류: arrow, stone. 비우면 범위 안을 바로 친다.
-@export var projectile: StringName
+func cost() -> Dictionary:
+	var c := {}
+	if cost_wood > 0:
+		c[&"wood"] = cost_wood
+	if cost_stone > 0:
+		c[&"stone"] = cost_stone
+	if cost_iron > 0:
+		c[&"iron"] = cost_iron
+	return c
+
+
+func made() -> Dictionary:
+	return {&"wood": made_wood, &"stone": made_stone, &"iron": made_iron}
+
+
+## 일꾼 n명이 있을 때 판마다 모으는 것(이 건물이 모으는 재료에 일꾼 몫을 더한다).
+func made_with(n: int) -> Dictionary:
+	var r := made()
+	for id in r:
+		if int(r[id]) > 0:
+			r[id] = int(r[id]) + per_worker * mini(n, workers)
+	return r

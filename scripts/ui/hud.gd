@@ -1,0 +1,569 @@
+class_name Hud
+extends CanvasLayer
+## 화면 위 글자와 창. 노드는 코드로 만든다(에셋이 들어오면 씬으로 바꿔도 된다).
+## 모양은 UiKit(엘든 링식: 모서리 없는 검은 판, 놋쇠빛 줄). 알림과 뽑기·제단 안내는 띠(Band)로, 새 구역 이름은 AreaTitle로 띄운다.
+## 규칙은 모른다. main이 값을 넣어 주고, 고르기·다시 하기는 신호로 돌려준다.
+
+signal chose(slot: int)
+signal restart_requested()
+signal altar_chosen(index: int)
+## 갈림길 지도 창에서 길을 골랐다(0, 1).
+signal path_picked(index: int)
+
+## 두 칸이 다 찼을 때 뜨는 창이, 연출을 넘기던 클릭을 받지 않도록 기다리는 시간.
+@export var choice_guard: float = 0.8
+@export var toast_time: float = 4.0
+
+const BLUR_DIM: Shader = preload("res://assets/ui/blur_dim.gdshader")
+
+var _life: LifeBar
+var _zone: Label
+var _sub: Label
+var _night_bar: ProgressBar
+var _help: Label
+var _cards: Array[RichTextLabel] = []
+var _card_boxes: Array[PanelContainer] = []
+var _toast: Band
+var _prompt: Band
+var _title: AreaTitle
+var _help_hint: Label
+var _flash: ColorRect
+var _boss_box: VBoxContainer
+var _boss_label: Label
+var _boss_bar: ProgressBar
+var _boss_fill: StyleBoxFlat
+var _choice: Control
+var _ch_new: RichTextLabel
+## 칸마다 지금 든 검(창을 열 때마다 칸 수만큼 새로 만든다).
+var _ch_slots: HBoxContainer
+var _discard: Button
+var _discard_armed: bool = false
+## 버릴까요?(2026-11-25): 한 번 누른 칸(-1은 두고 가기, -99는 없음). 버려질 검의 등급이 GameSettings.discard_ask 이상일 때만.
+var _armed: int = -99
+var _choice_grades: Array = []   # [새 검 등급, 칸0 등급, 칸1 등급, ...]
+var _slot_btns: Array[Button] = []
+var _choice_t: float = 0.0
+var _over: Control
+var _over_title: Label
+var _over_text: Label
+var _over_shards: Label
+var _over_records: VBoxContainer
+var _chain: ChainMeter
+var _night_button: Button
+var _altar: Control
+var _altar_list: VBoxContainer
+var _altar_t: float = 0.0
+var _map: PathMap
+
+
+func _ready() -> void:
+	UiKit.vignette(self)
+	var top := HBoxContainer.new()
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE, Control.PRESET_MODE_MINSIZE, 14)
+	top.add_theme_constant_override("separation", 14)
+	add_child(top)
+	# 내 체력: 글자 없는 막대 하나(LifeBar). 최대 체력이 늘면 길어진다
+	_life = LifeBar.new()
+	_life.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var life_pad := MarginContainer.new()
+	life_pad.add_theme_constant_override("margin_left", 14)
+	life_pad.add_theme_constant_override("margin_top", 14)
+	life_pad.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	life_pad.add_child(_life)
+	top.add_child(life_pad)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(spacer)
+	var mid := _panel(VBoxContainer.new())
+	mid.get_parent().custom_minimum_size = Vector2(340, 0)
+	top.add_child(mid.get_parent())
+	_zone = _label("", 20)
+	_zone.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mid.add_child(_zone)
+	_night_bar = _bar(Color(0.55, 0.47, 0.32))
+	mid.add_child(_night_bar)
+	_sub = _label("", 14)
+	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sub.modulate = UiKit.MUTED
+	mid.add_child(_sub)
+	var spacer2 := Control.new()
+	spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(spacer2)
+	_night_button = Button.new()
+	_night_button.text = "  밤 맞이하기 (N)  "
+	_night_button.focus_mode = Control.FOCUS_NONE
+	_night_button.custom_minimum_size = Vector2(260, 40)
+	_night_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top.add_child(_night_button)
+
+	# 위 가운데 목표 진행 줄(언덕지기·우두머리·봉화 체력, 포위 쪽). 이름 한 줄 + 가는 막대
+	_boss_box = VBoxContainer.new()
+	_boss_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_boss_box.position = Vector2(-220, 108)
+	_boss_box.custom_minimum_size = Vector2(440, 0)
+	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.add_theme_constant_override("separation", 3)
+	_boss_label = _label("언덕지기", 15)
+	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	_boss_label.add_theme_constant_override("shadow_offset_x", 1)
+	_boss_label.add_theme_constant_override("shadow_offset_y", 1)
+	_boss_box.add_child(_boss_label)
+	_boss_box.add_child(UiKit.rule(440.0, UiKit.LINE, 0.45))
+	_boss_bar = _bar(Color(1.0, 0.3, 0.42))
+	_boss_fill = _boss_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	_boss_box.add_child(_boss_bar)
+	_boss_box.visible = false
+	add_child(_boss_box)
+
+	_toast = Band.make(self, 166.0, 1000.0, 48.0, 17)
+	_prompt = Band.make(self, -236.0, 820.0, 46.0, 18)
+	_title = AreaTitle.make(self)
+
+	var bottom := HBoxContainer.new()
+	bottom.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 14)
+	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom.add_theme_constant_override("separation", 10)
+	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	add_child(bottom)
+	for k in 4:   # 검 칸은 2(언덕)·1(들판), 검 보관집이 있으면 3~4. set_cards가 쓰는 만큼만 보인다
+		var r := RichTextLabel.new()
+		r.bbcode_enabled = true
+		r.fit_content = true
+		r.scroll_active = false
+		r.custom_minimum_size = Vector2(380, 0)
+		r.add_theme_font_size_override("normal_font_size", 15)
+		r.add_theme_font_size_override("bold_font_size", 18)
+		var box := PanelContainer.new()
+		box.add_theme_stylebox_override("panel", _style(Color(UiKit.LINE, 0.25)))
+		box.size_flags_vertical = Control.SIZE_SHRINK_END
+		box.add_child(r)
+		bottom.add_child(box)
+		_cards.append(r)
+		_card_boxes.append(box)
+
+	_help = _label("WASD 걷기 · 마우스 둘러보기 · E 뽑기 · N 밤\n클릭/J 베기(검마다 다른 연타) · Shift 돌진 · Space 점프\n우클릭/F 갈고리(갈고리 검)\nQ 바꿔 쥐기 · 1~4 칸 · 휠 거리 · V 카메라\nEsc 마우스 풀기 · F2 무적 · F3 밤 넘기기\nF4 다음 뽑기 등급 고정 · ` 또는 F6 검 받기", 13)
+	_help.modulate = UiKit.MUTED
+	_help.position = Vector2(20, 96)
+	_help.visible = false
+	add_child(_help)
+	_help_hint = _label("F1  조작법", 13)
+	_help_hint.modulate = Color(UiKit.MUTED, 0.7)
+	_help_hint.position = Vector2(20, 96)
+	add_child(_help_hint)
+	# 늘 떠 있으면 화면 소음: 처음 몇 초만 보이고 사라진다(F1은 그대로 된다)
+	create_tween().tween_property(_help_hint, "modulate:a", 0.0, 1.5).set_delay(8.0)
+
+	_chain = ChainMeter.make(self)
+
+	_flash = ColorRect.new()
+	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_flash.color = Color(1, 1, 1, 0)
+	add_child(_flash)
+
+	_build_choice()
+	_build_altar()
+	_map = PathMap.make(self)
+	_map.picked.connect(func(i: int) -> void: path_picked.emit(i))
+	_build_over()
+
+
+func _process(delta: float) -> void:
+	_choice_t += delta
+	_altar_t += delta
+
+
+func night_button() -> Button:
+	return _night_button
+
+
+func set_status(hp: float, max_hp: float, zone_text: String, sub: String, night_k: float, night: bool) -> void:
+	_life.set_hp(hp, max_hp)
+	_zone.text = zone_text
+	_sub.text = sub
+	_night_bar.value = night_k * 100.0
+	_night_button.visible = not night
+
+
+## 위 가운데 목표 진행 줄. title이 비면 숨긴다. k는 막대(0~1, 음수면 막대 없이 글자만), col은 막대 색.
+func set_goal(title: String, k: float = -1.0, col: Color = Color(1.0, 0.3, 0.42)) -> void:
+	_boss_box.visible = title != ""
+	if title == "":
+		return
+	_boss_label.text = title
+	_boss_bar.visible = k >= 0.0
+	_boss_bar.max_value = 1.0
+	_boss_bar.value = clampf(k, 0.0, 1.0)
+	_boss_fill.bg_color = col.darkened(0.15)
+
+
+func set_cards(texts: Array[String], colors: Array[Color], active: int) -> void:
+	var n: int = texts.size()
+	var w: float = [380.0, 380.0, 300.0, 240.0][clampi(n - 1, 0, 3)]
+	for k in _cards.size():
+		_card_boxes[k].visible = k < n
+		if k >= n:
+			continue
+		_cards[k].custom_minimum_size.x = w
+		_cards[k].text = texts[k]
+		var col: Color = colors[k] if k == active else Color(UiKit.LINE, 0.25)
+		_card_boxes[k].add_theme_stylebox_override("panel", _style(col, 2 if k == active else 1))
+		_card_boxes[k].modulate.a = 1.0 if k == active else 0.75
+
+
+func toast(t: String) -> void:
+	_toast.show_for(t, toast_time)
+
+
+## 꽂힌 검이나 제단 앞에 섰을 때 아래 띠(키 칸 + 할 일). 빈 글이면 지운다.
+func set_prompt(key: String, t: String) -> void:
+	if t == "":
+		_prompt.hide_band()
+	else:
+		_prompt.show_key(key, t)
+
+
+## 새 구역에 올라섰을 때 가운데 큰 글자.
+## 뽑기 연출 영상을 화면 가득 튼다. 영상 길이(초)를 돌려준다(못 틀면 0).
+func play_video(path: String) -> float:
+	var stream := load(path) as VideoStream
+	if stream == null:
+		return 0.0
+	var v := VideoStreamPlayer.new()
+	v.stream = stream
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.expand = true
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(v)
+	v.play()
+	v.finished.connect(v.queue_free)
+	var length: float = v.get_stream_length()
+	return length if length > 0.0 else 3.0
+
+
+func area_title(t: String) -> void:
+	_title.show_title(t)
+
+
+func toggle_help() -> void:
+	_help.visible = not _help.visible
+	_help_hint.visible = not _help.visible
+
+
+## 큰 등급의 번쩍임(영상이 없을 때 대신).
+func flash(c: Color, strength: float = 0.7, time: float = 0.5) -> void:
+	_flash.color = Color(c, strength)
+	var tw := create_tween()
+	tw.tween_property(_flash, "color:a", 0.0, time).set_ease(Tween.EASE_OUT)
+
+
+## 새 검(위)과 칸마다 지금 든 검(아래 한 줄, 칸 수만큼). 칸 버튼이나 1~4로 바꾼다.
+## grades: [새 검 등급, 칸0 등급, …](버릴까요?를 물을지 정한다). 비우면 늘 묻는다.
+## colors: [새 검 색, 칸0 색, …](카드 아래 빛 받침줄, 2026-11-28 카드 손맛). 비우면 놋쇠빛.
+func open_choice(new_text: String, slot_texts: Array, grades: Array = [], colors: Array = []) -> void:
+	_ch_new.text = new_text
+	_choice_grades = grades
+	CardTilt.attach(_ch_new.get_parent() as Control, _card_col(colors, 0), 2.0)
+	_slot_btns.clear()
+	for c in _ch_slots.get_children():
+		c.queue_free()
+	var n: int = slot_texts.size()
+	var w: float = 320.0 if n <= 2 else (260.0 if n == 3 else 210.0)
+	for k in n:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 16)   # 카드 아래 빛 받침줄 자리
+		var r := _choice_card(w, false)
+		r.text = str(slot_texts[k])
+		col.add_child(r.get_parent())
+		CardTilt.attach(r.get_parent() as Control, _card_col(colors, k + 1))
+		var b := Button.new()
+		b.text = "바꾸기 (%d)" % (k + 1)
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(0, 40)
+		var slot: int = k
+		b.pressed.connect(func() -> void: pick(slot))
+		col.add_child(b)
+		_slot_btns.append(b)
+		_ch_slots.add_child(col)
+	_discard_armed = false
+	_armed = -99
+	_discard.text = "두고 간다 (X)"
+	_choice_t = 0.0
+	_choice.visible = true
+	var sm := _choice.material as ShaderMaterial
+	if sm:   # 뒤 화면이 0.2초에 걸쳐 흐려지고 어두워진다
+		sm.set_shader_parameter("dim", 0.0)
+		create_tween().tween_method(func(v: float) -> void: sm.set_shader_parameter("dim", v), 0.0, 1.0, 0.2).set_ease(Tween.EASE_OUT)
+
+
+func _card_col(colors: Array, i: int) -> Color:
+	if i < colors.size() and colors[i] is Color:
+		return colors[i]
+	return Color(0.72, 0.6, 0.4)
+
+
+func choice_open() -> bool:
+	return _choice.visible
+
+
+## 키보드나 버튼에서. -1은 두고 가기. 버려질 검(바꾸기면 그 칸의 검, 두고 가기면 새 검)의 등급이
+## GameSettings.discard_ask 이상이면 "버릴까요?"로 한 번 더 누르게 한다(같은 것을 두 번).
+func pick(k: int) -> void:
+	if not _choice.visible or _choice_t < choice_guard:
+		return
+	if _ask_discard(k) and _armed != k:
+		_arm(k)
+		return
+	_choice.visible = false
+	chose.emit(k)
+
+
+## 이 고르기에서 버려질 검을 한 번 더 물어야 하나.
+func _ask_discard(k: int) -> bool:
+	var i: int = 0 if k < 0 else k + 1
+	var g: int = int(_choice_grades[i]) if i < _choice_grades.size() else 99
+	return g >= GameSettings.discard_ask
+
+
+func _arm(k: int) -> void:
+	_armed = k
+	_discard_armed = k < 0
+	_discard.text = "버릴까요? 한 번 더 (X)" if k < 0 else "두고 간다 (X)"
+	for j in _slot_btns.size():
+		_slot_btns[j].text = ("이 검을 버릴까요? 한 번 더 (%d)" if j == k else "바꾸기 (%d)") % (j + 1)
+
+
+## 갈림길 지도 창(13단계). 글과 아이콘 id는 main이 만든다(PathMap.open).
+func open_map(title: String, head: String, trail: Array, cards: Array) -> void:
+	_map.open(title, head, trail, cards)
+
+
+func map_open() -> bool:
+	return _map.is_open()
+
+
+func pick_path(i: int) -> void:
+	_map.pick(i)
+
+
+## 끝 화면. shards > 0이면 큰 조각 숫자가 0부터 세어 올라가고(멈춘 뒤 한 번 튄다), 그다음 새 기록 줄이 하나씩 금빛으로 튀어나온다.
+func show_over(title: String, text: String, shards: int = 0, records: Array[String] = []) -> void:
+	_over_title.text = title
+	_over_text.text = text
+	_over.visible = true
+	_chain.modulate.a = 0.0
+	_over_shards.visible = shards > 0
+	for c in _over_records.get_children():
+		c.queue_free()
+	var count: float = clampf(0.5 + shards * 0.012, 0.6, 1.6)
+	var tw := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if shards > 0:
+		_over_shards.text = "조각 +0"
+		_over_shards.scale = Vector2.ONE
+		tw.tween_interval(0.35)
+		tw.tween_method(func(v: float) -> void: _over_shards.text = "조각 +%d" % roundi(v), 0.0, float(shards), count).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(func() -> void:
+			_over_shards.pivot_offset = _over_shards.size * 0.5
+			_over_shards.scale = Vector2.ONE * 1.25)
+		tw.tween_property(_over_shards, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for t in records:
+		var l := _label(t, 19)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.add_theme_color_override("font_color", ChainMeter.GOLD)
+		l.modulate.a = 0.0
+		_over_records.add_child(l)
+		tw.tween_interval(0.18)
+		tw.tween_callback(func() -> void:
+			l.pivot_offset = l.size * 0.5
+			l.scale = Vector2.ONE * 1.4
+			l.modulate.a = 1.0
+			flash(ChainMeter.GOLD, 0.12, 0.3))
+		tw.tween_property(l, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 처치 연쇄(2026-11-24): 연쇄 숫자를 띄운다(ChainMeter).
+func chain(n: int, paid: int, window: float, every: int) -> void:
+	_chain.bump(n, paid, window, every)
+
+
+func _build_choice() -> void:
+	_choice = _dim()
+	var blur := ShaderMaterial.new()   # 뒤 화면을 흐리고 어둡게(2026-11-28 카드 손맛)
+	blur.shader = BLUR_DIM
+	_choice.material = blur
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	var panel := _panel(box).get_parent() as PanelContainer
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_choice.add_child(panel)
+	var head := HBoxContainer.new()
+	var title := _label("검 칸이 다 찼다", 28)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	_discard = Button.new()
+	_discard.focus_mode = Control.FOCUS_NONE
+	_discard.pressed.connect(func() -> void: pick(-1))
+	head.add_child(_discard)
+	box.add_child(head)
+	box.add_child(_label("바꾼 칸의 검은 버린다.", 14))   # 어느 칸인지는 아래 카드와 단추가 보여 준다
+	var top := VBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	top.add_child(_label("새로 뽑은 검", 14))
+	_ch_new = _choice_card(420.0, true)
+	top.add_child(_ch_new.get_parent())
+	box.add_child(top)
+	_ch_slots = HBoxContainer.new()
+	_ch_slots.add_theme_constant_override("separation", 12)
+	box.add_child(_ch_slots)
+	_choice.visible = false
+
+
+## 고르기 창의 검 카드 하나(PanelContainer 안의 RichTextLabel을 돌려준다).
+func _choice_card(w: float, fresh: bool) -> RichTextLabel:
+	var r := RichTextLabel.new()
+	r.bbcode_enabled = true
+	r.fit_content = true
+	r.scroll_active = false
+	r.custom_minimum_size = Vector2(w, 0)
+	r.add_theme_font_size_override("normal_font_size", 14)
+	r.add_theme_font_size_override("bold_font_size", 17)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _style(Color(1, 0.84, 0.42) if fresh else Color(0.2, 0.23, 0.3), 2 if fresh else 1))
+	card.add_child(r)
+	return r
+
+
+func open_altar(texts: Array[String]) -> void:
+	for c in _altar_list.get_children():
+		c.queue_free()
+	for i in texts.size():
+		var b := Button.new()
+		b.text = "%d.  %s" % [i + 1, texts[i]]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(560, 40)
+		var k: int = i
+		b.pressed.connect(func() -> void: pick_altar(k))
+		_altar_list.add_child(b)
+	var close := Button.new()
+	close.text = "그냥 간다 (Esc)"
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(0, 36)
+	close.pressed.connect(func() -> void: pick_altar(-1))
+	_altar_list.add_child(close)
+	_altar_t = 0.0
+	_altar.visible = true
+
+
+func altar_is_open() -> bool:
+	return _altar.visible
+
+
+func pick_altar(i: int) -> void:
+	if not _altar.visible or _altar_t < 0.4:
+		return
+	_altar.visible = false
+	altar_chosen.emit(i)
+
+
+func _build_altar() -> void:
+	_altar = _dim()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	var panel := _panel(box).get_parent() as PanelContainer
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_altar.add_child(panel)
+	var at := _label("숫돌 제단", 26)
+	at.add_theme_color_override("font_color", UiKit.TITLE)
+	box.add_child(at)
+	box.add_child(UiKit.rule())
+	box.add_child(_label("한 번만 쓸 수 있다. 바친 검은 사라진다.", 14))
+	_altar_list = VBoxContainer.new()
+	_altar_list.add_theme_constant_override("separation", 6)
+	box.add_child(_altar_list)
+	_altar.visible = false
+
+
+func _build_over() -> void:
+	_over = _dim()
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 14)
+	var panel := _panel(box).get_parent() as PanelContainer
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_over.add_child(panel)
+	_over_title = _label("", 34)
+	_over_title.add_theme_color_override("font_color", UiKit.TITLE)
+	_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_over_title)
+	_over_shards = _label("", 40)
+	_over_shards.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_over_shards.add_theme_color_override("font_color", ChainMeter.GOLD)
+	box.add_child(_over_shards)
+	_over_text = _label("", 17)
+	_over_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_over_text)
+	_over_records = VBoxContainer.new()
+	_over_records.add_theme_constant_override("separation", 4)
+	box.add_child(_over_records)
+	var again := Button.new()
+	again.text = "  마을로 (R)  "
+	again.focus_mode = Control.FOCUS_NONE
+	again.custom_minimum_size = Vector2(0, 44)
+	again.pressed.connect(func() -> void: restart_requested.emit())
+	box.add_child(again)
+	_over.visible = false
+
+
+func _dim() -> Control:
+	var c := ColorRect.new()
+	c.color = Color(0.0, 0.0, 0.0, 0.78)
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(c)
+	return c
+
+
+func _panel(inner: Control) -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.08)))
+	p.add_child(inner)
+	return inner
+
+
+func _style(border: Color, width: int = 1) -> StyleBoxFlat:
+	var s := UiKit.style(border, width)
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 9
+	s.content_margin_bottom = 10
+	return s
+
+
+func _label(t: String, size: int) -> Label:
+	var l := Label.new()
+	l.text = t
+	l.add_theme_font_size_override("font_size", size)
+	return l
+
+
+func _bar(c: Color) -> ProgressBar:
+	var b := ProgressBar.new()
+	b.show_percentage = false
+	b.custom_minimum_size = Vector2(0, 8)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.05, 0.045, 0.04, 0.9)
+	bg.border_color = Color(UiKit.LINE, 0.35)
+	bg.set_border_width_all(1)
+	var fg := StyleBoxFlat.new()
+	fg.bg_color = c.darkened(0.15)
+	b.add_theme_stylebox_override("background", bg)
+	b.add_theme_stylebox_override("fill", fg)
+	return b

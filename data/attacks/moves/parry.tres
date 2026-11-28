@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoveData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/move_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"parry"
+display_name = "반격 자세"
+link_name = "받아치고"
+end_name = "반격"
+role = "special"
+shape = &"arc"
+damage = 1.0
+hits = 1
+interval = 0.0
+stun = 0.0
+knock = 1.0
+cooldown = 1.0
+time = 0.35
+delay = 0.0
+lock = 0.35
+walk = -1.0
+reach = 1.0
+arc = 1.0
+counter_reach = 1.2
+counter_damage = 2.5
+weak_damage = 0.6
+counter_invuln = 0.3

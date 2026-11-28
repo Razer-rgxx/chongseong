@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PatternData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/pattern_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 145
+display_name = "타오르는 수레바퀴"
+grade = 5
+moves = PackedStringArray("thrust", "spin", "wave")
+element = &"fire"
+echo = true

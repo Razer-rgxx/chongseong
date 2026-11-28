@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"chief_wolf"
+display_name = "검은 숲의 늑대왕"
+kind = &"wolf"
+view_scale = 2.2
+hp = 750
+damage = 12
+speed = 3.2
+radius = 0.6
+cooldown = 0.9
+color = Color(0.32, 0.27, 0.22, 1)
+knockback_mult = 0.3
+big = true
+boss = true
+token_cost = 0

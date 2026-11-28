@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 305
+display_name = "물에 잠긴 기도"
+grade = 2
+form = 3
+attack = 92
+inscriptions = PackedStringArray("망령 베기")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "늪에 빠진 이들의 기도는 물 위로 올라오지 못했다. 이 칼은 그 기도를 다 들었다."
+field_only = true

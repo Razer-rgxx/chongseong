@@ -1,0 +1,1 @@
+Quaternius Medieval Village MegaKit(Standard, CC0 1.0) 일부. 텍스처는 1024로 줄였고 노멀은 Godot용(Normals Godot-Unity)으로 바꿨다. https://quaternius.itch.io/medieval-village-megakit

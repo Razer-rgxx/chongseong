@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 453
+display_name = "환도-13 「유리 왕관」"
+grade = 5
+form = 1
+attack = 147
+inscriptions = PackedStringArray("잔상", "숫돌")
+unique_text = "조준: 체력이 거의 가득한 적에게 첫 타 피해가 크다.\n방벽: 6명 쓰러뜨릴 때마다 방어막이 생긴다."
+unique_ready = true
+unbreakable = false
+story = "쓰는 자의 머리 위에 보이지 않는 관이 선다."
+field_only = false
+cyber = true
+sub_type = "환도"
+cyber_powers = PackedStringArray("조준", "방벽")

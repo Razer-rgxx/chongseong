@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"stone"
+kind = &"giant"
+display_name = "돌 파수꾼"
+hp = 150
+damage = 14
+speed = 0.9
+radius = 0.6
+cooldown = 1.4
+color = Color(0.5, 0.47, 0.4, 1)
+knockback_mult = 0.4
+big = true
+wraith = false
+boss = false
+token_cost = 3
+past = true
+24_stone.tres4

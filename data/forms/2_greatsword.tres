@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="FormData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/form_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+display_name = "대검"
+damage = 1.7
+speed = 0.6
+reach = 1.3
+arc = 1.4
+durability = 1.3
+combo = 2
+knockback = 1.8
+pierce = 0
+blade_length = 1.61
+blade_width = 0.14
+description = "느린 2연 휘두르기, 2타째 큰 베기. 넉백이 크다"

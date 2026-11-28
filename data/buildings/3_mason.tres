@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/building_data.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"mason"
+display_name = "석공 마당"
+desc = "언덕 판이 끝날 때마다 돌을 다듬어 둔다. 일꾼을 두면 더 다듬는다."
+cost_wood = 10
+cost_stone = 4
+plot = Vector2(38.5, 15.5)
+size = Vector2(5.0, 4.0)
+facing = Vector2(0, -1)
+kind = &"mason"
+made_stone = 3
+workers = 2
+per_worker = 2

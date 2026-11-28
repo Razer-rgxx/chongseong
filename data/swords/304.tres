@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SwordData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/sword_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = 304
+display_name = "잠긴 성문"
+grade = 2
+form = 1
+attack = 100
+inscriptions = PackedStringArray("막기")
+unique_text = ""
+unique_ready = false
+unbreakable = false
+story = "성주는 이 칼로 빗장을 걸었다. 문 밖에서 부르는 소리가 멎을 때까지."
+field_only = true

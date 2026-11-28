@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://scripts/core/data/enemy_data.gd" id="1_s"]
+
+[resource]
+script = ExtResource("1_s")
+id = &"chief_giant"
+display_name = "발치의 거인"
+kind = &"giant"
+view_scale = 1.4
+hp = 1100
+damage = 24
+speed = 0.95
+radius = 0.85
+cooldown = 1.6
+color = Color(0.46, 0.5, 0.55, 1)
+knockback_mult = 0.2
+big = true
+boss = true
+token_cost = 0
